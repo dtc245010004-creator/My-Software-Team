@@ -76,9 +76,64 @@ docs/
 
 ---
 
+## 4b. Chiến lược kiểm thử & Ma trận test-cases
+
+### Chiến lược 3 tầng
+
+| Tầng | Mô tả | Công cụ |
+|---|---|---|
+| **Unit** | Test từng hàm `services/` độc lập, không cần chạy HTTP server | pytest + SQLite in-memory |
+| **Integration** | Test API endpoint từ đầu đến cuối qua `TestClient` | pytest + httpx |
+| **E2E thủ công** | Smoke-checklist bấm tay trước khi demo — xem mục 4c bên dưới | — |
+
+**Quy ước dùng fixture:**
+- `db_session`: SQLite in-memory, rollback sau mỗi test
+- `client`: `TestClient(app)` dùng `db_session` override
+- `auth_headers_admin`, `auth_headers_thukho`, `auth_headers_ketoan`: token JWT sẵn
+
+**Cách mock Gemini API:**
+```python
+@pytest.fixture
+def mock_gemini(monkeypatch):
+    monkeypatch.setattr("app.services.ai_service.call_gemini", lambda prompt: "MOCKED_RESPONSE")
+```
+
+### Ma trận nghiệp vụ → ca test → file test
+
+| Nghiệp vụ | Ca test bắt buộc | File test |
+|---|---|---|
+| Nhập kho | Tồn tăng đúng + thẻ kho có 1 dòng | `test_stock_transactions.py` |
+| Xuất kho hợp lệ | Tồn giảm đúng + thẻ kho `balance_after` khớp | `test_stock_transactions.py` |
+| Xuất kho quá tồn | HTTP 400, tồn không đổi | `test_stock_transactions.py` |
+| Hủy phiếu nhập | Tồn hoàn trả đúng | `test_stock_transactions.py` |
+| Thẻ kho cân đối | `Tồn đầu + Nhập - Xuất = Tồn cuối` | `test_stock_transactions.py` |
+| AI pipeline | Dữ liệu vào không chứa giá mua | `test_ai_service.py` |
+| AI fallback | API lỗi → fallback trả đúng cấu trúc JSON | `test_ai_service.py` |
+
+---
+
+## 4c. Smoke-checklist kiểm thử bấm tay (trước demo KT3/Cuối kỳ)
+
+Thực hiện theo thứ tự. Tick khi đã xác nhận không lỗi:
+
+- [ ] **Đăng nhập**: 3 tài khoản (`admin`, `thukho`, `ketoan`) đăng nhập thành công, sai mật khẩu trả lỗi rõ ràng
+- [ ] **Dashboard**: Hiển thị KPIs (tổng hàng, tổng tồn, badge cảnh báo hàng dưới ngưỡng)
+- [ ] **Nhập kho**: Lập phiếu nhập → Confirm → Tồn kho tăng đúng trong danh sách hàng hóa
+- [ ] **Xuất kho hợp lệ**: Lập phiếu xuất (đủ hàng) → Tồn giảm đúng
+- [ ] **Xuất kho thiếu hàng**: Nhập số lượng vượt tồn → Giao diện báo lỗi rõ ràng, tồn không đổi
+- [ ] **Cảnh báo tồn**: Hàng có `current_stock ≤ min_stock` hiển thị badge/cảnh báo
+- [ ] **Thẻ kho**: Tra cứu stock_ledger → Chuỗi `balance_after` liên tục, không nhảy số
+- [ ] **AI báo cáo tháng**: Bấm nút → Nhận kết quả trong ≤15 giây (hoặc fallback nếu offline)
+- [ ] **AI gợi ý nhập hàng**: Bấm nút → Danh sách hàng cần nhập có số lượng gợi ý
+- [ ] **AI bất thường**: Bấm nút → Danh sách mặt hàng có biến động đột biến hoặc tồn lâu
+- [ ] **AI fallback**: Xóa `GEMINI_API_KEY` khỏi `.env`, restart → 3 chức năng AI vẫn trả kết quả, giao diện không vỡ
+
+---
+
 ## 5. Cập nhật tiến độ
-Sau khi hoàn thành bước này, mở file [docs/plans/TIEN-DO.md](file:///E:/h%E1%BB%87%20th%E1%BB%91ng%20qu%E1%BA%A3n%20l%C3%BD%20kho/docs/plans/TIEN-DO.md) và cập nhật dòng **Bước 10** theo đúng mẫu sau:
+Sau khi hoàn thành bước này, mở file [docs/plans/TIEN-DO.md](file:///E:/hệ thống quản lý kho/docs/plans/TIEN-DO.md) và cập nhật dòng **Bước 10** theo đúng mẫu sau:
 
 ```markdown
 | YYYY-MM-DD | Bước 10 | Viết Bộ Test Tự động (Pytest) & Seed Data | Hoàn thành | `backend/tests/test_stock_transactions.py`, `backend/seed_data.py` | Đã hoàn thiện test suite Pytest pass 100% và script seed_data.py nạp dữ liệu 60 ngày |
 ```
+

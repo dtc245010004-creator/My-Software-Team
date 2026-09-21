@@ -93,8 +93,20 @@ docs/
 
 ---
 
+## 4b. Deliverable bổ sung — `docs/architecture.md` (trước KT2)
+
+Tạo `docs/architecture.md` để giảng viên có thể đọc kiến trúc hệ thống mà không cần đọc code.
+
+**Nội dung tối thiểu:**
+- Sơ đồ luồng nhập kho: `request → API → InventoryService → transaction ACID → stock_ledger`
+- Sơ đồ luồng xuất kho: `kiểm tồn atomic → trừ tồn / rollback nếu âm → stock_ledger`
+- Sơ đồ luồng AI: `tổng hợp dữ liệu → gọi Gemini → fallback heuristic nếu lỗi`
+- Mô tả ranh giới 3 tầng: `api/` (HTTP only) · `services/` (business logic) · `models/` (ORM + DB)
+
+---
+
 ## 5. Cập nhật tiến độ
-Sau khi hoàn thành bước này, mở file [docs/plans/TIEN-DO.md](file:///E:/h%E1%BB%87%20th%E1%BB%91ng%20qu%E1%BA%A3n%20l%C3%BD%20kho/docs/plans/TIEN-DO.md) và cập nhật dòng **Bước 07** theo đúng mẫu sau:
+Sau khi hoàn thành bước này, mở file [docs/plans/TIEN-DO.md](file:///E:/hệ thống quản lý kho/docs/plans/TIEN-DO.md) và cập nhật dòng **Bước 07** theo đúng mẫu sau:
 
 ```markdown
 | YYYY-MM-DD | Bước 07 | Module Nhập/Xuất kho & Thẻ kho (Transaction) | Hoàn thành | `backend/app/services/inventory_service.py`, `models/stock_ledger.py` | Đã hoàn thiện logic Transaction Nhập/Xuất kho, chống tồn âm và Thẻ kho |
