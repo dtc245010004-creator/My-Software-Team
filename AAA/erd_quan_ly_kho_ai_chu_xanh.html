@@ -1,0 +1,156 @@
+<h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Sơ đồ quan hệ thực thể của hệ thống quản lý kho AI gồm 9 bảng, chữ màu xanh nước biển.</h2>
+<style>
+#erd { overflow-x: auto; --ink: #185FA5; }
+:root[data-mode="dark"] #erd { --ink: #85B7EB; }
+@media (prefers-color-scheme: dark) { :root:not([data-mode]) #erd { --ink: #85B7EB; } }
+#erd svg text, #erd svg tspan { fill: var(--ink) !important; }
+#erd svg span, #erd svg p, #erd svg div, #erd svg .nodeLabel, #erd svg .edgeLabel, #erd svg .label { color: var(--ink) !important; fill: var(--ink) !important; }
+#erd svg.erDiagram .divider path { stroke-opacity: 0.5; }
+#erd svg.erDiagram .row-rect-odd path,
+#erd svg.erDiagram .row-rect-odd rect,
+#erd svg.erDiagram .row-rect-even path,
+#erd svg.erDiagram .row-rect-even rect { stroke: none !important; }
+</style>
+<div id="erd"></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const themeMode = document.documentElement.dataset.mode;
+const dark = themeMode ? themeMode === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+const ink = dark ? '#85B7EB' : '#185FA5';
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"anthropic-sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"anthropic-sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: ink,
+    primaryTextColor: ink,
+    secondaryTextColor: ink,
+    tertiaryTextColor: ink,
+  },
+});
+const { svg } = await mermaid.render('erd-svg', `erDiagram
+    USERS ||--o{ IMPORT_NOTES : "tao"
+    USERS ||--o{ EXPORT_NOTES : "tao"
+    USERS ||--o{ STOCK_LEDGER : "thuc_hien"
+    CATEGORIES ||--o{ PRODUCTS : "phan_loai"
+    SUPPLIERS ||--o{ IMPORT_NOTES : "cung_cap"
+    IMPORT_NOTES ||--|{ IMPORT_NOTE_DETAILS : "chua"
+    PRODUCTS ||--o{ IMPORT_NOTE_DETAILS : "nam_trong"
+    EXPORT_NOTES ||--|{ EXPORT_NOTE_DETAILS : "chua"
+    PRODUCTS ||--o{ EXPORT_NOTE_DETAILS : "nam_trong"
+    PRODUCTS ||--o{ STOCK_LEDGER : "ghi_the_kho"
+
+    USERS {
+        int id PK
+        string username UK
+        string password_hash
+        string full_name
+        string role "ADMIN, WAREHOUSE_KEEPER, ACCOUNTANT"
+        boolean is_active
+        datetime created_at
+    }
+    CATEGORIES {
+        int id PK
+        string code UK
+        string name
+        string description
+    }
+    PRODUCTS {
+        int id PK
+        string code UK
+        string name
+        int category_id FK
+        string unit
+        int min_stock
+        int current_stock "CHECK ≥ 0"
+        float standard_price
+        string status
+        datetime created_at
+    }
+    SUPPLIERS {
+        int id PK
+        string code UK
+        string name
+        string phone
+        string email
+        string address
+        boolean is_active
+    }
+    IMPORT_NOTES {
+        int id PK
+        string code UK
+        int supplier_id FK
+        int created_by FK
+        datetime note_date
+        float total_amount
+        string note
+        string status "DRAFT, COMPLETED, CANCELLED"
+    }
+    IMPORT_NOTE_DETAILS {
+        int id PK
+        int import_note_id FK
+        int product_id FK
+        int quantity
+        float unit_price
+        float subtotal
+    }
+    EXPORT_NOTES {
+        int id PK
+        string code UK
+        string recipient_name
+        int created_by FK
+        datetime note_date
+        float total_amount
+        string note
+        string status "DRAFT, COMPLETED, CANCELLED"
+    }
+    EXPORT_NOTE_DETAILS {
+        int id PK
+        int export_note_id FK
+        int product_id FK
+        int quantity
+        float unit_price
+        float subtotal
+    }
+    STOCK_LEDGER {
+        int id PK
+        int product_id FK
+        string transaction_type "IMPORT, EXPORT, ADJUSTMENT"
+        string reference_code
+        int quantity_change
+        int balance_after
+        int created_by FK
+        datetime transaction_date
+        string note
+    }`);
+document.getElementById('erd').innerHTML = svg;
+
+document.querySelectorAll('#erd svg.erDiagram .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+
+document.querySelectorAll('#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>
