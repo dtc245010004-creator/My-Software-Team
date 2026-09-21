@@ -1,4 +1,4 @@
-# CLAUDE.md
+
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
@@ -303,3 +303,31 @@ Mỗi trigger dưới đây là **bắt buộc**, không tùy chọn:
   hoặc tạo Buoc-NN.md mới — không để nhiệm vụ chỉ tồn tại ở MASTER-ROADMAP mà không có
   spec chi tiết.
 
+  ## Quy tắc: Kiểm tra tác động trước khi sửa file đã có
+
+Áp dụng khi sửa, nâng cấp, sửa lỗi, đổi tên, di chuyển hoặc xóa file, hàm, class,
+route, schema, biến môi trường đã tồn tại,nếu không phải các trường hợp trên thì có thể bỏ qua.
+
+1. **Tìm mọi nơi tham chiếu trước khi sửa** (grep tên file, tên symbol, đường dẫn
+   import, tên route, tên trường trong `api_contract.md`, `docs/plans/`, tests,
+   `.env.example`, docker-compose).
+2. **Liệt kê ngắn gọn** thay đổi định làm và các chỗ bị ảnh hưởng (file:dòng).
+3. **Cập nhật tất cả chỗ bị ảnh hưởng trong cùng lần sửa.** Không để import,
+   đường dẫn hoặc contract bị lệch nhau.
+4. Nếu đổi thứ mà bên ngoài dùng (tên endpoint, trường JSON, tên cột DB): báo
+   người dùng trước, rồi cập nhật `api_contract.md`.
+5. **Ghi bài học vào `docs/LESSONS.md`** dưới dạng "đổi X thì phải kiểm tra Y".
+   Đọc file này trước khi tạo file mới để không lặp lại lỗi cũ.
+6. **Sau khi sửa**, chạy lại import, test hoặc lint để xác nhận không vỡ.
+
+
+## Cấu trúc tài liệu
+
+- `docs/plans/`: **bản đồ**. Quy trình và hướng dẫn từng bước tới đích. Luôn cập nhật trạng thái từng bước (Chưa / Đang làm / Xong).
+- `docs/SDLC/`: **mốc kiểm tra**. Mỗi mốc ghi rõ: các bước plan liên quan, điều kiện đạt, file nộp tương ứng, trạng thái.
+- `docs/submissions/`: **file nộp bài** (bài trả lời, bài tập). Chỉ sinh khi mốc SDLC tương ứng đạt.
+
+### Khi hoàn thành các bước plan của một mốc
+1. Đối chiếu điều kiện đạt của mốc trong `docs/SDLC/`.
+2. Nếu đạt: đánh dấu mốc Xong, sinh file nộp tương ứng vào `docs/submissions/`. Nội dung lấy từ plan và code thực tế, không viết từ suy đoán.
+3. Báo người dùng biết file nộp đã sinh. Không tự sinh sớm khi mốc chưa đạt.
