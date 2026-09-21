@@ -324,8 +324,9 @@ route, schema, biến môi trường đã tồn tại,nếu không phải các t
 ## Cấu trúc tài liệu
 
 - `docs/plans/`: **bản đồ**. Quy trình và hướng dẫn từng bước tới đích. Luôn cập nhật trạng thái từng bước (Chưa / Đang làm / Xong).
+- `docs/MASTER-ROADMAP.md` : **la bàn**. dù tên là map nhưng tôi càng thích coi nó là la bàn vì nó thể hiện ta đi tới đâu rồi.
 - `docs/SDLC/`: **mốc kiểm tra**. Mỗi mốc ghi rõ: các bước plan liên quan, điều kiện đạt, file nộp tương ứng, trạng thái.
-- `docs/submissions/`: **file nộp bài** (bài trả lời, bài tập). Chỉ sinh khi mốc SDLC tương ứng đạt.
+- `docs/SDLC/...(KT1/KT2/KT3/final)/submissions (KT1/KT2/KT3/final)/`: **file nộp bài** (bài trả lời, bài tập). Chỉ sinh khi mốc SDLC tương ứng đạt.
 
 ### Khi hoàn thành các bước plan của một mốc
 1. Đối chiếu điều kiện đạt của mốc trong `docs/SDLC/`.
