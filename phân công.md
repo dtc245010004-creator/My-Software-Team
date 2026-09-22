@@ -113,7 +113,7 @@ flowchart LR
 * **Vai trò:** Thiết lập kiến trúc giao diện người dùng, hệ thống design system, quản lý trạng thái đăng nhập và bảng điều khiển tổng quan cho CPO.
 * **Nhiệm vụ cụ thể:**
   1. **Khởi tạo & Cấu hình Project** (Bước 10):
-     - Cấu hình React 18 + Vite + Tailwind CSS, PostCSS, tích hợp thư viện icon `lucide-react` và Axios client.
+     - Cấu hình React 19 + Vite + Tailwind CSS, PostCSS, Oxlint + ESLint chạy song song (`eslint-plugin-oxlint`), tích hợp thư viện icon `lucide-react` và Axios client.
      - Cấu hình Vite Proxy chuyển tiếp `/api` và `/ws` tới Backend.
   2. **Hệ thống Layout & Auth Context** (Bước 10):
      - Xây dựng `AuthContext`: Lưu trữ token, giải mã role, hàm login/logout, bảo vệ route (`ProtectedRoute`).

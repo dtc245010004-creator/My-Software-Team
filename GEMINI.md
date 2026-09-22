@@ -80,8 +80,9 @@ Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc
 | Backend | FastAPI (Python 3.10+) + SQLAlchemy 2.0 | REST API hiệu năng cao + WebSocket telemetry |
 | CSDL | SQLite (phát triển/test) / PostgreSQL (sẵn sàng) | Lưu trữ ACID, ràng buộc khóa ngoại & check constraint |
 | Realtime | FastAPI WebSocket | Truyền nhận dữ liệu đo đếm sạc thời gian thực (Telemetry) |
-| Frontend | React 18 + Vite + Tailwind CSS | Giao diện quản trị CPO, giao diện tài xế & bộ mô phỏng sạc |
+| Frontend | React 19 + Vite + Tailwind CSS | Giao diện quản trị CPO, giao diện tài xế & bộ mô phỏng sạc |
 | UI & Charts | Lucide Icons + Recharts | Hiển thị biểu đồ sạc realtime và thống kê doanh thu |
+| Linting & QA | Oxlint + ESLint (chạy song song) | Tối ưu tốc độ kiểm tra và bảo đảm toàn diện rules Tailwind/a11y |
 | AI Engine | Google Gemini API + Heuristic Fallback | Phân tích điều phối tải & bảo trì; tự động fallback khi offline |
 | Kiểm thử | pytest tại `backend/tests/` | Đảm bảo logic tính cước, phiên sạc và ví tiền chính xác |
 

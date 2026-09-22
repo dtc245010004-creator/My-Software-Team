@@ -60,7 +60,7 @@ Dựa trên đặc tả hệ thống tại `nentang.md` và `Prompt.md`, các y�
 
 ```
 ┌───────────────────────────────────────────────────────────┐
-│                     FRONTEND (React 18)                   │
+│                     FRONTEND (React 19)                   │
 │  - CPO Dashboard: Giám sát toàn mạng lưới trạm & doanh thu│
 │  - Simulator UI: Giả lập cắm sạc & đồ thị Recharts        │
 │  - Driver Portal: Quản lý ví cá nhân & phiên sạc          │

@@ -1,4 +1,4 @@
-# BƯỚC 10: XÂY DỰNG FRONTEND WEB (REACT 18 + TAILWIND CSS + RECHARTS)
+# BƯỚC 10: XÂY DỰNG FRONTEND WEB (REACT 19 + TAILWIND CSS + RECHARTS)
 
 > **TÍNH CHẤT TÀI LIỆU:** Đây là một **Prompt / Nhiệm vụ thực thi độc lập (Self-contained Spec)**. Bất kỳ AI hoặc lập trình viên nào khi đọc tài liệu này đều có đầy đủ 100% bối cảnh, yêu cầu và tiêu chuẩn nghiệm thu để thực hiện mà không cần tra cứu thêm.
 >
@@ -10,7 +10,7 @@
 ---
 
 ## 1. Mục tiêu bước 10
-- Xây dựng giao diện Web hoàn chỉnh, hiện đại, trực quan, hỗ trợ đầy đủ 3 nhóm chức năng:
+- Xây dựng giao diện Web hoàn chỉnh, hiện đại, trực quan trên nền tảng **React 19 + Vite + Tailwind CSS + Recharts + Lucide Icons**, thiết lập chạy song song **Oxlint + ESLint** (`eslint-plugin-oxlint`), hỗ trợ đầy đủ 3 nhóm chức năng:
   1. **CPO Dashboard**: Quản lý trạm sạc, trụ sạc, giám sát trạng thái thời gian thực, quản lý biểu giá và xem doanh thu.
   2. **Simulator UI**: Màn hình mô phỏng cắm sạc, biểu đồ sạc realtime bằng Recharts (SoC %, công suất kW, nhiệt độ °C), cho phép bấm thử nghiệm cắm/rút sạc và kích hoạt lỗi.
   3. **Driver Portal**: Tra cứu trạm sạc, quản lý ví cá nhân (nạp tiền, xem biến động số dư) và xem tiến độ phiên sạc của tôi.

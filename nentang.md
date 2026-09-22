@@ -6,7 +6,7 @@ Dự án xây dựng một **Nền tảng web vận hành và quản lý mạng 
 
 Hệ thống được thiết kế theo kiến trúc chuẩn mực:
 - **Backend**: FastAPI (Python 3.10+) + SQLAlchemy 2.0 + SQLite/PostgreSQL + WebSocket phục vụ telemetry realtime.
-- **Frontend**: React 18 + Vite + Tailwind CSS + Lucide Icons + Recharts/Chart.js cho dashboard và biểu đồ sạc.
+- **Frontend**: React 19 + Vite + Tailwind CSS + Lucide Icons + Recharts cho dashboard và biểu đồ sạc; Linting song song Oxlint + ESLint.
 - **AI Engine**: Google Gemini API + Fallback Heuristic Engine (đảm bảo hệ thống vận hành 100% khi mất mạng hoặc hết quota).
 - **Mô phỏng trạm sạc (Charging Simulator)**: Tích hợp module giả lập tín hiệu trụ sạc (dựa trên luồng chuẩn OCPP 1.6J) để chạy thử nghiệm và demo đầy đủ mà không cần phần cứng vật lý.
 
@@ -104,7 +104,7 @@ Hệ thống tích hợp Google Gemini API kết hợp cùng Thuật toán Heuri
 ```
 ┌────────────────────────────────────────────────────────┐
 │                   FRONTEND WEB APP                     │
-│  React 18 + Vite + Tailwind CSS + Recharts + WebSocket │
+│  React 19 + Vite + Tailwind CSS + Recharts + WebSocket │
 │  - Driver Portal: Tìm trạm, ví tiền, phiên sạc realtime│
 │  - CPO Dashboard: Quản lý trạm/trụ, biểu giá, bảo trì  │
 │  - Simulator UI: Công cụ giả lập trụ sạc và xe sạc     │

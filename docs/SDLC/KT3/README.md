@@ -6,7 +6,7 @@
   2. **Predictive Maintenance**: Phân tích dữ liệu telemetry phát hiện trụ sạc quá nhiệt, sụt áp và khuyến nghị bảo dưỡng.
   3. **Dynamic Pricing & AI Advisor**: Gợi ý điều chỉnh biểu giá TOU và trợ lý giải đáp số liệu vận hành.
 - Xây dựng **Fallback Heuristic Engine**: Tự động kích hoạt khi mất mạng hoặc hết quota AI, chia tải theo tỷ lệ công suất chuẩn và cảnh báo ngưỡng cứng, đảm bảo hệ thống không bao giờ bị vỡ.
-- Hoàn thiện giao diện **Frontend Web (React 18 + Tailwind CSS)**:
+- Hoàn thiện giao diện **Frontend Web (React 19 + Tailwind CSS)**:
   - CPO Dashboard: Giám sát toàn mạng lưới trạm, doanh thu và biểu đồ phụ tải.
   - Driver Portal: Quản lý ví cá nhân, nạp tiền và theo dõi tiến trình sạc.
   - Simulator UI: Màn hình mô phỏng cắm sạc, hiển thị đồng hồ đo công suất và đồ thị sạc pin thời gian thực.

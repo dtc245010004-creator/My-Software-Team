@@ -9,7 +9,7 @@ Hệ thống được thiết kế theo mô hình phân tầng chặt chẽ, tá
 
 ```mermaid
 flowchart TD
-    subgraph Clients["TẦNG GIAO DIỆN (Frontend: React + Vite + Tailwind)"]
+    subgraph Clients["TẦNG GIAO DIỆN (Frontend: React 19 + Vite + Tailwind CSS)"]
         UI_Admin["Admin Portal"]
         UI_CPO["CPO Dashboard & Stations"]
         UI_Driver["Driver Portal (Ví & Sạc)"]
@@ -312,3 +312,17 @@ flowchart TD
 | **"Cảnh báo nhiệt độ có phải AI không?"** | Không. Ngưỡng cứng $T > 70^\circ\text{C}$ là **Rule-based Fallback** đảm bảo an toàn vật lý. AI đóng vai trò phân tích **chuỗi dữ liệu đa biến** (tốc độ tăng nhiệt kết hợp công suất sạc) để dự báo hỏng hóc trước khi chạm ngưỡng báo động. |
 | **"Hệ thống có chuẩn OCPP 1.6J không?"** | Hệ thống xây dựng **mô hình máy trạng thái lấy cảm hứng từ chuẩn OCPP (OCPP-like)** để quản lý vòng đời cổng sạc, không đóng vai trò là một máy chủ OCPP 1.6J hoàn chỉnh do giới hạn phạm vi mô phỏng web. |
 | **"Tiền trong ví nạp từ đâu?"** | Để phục vụ thử nghiệm và đánh giá đồ án, hệ thống cung cấp module **Sandbox/Mock Top-up**. Toàn bộ giao dịch trừ cước phiên sạc được xử lý qua **DB ACID Transaction**, cam kết số dư không âm. |
+
+---
+
+## 10. Đặc tả Công nghệ & Quy chuẩn Kiểm soát Chất lượng (Modernized Tech Stack & QA)
+
+| Hạng mục | Công nghệ chấp nhận | Vai trò & Giải pháp kiểm soát chất lượng |
+|---|---|---|
+| **Core Frontend** | **React 19 + Vite** | Khung giao diện hiệu năng cao, tối ưu HMR, nạp module ESM tức thì. Kiểm soát tương thích với các thư viện `recharts`, `lucide-react`, `axios`. |
+| **CSS & Styling** | **Tailwind CSS + PostCSS** | Thiết kế giao diện Dashboard, Simulator, Driver Portal trực quan, responsive theo chuẩn Design System. |
+| **Linting Song song** | **Oxlint + ESLint** | • **Oxlint**: Lint tốc độ cao (Rust-based), phát hiện nhanh lỗi cú pháp.<br>• **ESLint (`eslint-plugin-oxlint`)**: Bổ trợ kiểm tra toàn diện rules Tailwind CSS, React Hooks và tiêu chuẩn Accessibility (a11y). |
+| **Giao tiếp & Proxy** | **Vite Proxy (`/api`, `/ws`)** | Chuyển tiếp request `/api` và kết nối `/ws` về FastAPI (port 8000), kết hợp cơ chế Ticket-based Handshake ngăn chặn lộ JWT trên URL. |
+| **Điều phối Staging** | **Docker Compose (Postgres 16 + Backend + Frontend)** | Đóng gói môi trường đồng nhất 3 tầng, bảo mật hoàn toàn qua file `.env` (không hardcode secret), CSDL chuẩn `ev_csms_db`. |
+| **CI/CD Pipeline** | **GitHub Actions** | Tự động hóa kiểm tra: Linting Frontend (`oxlint` + `eslint`), build Vite, test Backend (`pytest` ACID ví) và kiểm tra hợp lệ `docker-compose.yml`. |
+

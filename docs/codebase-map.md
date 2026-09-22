@@ -89,7 +89,7 @@
 
 | File | Sẽ tạo ở Bước | Vai trò dự kiến |
 |---|:---:|---|
-| `frontend/package.json` | 10 | Node dependencies: react 18, lucide-react, recharts, axios; devDeps: vite, tailwindcss |
+| `frontend/package.json` | 10 | Node dependencies: react 19, lucide-react, recharts, axios; devDeps: vite, tailwindcss, oxlint, eslint |
 | `frontend/vite.config.js` | 10 | Vite config (React plugin, proxy `/api` và `/ws` → backend) |
 | `frontend/index.html` | 10 | Entry HTML cho Vite |
 | `frontend/src/main.jsx` | 10 | React root — mount `<App />` vào `#root` |
