@@ -23,6 +23,9 @@
 | `HUONGDAN.md` | Bản hướng dẫn vận hành chi tiết đồng bộ cùng README.md |
 | `phân công.md` | Bảng phân chia nhiệm vụ chi tiết cho 3 Backend và 3 Frontend kèm ma trận ghép cặp |
 
+| `test.md` | Báo cáo đối chiếu và đánh giá độc lập cho Hiếu và Study332 |
+| `huongdanfix.md` | Hướng dẫn khắc phục và đồng bộ mã nguồn chi tiết từng bước |
+
 ### `docs/`
 
 | File | Vai trò |

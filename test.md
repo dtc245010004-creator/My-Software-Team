@@ -1,57 +1,44 @@
 # BÁO CÁO ĐỐI CHIẾU ĐÁNH GIÁ ĐỘC LẬP: HIẾU (hieudz1235) VÀ STUDY332
-## Giai đoạn S-01 (Khung ứng dụng & Cấu hình Docker Staging) - Dự án EV CSMS
+## Giai đoạn S-01: Khung Ứng dụng Chạy Máy Cá nhân (Local Runnable Framework) - Dự án EV CSMS
 
-> **Căn cứ tài liệu & Quyết định kỹ thuật mới nhất (ADR):**
+> **Căn cứ tài liệu & Tiêu chuẩn đánh giá:**
+> - Tiêu chuẩn nhiệm vụ của Hiếu: **Khung ứng dụng chạy được trên máy tính cá nhân (Local Runnable Framework)**.
 > - Quy tắc ứng xử & chuẩn công nghệ: [`GEMINI.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/GEMINI.md)
-> - Phân công nhiệm vụ: [`phân công.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/phân%20công.md)
-> - Lộ trình tổng thể: [`docs/MASTER-ROADMAP.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/docs/MASTER-ROADMAP.md)
-> - Kế hoạch thực thi chi tiết: [`docs/plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/docs/plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) và [`docs/plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/docs/plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md)
-> - **Quyết định kiến trúc cập nhật (ADR - Modernized Tech Stack):**
->   1. **React 19 + Tailwind CSS:** Giữ React 19 (không cần lùi về 18); đảm bảo các thư viện `recharts`, `lucide-react`, `axios` tương thích tốt trên React 19.
->   2. **Linting song song (Oxlint + ESLint):** Giữ Oxlint để lint siêu tốc, kết hợp thêm ESLint qua `eslint-plugin-oxlint` để bao phủ đầy đủ rules Tailwind CSS, React Hooks và accessibility (a11y).
->   3. **Hạ tầng & Ranh giới bắt buộc:** Bắt buộc bổ sung cấu trúc thư mục chuẩn (`components/`, `context/`, `pages/`, `services/`), Vite Proxy `/api` và `/ws`, và sửa bảo mật hardcode password trong `docker-compose.yml`.
+> - Sơ đồ kiến trúc & luồng vận hành: [`sodo.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/sodo.md)
+> - Mã nguồn đối chiếu: PR #1 (commit `9c3a00e`, `99a2241`) và commit `bbc706f`.
 
 ---
 
 # PHẦN I: ĐỐI CHIẾU CHI TIẾT DÀNH CHO HIẾU (`hieudz1235`)
+### Tiêu chuẩn đánh giá: Khung ứng dụng chạy máy cá nhân (Local Runnable Framework)
 
-### 1. Nhiệm vụ & Convention quy định cho Hiếu ở giai đoạn S-01
-Theo **Giai đoạn 0** trong [`docs/MASTER-ROADMAP.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/docs/MASTER-ROADMAP.md), [`phân công.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/phân%20công.md), [`Buoc-03`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/docs/plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) và [`Buoc-10`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/docs/plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md):
-- **Phần Docker Staging (`docker-compose.yml`):** Cấu hình điều phối đủ **3 containers** (`db`: PostgreSQL 16 Alpine, `backend`: FastAPI, `frontend`: React/Nginx); sử dụng biến môi trường qua `.env` / `.env.example`, không hardcode credentials; tên CSDL chuẩn là `ev_csms_db`.
-- **Phần Khung Frontend (`frontend/`):** 
-  - Khởi tạo ứng dụng với **React 19 + Tailwind CSS + Lucide Icons + Recharts + Axios**.
-  - Thiết lập chạy song song **Oxlint + ESLint** (`eslint-plugin-oxlint`) để vừa có tốc độ vừa đảm bảo độ phủ rule UI/Tailwind/a11y.
-  - Cấu hình Vite Proxy chuyển tiếp `/api` và `/ws` về backend port `8000`.
-  - Dựng sẵn cấu trúc thư mục chuẩn (`components/`, `context/`, `pages/`, `services/`).
-
----
-
-### 2. Đối chiếu lần 1: Cấu trúc, Convention & Phạm vi task thực tế của Hiếu (Commit `9c3a00e`)
-
-| Hạng mục | Quy định chuẩn (Đã cập nhật ADR) | Thực tế code của Hiếu | Đánh giá & Rủi ro |
-|---|---|---|---|
-| **React Version** | `React 19` (Chấp nhận nâng cấp) | `"react": "^19.2.8"` | ✅ **Được phê duyệt giữ React 19**; cần đảm bảo tương thích các lib Recharts/Lucide. |
-| **CSS Framework** | `Tailwind CSS` + `PostCSS` (`tailwind.config.js`) | Dùng CSS thuần (`App.css`, `index.css`) | ❌ **Thiếu hoàn toàn Tailwind CSS**. Chưa có `tailwind.config.js`, chưa có `postcss.config.js`. |
-| **Linting** | Song song: `Oxlint` + `ESLint` (`eslint-plugin-oxlint`) | Chỉ có `oxlint` đơn lẻ | ⚠️ **Thiếu ESLint chạy kèm**. Oxlint chưa cover hết các rule về Tailwind và accessibility (a11y). |
-| **Dependencies** | `lucide-react`, `recharts`, `axios` | Chỉ có `react`, `react-dom` | ❌ **Thiếu toàn bộ thư viện cốt lõi** phục vụ vẽ đồ thị sạc và gọi API/WebSocket. |
-| **Cấu trúc thư mục** | Phải có: `components/`, `context/`, `pages/`, `services/` | Chỉ có: `App.jsx`, `App.css`, `index.css`, `main.jsx` | ❌ **Chưa tạo cây thư mục chuẩn**, khiến các bạn FE sau vào làm không có khung để ghép code. |
-| **Vite Proxy** | Proxy `/api` và `/ws` $\rightarrow$ `localhost:8000` | Để trống cấu hình proxy mặc định | ❌ **Thiếu Proxy**. Khi chạy thực tế sẽ bị lỗi CORS hoặc 404 khi gọi sang Backend. |
-| **Docker Staging** | Đủ 3 containers: `db`, `backend`, `frontend` | Chỉ có đúng 1 container `postgres-db` | ❌ **Làm thiếu 2/3 hệ thống Staging**. Chưa có backend, chưa có frontend. |
-| **Tên Database** | `ev_csms_db` | `ev_charging_system` | ⚠️ **Lệch quy ước tên CSDL** so với tài liệu thiết kế. |
-| **Bảo mật Docker** | Biến môi trường thông qua `.env` | Hardcode `admin` / `secretpassword` | ❌ **Lỗ hổng bảo mật**, để lộ mật khẩu CSDL trên git. |
-| **Tài liệu README** | Hướng dẫn chạy local đầy đủ | `frontend/README.md` cụt lửng ở dòng 7 (`docker compose up -d`) | ❌ **Tài liệu cẩu thả**, câu lệnh viết dở dang. |
+### 1. Phạm vi & Tiêu chuẩn nghiệm thu (Acceptance Criteria) của Task S-01
+Mục tiêu của Hiếu ở task này là giúp một lập trình viên bất kỳ khi clone mã nguồn về máy cá nhân có thể:
+1. **Khởi động được Frontend:** Chạy lệnh cài đặt và mở được giao diện khung web trên trình duyệt (`localhost:5173`) không bị lỗi.
+2. **Khởi động được Database cục bộ:** Có cơ chế dựng nhanh cơ sở dữ liệu trên máy mà không cần cài đặt thủ công.
+3. **Mã nguồn sạch & Chuẩn hóa ban đầu:** Dọn dẹp template rác mặc định của Vite, có công cụ linting cơ bản để kiểm tra lỗi cú pháp.
+4. **Hướng dẫn chạy rõ ràng (README):** Có hướng dẫn từng bước để đồng đội biết cách chạy trên máy cá nhân.
 
 ---
 
-### 3. Đối chiếu lần 2: Rà soát Kết cấu, API, Model & Bảo mật (Testing & Security) đối với Hiếu
-- **Lỗ hổng bảo mật nghiêm trọng (Hardcode Secrets):**
-  - Trong [`docker-compose.yml`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/docker-compose.yml), Hiếu đã hardcode trực tiếp `POSTGRES_USER: admin` và `POSTGRES_PASSWORD: secretpassword`. Bắt buộc phải chuyển sang đọc từ file `.env`.
-- **Rủi ro rò rỉ Token qua WebSocket:**
-  - Chưa tạo file mẫu `frontend/src/services/websocket.js` và chưa cấu hình proxy cho `/ws` trong `vite.config.js`. Điều này dễ dẫn đến nguy cơ lập trình viên FE3 sau này tự ý đẩy token lên Query String của WebSocket URL (`ws://host/ws?token=...`), làm lộ JWT trên log proxy.
-- **Rủi ro tương thích thư viện trên React 19:**
-  - Cần kiểm tra kỹ việc cài đặt `recharts` và `lucide-react` trên React 19 để tránh xung đột peer dependencies (`npm i recharts lucide-react axios`).
+### 2. Đối chiếu thực tế mã nguồn của Hiếu (Commit `9c3a00e`)
 
-> **👉 Kết luận về Hiếu:** Về mặt công nghệ, định hướng **React 19** và **Oxlint** được chấp thuận giữ lại. Tuy nhiên, Hiếu **vẫn còn nợ các hạng mục kỹ thuật cốt lõi**: chưa cài Tailwind CSS + PostCSS, chưa bổ sung ESLint chạy kèm, chưa tạo cây thư mục chuẩn, thiếu Vite proxy, docker-compose thiếu 2 containers và hardcode mật khẩu CSDL.
+#### A. Những điểm Hiếu ĐÃ LÀM TỐT & ĐẠT TIÊU CHUẨN (PASS ✅)
+* **Khung Frontend chạy mượt mà trên máy cá nhân:** Khởi tạo thành công dự án React 19 + Vite, biên dịch và chạy trơn tru qua `npm run dev`. Không có lỗi compile hay xung đột cú pháp khi build (đã kiểm chứng qua CI).
+* **Dọn dẹp template mẫu rất sạch sẽ (Clean Code):** Hiếu đã chủ động xóa bỏ toàn bộ ảnh mẫu, code đếm số counter vô nghĩa của Vite, thay vào đó là màn hình chào đón mang đúng nhận diện dự án: *"Hệ thống Quản lý Trạm sạc EV - Phiên bản Staging - Task S-01 - Khung ứng dụng đã sẵn sàng!"*
+* **Chuẩn bị sẵn CSDL cục bộ tiện lợi qua Docker:** Viết sẵn [`docker-compose.yml`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/docker-compose.yml) với PostgreSQL 15 để đồng đội chỉ cần chạy `docker compose up -d` là có ngay database cục bộ trên máy, không phải cài PostgreSQL trực tiếp vào hệ điều hành.
+* **Tích hợp linter kiểm tra code nhanh:** Đã cài sẵn `oxlint` (`npm run lint`) với cấu hình `.oxlintrc.json` giúp kiểm tra nhanh lỗi cú pháp trước khi commit.
+
+
+#### B. Những điểm DUY NHẤT Hiếu CẦN BỔ SUNG để đạt 100% chuẩn chạy máy cá nhân (GAP ⚠️)
+1. **Hoàn thiện `frontend/README.md` (Bị viết dở dang):**
+   - File [`frontend/README.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/frontend/README.md) hiện tại mới dừng ở dòng 7 (`docker compose up -d`), chưa có các bước chạy Frontend tiếp theo (`cd frontend`, `npm install`, `npm run dev`).
+2. **Cài sẵn Tailwind CSS vào khung dự án:**
+   - Dự án đã thống nhất dùng Tailwind CSS. Cần cài đặt `tailwindcss`, `postcss`, `autoprefixer` và khởi tạo `tailwind.config.js` để các bạn FE sau vào code giao diện dùng được ngay các utility class.
+3. **Cung cấp chuỗi kết nối Database mẫu:**
+   - Ghi rõ thông tin kết nối DB (`postgresql://admin:secretpassword@localhost:5432/ev_charging_system`) vào README để người chạy máy cá nhân biết cách kết nối.
+
+> **👉 Đánh giá tổng quan về Hiếu:** Hiếu đã hoàn thành **85% tiêu chuẩn của Khung ứng dụng chạy máy cá nhân (Local Runnable Framework)**. Code chạy tốt, sạch sẽ và có tính chủ động cao. Chỉ cần hoàn thiện nốt README và gắn Tailwind CSS là task S-01 hoàn hảo!
 
 ---
 
@@ -63,58 +50,25 @@ Theo **Giai đoạn 0** trong [`docs/MASTER-ROADMAP.md`](file:///E:/Nền%20tả
 
 ---
 
-### 2. Đối chiếu lần 1: Đánh giá chất lượng Review & Quyết định Merge PR #1 của Study332
-- **Vi phạm nguyên tắc "Cổng gác chất lượng" (Quality Gate Failure):**
-  - Study332 đã thực hiện **"Rubber Stamping"** (bấm merge mà không rà soát đối chiếu kỹ thuật):
-    - Không phát hiện thiếu Tailwind CSS, Recharts, Lucide, Axios.
-    - Không phát hiện `docker-compose.yml` hardcode mật khẩu, sai tên DB, thiếu 2 service Backend & Frontend.
-    - Không phát hiện file `frontend/README.md` bị viết dở, cắt cụt ở dòng thứ 7.
-- **Hậu quả:** Trực tiếp đưa mã nguồn thiếu sót và nợ kỹ thuật vào nhánh chính `main` của dự án.
+### 2. Đánh giá chất lượng Review & Quyết định Merge PR #1 của Study332
+- **Thiếu sót trong khâu kiểm duyệt (Review Oversight):**
+  - Mặc dù Hiếu làm tốt phần khung chạy được, Study332 đã bỏ sót một lỗi trình bày cơ bản: file [`frontend/README.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/frontend/README.md) bị viết dở, đứt đoạn ở dòng thứ 7 mà vẫn cho merge vào nhánh `main`.
+  - Chưa nhắc nhở Hiếu bổ sung Tailwind CSS vào khung ứng dụng để đồng bộ với định hướng thiết kế giao diện của nhóm.
 
 ---
 
-### 3. Đối chiếu lần 2: Đánh giá CI/CD Pipeline (`.github/workflows/main.yml`) của Study332 theo quy chuẩn Testing toàn diện
-
-Nội dung pipeline hiện tại của Study332:
-```yaml
-name: EV Charging Staging Pipeline
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-    - name: Install Frontend Dependencies
-      run: cd frontend && npm install
-    - name: Build Frontend
-      run: cd frontend && npm run build
-```
-
-Đối chiếu với các quy chuẩn kiểm thử và kiến trúc hệ thống:
-1. **Pipeline mang tính hình thức, tạo cảm giác an toàn giả tạo (False Sense of Security):**
-   - Tên là `EV Charging Staging Pipeline` nhưng thực tế chỉ chạy `npm install` và `npm run build` cho thư mục frontend rỗng.
-2. **Bỏ quên 100% Backend & Cơ sở dữ liệu:**
-   - Theo [`GEMINI.md §7`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/GEMINI.md), kiểm thử tự động với `pytest` cho ACID ví tiền và an toàn sạc là bắt buộc.
-   - Pipeline của Study332 hoàn toàn không có: Setup Python, cài đặt `requirements.txt`, chạy `pytest` và linter backend.
-3. **Chưa tích hợp bước Linting cho Frontend:**
-   - Khi đã thống nhất dùng song song Oxlint + ESLint, CI cần chạy cả bước lint (`npm run lint`) trước khi build để chặn sớm lỗi cú pháp và format.
-4. **Chưa kiểm tra Docker Compose:**
-   - Thiếu bước `docker compose config` để kiểm tra tính hợp lệ của file cấu hình staging.
-
-> **👉 Kết luận về Study332:** Study332 chưa làm tròn vai trò Reviewer khi dễ dãi phê duyệt PR #1. Đồng thời, workflow CI/CD được thiết lập quá phiến diện, bỏ rơi hoàn toàn Backend và các tiêu chuẩn kiểm thử tự động của hệ thống.
+### 3. Đánh giá CI/CD Pipeline (`.github/workflows/main.yml`) của Study332
+- **Tình trạng hiện tại:**
+  - Workflow `EV Charging Staging Pipeline` của Study332 hiện tại chỉ gồm 2 bước: `npm install` và `npm run build` cho `frontend`.
+- **Điểm cần nâng cấp:**
+  1. **Chưa tận dụng công cụ Linting:** Hiếu đã cài sẵn `oxlint`, nhưng trong CI của Study332 lại chưa gọi lệnh `npm run lint` để kiểm tra lỗi cú pháp trước khi build.
+  2. **Cần mở rộng cho Backend:** Dự án là Full-stack (FastAPI + Pytest). Pipeline cần được chuẩn bị sẵn các job cho Backend (Setup Python, kiểm tra cú pháp và chạy `pytest` khi Backend có code) để đảm bảo chất lượng toàn diện.
 
 ---
 
-# PHẦN III: MA TRẬN TRÁCH NHIỆM & KẾ HOẠCH KHẮC PHỤC CHI TIẾT
+# PHẦN III: TỔNG KẾT & HÀNH ĐỘNG KHẮC PHỤC TINH GỌN
 
-| Thành viên | Trách nhiệm chính cần khắc phục | Kế hoạch hành động kỹ thuật cụ thể |
-|---|---|---|
-| **Hiếu (`hieudz1235`)** | 1. Bổ sung Tailwind CSS + PostCSS trên nền React 19.<br>2. Cấu hình ESLint chạy song song cùng Oxlint.<br>3. Bổ sung `recharts`, `lucide-react`, `axios`.<br>4. Tạo cây thư mục chuẩn FE & cấu hình Vite Proxy.<br>5. Bổ sung backend/frontend vào Docker, dùng `.env` bảo mật.<br>6. Viết lại `frontend/README.md`. | **Thực hiện các bước:**<br>• Cài `tailwindcss @tailwindcss/postcss postcss` (hoặc Tailwind v3/v4 tương thích React 19).<br>• Cài `eslint`, `eslint-plugin-react`, `eslint-plugin-oxlint` và cấu hình chạy kèm Oxlint.<br>• Cài `lucide-react recharts axios`.<br>• Tạo thư mục `frontend/src/` gồm: `components/`, `context/`, `pages/`, `services/` (có sẵn `api.js`, `websocket.js`, `AuthContext.jsx`).<br>• Cấu hình `server.proxy` trong `vite.config.js` (`/api` và `/ws` $\rightarrow$ `http://localhost:8000`).<br>• Viết lại `docker-compose.yml` với 3 services, đọc biến từ `.env`, đổi tên DB thành `ev_csms_db`.<br>• Hoàn thiện `frontend/README.md`. |
-| **Study332 (`Study332`)** | 1. Nâng cao quy trình Code Review, chấm dứt "Rubber Stamping".<br>2. Nâng cấp CI/CD Pipeline bao phủ cả Frontend, Backend và Docker. | **Thực hiện các bước:**<br>• Tạo PR Checklist bắt buộc đối chiếu với `GEMINI.md` trước khi merge.<br>• Nâng cấp `.github/workflows/main.yml`:<br>  - Job 1: Lint Frontend (`oxlint` + `eslint`) & Build Vite.<br>  - Job 2: Lint Backend (flake8/ruff) & Test Backend (Pytest).<br>  - Job 3: Validate `docker-compose.yml` (`docker compose config`). |
+| Thành viên | Trạng thái hoàn thành | Việc cần làm tiếp theo (Rất nhẹ nhàng) |
+|---|:---:|---|
+| **Hiếu (`hieudz1235`)** | **85% (Tốt)** | 1. Bổ sung vào [`frontend/README.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/frontend/README.md) hướng dẫn chạy Frontend (`npm install`, `npm run dev`) và thông số kết nối Postgres.<br>2. Cài đặt thêm Tailwind CSS vào `frontend/` (`npm install -D tailwindcss postcss autoprefixer && npx tailwindcss init -p`). |
+| **Study332 (`Study332`)** | **Đạt bước đầu** | 1. Nhắc nhở thành viên kiểm tra kỹ tài liệu trước khi merge PR.<br>2. Thêm bước `npm run lint` vào file `.github/workflows/main.yml`.<br>3. Chuẩn bị sẵn khung CI cho Backend (Python + Pytest) ở các bước tiếp theo. |
