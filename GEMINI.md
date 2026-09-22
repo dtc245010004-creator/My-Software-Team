@@ -1,5 +1,3 @@
-
-
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
@@ -68,87 +66,87 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 # 5. Ngữ cảnh dự án
 
-**Hệ thống quản lý kho có tích hợp AI — Đề tài 07.** Doanh nghiệp nhỏ quản lý hàng hóa,
-nhà cung cấp, phiếu nhập, phiếu xuất, tồn kho và cảnh báo hàng sắp hết. AI hỗ trợ sinh
-báo cáo nhập-xuất-tồn, gợi ý nhập hàng và tóm tắt biến động bất thường.
+**Nền tảng vận hành trạm sạc xe điện tích hợp AI (EV Charging Station Management System - EV CSMS).**
+Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc xe điện, bao gồm: quản lý trạm sạc, trụ sạc (EVSE), cổng sạc (Connector), cấu hình biểu giá điện linh hoạt (TOU Tariff), ví điện tử khách hàng (Wallet), phiên sạc thời gian thực (Charging Sessions) và giám sát telemetry (SoC %, công suất kW, kWh, chi phí). Đồng thời, tích hợp AI hỗ trợ điều phối công suất thông minh (Smart Charging/Load Balancing), dự báo bảo trì kỹ thuật (Predictive Maintenance) và tư vấn tối ưu biểu giá doanh thu.
 
-Đề bài gốc: [`de_tai_07.md`](de_tai_07.md). Đặc tả hợp nhất: [`Prompt.md`](Prompt.md).
+Đặc tả gốc: [`nentang.md`](nentang.md). Đặc tả hợp nhất: [`Prompt.md`](Prompt.md).
 
-Dự án là đồ án môn học — code cần có comment rõ ràng để sinh viên **giải thích được** trước
-hội đồng. Ưu tiên MVP chạy đúng nghiệp vụ kho trước, tối ưu sau.
+> ⚠️ **Lưu ý quan trọng**: Dự án là một nền tảng web hoàn chỉnh, trực quan, có module giả lập sạc (Simulator) để người dùng/hội đồng có thể tương tác trực tiếp. Các kịch bản trong `docs/SDLC/` được chia thành các mốc nhỏ (KT1, KT2, KT3, Final) để phục vụ chấm điểm tiến độ bài tập cá nhân, không áp đặt các quy chuẩn của đề tài quản lý kho cũ vào hệ thống này.
 
-## Stack
+## Stack công nghệ
 
-| Hạng mục | Lựa chọn |
-|---|---|
-| Backend | FastAPI + SQLAlchemy 2.0 |
-| CSDL | SQLite + giao dịch ACID |
-| Frontend | React 18 + Vite + Tailwind CSS |
-| AI Engine | Google Gemini API + Heuristic Fallback (chạy được khi mất mạng/hết quota) |
-| Kiểm thử | pytest tại `backend/tests/` |
+| Hạng mục | Lựa chọn | Vai trò |
+|---|---|---|
+| Backend | FastAPI (Python 3.10+) + SQLAlchemy 2.0 | REST API hiệu năng cao + WebSocket telemetry |
+| CSDL | SQLite (phát triển/test) / PostgreSQL (sẵn sàng) | Lưu trữ ACID, ràng buộc khóa ngoại & check constraint |
+| Realtime | FastAPI WebSocket | Truyền nhận dữ liệu đo đếm sạc thời gian thực (Telemetry) |
+| Frontend | React 18 + Vite + Tailwind CSS | Giao diện quản trị CPO, giao diện tài xế & bộ mô phỏng sạc |
+| UI & Charts | Lucide Icons + Recharts | Hiển thị biểu đồ sạc realtime và thống kê doanh thu |
+| AI Engine | Google Gemini API + Heuristic Fallback | Phân tích điều phối tải & bảo trì; tự động fallback khi offline |
+| Kiểm thử | pytest tại `backend/tests/` | Đảm bảo logic tính cước, phiên sạc và ví tiền chính xác |
 
 ## Cấu trúc thư mục thực tế
 
 > Xem `docs/codebase-map.md` để biết chính xác file nào đang tồn tại và vai trò của nó.
-> Cây dưới đây là bức tranh **mục tiêu cuối dự án** — các mục đánh dấu `[scaffold]` đã có, còn lại sẽ tạo theo từng giai đoạn.
 
 ```
-E:\hệ thống quản lý kho\          <- thư mục gốc
+E:\Nền tảng vận hành trạm sạc xe điện\
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/               [scaffold] __init__.py có; endpoints/ sẽ tạo từ Giai đoạn 2
-│   │   ├── core/                 [scaffold] config.py + database.py đã có
-│   │   ├── models/               [scaffold] __init__.py có; *.py sẽ tạo ở Giai đoạn 1
-│   │   ├── schemas/              [scaffold] __init__.py có; *.py sẽ tạo ở Giai đoạn 2
-│   │   ├── services/             [scaffold] __init__.py có; *_service.py sẽ tạo từ Giai đoạn 3
-│   │   └── main.py               [scaffold] FastAPI app, CORS, /health
-│   ├── tests/                    [scaffold] __init__.py có; test files sẽ tạo ở Giai đoạn 5
-│   ├── requirements.txt          [scaffold] đã có
-│   └── .env.example              [scaffold] đã có — copy thành .env trước khi chạy
+│   │   ├── api/v1/endpoints/     <- stations, chargers, sessions, wallet, tariffs, ai
+│   │   ├── core/                 <- config.py, database.py, security.py
+│   │   ├── models/               <- user, station, charging_point, connector, session, wallet, tariff
+│   │   ├── schemas/              <- pydantic schemas cho request/response
+│   │   ├── services/             <- station_service, session_service, wallet_service, ai_service
+│   │   ├── simulator/            <- charging_simulator.py (giả lập tín hiệu OCPP-like & telemetry)
+│   │   └── main.py               <- FastAPI app, WebSocket routes, CORS
+│   ├── tests/                    <- test_sessions, test_wallet_acid, test_tariffs, test_ai_fallback
+│   ├── requirements.txt
+│   └── .env.example
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx               [scaffold] placeholder "Scaffolding Ready"
-│   │   ├── index.css             [scaffold] Tailwind directives
-│   │   ├── main.jsx              [scaffold] React root
-│   │   ├── context/              sẽ tạo ở Giai đoạn 6 (AuthContext.jsx)
-│   │   ├── pages/                sẽ tạo ở Giai đoạn 6 (Dashboard, Products, ...)
-│   │   └── services/             sẽ tạo ở Giai đoạn 6 (api.js)
-│   ├── index.html                [scaffold] đã có
-│   ├── package.json              [scaffold] đã có
-│   ├── vite.config.js            [scaffold] đã có
-│   ├── tailwind.config.js        [scaffold] đã có
-│   └── postcss.config.js         [scaffold] đã có
+│   │   ├── components/           <- Navbar, Sidebar, StatCard, ChargingChart, LiveGauge
+│   │   ├── context/              <- AuthContext, NotificationContext
+│   │   ├── pages/
+│   │   │   ├── Dashboard.jsx     <- Tổng quan mạng lưới trạm, doanh thu & trạng thái trụ
+│   │   │   ├── Stations.jsx      <- Quản lý trạm sạc, trụ sạc, cổng sạc
+│   │   │   ├── Sessions.jsx      <- Lịch sử và chi tiết các phiên sạc
+│   │   │   ├── Simulator.jsx     <- Giao diện mô phỏng cắm sạc & theo dõi realtime
+│   │   │   ├── Wallet.jsx        <- Quản lý ví tiền, nạp tiền và lịch sử trừ cước
+│   │   │   └── AIAdvisor.jsx     <- Phân tích điều phối tải & bảo trì dự đoán
+│   │   ├── services/             <- api.js, websocket.js
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── tailwind.config.js
 ├── docs/
-│   ├── codebase-map.md           <- bản đồ mã nguồn (đọc đầu mỗi phiên)
-│   ├── MASTER-ROADMAP.md         <- bức tranh 8 giai đoạn
-│   ├── implementation_plan.md    <- phân tích yêu cầu ban đầu
-│   ├── plans/                    <- kế hoạch từng bước đã duyệt
-│   │   ├── TIEN-DO.md            <- trạng thái tiến độ (nguồn sự thật)
-│   │   └── Buoc-NN-*.md
-│   ├── sessions/                 <- log phiên làm việc (tự động tạo bởi hook)
-│   └── SDLC/                    <- tài liệu chấm điểm 4 giai đoạn
-│       ├── KT1/
-│       ├── KT2/
-│       ├── KT3/
-│       └── final/
-├── .claude/
-│   └── hooks/                    <- session-start.ps1 + session-stop.ps1
-├── de_tai_07.md                  <- đề bài gốc, KHONG SUA
-├── Prompt.md                     <- đặc tả hợp nhất đầy đủ
-├── README.md                     <- nhật ký vận hành phiên làm việc
-└── CLAUDE.md                     <- file này
+│   ├── codebase-map.md           <- Bản đồ mã nguồn
+│   ├── MASTER-ROADMAP.md         <- Lộ trình 8 giai đoạn toàn diện
+│   ├── plans/
+│   │   ├── TIEN-DO.md            <- Trạng thái tiến độ thực tế
+│   │   └── Buoc-NN-*.md          <- Kế hoạch chi tiết từng bước
+│   └── SDLC/                     <- Hồ sơ mốc đánh giá bài tập cá nhân (KT1, KT2, KT3, Final)
+├── nentang.md                    <- Đặc tả nghiệp vụ nền tảng trạm sạc xe điện
+├── Prompt.md                     <- Đặc tả hợp nhất hệ thống
+├── README.md                     <- Hướng dẫn vận hành phiên làm việc
+└── GEMINI.md                     <- Quy tắc hướng dẫn AI (file này)
 ```
 
 ## Quy ước ngôn ngữ
 
 - **Tài liệu, comment, thông báo lỗi hiển thị cho người dùng: tiếng Việt.**
 - **Định danh code, tên bảng, tên cột, tên hàm, tên biến, tên file: tiếng Anh không dấu.**
-  Ví dụ: `product`, `supplier`, `import_note`, `export_note`, `stock_ledger`.
+  Ví dụ: `station`, `charging_point`, `connector`, `charging_session`, `wallet`, `tariff`.
 - Thông điệp commit: tiếng Việt không dấu, dạng `<loại>: <mô tả>`.
 
-## Vai trò người dùng
+## Vai trò người dùng (RBAC)
 
-`admin` (quản trị viên) · `warehouse_keeper` (thủ kho) · `accountant` (kế toán)
+- `admin`: Quản trị viên toàn hệ thống, quản lý tài khoản CPO và cấu hình nền tảng.
+- `operator`: Đơn vị vận hành trạm sạc (CPO), quản lý trạm, trụ, cấu hình biểu giá và theo dõi bảo trì.
+- `customer`: Khách hàng lái xe điện, nạp ví, cắm sạc và theo dõi tiến trình sạc cá nhân.
 
 ---
 
@@ -156,10 +154,9 @@ E:\hệ thống quản lý kho\          <- thư mục gốc
 
 ## Mở phiên — làm đủ 3 việc này trước khi làm bất cứ gì khác
 
-1. **Làm việc tại `E:\hệ thống quản lý kho`.** Mọi đường dẫn trong tài liệu đều tương đối
-   so với thư mục này.
-2. Đọc [`docs/codebase-map.md`](docs/codebase-map.md) để biết hiện có những file nào, làm gì.
-3. Đọc [`docs/plans/TIEN-DO.md`](docs/plans/TIEN-DO.md) để biết đang ở bước nào và còn việc gì chưa xong.
+1. **Làm việc tại `E:\Nền tảng vận hành trạm sạc xe điện`.**
+2. Đọc [`docs/codebase-map.md`](docs/codebase-map.md) để nắm rõ hiện trạng file.
+3. Đọc [`docs/plans/TIEN-DO.md`](docs/plans/TIEN-DO.md) để biết đang ở bước nào và công việc tiếp theo.
 
 ## Đóng phiên — bắt buộc nếu phiên có thay đổi code
 
@@ -169,14 +166,9 @@ E:\hệ thống quản lý kho\          <- thư mục gốc
 
 Không được để việc cập nhật tài liệu trôi sang phiên sau.
 
-## Luật kế hoạch
-
-Mỗi khi một kế hoạch được người dùng duyệt, **lưu ngay vào `docs/plans/Buoc-NN-<slug>.md`**
-với checklist `[ ]` cho từng bước, tick `[x]` trong lúc thực hiện.
-
 ---
 
-# 7. Luật kiểm thử
+# 7. Luật kiểm thử & Bảo toàn dữ liệu
 
 Bộ test nằm tại `backend/tests/`. Chạy bằng:
 ```bash
@@ -186,149 +178,46 @@ pytest
 
 ## Ba luật chống test giả
 
-Rủi ro lớn nhất khi sinh test bằng AI là test luôn xanh nhưng không chứng minh điều gì.
-
 1. **Không mock chính lớp đang test.** Mock chỉ dành cho ranh giới ngoài: Gemini API, thời gian hệ thống.
 2. **Mỗi bug fix phải có test tái hiện được bug** — chạy đỏ trước khi sửa, xanh sau khi sửa.
 3. **Test AI phải assert nội dung thật**, không chỉ assert "không ném exception".
 
-## Hai luật bao phủ
+## Ba luật bất khả xâm phạm về nghiệp vụ trạm sạc
 
-- Mỗi hàm public trong `backend/app/services/` có tối thiểu **1 test happy path + 1 test biên**.
-- Mọi thay đổi liên quan tồn kho phải kèm test chặn tồn âm (tồn kho không được âm).
-
-**Không đặt mục tiêu coverage phần trăm** — chỉ tiêu coverage đẻ ra test chạy qua code mà không
-kiểm tra gì.
+- **Bảo toàn số dư ví (No Negative Balance)**: Mọi thao tác trừ tiền phiên sạc phải dùng Database Transaction, đảm bảo số dư ví không bao giờ âm bất hợp lệ.
+- **Trạng thái trụ sạc độc quyền**: Không cho phép bắt đầu 2 phiên sạc đồng thời trên cùng một cổng sạc (`connector`).
+- **An toàn ngắt sạc khẩn cấp**: Khi số dư ví hết hoặc xảy ra sự cố quá nhiệt/sụt áp, hệ thống phải dừng phiên sạc ngay lập tức và chốt số điện năng đã tiêu thụ.
 
 ---
 
-# 8. Ranh giới kiến trúc
+# 8. Ranh giới kiến trúc & An toàn AI
 
-- `backend/app/api/v1/` chỉ làm HTTP: parse request, kiểm tra quyền, trả response. **Không chứa logic nghiệp vụ.**
-- `backend/app/services/` chứa toàn bộ logic nghiệp vụ, test được mà không cần khởi động app.
-- Mọi thao tác thay đổi tồn kho **phải đi qua database transaction ACID** — không cập nhật
-  `current_stock` lẻ tẻ ngoài transaction.
+- `backend/app/api/v1/` chỉ làm HTTP/WebSocket: parse request, kiểm tra quyền, trả response. **Không chứa logic nghiệp vụ.**
+- `backend/app/services/` chứa toàn bộ logic nghiệp vụ (tính cước, trừ ví, cập nhật phiên sạc), test được độc lập.
+- `backend/app/simulator/` chứa logic phát xung nhịp giả lập telemetry sạc (SoC %, công suất, kWh).
 
 ## Quy tắc an toàn AI
 
-Hai điều tuyệt đối:
-
-- **Không gửi giá mua/giá nhập** vào prompt AI khi không cần phân tích chi phí.
-- AI **không tự thay đổi số liệu kho** — chỉ đọc và sinh nhận xét/gợi ý.
-- Nếu API AI lỗi/hết quota → **Fallback Heuristic Engine** tự động kích hoạt, giao diện không vỡ.
+- **AI chỉ đóng vai trò cố vấn/phân tích**: AI đưa ra khuyến nghị phân bổ công suất hoặc gợi ý biểu giá, không trực tiếp thay đổi số dư ví hay đóng/ngắt rơ-le vật lý ngoài ý muốn.
+- **Bảo mật thông tin**: Tuyệt đối không đưa thông tin nhạy cảm của người dùng (mật khẩu, khóa riêng, thông tin thẻ) vào prompt AI.
+- **Cơ chế Fallback Heuristic bắt buộc**: Nếu Gemini API lỗi, hết hạn ngạch hoặc mất mạng, hệ thống tự động kích hoạt thuật toán Heuristic chia tải theo tỷ lệ công suất và phân tích ngưỡng cảnh báo, bảo đảm Web app vẫn hoạt động 100%.
 
 ---
 
-# 9. Bài học — luật phân loại
+# 9. Nguồn sự thật & Quy ước cập nhật tài liệu
 
-**Khi phát hiện một lỗi do chính mình gây ra lần thứ hai, phải phân loại trước khi đóng phiên:**
-
-- **Tự động hóa được** → thêm test vào `backend/tests/`.
-- **Không tự động hóa được** → thêm **một dòng** vào danh sách dưới đây.
-- Danh sách này có **trần cứng 5 dòng**. Muốn thêm dòng thứ 6 thì phải xóa một dòng hoặc tự động hóa
-  một dòng cũ.
-
-## Danh sách (0/5 dòng)
-
-*(Trống — chưa có bài học nào được ghi nhận)*
-
----
-
-# 10. Tài liệu bổ sung theo giai đoạn
-
-Các hướng dẫn chi tiết đã được chuyển vào file kế hoạch phù hợp:
-
-| Tài liệu cần tạo | Giai đoạn | Spec chi tiết tại |
-|---|:---:|---|
-| `docs/sessions/` — log phiên làm việc | — | Tự động tạo bởi `.claude/hooks/session-start.ps1` |
-| `docs/architecture.md` — sơ đồ kiến trúc 3 luồng | 3 (trước KT2) | [`docs/plans/Buoc-07-*.md §4b`](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) |
-| `docs/testing/` — chiến lược test & ma trận test-cases | 5 (trước KT3) | [`docs/plans/Buoc-10-*.md §4b`](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) |
-| Smoke-checklist bấm tay trước demo | 5 (trước KT3) | [`docs/plans/Buoc-10-*.md §4c`](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) |
-| `docs/MASTER-ROADMAP.md` — lộ trình 8 giai đoạn | — | [`docs/MASTER-ROADMAP.md`](../docs/MASTER-ROADMAP.md) — **đã có, không cần tạo thêm** |
-
----
-
-# 11. Nguồn sự thật & Quy ước cập nhật tài liệu
-
-## Phân cấp nguồn sự thật (khi hai file mâu thuẫn)
-
+## Phân cấp nguồn sự thật
 ```
 TIEN-DO.md          → THẮNG về trạng thái (bước nào xong, bước nào chưa)
 Buoc-NN.md          → THẮNG về cách làm (spec kỹ thuật, checklist, file cần tạo)
 MASTER-ROADMAP.md   → Bức tranh toàn cảnh; chỉ cập nhật khi TIEN-DO.md đã cập nhật xong
 ```
 
-**Nguyên tắc:** MASTER-ROADMAP.md không bao giờ là tài liệu đầu tiên được sửa.
-Mọi thay đổi trạng thái đi theo chiều: `thực tế code` → `TIEN-DO.md` → `MASTER-ROADMAP.md`.
-
----
-
-## Kế hoạch sống — nguyên tắc bổ sung dần
-
-`docs/plans/Buoc-NN.md` là tài liệu **sống**, không phải đá granite. Khi thực tế khác với
-kế hoạch ban đầu, **không xóa nội dung cũ** — thêm ghi chú ngay bên dưới mục liên quan:
-
-```markdown
-> 📝 **Cập nhật thực tế [YYYY-MM-DD]:** [Mô tả điều đã thay đổi và lý do]
-```
-
-Ví dụ: phát hiện cần thêm index vào bảng khi đang làm Bước 07 → thêm ghi chú vào
-`Buoc-07.md`, không tạo file mới và không xóa nội dung cũ.
-
----
-
-## Trigger cập nhật tài liệu — điều kiện cụ thể, không phải "nhớ thì làm"
-
-Mỗi trigger dưới đây là **bắt buộc**, không tùy chọn:
-
-| Khi nào | Cập nhật gì | Thứ tự |
-|---|---|:---:|
-| Hoàn thành 1 nhiệm vụ trong Buoc-NN.md | Tick `[x]` vào checkbox tương ứng trong Buoc-NN.md | 1 |
-| Hoàn thành toàn bộ 1 Bước (Buoc-NN) | Cập nhật dòng tương ứng trong `TIEN-DO.md` thành `Hoàn thành` | 2 |
-| Cập nhật TIEN-DO.md xong | Cập nhật ô trạng thái tương ứng trong `MASTER-ROADMAP.md` | 3 |
-| Thêm/xóa/đổi vai trò file bất kỳ | Cập nhật `docs/codebase-map.md` | ngay lập tức |
-| Phát hiện kế hoạch cần điều chỉnh | Thêm ghi chú `📝 Cập nhật thực tế` vào Buoc-NN.md liên quan | ngay lập tức |
-| Kết thúc phiên có thay đổi code | Chạy `pytest`, ghi kết quả vào TIEN-DO.md cột "Ghi chú" | cuối phiên |
-
-**Không được đóng phiên** nếu bất kỳ trigger nào ở trên chưa được thực hiện.
-
----
-
-## Quy ước MASTER-ROADMAP.md
-
-- Chỉ có **1 tài liệu MASTER-ROADMAP**: `docs/MASTER-ROADMAP.md`.
-- Mọi thay đổi trạng thái trong MASTER-ROADMAP phải có 1 dòng mới trong bảng
-  **"Lịch sử cập nhật"** ở cuối file (không xóa dòng cũ).
-- Khi thêm nhiệm vụ mới vào MASTER-ROADMAP, phải đồng thời thêm vào Buoc-NN.md tương ứng
-  hoặc tạo Buoc-NN.md mới — không để nhiệm vụ chỉ tồn tại ở MASTER-ROADMAP mà không có
-  spec chi tiết.
-
-  ## Quy tắc: Kiểm tra tác động trước khi sửa file đã có
-
-Áp dụng khi sửa, nâng cấp, sửa lỗi, đổi tên, di chuyển hoặc xóa file, hàm, class,
-route, schema, biến môi trường đã tồn tại,nếu không phải các trường hợp trên thì có thể bỏ qua.
-
-1. **Tìm mọi nơi tham chiếu trước khi sửa** (grep tên file, tên symbol, đường dẫn
-   import, tên route, tên trường trong `api_contract.md`, `docs/plans/`, tests,
-   `.env.example`, docker-compose).
-2. **Liệt kê ngắn gọn** thay đổi định làm và các chỗ bị ảnh hưởng (file:dòng).
-3. **Cập nhật tất cả chỗ bị ảnh hưởng trong cùng lần sửa.** Không để import,
-   đường dẫn hoặc contract bị lệch nhau.
-4. Nếu đổi thứ mà bên ngoài dùng (tên endpoint, trường JSON, tên cột DB): báo
-   người dùng trước, rồi cập nhật `api_contract.md`.
-5. **Ghi bài học vào `docs/LESSONS.md`** dưới dạng "đổi X thì phải kiểm tra Y".
-   Đọc file này trước khi tạo file mới để không lặp lại lỗi cũ.
-6. **Sau khi sửa**, chạy lại import, test hoặc lint để xác nhận không vỡ.
-
-
-## Cấu trúc tài liệu
-
-- `docs/plans/`: **bản đồ**. Quy trình và hướng dẫn từng bước tới đích. Luôn cập nhật trạng thái từng bước (Chưa / Đang làm / Xong).
-- `docs/MASTER-ROADMAP.md` : **la bàn**. dù tên là map nhưng tôi càng thích coi nó là la bàn vì nó thể hiện ta đi tới đâu rồi.
-- `docs/SDLC/`: **mốc kiểm tra**. Mỗi mốc ghi rõ: các bước plan liên quan, điều kiện đạt, file nộp tương ứng, trạng thái.
-- `docs/SDLC/...(KT1/KT2/KT3/final)/submissions (KT1/KT2/KT3/final)/`: **file nộp bài** (bài trả lời, bài tập). Chỉ sinh khi mốc SDLC tương ứng đạt.
-
-### Khi hoàn thành các bước plan của một mốc
-1. Đối chiếu điều kiện đạt của mốc trong `docs/SDLC/`.
-2. Nếu đạt: đánh dấu mốc Xong, sinh file nộp tương ứng vào `docs/submissions/`. Nội dung lấy từ plan và code thực tế, không viết từ suy đoán.
-3. Báo người dùng biết file nộp đã sinh. Không tự sinh sớm khi mốc chưa đạt.
+## Cấu trúc tài liệu SDLC (Bài tập cá nhân)
+- `docs/plans/`: Bản đồ các bước thực hiện chi tiết.
+- `docs/MASTER-ROADMAP.md`: La bàn định hướng 8 giai đoạn.
+- `docs/SDLC/`: Các mốc kiểm tra bài tập cá nhân:
+  - `KT1/`: Đánh giá đặc tả yêu cầu, thiết kế kiến trúc, ERD CSDL và API contract.
+  - `KT2/`: Đánh giá hiện thực hóa Core Backend, mô phỏng sạc (Simulator) và giao dịch ví tiền ACID.
+  - `KT3/`: Đánh giá tích hợp AI (Smart Charging, Predictive Maintenance, Fallback) và giao diện Web Frontend.
+  - `final/`: Đánh giá kiểm thử toàn diện, tối ưu hiệu năng, tài liệu bàn giao và kịch bản demo bảo vệ.

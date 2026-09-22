@@ -1,100 +1,89 @@
-# BƯỚC 11: ĐÓNG GÓI, TÀI LIỆU SDLC & KỊCH BẢN DEMO (FINAL POLISH)
+# BƯỚC 11: BỘ TEST TỰ ĐỘNG, SEED DATA & ĐÓNG GÓI TÀI LIỆU SDLC (TESTING & PACKAGING)
 
 > **TÍNH CHẤT TÀI LIỆU:** Đây là một **Prompt / Nhiệm vụ thực thi độc lập (Self-contained Spec)**. Bất kỳ AI hoặc lập trình viên nào khi đọc tài liệu này đều có đầy đủ 100% bối cảnh, yêu cầu và tiêu chuẩn nghiệm thu để thực hiện mà không cần tra cứu thêm.
 >
 > **RANH GIỚI TÀI LIỆU:**
 > - `docs/plans/Buoc-11-...md`: Tài liệu KẾ HOẠCH & CHECKLIST thực thi (nơi bạn đang đọc).
-> - `docs/SDLC/final/`: Chứa toàn bộ BÁO CÁO KỸ THUẬT, HƯỚNG DẪN SỬ DỤNG, SLIDE THUYẾT TRÌNH dùng để nộp bài và chấm điểm cuối kỳ.
-> - `README.md`: Hướng dẫn khởi chạy dự án tại thư mục gốc.
+> - Mã nguồn được sinh trực tiếp vào thư mục `backend/tests/`, `backend/seed_data.py`.
+> - Sản phẩm bàn giao: `docs/SDLC/KT3/03_Test_Plan_and_Results.md`, `docs/SDLC/final/...`.
 
 ---
 
 ## 1. Mục tiêu bước 11
-- Hoàn thiện toàn bộ hồ sơ minh chứng học phần theo 4 mốc đánh giá SDLC (KT1, KT2, KT3, Cuối kỳ) trong thư mục `docs/SDLC/`.
-- Viết tài liệu `README.md` tại thư mục gốc với hướng dẫn cài đặt và khởi chạy 1-Click.
-- Xây dựng Kịch bản Demo 5 phút để sinh viên tự tin thuyết trình và đạt điểm tối đa trước hội đồng chấm thi.
+- Xây dựng bộ kiểm thử tự động toàn diện bằng `pytest` cho Backend:
+  - Kiểm thử giao dịch ACID trừ tiền ví: Kiểm tra số dư không thể bị âm khi gặp tranh chấp đồng thời hoặc số dư không đủ.
+  - Kiểm thử trạng thái độc quyền cổng sạc: Chặn tuyệt đối việc tạo 2 phiên sạc đồng thời trên cùng một cổng.
+  - Kiểm thử thuật toán chia tải và cơ chế Fallback Heuristic khi Gemini API offline.
+- Xây dựng script `backend/seed_data.py` nạp dữ liệu mẫu sinh động:
+  - 3 trạm sạc thực tế (Hà Nội, Đà Nẵng, TP.HCM) kèm tọa độ GPS.
+  - 8 trụ sạc công suất từ 22kW AC đến 150kW DC, trạng thái đa dạng.
+  - 15 khách hàng lái xe điện kèm ví tiền có sẵn số dư.
+  - Lịch sử hơn 50 phiên sạc trong 30 ngày qua với thông số đo đếm thực tế để demo biểu đồ.
+- Đóng gói tài liệu bàn giao mốc Cuối kỳ (`docs/SDLC/final/`): Báo cáo kỹ thuật tổng kết, Hướng dẫn chạy 1 nút nhấn và Kịch bản demo thuyết trình bảo vệ trước hội đồng.
 
 ---
 
 ## 2. Nội dung công việc chi tiết
 
-### 2.1. Hoàn thiện Tài liệu 4 Giai đoạn SDLC
-1. **Thư mục `docs/SDLC/KT1/`**:
-   - `01_SRS_and_UseCases.md`: Phân tích quy trình, 3 Actor, Use Case.
-   - `02_Database_Design_ERD.md`: Thiết kế 9 bảng, Data Dictionary, sơ đồ Mermaid ERD.
-   - `03_AI_Architecture_and_Prompts.md`: Kiến trúc module AI và prompt mẫu.
-   - `04_Wireframes.md`: Phác thảo cấu trúc các màn hình giao diện.
-2. **Thư mục `docs/SDLC/KT2/`**:
-   - `01_API_Specifications.md`: Tài liệu đặc tả RESTful APIs.
-   - `02_Transaction_Design_and_Negative_Stock_Prevention.md`: Thiết kế Transaction và chống tồn âm.
-   - `03_AI_Assisted_Development_Evidence.md`: Minh chứng dùng AI hỗ trợ viết code.
-3. **Thư mục `docs/SDLC/KT3/`**:
-   - `01_Prompt_Engineering_and_Evaluation.md`: Báo cáo so sánh các phiên bản Prompt.
-   - `02_Test_Plan_and_Results.md`: Kết quả chạy bộ kiểm thử Pytest.
-   - `03_AI_Fallback_Architecture.md`: Kiến trúc Fallback Heuristic khi offline.
-4. **Thư mục `docs/SDLC/final/`**:
-   - `01_Final_Technical_Report.md`: Báo cáo kỹ thuật tổng kết đồ án.
-   - `02_User_Guide_and_Demo_Script.md`: Hướng dẫn sử dụng và kịch bản demo chấm thi.
-   - `03_Presentation_Slides.md`: Nội dung slide thuyết trình bảo vệ đồ án.
+### 2.1. Bộ Kiểm thử Tự động (Pytest)
+- `backend/tests/conftest.py`: Cấu hình SQLite in-memory, override `get_db` fixture, tạo tài khoản test (Admin, Operator, Customer).
+- `backend/tests/test_wallet_acid.py`:
+  - Test nạp tiền thành công.
+  - Test trừ tiền với số dư đủ.
+  - Test trừ tiền khi số dư thiếu $\rightarrow$ Bắt buộc ném `HTTP 400 InsufficientBalance` và rollback hoàn toàn, số dư nguyên vẹn.
+  - Test mô phỏng giao dịch đồng thời (Concurrent deduction).
+- `backend/tests/test_sessions.py`:
+  - Test bắt đầu sạc khi cổng `AVAILABLE`.
+  - Test chặn bắt đầu sạc khi cổng đang `CHARGING`.
+  - Test tự động ngắt sạc khi ví hết tiền.
+- `backend/tests/test_ai_fallback.py`:
+  - Mock ngắt kết nối Gemini API $\rightarrow$ Xác nhận `fallback_service` tự động tiếp quản, chia tải chính xác theo tỷ lệ công suất định mức.
 
-### 2.2. Tài liệu Hướng dẫn Khởi chạy 1-Click (`README.md`)
-- Hướng dẫn cài đặt nhanh:
-  ```bash
-  # 1. Chạy Backend
-  cd backend
-  pip install -r requirements.txt
-  python seed_data.py
-  uvicorn app.main:app --reload
+### 2.2. Script Seed Data Chân thực
+- `backend/seed_data.py`:
+  - Tạo tài khoản mẫu:
+    - Admin: `admin` / `admin123`
+    - CPO: `operator` / `operator123`
+    - Driver: `driver` / `driver123` (ví có sẵn 200,000 VND)
+  - Tạo 3 trạm sạc:
+    - Trạm Sạc Vincom Center (Hà Nội) - Công suất nguồn 250 kW
+    - Trạm Sạc Cầu Rồng (Đà Nẵng) - Công suất nguồn 180 kW
+    - Trạm Sạc Landmark 81 (TP.HCM) - Công suất nguồn 300 kW
+  - Tạo các trụ sạc AC 22kW, DC Fast 60kW, DC Ultra-Fast 150kW.
+  - Tạo biểu giá TOU chuẩn và nạp lịch sử phiên sạc 30 ngày.
 
-  # 2. Chạy Frontend
-  cd frontend
-  npm install
-  npm run dev
-  ```
-- Danh sách tài khoản đăng nhập mẫu (`admin`, `thukho`, `ketoan`).
-
-### 2.3. Kịch bản Demo 5 Phút Chuẩn Chấm Thi
-1. **Phút 1**: Giới thiệu bài toán doanh nghiệp nhỏ và cấu trúc phân quyền 3 vai trò.
-2. **Phút 2**: Đăng nhập vai trò Thủ kho $\rightarrow$ Thực hiện Lập phiếu xuất với số lượng vượt tồn kho $\rightarrow$ Cho giảng viên thấy hệ thống chặn đứng tồn kho âm và trả thông báo lỗi.
-3. **Phút 3**: Nhập số lượng hợp lệ $\rightarrow$ Xuất thành công $\rightarrow$ Mở Thẻ kho cho thấy số dư được trừ tức thì và lịch sử được ghi nhận chuẩn xác.
-4. **Phút 4**: Chuyển sang màn hình Báo cáo $\rightarrow$ Bấm nút "Yêu cầu AI phân tích" $\rightarrow$ Giới thiệu 3 kết quả thông minh: Nhận xét tháng, gợi ý số lượng nhập hàng, phát hiện xuất đột biến và hàng chết.
-5. **Phút 5**: Giới thiệu bộ kiểm thử Pytest pass 100% và cơ chế Fallback Heuristic khi mất mạng.
+### 2.3. Đóng gói Tài liệu SDLC & Kịch bản Demo
+- `docs/SDLC/final/01_Final_Technical_Report.md`: Báo cáo tổng thể đồ án.
+- `docs/SDLC/final/02_User_Guide_and_Demo_Script.md`: Kịch bản từng bước demo trực quan:
+  1. Đăng nhập tài xế -> Tra cứu trạm -> Xem số dư ví.
+  2. Mở màn hình Simulator -> Cắm súng sạc -> Bắt đầu sạc.
+  3. Quan sát đồ thị Recharts nhảy thông số SoC %, công suất kW và tiền nhảy realtime qua WebSocket.
+  4. Bấm dừng sạc -> Hóa đơn điện tử xuất hiện -> Ví trừ tiền chính xác.
+  5. Đăng nhập CPO -> Xem Dashboard cập nhật doanh thu -> Mở AI Advisor xem gợi ý điều phối tải và cảnh báo bảo trì.
+- `docs/SDLC/final/03_Presentation_Slides.md`: Dàn ý slide bảo vệ.
 
 ---
 
-## 3. Cấu trúc file/thư mục cần sinh
-Khi thực hiện bước này, các file và thư mục sau phải được tạo ra:
-
+## 3. Cấu trúc file cần sinh
 ```text
-he-thong-quan-ly-kho/
-├── README.md                                  # File hướng dẫn chạy 1-click tại thư mục gốc
-├── run.bat                                    # Script chạy tự động trên Windows (1-click)
-└── docs/
-    └── SDLC/
-        ├── KT2/
-        │   ├── 01_API_Specifications.md
-        │   └── 03_AI_Assisted_Development_Evidence.md
-        ├── KT1/
-        │   ├── 03_AI_Architecture_and_Prompts.md
-        │   └── 04_Wireframes.md
-        └── final/
-            ├── 01_Final_Technical_Report.md   # Báo cáo kỹ thuật tổng kết đồ án
-            ├── 02_User_Guide_and_Demo_Script.md # Hướng dẫn sử dụng & Kịch bản demo 5 phút
-            └── 03_Presentation_Slides.md      # Nội dung Slide thuyết trình bảo vệ đồ án
+backend/
+├── tests/
+│   ├── conftest.py
+│   ├── test_wallet_acid.py
+│   ├── test_sessions.py
+│   └── test_ai_fallback.py
+├── seed_data.py
+docs/SDLC/final/
+├── 01_Final_Technical_Report.md
+├── 02_User_Guide_and_Demo_Script.md
+└── 03_Presentation_Slides.md
 ```
 
 ---
 
-## 4. Ràng buộc kỹ thuật & Tiêu chí hoàn thành (Definition of Done)
-- [ ] Tất cả các file tài liệu markdown không bị lỗi định dạng, sơ đồ Mermaid render rõ ràng.
-- [ ] Người chưa từng tiếp xúc dự án có thể đọc `README.md` và khởi chạy thành công hệ thống trong 5 phút.
-- [ ] Kịch bản demo mạch lạc, chứng minh đầy đủ 100% yêu cầu của `de_tai_07.md`.
-
----
-
-## 5. Cập nhật tiến độ
-Sau khi hoàn thành bước này, mở file [docs/plans/TIEN-DO.md](file:///E:/h%E1%BB%87%20th%E1%BB%91ng%20qu%E1%BA%A3n%20l%C3%BD%20kho/docs/plans/TIEN-DO.md) và cập nhật dòng **Bước 11** theo đúng mẫu sau:
-
-```markdown
-| YYYY-MM-DD | Bước 11 | Đóng gói, Tài liệu SDLC & Kịch bản Demo | Hoàn thành | `README.md`, `docs/SDLC/final/...` | Đã hoàn tất đóng gói toàn bộ dự án, hồ sơ SDLC 4 giai đoạn và kịch bản demo |
-```
+## 4. Checklist thực hiện
+- [ ] Viết bộ test `tests/test_wallet_acid.py`, `tests/test_sessions.py`, `tests/test_ai_fallback.py`.
+- [ ] Chạy `pytest` xác nhận toàn bộ test cases màu xanh.
+- [ ] Viết `seed_data.py` và kiểm tra nạp dữ liệu thành công vào CSDL.
+- [ ] Hoàn thiện các tài liệu mốc Cuối kỳ trong `docs/SDLC/final/`.
+- [ ] Cập nhật trạng thái Bước 11 trong `docs/plans/TIEN-DO.md`.

@@ -10,10 +10,11 @@
 
 ## 1. Mục tiêu bước 5
 - Xây dựng hệ thống xác thực người dùng an toàn bằng JWT (JSON Web Tokens) và mã hóa mật khẩu một chiều với `bcrypt`.
+- Tự động tạo ví điện tử (`Wallet`) số dư 0 VND cho người dùng mới khi đăng ký.
 - Triển khai phân quyền theo vai trò (Role-Based Access Control - RBAC) chặt chẽ tại tầng Backend cho 3 nhóm người dùng:
-  - `ADMIN` (Quản trị viên)
-  - `WAREHOUSE_KEEPER` (Thủ kho)
-  - `ACCOUNTANT` (Kế toán)
+  - `ADMIN` (Quản trị viên toàn hệ thống)
+  - `OPERATOR` (Đơn vị vận hành trạm sạc / CPO)
+  - `CUSTOMER` (Khách hàng lái xe điện)
 
 ---
 
@@ -23,13 +24,15 @@
 - Model `User` (`app/models/user.py`):
   - `id`: Integer, Primary Key.
   - `username`: String, Unique, Indexed.
+  - `email`: String, Unique, Indexed.
   - `password_hash`: String.
   - `full_name`: String.
-  - `role`: Enum/String (`ADMIN`, `WAREHOUSE_KEEPER`, `ACCOUNTANT`).
+  - `role`: Enum/String (`ADMIN`, `OPERATOR`, `CUSTOMER`).
   - `is_active`: Boolean, default True.
   - `created_at`: DateTime.
+  - Relationship với `Wallet`.
 - Schemas (`app/schemas/user.py`):
-  - `UserLogin`, `UserCreate`, `UserResponse`, `TokenResponse`.
+  - `UserLogin`, `UserRegister`, `UserResponse`, `TokenResponse`.
 
 ### 2.2. Cơ chế Bảo mật & JWT
 - `app/core/security.py`:
@@ -40,46 +43,35 @@
 
 ### 2.3. Endpoints Xác thực & Phân quyền
 - Router `app/api/v1/endpoints/auth.py`:
-  - `POST /api/v1/auth/login`: Nhận username/password $\rightarrow$ Kiểm tra $\rightarrow$ Cấp JWT Token.
-  - `GET /api/v1/auth/me`: Trả về thông tin người dùng đang đăng nhập.
+  - `POST /api/v1/auth/register`: Đăng ký tài khoản (tự động tạo Wallet đi kèm).
+  - `POST /api/v1/auth/login`: Nhận username/password $\rightarrow$ Cấp JWT Token.
+  - `GET /api/v1/auth/me`: Trả về thông tin người dùng và số dư ví.
 - Dependencies (`app/api/deps.py`):
-  - `get_current_user`: Trích xuất token từ header `Authorization: Bearer <token>`, giải mã và tìm user trong DB.
-  - `require_roles(["ADMIN", "WAREHOUSE_KEEPER"])`: Kiểm tra `current_user.role`, trả về HTTP 403 Forbidden nếu không đủ quyền.
+  - `get_current_user`: Trích xuất và giải mã JWT token.
+  - `require_roles(["ADMIN", "OPERATOR"])`: Kiểm tra quyền hạn, trả về HTTP 403 Forbidden nếu không đủ quyền.
 
 ---
 
-## 3. Cấu trúc file/thư mục cần sinh
-Khi thực hiện bước này, các file và thư mục sau phải được tạo ra:
-
+## 3. Cấu trúc file cần sinh
 ```text
 backend/
 ├── app/
 │   ├── core/
-│   │   └── security.py                # Hash bcrypt & sinh/giải mã JWT token
+│   │   └── security.py                # Hash bcrypt & sinh/giải mã JWT
 │   ├── models/
 │   │   └── user.py                    # SQLAlchemy Model User
 │   ├── schemas/
-│   │   └── user.py                    # Pydantic Schemas User & Token
+│   │   └── user.py                    # Schemas User & Token
 │   ├── api/
 │   │   ├── deps.py                    # Dependencies: get_current_user, require_roles
-│   │   └── v1/
-│   │       └── endpoints/
-│   │           ├── __init__.py
-│   │           └── auth.py            # Routers /login, /me, /users
+│   │   └── v1/endpoints/
+│   │       └── auth.py                # API login, register, me
 ```
 
 ---
 
-## 4. Ràng buộc kỹ thuật & Tiêu chí hoàn thành (Definition of Done)
-- [ ] Mật khẩu không bao giờ lưu dưới dạng plain text; 100% mật khẩu được băm qua `bcrypt`.
-- [ ] API trả về lỗi HTTP 401 khi token sai hoặc hết hạn; trả về HTTP 403 khi gọi API vượt quyền.
-- [ ] Test thành công chức năng đăng nhập và lấy thông tin tài khoản qua Swagger UI.
-
----
-
-## 5. Cập nhật tiến độ
-Sau khi hoàn thành bước này, mở file [docs/plans/TIEN-DO.md](file:///E:/h%E1%BB%87%20th%E1%BB%91ng%20qu%E1%BA%A3n%20l%C3%BD%20kho/docs/plans/TIEN-DO.md) và cập nhật dòng **Bước 05** theo đúng mẫu sau:
-
-```markdown
-| YYYY-MM-DD | Bước 05 | Xác thực, Đăng nhập & Phân quyền RBAC | Hoàn thành | `backend/app/api/v1/endpoints/auth.py`, `core/security.py` | Đã hoàn thiện xác thực JWT, hash bcrypt và phân quyền RBAC 3 vai trò |
-```
+## 4. Checklist thực hiện
+- [ ] Cài đặt `security.py` với bcrypt và JWT.
+- [ ] Cài đặt Model `User`, Schema và Router `/auth`.
+- [ ] Đảm bảo đăng ký người dùng tự động sinh ví điện tử liên kết.
+- [ ] Cập nhật trạng thái Bước 05 trong `docs/plans/TIEN-DO.md`.

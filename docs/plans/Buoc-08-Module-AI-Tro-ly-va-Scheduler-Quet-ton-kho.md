@@ -1,90 +1,62 @@
-# BƯỚC 08: MODULE AI TRỢ LÝ & SCHEDULER QUÉT TỒN KHO (AI INTEGRATION)
+# BƯỚC 08: MODULE GIẢ LẬP TRẠM SẠC (SIMULATOR & REALTIME TELEMETRY)
 
 > **TÍNH CHẤT TÀI LIỆU:** Đây là một **Prompt / Nhiệm vụ thực thi độc lập (Self-contained Spec)**. Bất kỳ AI hoặc lập trình viên nào khi đọc tài liệu này đều có đầy đủ 100% bối cảnh, yêu cầu và tiêu chuẩn nghiệm thu để thực hiện mà không cần tra cứu thêm.
 >
 > **RANH GIỚI TÀI LIỆU:**
 > - `docs/plans/Buoc-08-...md`: Tài liệu KẾ HOẠCH & CHECKLIST thực thi (nơi bạn đang đọc).
-> - `docs/SDLC/KT3/01_Prompt_Engineering_and_Evaluation.md`: SẢN PHẨM BÀN GIAO THẬT (Deliverable) đánh giá Prompt cho bài KT3.
-> - `docs/SDLC/KT3/03_AI_Fallback_Architecture.md`: SẢN PHẨM BÀN GIAO THẬT (Deliverable) kiến trúc Fallback cho bài KT3.
-> - Mã nguồn được sinh trực tiếp vào thư mục `backend/app/` (ai, services, endpoints).
+> - Mã nguồn được sinh trực tiếp vào thư mục `backend/app/simulator/` và `backend/app/core/websocket.py`.
+> - Sản phẩm bàn giao: `docs/SDLC/KT2/03_Simulator_and_Telemetry_Design.md`.
 
 ---
 
 ## 1. Mục tiêu bước 8
-- Tích hợp Trợ lý AI (Google Gemini API) để giải quyết 3 bài toán thông minh của Đề tài 07:
-  1. AI sinh báo cáo Nhập - Xuất - Tồn theo tháng kèm nhận xét xu hướng.
-  2. AI gợi ý nhập hàng tối ưu (dựa trên tồn kho, tồn tối thiểu và tốc độ xuất).
-  3. AI tóm tắt biến động bất thường (xuất tăng đột biến $>200\%$ và hàng tồn kho lâu $>30$ ngày).
-- Xây dựng Data Pre-processing Pipeline: SQL tính toán trước các chỉ số thống kê, lọc bỏ thông tin giá mua nhạy cảm.
-- Xây dựng **Heuristic Fallback Engine**: Tự động sinh báo cáo theo quy tắc nếu không có mạng hoặc chưa có API Key, đảm bảo ứng dụng luôn chạy demo được.
-- Xây dựng Scheduler (APScheduler/Cron) tự động quét hàng dưới ngưỡng tồn tối thiểu.
+- Xây dựng module **Charging Simulator** giả lập phần cứng trụ sạc xe điện chuẩn OCPP-like, phục vụ chạy thử nghiệm và demo trực quan không cần thiết bị vật lý.
+- Mô phỏng đường cong sạc pin chân thực (Charging Curve): SoC % tăng dần từ 20% -> 80% (công suất tối đa), từ 80% -> 100% (giảm dần công suất để bảo vệ pin).
+- Định kỳ 2 giây/lần phát sóng gói tin đo đếm (Telemetry) qua WebSocket lên Frontend:
+  - Tỷ lệ phần trăm pin (`SoC` %)
+  - Công suất sạc tức thời (`Power` kW)
+  - Điện áp (`Voltage` V) và dòng điện (`Current` A)
+  - Nhiệt độ cổng sạc (`Connector Temperature` °C)
+  - Điện năng tiêu thụ tích lũy (`Energy` kWh)
+  - Chi phí tạm tính (VND)
+- Tự động kích hoạt cơ chế ngắt sạc an toàn khi: Pin đạt 100%, hoặc số dư ví không đủ chi trả, hoặc nhiệt độ cổng sạc vượt ngưỡng an toàn ($> 75^\circ\text{C}$).
 
 ---
 
 ## 2. Nội dung công việc chi tiết
 
-### 2.1. Pipeline Tổng hợp Dữ liệu cho AI
-- Hàm `get_aggregated_inventory_data(db, month, year)`:
-  - Tính tốc độ xuất bình quân ngày (30 ngày qua).
-  - Lọc danh sách hàng `current_stock <= min_stock`.
-  - Lọc hàng không có phiếu xuất trong 30 ngày gần nhất (hàng chết / tồn lâu).
-  - Lọc hàng có lượng xuất tuần này tăng vọt so với bình quân.
-  - **Bảo mật**: Loại bỏ hoàn toàn trường giá nhập `unit_price`.
+### 2.1. Logic Mô phỏng đường cong sạc pin
+- Lớp `ChargingSimulator` (`app/simulator/charging_simulator.py`):
+  - Nhận đầu vào: `session_id`, `connector_id`, `battery_capacity_kwh` (ví dụ 60 kWh), `max_power_kw` (ví dụ 60 kW hoặc 120 kW).
+  - Trạng thái sạc:
+    - Nếu `SoC < 80%`: Công suất = `max_power_kw` * (0.95 - 1.05 ngẫu nhiên).
+    - Nếu `SoC >= 80%`: Công suất hạ dần tuyến tính về 10 kW khi đạt 99%.
+    - Khi `SoC == 100%`: Tự động gửi tín hiệu `BatteryFull` và gọi `stop_session`.
+  - Nhiệt độ cổng sạc: Ban đầu $30^\circ\text{C}$, tăng dần theo công suất và ổn định ở $45 - 55^\circ\text{C}$. Có tùy chọn giả lập sự cố quá nhiệt ($> 75^\circ\text{C}$) để demo kịch bản ngắt khẩn cấp.
 
-### 2.2. Prompt Engineering & Gemini API Client
-- Tách biệt Prompt Template tại `app/ai/prompts/` hoặc trong `ai_service.py`:
-  - **System Prompt**: *"Bạn là trợ lý quản lý kho chuyên nghiệp. Chỉ phân tích trên dữ liệu được cung cấp. Tuyệt đối không bịa số liệu."*
-  - **User Prompt**: Truyền bảng tổng hợp dữ liệu kho dưới dạng Markdown/JSON.
-
-### 2.3. Heuristic Fallback Engine
-- Nếu `GEMINI_API_KEY` trống hoặc gọi API bị lỗi/timeout:
-  - Kích hoạt hàm `fallback_analysis(data)`:
-    - Tính toán số lượng nhập đề xuất: `suggested_qty = (min_stock * 2) - current_stock`.
-    - Gắn cờ các mặt hàng xuất đột biến hoặc tồn lâu.
-    - Trả về cấu trúc báo cáo chuẩn xác, không làm crash ứng dụng.
+### 2.2. Kênh truyền phát WebSocket
+- Tích hợp với `ConnectionManager` tại `app/core/websocket.py`.
+- Mỗi phiên sạc đang hoạt động sẽ chạy một background task `asyncio.create_task(run_simulation_loop(...))`.
+- Broadcast dữ liệu telemetry tới tất cả client đang theo dõi phiên sạc đó.
 
 ---
 
-## 3. Cấu trúc file/thư mục cần sinh
-Khi thực hiện bước này, các file và thư mục sau phải được tạo ra:
-
+## 3. Cấu trúc file cần sinh
 ```text
 backend/
 ├── app/
-│   ├── ai/
+│   ├── simulator/
 │   │   ├── __init__.py
-│   │   └── prompts/
-│   │       ├── inventory_report_prompt.txt   # Template prompt báo cáo tháng
-│   │       ├── reorder_suggestion_prompt.txt # Template prompt gợi ý nhập hàng
-│   │       └── anomaly_detection_prompt.txt  # Template prompt tóm tắt bất thường
-│   ├── schemas/
-│   │   └── ai.py                             # Schemas dữ liệu yêu cầu & phản hồi AI
-│   ├── services/
-│   │   ├── ai_service.py                     # Client gọi Gemini API & Pipeline tổng hợp
-│   │   └── fallback_service.py               # Thuật toán Heuristic dự phòng khi offline
-│   └── api/
-│       └── v1/
-│           └── endpoints/
-│               └── ai.py                     # Routers /monthly-report, /restock, /anomalies
-docs/
-└── SDLC/
-    └── KT3/
-        ├── 01_Prompt_Engineering_and_Evaluation.md  # Báo cáo đánh giá prompt KT3
-        └── 03_AI_Fallback_Architecture.md           # Kiến trúc Fallback KT3
+│   │   └── charging_simulator.py      # Bộ sinh xung nhịp telemetry & đường cong sạc
+│   └── api/v1/endpoints/
+│       └── simulator.py               # API kích hoạt/dừng/điều khiển giả lập sự cố
 ```
 
 ---
 
-## 4. Ràng buộc kỹ thuật & Tiêu chí hoàn thành (Definition of Done)
-- [ ] Không gửi giá mua nhạy cảm vào prompt AI.
-- [ ] Khi ngắt mạng hoặc xóa API key, hệ thống vẫn trả về báo cáo phân tích thông minh qua bộ Fallback Engine trong $< 500$ms.
-- [ ] Prompt AI trả về đúng schema định dạng cấu trúc rõ ràng.
-
----
-
-## 5. Cập nhật tiến độ
-Sau khi hoàn thành bước này, mở file [docs/plans/TIEN-DO.md](file:///E:/h%E1%BB%87%20th%E1%BB%91ng%20qu%E1%BA%A3n%20l%C3%BD%20kho/docs/plans/TIEN-DO.md) và cập nhật dòng **Bước 08** theo đúng mẫu sau:
-
-```markdown
-| YYYY-MM-DD | Bước 08 | Module AI Trợ lý & Scheduler Quét tồn kho | Hoàn thành | `backend/app/services/ai_service.py`, `services/fallback_service.py` | Đã hoàn thiện Module AI (Gemini API + Heuristic Fallback) cho 3 bài toán phân tích kho |
-```
+## 4. Checklist thực hiện
+- [ ] Cài đặt `charging_simulator.py` với thuật toán đường cong sạc pin chân thực.
+- [ ] Kết nối simulator với WebSocket để phát dữ liệu realtime mỗi 2 giây.
+- [ ] Xử lý tự động ngắt sạc khi pin đầy hoặc hết tiền ví.
+- [ ] Viết tài liệu bàn giao `docs/SDLC/KT2/03_Simulator_and_Telemetry_Design.md`.
+- [ ] Cập nhật trạng thái Bước 08 trong `docs/plans/TIEN-DO.md`.

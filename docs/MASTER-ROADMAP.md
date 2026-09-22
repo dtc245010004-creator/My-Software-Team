@@ -1,8 +1,8 @@
 # MASTER ROADMAP
-## Đề tài 07 — Hệ thống quản lý kho có tích hợp AI
+## Nền tảng vận hành trạm sạc xe điện tích hợp AI (EV CSMS)
 
-> **Vai trò của file này:** Bức tranh toàn cảnh — điều hướng sang từng kế hoạch chi tiết.
-> Xem `CLAUDE.md §11` để hiểu quy ước nguồn sự thật và khi nào cập nhật file này.
+> **Vai trò của file này:** Bức tranh toàn cảnh — la bàn định hướng cho toàn bộ dự án và liên kết sang từng bước thực thi chi tiết.
+> Xem `GEMINI.md §9` để hiểu quy ước nguồn sự thật và khi nào cập nhật file này.
 
 ---
 
@@ -10,9 +10,9 @@
 
 ```
 docs/plans/TIEN-DO.md          ← Trạng thái thực tế (tick ✅ ở đây là chính thức)
-    ↑ đồng bộ
+     ↑ đồng bộ
 MASTER-ROADMAP.md   ← Bức tranh toàn cảnh + điều hướng (file này)
-    ↓ link sang
+     ↓ link sang
 Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 ```
 
@@ -24,14 +24,14 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | Giai đoạn | Mô tả | Mốc SDLC | Tiến độ |
 |:---:|---|:---:|:---:|
-| **0** | Nền tảng dự án | — | ⬜ Chưa bắt đầu |
-| **1** | Tài liệu KT1 + DB Models | KT1 | ⬜ Chưa bắt đầu |
-| **2** | Backend Auth + CRUD | KT2 | ⬜ Chưa bắt đầu |
-| **3** | Transaction ACID + Stock Ledger | KT2 | ⬜ Chưa bắt đầu |
-| **4** | Tích hợp AI + Fallback Engine | KT3 | ⬜ Chưa bắt đầu |
-| **5** | Kiểm thử tự động (Pytest) | KT3 | ⬜ Chưa bắt đầu |
-| **6** | Frontend React + Tailwind | Cuối kỳ | ⬜ Chưa bắt đầu |
-| **7** | Đóng gói + Tài liệu cuối | Cuối kỳ | ⬜ Chưa bắt đầu |
+| **0** | Nền tảng dự án & Scaffold | — | 🔄 Đang thực hiện |
+| **1** | Đặc tả & Thiết kế CSDL (ERD) | KT1 | ⬜ Chưa bắt đầu |
+| **2** | Backend Auth + Quản lý Hạ tầng trạm | KT2 | ⬜ Chưa bắt đầu |
+| **3** | Biểu giá, Ví tiền & Phiên sạc (ACID) | KT2 | ⬜ Chưa bắt đầu |
+| **4** | Simulator sạc xe điện & Telemetry WebSocket | KT2 | ⬜ Chưa bắt đầu |
+| **5** | AI Smart Charging, Bảo trì & Fallback | KT3 | ⬜ Chưa bắt đầu |
+| **6** | Xây dựng Frontend Web (React + Tailwind) | KT3 | ⬜ Chưa bắt đầu |
+| **7** | Kiểm thử, Seed Data & Đóng gói Cuối kỳ | Cuối kỳ | ⬜ Chưa bắt đầu |
 
 > **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
 
@@ -41,166 +41,124 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 ---
 
-### GIAI ĐOẠN 0 — Nền tảng dự án
+### GIAI ĐOẠN 0 — Nền tảng dự án & Khởi tạo
 
-> **Mục tiêu:** Dựng khung chạy được trước khi viết bất kỳ nghiệp vụ nào.
+> **Mục tiêu:** Dựng khung ứng dụng chạy được (FastAPI + React + WebSocket) trước khi viết nghiệp vụ.
 > **Dependency:** Không có — thực hiện đầu tiên.
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 0.1 | Tạo cấu trúc thư mục đầy đủ theo `Prompt.md §6` | 🔴 P0 | [Buoc-03](plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) | Cây thư mục khớp đặc tả | ⬜ |
-| 0.2 | `requirements.txt` + `.env.example` | 🔴 P0 | [Buoc-03](plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) | `backend/requirements.txt`, `backend/.env.example` | ⬜ |
-| 0.3 | FastAPI app khung: `main.py`, `core/config.py`, `core/database.py` | 🔴 P0 | [Buoc-04](plans/Buoc-04-Cau-truc-Backend-Cau-hinh-va-Database-Session.md) | Backend khởi động được tại `uvicorn app.main:app` | ⬜ |
-| 0.4 | React + Vite + Tailwind CSS khởi tạo | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | Frontend chạy được tại `localhost:5173` | ⬜ |
-
-**Tiêu chí hoàn thành Giai đoạn 0:** Backend trả `200 OK` tại `/health`, frontend hiển thị trang trắng không lỗi.
+| 0.1 | Khởi tạo đặc tả `nentang.md` & `Prompt.md` | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `nentang.md`, `Prompt.md` | ✅ |
+| 0.2 | Chuẩn hóa `GEMINI.md`, `CLAUDE.md`, `README.md` | 🔴 P0 | — | File quy tắc & hướng dẫn vận hành | ✅ |
+| 0.3 | Cấu hình Backend: `requirements.txt`, `.env.example`, `database.py` | 🔴 P0 | [Buoc-03](plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) | FastAPI app khởi động được tại `/health` | 🔄 |
+| 0.4 | Khởi tạo Frontend: React 18 + Vite + Tailwind CSS + Lucide Icons | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind.md) | Frontend chạy được tại `localhost:5173` | 🔄 |
 
 ---
 
-### GIAI ĐOẠN 1 — Tài liệu KT1 + DB Models
+### GIAI ĐOẠN 1 — Thiết kế Hệ thống & Hồ sơ KT1
 
-> **Mục tiêu:** Hoàn thiện thiết kế trên giấy TRƯỚC khi viết model — tránh thiết kế sai phải đập lại.
-> **Dependency:** Giai đoạn 0 (môi trường chạy được).
+> **Mục tiêu:** Hoàn thiện đặc tả chi tiết và thiết kế CSDL trên giấy trước khi viết mã nguồn.
 > **Mốc nộp bài:** KT1
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 1.1 | Tài liệu SRS + Use Case (3 Actor, 8 luồng nghiệp vụ) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/01_SRS_and_UseCases.md` | ⬜ |
-| 1.2 | Thiết kế ERD + Data Dictionary (9 bảng) | 🔴 P0 | [Buoc-02](plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md) | `docs/SDLC/KT1/02_Database_Design_ERD.md` | ⬜ |
-| 1.3 | Kiến trúc AI + Prompt mẫu (anti-hallucination) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/03_AI_Architecture_and_Prompts.md` | ⬜ |
-| 1.4 | Wireframes: Dashboard, Phiếu nhập/xuất, Trợ lý AI | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/04_Wireframes.md` | ⬜ |
-| 1.5 | 9 SQLAlchemy Models (`users`, `categories`, `products`, `suppliers`, `import_notes`, `import_note_details`, `export_notes`, `export_note_details`, `stock_ledger`) | 🔴 P0 | [Buoc-02](plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md) | `backend/app/models/*.py` | ⬜ |
-| 1.6 | `Base.metadata.create_all()` — tạo bảng khi khởi động | 🔴 P0 | [Buoc-04](plans/Buoc-04-Cau-truc-Backend-Cau-hinh-va-Database-Session.md) | DB schema khớp ERD, `CHECK (current_stock >= 0)` | ⬜ |
-
-**Tiêu chí hoàn thành Giai đoạn 1:** 4 file deliverable KT1 tồn tại và có nội dung; chạy backend tạo đúng 9 bảng trong SQLite.
+| 1.1 | Tài liệu SRS & Use Case (Admin, Operator/CPO, Driver) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/01_SRS_and_UseCases.md` | ⬜ |
+| 1.2 | Thiết kế CSDL & Sơ đồ ERD (Stations, Chargers, Sessions, Wallets, Tariffs) | 🔴 P0 | [Buoc-02](plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md) | `docs/SDLC/KT1/02_Database_Design_ERD.md` | ⬜ |
+| 1.3 | Kiến trúc AI (Smart Charging, Predictive Maintenance & Heuristic Fallback) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/03_AI_Architecture.md` | ⬜ |
+| 1.4 | Thiết kế Wireframe giao diện (Dashboard CPO, Simulator, Driver Portal) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/04_Wireframes.md` | ⬜ |
+| 1.5 | Cài đặt SQLAlchemy Models tương ứng | 🔴 P0 | [Buoc-02](plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md) | `backend/app/models/*.py` | ⬜ |
 
 ---
 
-### GIAI ĐOẠN 2 — Backend Auth + CRUD
+### GIAI ĐOẠN 2 — Backend Auth, RBAC & Quản lý Hạ tầng trạm sạc
 
-> **Mục tiêu:** API có xác thực và CRUD master data hoạt động — nền cho nghiệp vụ kho.
-> **Dependency:** Giai đoạn 1 (models đã có).
+> **Mục tiêu:** Hoàn thành xác thực người dùng và API quản lý trạm, trụ, cổng sạc.
+> **Dependency:** Giai đoạn 1 (Models đã có).
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 2.1 | Pydantic Schemas cho tất cả models | 🔴 P0 | [Buoc-04](plans/Buoc-04-Cau-truc-Backend-Cau-hinh-va-Database-Session.md) | `backend/app/schemas/*.py` | ⬜ |
-| 2.2 | Auth: bcrypt + JWT + endpoint `/auth/login` | 🔴 P0 | [Buoc-05](plans/Buoc-05-Xac-thuc-Dang-nhap-va-Phan-quyen-RBAC.md) | `backend/app/core/security.py`, `api/v1/endpoints/auth.py` | ⬜ |
-| 2.3 | RBAC dependency `require_role(["ADMIN", ...])` | 🔴 P0 | [Buoc-05](plans/Buoc-05-Xac-thuc-Dang-nhap-va-Phan-quyen-RBAC.md) | Tích hợp vào tất cả protected endpoints | ⬜ |
-| 2.4 | CRUD: Categories, Products (với `min_stock`, `current_stock`) | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Hang-hoa-Nhom-hang-va-Nha-cung-cap.md) | `api/v1/endpoints/products.py` + Swagger OK | ⬜ |
-| 2.5 | CRUD: Suppliers | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Hang-hoa-Nhom-hang-va-Nha-cung-cap.md) | `api/v1/endpoints/suppliers.py` + Swagger OK | ⬜ |
-| 2.6 | Tài liệu API Spec KT2 | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Hang-hoa-Nhom-hang-va-Nha-cung-cap.md) | `docs/SDLC/KT2/01_API_Specifications.md` | ⬜ |
-
-**Tiêu chí hoàn thành Giai đoạn 2:** Login trả JWT; CRUD products/suppliers pass test; Swagger UI hiển thị đủ endpoints.
+| 2.1 | Pydantic Schemas cho Users, Stations, ChargingPoints, Connectors | 🔴 P0 | [Buoc-04](plans/Buoc-04-Cau-truc-Backend-Cau-hinh-va-Database-Session.md) | `backend/app/schemas/*.py` | ⬜ |
+| 2.2 | Xác thực Auth (JWT, bcrypt) & phân quyền RBAC (`admin`, `operator`, `customer`) | 🔴 P0 | [Buoc-05](plans/Buoc-05-Xac-thuc-Dang-nhap-va-Phan-quyen-RBAC.md) | `api/v1/endpoints/auth.py`, `core/security.py` | ⬜ |
+| 2.3 | CRUD Trạm sạc (`Station`) & cấu hình công suất nguồn lưới | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Hang-hoa-Nhom-hang-va-Nha-cung-cap.md) | `api/v1/endpoints/stations.py` | ⬜ |
+| 2.4 | Quản lý Trụ sạc (`ChargingPoint`) và Cổng sạc (`Connector`: CCS2, Type 2) | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Hang-hoa-Nhom-hang-va-Nha-cung-cap.md) | `api/v1/endpoints/chargers.py` | ⬜ |
 
 ---
 
-### GIAI ĐOẠN 3 — Transaction ACID + Stock Ledger ⭐ Tâm điểm đề tài
+### GIAI ĐOẠN 3 — Biểu giá, Ví điện tử & Phiên sạc (ACID) ⭐ Trọng tâm kỹ thuật
 
-> **Mục tiêu:** Nghiệp vụ kho cốt lõi — phải đúng 100%, không được thỏa hiệp.
-> **Dependency:** Giai đoạn 2 (CRUD master data xong).
+> **Mục tiêu:** Hiện thực hóa logic tính tiền, trừ ví và quản lý phiên sạc tuyệt đối không sai lệch.
+> **Dependency:** Giai đoạn 2.
 > **Mốc nộp bài:** KT2
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 3.1 | `InventoryService.create_import()` — Transaction ACID nhập hàng + ghi Stock Ledger | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `backend/app/services/inventory_service.py` | ⬜ |
-| 3.2 | `InventoryService.create_export()` — Atomic check tồn + Rollback nếu âm + ghi Stock Ledger | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `backend/app/services/inventory_service.py` | ⬜ |
-| 3.3 | API endpoints nhập/xuất kho (`/import-notes`, `/export-notes`) | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `api/v1/endpoints/import_notes.py`, `export_notes.py` | ⬜ |
-| 3.4 | State Machine phiếu: `DRAFT → COMPLETED → CANCELLED` (hoàn trả tồn kho khi hủy) | 🟡 P1 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | Logic trong `inventory_service.py` | ⬜ |
-| 3.5 | API Báo cáo Nhập-Xuất-Tồn theo kỳ + tra cứu Stock Ledger | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `api/v1/endpoints/reports.py`, `stock_ledger.py` | ⬜ |
-| 3.6 | API cảnh báo hàng dưới tồn tối thiểu | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | Tích hợp vào `/products` hoặc `/reports/alerts` | ⬜ |
-| 3.7 | Tài liệu Transaction Design KT2 | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `docs/SDLC/KT2/02_Transaction_Design_and_Negative_Stock_Prevention.md` | ⬜ |
-| 3.8 | Minh chứng dùng AI trong SDLC KT2 | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `docs/SDLC/KT2/03_AI_Assisted_Development_Evidence.md` | ⬜ |
-
-**Tiêu chí hoàn thành Giai đoạn 3:** Xuất quá tồn → HTTP 400, `current_stock` không đổi; mỗi nhập/xuất tạo bản ghi `stock_ledger`; công thức `Tồn đầu + Nhập - Xuất = Tồn cuối` khớp.
+| 3.1 | Cấu hình Biểu giá linh hoạt (`Tariff`: giá TOU theo giờ cao/thấp điểm) | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `api/v1/endpoints/tariffs.py` | ⬜ |
+| 3.2 | Ví điện tử (`Wallet`) & Nạp tiền: Giao dịch ACID chống âm số dư | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `services/wallet_service.py` | ⬜ |
+| 3.3 | Bắt đầu & Dừng phiên sạc (`ChargingSession`): Khóa cổng sạc độc quyền | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `services/session_service.py` | ⬜ |
+| 3.4 | Quyết toán phiên sạc: Trừ tiền ví, xuất hóa đơn điện tử | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `api/v1/endpoints/sessions.py` | ⬜ |
 
 ---
 
-### GIAI ĐOẠN 4 — Tích hợp AI + Fallback Engine
+### GIAI ĐOẠN 4 — Module Giả lập Trạm sạc (Charging Simulator & Telemetry)
 
-> **Mục tiêu:** 3 chức năng AI hoạt động, offline-safe, không bịa số liệu.
-> **Dependency:** Giai đoạn 3 (có dữ liệu kho thực để AI phân tích).
+> **Mục tiêu:** Xây dựng module giả lập sạc pin xe điện sinh động phục vụ demo và kiểm thử.
+> **Dependency:** Giai đoạn 3.
+
+| # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
+|---|---|:---:|---|---|:---:|
+| 4.1 | Thuật toán mô phỏng đường cong sạc pin xe (SoC %, kW, V, A, nhiệt độ) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `app/simulator/charging_simulator.py` | ⬜ |
+| 4.2 | Kết nối WebSocket phát dữ liệu đo đếm realtime định kỳ | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `app/core/websocket.py`, `/ws/telemetry` | ⬜ |
+| 4.3 | Tự động kích hoạt dừng sạc khi: Pin đầy (100%), Hết tiền ví, hoặc Sự cố | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | Ngắt sạc an toàn | ⬜ |
+
+---
+
+### GIAI ĐOẠN 5 — Tích hợp AI (Smart Charging & Bảo trì) + Fallback
+
+> **Mục tiêu:** Ứng dụng AI thông minh có giá trị thực tế kết hợp cơ chế Fallback vững chắc.
+> **Dependency:** Giai đoạn 4.
 > **Mốc nộp bài:** KT3
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 4.1 | Data Aggregation Pipeline (SQL tổng hợp, loại bỏ giá mua) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `backend/app/services/ai_service.py` — hàm `tong_hop_du_lieu()` | ⬜ |
-| 4.2 | Kết nối Gemini API — Báo cáo tháng | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `ai_service.sinh_bao_cao()` | ⬜ |
-| 4.3 | Kết nối Gemini API — Gợi ý nhập hàng (kèm velocity 30 ngày) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `ai_service.goi_y_nhap_hang()` | ⬜ |
-| 4.4 | Kết nối Gemini API — Biến động bất thường (xuất >200%, tồn >30 ngày) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `ai_service.tom_tat_bien_dong()` | ⬜ |
-| 4.5 | Prompt Templates tập trung (không hardcode trong router) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | Module/file prompts riêng biệt | ⬜ |
-| 4.6 | Heuristic Fallback Engine (offline-safe, trả cùng cấu trúc JSON) | 🟡 P1 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `backend/app/services/fallback_service.py` | ⬜ |
-| 4.7 | API endpoints AI (`/ai/monthly-report`, `/ai/restock-suggestions`, `/ai/anomalies`) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `api/v1/endpoints/ai.py` | ⬜ |
-| 4.8 | Tài liệu KT3: Prompt Engineering + AI Architecture | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `docs/SDLC/KT3/01_Prompt_Engineering_and_Evaluation.md`, `03_AI_Integration_Architecture.md` | ⬜ |
-
-**Tiêu chí hoàn thành Giai đoạn 4:** 3 endpoint AI trả kết quả đúng cấu trúc; khi `GEMINI_API_KEY` trống, Fallback Engine kích hoạt tự động và giao diện không vỡ.
+| 5.1 | Tích hợp Google Gemini API: Phân tích và tạo khuyến nghị | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `services/ai_service.py` | ⬜ |
+| 5.2 | Smart Charging: Điều phối công suất chống quá tải nguồn trạm | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | API `/api/v1/ai/smart-charging` | ⬜ |
+| 5.3 | Predictive Maintenance: Phát hiện quá nhiệt và cảnh báo trụ sạc xuống cấp | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | API `/api/v1/ai/predictive-maintenance` | ⬜ |
+| 5.4 | Heuristic Fallback Engine: Tự động chia tải và cảnh báo khi mất mạng/hết quota | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `services/fallback_service.py` | ⬜ |
 
 ---
 
-### GIAI ĐOẠN 5 — Kiểm thử tự động (Pytest)
+### GIAI ĐOẠN 6 — Xây dựng Giao diện Web Frontend (React + Tailwind)
 
-> **Mục tiêu:** Bộ test đủ mạnh để phát hiện regression và minh chứng cho KT3.
-> **Dependency:** Giai đoạn 3 + 4 (có code để test).
-> **Mốc nộp bài:** KT3
+> **Mục tiêu:** Giao diện Web hiện đại, trực quan, phục vụ CPO, tài xế và giả lập sạc.
+> **Dependency:** Giai đoạn 3, 4, 5.
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 5.1 | `conftest.py` — Pytest fixtures (SQLite in-memory, test client) | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `backend/tests/conftest.py` | ⬜ |
-| 5.2 | `test_import_stock` — Nhập kho tăng đúng tồn + ghi đúng Stock Ledger | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `backend/tests/test_stock_transactions.py` | ⬜ |
-| 5.3 | `test_prevent_negative_stock` — Xuất > tồn → HTTP 400, tồn không đổi | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `backend/tests/test_stock_transactions.py` | ⬜ |
-| 5.4 | `test_stock_ledger_balance` — `balance_after` khớp `current_stock` sau mỗi giao dịch | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `backend/tests/test_stock_transactions.py` | ⬜ |
-| 5.5 | `test_ai_pipeline` — Mock Gemini, kiểm tra dữ liệu đầu vào không chứa giá mua | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `backend/tests/test_ai.py` | ⬜ |
-| 5.6 | `test_ai_fallback` — Khi API lỗi, fallback trả đúng cấu trúc | 🟡 P1 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `backend/tests/test_ai.py` | ⬜ |
-| 5.7 | Seed Data thực tế: 20+ SP, 3 user, giao dịch 60 ngày | 🟡 P1 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `backend/seed_data.py` | ⬜ |
-| 5.8 | Báo cáo kết quả test KT3 | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `docs/SDLC/KT3/02_Test_Plan_and_Results.md` | ⬜ |
-
-**Tiêu chí hoàn thành Giai đoạn 5:** `pytest` chạy không có test đỏ; các test không mock chính layer đang test (xem `CLAUDE.md §7`).
+| 6.1 | Auth Flow: Đăng nhập, đăng ký, lưu token, bảo vệ Route | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/context/AuthContext.jsx` | ⬜ |
+| 6.2 | Dashboard CPO: Thống kê doanh thu, trạng thái trụ, công suất trạm | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/Dashboard.jsx` | ⬜ |
+| 6.3 | Quản lý Trạm, Trụ sạc & Biểu giá | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/Stations.jsx` | ⬜ |
+| 6.4 | Màn hình Giả lập sạc (Simulator UI) & Đồ thị Realtime Recharts | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/Simulator.jsx` | ⬜ |
+| 6.5 | Driver Portal: Quản lý ví tiền, nạp tiền, phiên sạc của tôi | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/Wallet.jsx`, `Sessions.jsx` | ⬜ |
+| 6.6 | AI Advisor UI: Xem khuyến nghị điều phối công suất & bảo trì | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/AIAdvisor.jsx` | ⬜ |
 
 ---
 
-### GIAI ĐOẠN 6 — Frontend React + Tailwind CSS
+### GIAI ĐOẠN 7 — Kiểm thử, Seed Data & Đóng gói Cuối kỳ
 
-> **Mục tiêu:** Giao diện đầy đủ, sinh viên demo được toàn bộ nghiệp vụ.
-> **Dependency:** Giai đoạn 2+3+4 (API backend ổn định).
-> **Mốc nộp bài:** Cuối kỳ
+> **Mục tiêu:** Hệ thống kiểm thử đầy đủ, dữ liệu mẫu phong phú và kịch bản demo hoàn hảo.
+> **Mốc nộp bài:** Cuối kỳ (Final)
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 6.1 | Auth Context + Axios client + Trang Login | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `src/context/AuthContext.jsx`, `src/services/api.js`, `src/pages/Login.jsx` | ⬜ |
-| 6.2 | Dashboard: KPIs tổng quan + badge cảnh báo tồn kho | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `src/pages/Dashboard.jsx` | ⬜ |
-| 6.3 | Trang Hàng hóa + Nhóm hàng (CRUD + lọc tìm kiếm) | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `src/pages/Products.jsx` | ⬜ |
-| 6.4 | Trang Nhà cung cấp (CRUD) | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `src/pages/Suppliers.jsx` | ⬜ |
-| 6.5 | Trang Lập phiếu Nhập kho (form chọn hàng, tự tính tổng, cảnh báo tồn tức thời) | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `src/pages/Imports.jsx` | ⬜ |
-| 6.6 | Trang Lập phiếu Xuất kho (kiểm tra tồn realtime trước khi submit) | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `src/pages/Exports.jsx` | ⬜ |
-| 6.7 | Trang Báo cáo Nhập-Xuất-Tồn + tra cứu Thẻ kho | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `src/pages/Reports.jsx` | ⬜ |
-| 6.8 | Trang Trợ lý AI (3 nút 1-click: Báo cáo tháng · Gợi ý nhập · Bất thường) | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `src/pages/AIAssistant.jsx` | ⬜ |
-| 6.9 | Biểu đồ trực quan trên Dashboard (Recharts/Chart.js) | 🟢 P2 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | Tích hợp trong `Dashboard.jsx` | ⬜ |
-
-**Tiêu chí hoàn thành Giai đoạn 6:** Demo được toàn bộ luồng: Đăng nhập → Nhập kho → Xuất kho → Xem cảnh báo → Xem báo cáo AI.
+| 7.1 | Bộ Test Pytest: Test ACID ví tiền, test phiên sạc, test Fallback AI | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | `backend/tests/` pass 100% | ⬜ |
+| 7.2 | Script Seed Data: Tạo trạm sạc, trụ sạc, khách hàng, lịch sử phiên sạc | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | `backend/seed_data.py` | ⬜ |
+| 7.3 | Hoàn thiện tài liệu SDLC (KT1 -> KT2 -> KT3 -> Final) | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | Thư mục `docs/SDLC/` đầy đủ | ⬜ |
+| 7.4 | Kịch bản Demo thực tế phục vụ báo cáo hội đồng | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | Hướng dẫn chạy & kịch bản demo | ⬜ |
 
 ---
 
-### GIAI ĐOẠN 7 — Đóng gói + Tài liệu cuối
+## Lịch sử cập nhật
 
-> **Mục tiêu:** Giảng viên nhận repo, chạy được trong 5 phút, sinh viên thuyết trình được.
-> **Dependency:** Giai đoạn 6 (toàn bộ app hoàn chỉnh).
-> **Mốc nộp bài:** Cuối kỳ
-
-| # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
-|---|---|:---:|---|---|:---:|
-| 7.1 | `README.md` hướng dẫn cài đặt 1-click + kịch bản demo | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | `README.md` ở gốc dự án | ⬜ |
-| 7.2 | Báo cáo kỹ thuật tổng kết đồ án | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | `docs/SDLC/final/01_Final_Technical_Report.md` | ⬜ |
-| 7.3 | Hướng dẫn sử dụng + kịch bản demo chấm thi | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | `docs/SDLC/final/02_User_Guide_and_Demo_Script.md` | ⬜ |
-| 7.4 | Slide thuyết trình bảo vệ đồ án | 🟡 P1 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | `docs/SDLC/final/03_Presentation_Slides.md` | ⬜ |
-| 7.5 | Kiểm tra bảo mật cuối: CORS, JWT expiry, không lộ key | 🟡 P1 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | Review code + ghi chú trong báo cáo | ⬜ |
-
-**Tiêu chí hoàn thành Giai đoạn 7:** `git clone` + `pip install` + `npm install` + `python seed_data.py` → app chạy được trong ≤5 phút.
-
----
-
-## Lịch sử cập nhật MASTER-ROADMAP
-
-| Ngày | Phiên | Nội dung thay đổi |
+| Ngày | Người thực hiện | Thay đổi |
 |:---:|:---:|---|
-| 2026-09-20 | #1 | Tạo mới — thiết lập toàn bộ 8 giai đoạn |
-
-> **Quy ước ghi lịch sử:** Mỗi lần cập nhật file này (thay đổi trạng thái, thêm/sửa nhiệm vụ, điều chỉnh kế hoạch), thêm 1 dòng vào bảng trên với ngày và lý do. Không xóa dòng cũ.
+| 2026-09-22 | AI | Khởi tạo lại toàn bộ Master Roadmap chuyển đổi sang Nền tảng vận hành trạm sạc xe điện (EV CSMS) |
