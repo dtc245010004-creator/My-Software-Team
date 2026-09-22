@@ -5,3 +5,7 @@ psycopg2-binary
 alembic
 python-dotenv
 pydantic-settings
+argon2-cffi
+pyjwt
+pytest
+httpx
