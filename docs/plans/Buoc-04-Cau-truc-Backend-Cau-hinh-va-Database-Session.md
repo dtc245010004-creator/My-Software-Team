@@ -53,7 +53,14 @@ backend/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Hoàn thiện `core/config.py`, `core/database.py`, `core/websocket.py`.
-- [ ] Khởi chạy `app/main.py` kiểm tra `/health` và kết nối WebSocket mẫu.
-- [ ] Cập nhật trạng thái Bước 04 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Khung ứng dụng FastAPI (`app/main.py`)** | ⚠️ Cần xem xét | **Mới làm khung ban đầu (Task T-01)**: Đã có endpoint `/health`. **XUNG ĐỘT:** Thiếu `CORSMiddleware` cho phép kết nối từ Vite Frontend port `5173`, chưa có router prefix `/api/v1`. |
+| **2. Quản lý phiên CSDL (`app/core/database.py` & `config.py`)** | ⚠️ Cần xem xét | **Mới làm khung ban đầu**: Đã có `create_engine`, `SessionLocal`, `get_db()`. **XUNG ĐỘT:** Đang cấu hình DB `csms` (sai lệch với `docker-compose.yml`); thiếu cấu hình hỗ trợ SQLite fallback cho kiểm thử. |
+| **3. Tích hợp di chuyển lược đồ Alembic (`migrations/`)** | ⚠️ Cần xem xét | **Đã khởi tạo**: Đã có `alembic.ini`, `env.py` và revision đầu `5bd3f74937cd_init.py`. **NGUY CƠ CRASH:** `env.py` gọi `None.replace(...)` khi thiếu file `.env`. Cần lấy trực tiếp từ `settings.database_url`. |
+| **4. WebSocket Manager quản lý Telemetry (`core/websocket.py`)** | ⬜ Chưa bắt đầu | **Chưa có**: Chưa xây dựng `ConnectionManager` và WebSocket endpoint `/ws/telemetry` phục vụ truyền phát dữ liệu đo đếm sạc xe. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng hiện trạng (40% toàn bước / 75% Task T-01 - Cần xem xét do lỗi kết nối và CORS). |

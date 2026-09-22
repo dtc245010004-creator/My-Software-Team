@@ -72,10 +72,16 @@ frontend/src/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Hoàn thiện `AuthContext.jsx` và cấu hình Routing trong `App.jsx`.
-- [ ] Xây dựng `Dashboard.jsx`, `Stations.jsx`, `Wallet.jsx`.
-- [ ] Xây dựng `Simulator.jsx` tích hợp đồ thị Recharts và kết nối WebSocket realtime.
-- [ ] Xây dựng `AIAdvisor.jsx` hiển thị kết quả phân tích tải và bảo trì.
-- [ ] Soạn tài liệu bàn giao `docs/SDLC/KT3/02_Frontend_Architecture_and_UI_Guide.md`.
-- [ ] Cập nhật trạng thái Bước 10 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Khởi tạo khung Vite + React 19 + Oxlint** | ✅ Hoàn thành | Hiếu hoàn thành (Task S-01, PR #1): Biên dịch mượt mà, dọn sạch template mẫu. |
+| **2. Cài đặt Tailwind CSS & Styling System** | ⚠️ Cần xem xét | **XUNG ĐỘT:** Hiện đang dùng CSS thuần (`App.css`, `index.css`). [`sodo.md`](file:///E:/Nền%20tảng%20vận%20hành%20trạm%20sạc%20xe%20điện/sodo.md) quy định bắt buộc dùng Tailwind CSS để đồng bộ Design System. |
+| **3. Cấu hình Vite Proxy kết nối Backend** | ⚠️ Cần xem xét | **CHƯA CÓ:** File `vite.config.js` chưa khai báo proxy chuyển tiếp `/api` và `/ws` sang backend port 8000. |
+| **4. AuthContext & Hệ thống Layout (Sidebar, Navbar)** | ⬜ Chưa bắt đầu | Cần cấu hình lưu JWT Bearer token và bảo vệ route theo vai trò RBAC. |
+| **5. Các trang nghiệp vụ (Dashboard, Stations, Simulator, Wallet, AIAdvisor)** | ⬜ Chưa bắt đầu | Chuẩn bị triển khai các component Recharts và form nghiệp vụ. |
+| **6. Xuất tài liệu nộp mốc KT3 (`02_Frontend_Architecture_and_UI_Guide.md`)** | ⬜ Chưa bắt đầu | Sẽ xuất vào thư mục `docs/SDLC/KT3/`. |
+| **7. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (30% toàn bước / 85% Task S-01 - Cần xem xét do thiếu Tailwind & Proxy). |

@@ -76,9 +76,14 @@ backend/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Cài đặt Models & Schemas cho `Tariff`, `Wallet`, `Session`.
-- [ ] Cài đặt `wallet_service.py` với transaction ACID và khóa `with_for_update`.
-- [ ] Cài đặt `session_service.py` với kiểm tra độc quyền cổng sạc.
-- [ ] Soạn tài liệu bàn giao `docs/SDLC/KT2/02_Transaction_Design_and_Wallet_ACID.md`.
-- [ ] Cập nhật trạng thái Bước 07 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Models & Schemas Tariff, Wallet, Session** | ⬜ Chưa bắt đầu | Bắt buộc khai báo ràng buộc CSDL `CHECK (balance >= 0)`. |
+| **2. Giao dịch Ví tiền ACID (`wallet_service.py`)** | ⬜ Chưa bắt đầu | **Trọng tâm kỹ thuật**: Sử dụng Database Transaction và khóa dòng `with_for_update()`, cam kết không bao giờ âm ví. |
+| **3. Vòng đời phiên sạc & Chặn đồng thời (`session_service.py`)** | ⬜ Chưa bắt đầu | Khóa trạng thái cổng sạc độc quyền bằng atomic update, không cho 2 phiên sạc cùng lúc. |
+| **4. Xuất tài liệu nộp mốc KT2 (`02_Transaction_Design_and_Wallet_ACID.md`)** | ⬜ Chưa bắt đầu | Sẽ xuất vào thư mục `docs/SDLC/KT2/`. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (Đạt 0% - Chưa bắt đầu). |

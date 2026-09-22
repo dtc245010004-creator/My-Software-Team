@@ -70,8 +70,14 @@ backend/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Cài đặt `security.py` với bcrypt và JWT.
-- [ ] Cài đặt Model `User`, Schema và Router `/auth`.
-- [ ] Đảm bảo đăng ký người dùng tự động sinh ví điện tử liên kết.
-- [ ] Cập nhật trạng thái Bước 05 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Mã hóa mật khẩu & JWT (`core/security.py`)** | ⬜ Chưa bắt đầu | Chuẩn bị cài đặt bcrypt và sinh/giải mã JWT Bearer Token. |
+| **2. Model User & RBAC 3 vai trò** | ⬜ Chưa bắt đầu | Chuẩn bị tạo bảng `users` với role `admin`, `operator`, `customer`. |
+| **3. Endpoints Auth (`/api/v1/auth`)** | ⬜ Chưa bắt đầu | Chuẩn bị viết API đăng ký, đăng nhập, lấy thông tin cá nhân `/me`. |
+| **4. Cơ chế CPO Ownership Check (Dependency)** | ⬜ Chưa bắt đầu | Bắt buộc kiểm tra quyền sở hữu đa CPO theo yêu cầu bảo mật kiến trúc. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (Đạt 0% - Chưa bắt đầu). |

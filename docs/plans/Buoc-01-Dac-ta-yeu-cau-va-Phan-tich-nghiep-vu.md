@@ -60,8 +60,14 @@ docs/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Soạn thảo tài liệu SRS hoàn chỉnh vào `docs/SDLC/KT1/01_SRS_and_UseCases.md`.
-- [ ] Mô tả chi tiết 3 Actor và ma trận quyền hạn (CRUD Matrix).
-- [ ] Vẽ sơ đồ Use Case tổng thể và Use Case chi tiết cho luồng sạc và thanh toán ví.
-- [ ] Cập nhật trạng thái Bước 01 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Đặc tả hợp nhất hệ thống (`Prompt.md`, `nentang.md`)** | ✅ Hoàn thành | Đã hoàn thành 100% đặc tả 3 Actor, 4 phân hệ, 3 bài toán AI và 2 rơ-le an toàn. |
+| **2. Sơ đồ kiến trúc & Luồng vận hành (`sodo.md`)** | ✅ Hoàn thành | Đã vẽ sơ đồ 2 vòng lặp (Fast/Slow Loop), Ticket Handshake, Event Bus và State Machine. |
+| **3. Ma trận phân công nhiệm vụ (`phân công.md`)** | ✅ Hoàn thành | Đã phân bổ 6 thành viên theo 3 cặp chéo chức năng (Cross-functional Pairs). |
+| **4. Xuất tài liệu nộp mốc KT1 (`docs/SDLC/KT1/01_SRS_and_UseCases.md`)** | 🔄 Đang thực hiện | Cần trích xuất tổng hợp thành file tài liệu chính thức nộp mốc KT1. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (Đạt 90% - Không có xung đột). |

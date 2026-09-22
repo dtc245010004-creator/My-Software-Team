@@ -59,9 +59,14 @@ backend/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Cài đặt `ai_service.py` tích hợp Google Gemini API.
-- [ ] Cài đặt `fallback_service.py` với thuật toán chia tải và cảnh báo ngưỡng cứng.
-- [ ] Cài đặt API Endpoints `/api/v1/ai/...`.
-- [ ] Soạn tài liệu bàn giao `docs/SDLC/KT3/01_AI_Integration_and_Prompt_Evaluation.md`.
-- [ ] Cập nhật trạng thái Bước 09 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Fast Loop: Thuật toán Heuristic chia sẻ công suất** | ⬜ Chưa bắt đầu | Đảm bảo $\sum P_i \le P_{\text{grid\_max}}$ tức thì, độc lập với internet. |
+| **2. Slow Loop: Tích hợp Google Gemini API (`ai_service.py`)** | ⬜ Chưa bắt đầu | Chu kỳ 1–5 phút phân tích chuỗi thời gian, đề xuất bảo trì và tối ưu giá. |
+| **3. Heuristic Fallback Engine (`fallback_service.py`)** | ⬜ Chưa bắt đầu | Tự động chuyển 100% sang Heuristic khi offline hoặc dính lỗi 429 Quota. |
+| **4. Xuất tài liệu nộp mốc KT3 (`01_AI_Integration_and_Prompt_Evaluation.md`)** | ⬜ Chưa bắt đầu | Sẽ xuất vào thư mục `docs/SDLC/KT3/`. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (Đạt 0% - Chưa bắt đầu). |

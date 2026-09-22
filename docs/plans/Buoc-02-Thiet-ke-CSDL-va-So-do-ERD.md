@@ -57,8 +57,14 @@ docs/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Soạn thảo sơ đồ Mermaid ERD chi tiết 9 bảng.
-- [ ] Viết Data Dictionary đầy đủ kiểu dữ liệu, ràng buộc, mô tả tiếng Việt.
-- [ ] Viết câu lệnh DDL mẫu (SQLite & PostgreSQL compatible).
-- [ ] Cập nhật trạng thái Bước 02 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Sơ đồ Mermaid ERD chi tiết 9 bảng** | ⬜ Chưa bắt đầu | Chuẩn bị thiết kế các quan hệ: User, Station, Charger, Connector, Session, Wallet, Tariff. |
+| **2. Từ điển dữ liệu (Data Dictionary)** | ⬜ Chưa bắt đầu | Cần định nghĩa đầy đủ kiểu dữ liệu, khóa chính, khóa ngoại, ràng buộc CHECK `balance >= 0`. |
+| **3. Định nghĩa DDL tương thích SQLite & Postgres** | ⬜ Chưa bắt đầu | Chuẩn bị câu lệnh DDL khởi tạo schema hoàn chỉnh. |
+| **4. Xuất tài liệu nộp mốc KT1 (`02_Database_Design_ERD.md`)** | ⬜ Chưa bắt đầu | Sẽ xuất vào thư mục `docs/SDLC/KT1/`. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (Đạt 0% - Chưa bắt đầu). |

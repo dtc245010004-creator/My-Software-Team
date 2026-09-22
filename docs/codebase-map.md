@@ -23,8 +23,41 @@
 | `HUONGDAN.md` | Bản hướng dẫn vận hành chi tiết đồng bộ cùng README.md |
 | `phân công.md` | Bảng phân chia nhiệm vụ chi tiết cho 3 Backend và 3 Frontend kèm ma trận ghép cặp |
 
-| `test.md` | Báo cáo đối chiếu và đánh giá độc lập cho Hiếu và Study332 |
+| `test.md` | Báo cáo đối chiếu và đánh giá độc lập cho Hiếu, Study332 và KimiCoNY |
 | `huongdanfix.md` | Hướng dẫn khắc phục và đồng bộ mã nguồn chi tiết từng bước |
+| `docker-compose.yml` | Cấu hình container PostgreSQL 15 cục bộ |
+
+### `.github/`
+
+| File | Vai trò |
+|---|---|
+| `.github/workflows/main.yml` | Pipeline GitHub Actions tự động build Frontend |
+
+### `backend/`
+
+| File | Vai trò |
+|---|---|
+| `backend/requirements.txt` | Danh sách Python dependencies (FastAPI, SQLAlchemy, Alembic, psycopg2...) |
+| `backend/Dockerfile` | Dockerfile đóng gói backend FastAPI (Python 3.12-slim) |
+| `backend/alembic.ini` | Cấu hình công cụ di chuyển CSDL Alembic |
+| `backend/app/main.py` | Điểm vào FastAPI: endpoint `/` health check |
+| `backend/app/core/config.py` | Pydantic Settings đọc cấu hình kết nối CSDL |
+| `backend/app/core/database.py` | SQLAlchemy engine, SessionLocal, dependency `get_db()` |
+| `backend/migrations/env.py` | Môi trường di chuyển Alembic (gắn Base.metadata) |
+| `backend/migrations/script.py.mako` | File template sinh mã migration của Alembic |
+| `backend/migrations/versions/5bd3f74937cd_init.py` | File migration khởi tạo đầu tiên |
+
+### `frontend/`
+
+| File | Vai trò |
+|---|---|
+| `frontend/package.json` | Node dependencies: React 19, Vite, Oxlint |
+| `frontend/vite.config.js` | File cấu hình Vite cơ bản |
+| `frontend/index.html` | Entry point HTML cho Vite |
+| `frontend/src/main.jsx` | React root mount ứng dụng |
+| `frontend/src/App.jsx` | Màn hình Staging cơ bản kiểm tra ứng dụng chạy được |
+| `frontend/.oxlintrc.json` | Cấu hình bộ linter Oxlint kiểm tra cú pháp nhanh |
+| `frontend/README.md` | Tài liệu hướng dẫn khởi chạy Frontend cục bộ |
 
 ### `docs/`
 
@@ -58,11 +91,7 @@
 
 | File | Sẽ tạo ở Bước | Vai trò dự kiến |
 |---|:---:|---|
-| `backend/requirements.txt` | 03 | Danh sách Python dependencies (FastAPI, SQLAlchemy, websockets, etc.) |
 | `backend/.env.example` | 03 | Mẫu biến môi trường |
-| `backend/app/main.py` | 04 | Điểm vào FastAPI: khởi tạo app, CORS, routes & WebSocket endpoint |
-| `backend/app/core/config.py` | 04 | Pydantic Settings — cấu hình JWT, DB URL, Gemini API Key |
-| `backend/app/core/database.py` | 04 | SQLAlchemy engine + SessionLocal + `get_db()` |
 | `backend/app/models/user.py` | 02 / 05 | Model người dùng, phân quyền RBAC (`admin`, `operator`, `customer`) |
 | `backend/app/models/station.py` | 02 / 06 | Model Trạm sạc (`Station`), Trụ sạc (`ChargingPoint`), Cổng (`Connector`) |
 | `backend/app/models/session.py` | 02 / 07 | Model Phiên sạc (`ChargingSession`) |
@@ -92,14 +121,12 @@
 
 | File | Sẽ tạo ở Bước | Vai trò dự kiến |
 |---|:---:|---|
-| `frontend/package.json` | 10 | Node dependencies: react 19, lucide-react, recharts, axios; devDeps: vite, tailwindcss, oxlint, eslint |
-| `frontend/vite.config.js` | 10 | Vite config (React plugin, proxy `/api` và `/ws` → backend) |
-| `frontend/index.html` | 10 | Entry HTML cho Vite |
-| `frontend/src/main.jsx` | 10 | React root — mount `<App />` vào `#root` |
-| `frontend/src/App.jsx` | 10 | Khung ứng dụng chính, định tuyến các trang |
+| `frontend/src/context/AuthContext.jsx` | 10 | Context quản lý phiên đăng nhập và phân quyền giao diện |
 | `frontend/src/pages/Dashboard.jsx` | 10 | Trang tổng quan mạng lưới trạm sạc, công suất và doanh thu |
 | `frontend/src/pages/Stations.jsx` | 10 | Trang quản lý danh sách trạm, chi tiết trụ sạc và cổng sạc |
 | `frontend/src/pages/Simulator.jsx` | 10 | Giao diện mô phỏng cắm sạc & đồ thị realtime trực quan |
 | `frontend/src/pages/Sessions.jsx` | 10 | Lịch sử phiên sạc và chi tiết hóa đơn điện tử |
 | `frontend/src/pages/Wallet.jsx` | 10 | Quản lý ví cá nhân, nạp tiền và lịch sử giao dịch |
 | `frontend/src/pages/AIAdvisor.jsx` | 10 | Màn hình phân tích điều phối công suất & gợi ý bảo trì AI |
+| `frontend/src/services/api.js` | 10 | Cấu hình Axios client và interceptor Bearer Token |
+| `frontend/src/services/websocket.js` | 10 | Client kết nối WebSocket nhận telemetry sạc realtime |

@@ -54,9 +54,14 @@ backend/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Cài đặt `charging_simulator.py` với thuật toán đường cong sạc pin chân thực.
-- [ ] Kết nối simulator với WebSocket để phát dữ liệu realtime mỗi 2 giây.
-- [ ] Xử lý tự động ngắt sạc khi pin đầy hoặc hết tiền ví.
-- [ ] Viết tài liệu bàn giao `docs/SDLC/KT2/03_Simulator_and_Telemetry_Design.md`.
-- [ ] Cập nhật trạng thái Bước 08 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Thuật toán sạc pin CC-CV (`charging_simulator.py`)** | ⬜ Chưa bắt đầu | Mô phỏng đường cong sạc pin: SoC tăng 20% -> 80% (công suất max), 80% -> 100% (giảm dòng). |
+| **2. Rơ-le bảo vệ phần cứng (Hardware Safety Cut-off)** | ⬜ Chưa bắt đầu | Ngắt khẩn cấp tức thì khi nhiệt độ súng sạc $T > 85^\circ\text{C}$ hoặc sụt áp lưới. |
+| **3. In-Memory State Buffer & Telemetry Loop** | ⬜ Chưa bắt đầu | Cập nhật dữ liệu RAM nhịp 2–5s, giảm tải đĩa, phát WebSocket realtime tới UI. |
+| **4. Xuất tài liệu nộp mốc KT2 (`03_Simulator_and_Telemetry_Design.md`)** | ⬜ Chưa bắt đầu | Sẽ xuất vào thư mục `docs/SDLC/KT2/`. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (Đạt 0% - Chưa bắt đầu). |

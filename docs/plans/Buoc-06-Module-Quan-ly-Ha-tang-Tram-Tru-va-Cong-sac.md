@@ -54,8 +54,14 @@ backend/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Cài đặt Models `Station`, `ChargingPoint`, `Connector`.
-- [ ] Cài đặt Schemas và `station_service.py`.
-- [ ] Cài đặt Endpoints `/stations` và `/chargers`.
-- [ ] Cập nhật trạng thái Bước 06 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Models Station, ChargingPoint, Connector** | ⬜ Chưa bắt đầu | Cần cấu hình quan hệ phân cấp: Station -> ChargingPoint -> Connector. |
+| **2. Quản lý công suất nguồn trạm (`grid_capacity_kw`)** | ⬜ Chưa bắt đầu | Tham số quan trọng làm đầu vào cho thuật toán điều phối tải AI / Heuristic. |
+| **3. Nghiệp vụ hạ tầng (`station_service.py`)** | ⬜ Chưa bắt đầu | Tách biệt hoàn toàn nghiệp vụ khỏi tầng router theo quy chuẩn kiến trúc. |
+| **4. Endpoints CRUD `/stations` và `/chargers`** | ⬜ Chưa bắt đầu | Cung cấp API quản lý danh sách trạm, bộ lọc theo thành phố, công suất. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (Đạt 0% - Chưa bắt đầu). |

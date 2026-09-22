@@ -52,7 +52,14 @@
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Cập nhật `.env.example` với đầy đủ các biến môi trường của hệ thống trạm sạc.
-- [ ] Cấu hình `docker-compose.yml` hỗ trợ PostgreSQL + Backend + Frontend.
-- [ ] Cập nhật trạng thái Bước 03 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Khởi tạo container CSDL cục bộ (`docker-compose.yml`)** | ⚠️ Cần xem xét | **Mới làm khung ban đầu**: Đã có container Postgres 15 chạy được. **XUNG ĐỘT:** Đang đặt tên DB `ev_charging_system` (user `admin`), chưa khớp với chuẩn `ev_csms_db` (user `postgres`) trong `sodo.md`. |
+| **2. Đóng gói Backend (`backend/Dockerfile` & `requirements.txt`)** | 🔄 Đang thực hiện | **Đã có file**: Dockerfile Python 3.12-slim và requirements cốt lõi. Chưa ghép service `backend` vào `docker-compose.yml` để chạy đồng thời. |
+| **3. Cấu hình file biến môi trường mẫu (`.env.example`)** | ⚠️ Cần xem xét | **Chưa có**: Cả thư mục gốc và `backend/` đều thiếu `.env.example`, gây nguy cơ crash khi chạy code mới clone. |
+| **4. Ghép nối toàn bộ hạ tầng Docker Compose** | ⬜ Chưa bắt đầu | Cần cấu hình đồng bộ 3 service: `db` + `backend` + `frontend` chạy qua 1 lệnh `docker compose up`. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng hiện trạng (55% - Cần xem xét do xung đột CSDL). |

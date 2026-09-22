@@ -81,9 +81,14 @@ docs/SDLC/final/
 
 ---
 
-## 4. Checklist thực hiện
-- [ ] Viết bộ test `tests/test_wallet_acid.py`, `tests/test_sessions.py`, `tests/test_ai_fallback.py`.
-- [ ] Chạy `pytest` xác nhận toàn bộ test cases màu xanh.
-- [ ] Viết `seed_data.py` và kiểm tra nạp dữ liệu thành công vào CSDL.
-- [ ] Hoàn thiện các tài liệu mốc Cuối kỳ trong `docs/SDLC/final/`.
-- [ ] Cập nhật trạng thái Bước 11 trong `docs/plans/TIEN-DO.md`.
+## 4. Bảng kiểm tra thực hiện & Trạng thái (Execution Checklist)
+
+> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+
+| Hạng mục kiểm tra | Trạng thái | Đánh giá thực tế & Nguyên nhân trạng thái |
+|---|:---:|---|
+| **1. Bộ Test tự động Pytest (`backend/tests/`)** | ⬜ Chưa bắt đầu | Bắt buộc kiểm thử: ACID ví tiền (luồng đồng thời), ngắt an toàn súng sạc $T > 85^\circ\text{C}$ và AI Fallback. |
+| **2. Script nạp dữ liệu mẫu (`backend/seed_data.py`)** | ⬜ Chưa bắt đầu | Nạp 3 trạm GPS thật, 8 trụ, 15 ví tài xế, 50 phiên sạc lịch sử. |
+| **3. Trọn bộ tài liệu nghiệm thu SDLC 4 mốc** | ⬜ Chưa bắt đầu | Hoàn thiện tài liệu bàn giao `docs/SDLC/` (`KT1`, `KT2`, `KT3`, `final/`). |
+| **4. Kịch bản Demo thực nghiệm & Slide bảo vệ** | ⬜ Chưa bắt đầu | Kịch bản demo 5 bước tương tác trực quan trước hội đồng. |
+| **5. Cập nhật tiến độ vào `docs/plans/TIEN-DO.md`** | ✅ Hoàn thành | Đã ghi nhận đúng tiến độ (Đạt 0% - Chưa bắt đầu). |
