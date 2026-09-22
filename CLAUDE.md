@@ -71,7 +71,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 **Nền tảng vận hành trạm sạc xe điện tích hợp AI (EV Charging Station Management System - EV CSMS).**
 Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc xe điện, bao gồm: quản lý trạm sạc, trụ sạc (EVSE), cổng sạc (Connector), cấu hình biểu giá điện linh hoạt (TOU Tariff), ví điện tử khách hàng (Wallet), phiên sạc thời gian thực (Charging Sessions) và giám sát telemetry (SoC %, công suất kW, kWh, chi phí). Đồng thời, tích hợp AI hỗ trợ điều phối công suất thông minh (Smart Charging/Load Balancing), dự báo bảo trì kỹ thuật (Predictive Maintenance) và tư vấn tối ưu biểu giá doanh thu.
 
-Đặc tả gốc: [`nentang.md`](nentang.md). Đặc tả hợp nhất: [`Prompt.md`](Prompt.md).
+Đặc tả gốc: [`nentang.md`](nentang.md). Đặc tả hợp nhất: [`Prompt.md`](Prompt.md). Sơ đồ kiến trúc & luồng vận hành: [`sodo.md`](sodo.md).
 
 > ⚠️ **Lưu ý quan trọng**: Dự án là một nền tảng web hoàn chỉnh, trực quan, có module giả lập sạc (Simulator) để người dùng/hội đồng có thể tương tác trực tiếp. Các kịch bản trong `docs/SDLC/` được chia thành các mốc nhỏ (KT1, KT2, KT3, Final) để phục vụ chấm điểm tiến độ bài tập cá nhân, không áp đặt các quy chuẩn của đề tài quản lý kho cũ vào hệ thống này.
 
@@ -92,11 +92,11 @@ Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc
 > Xem `docs/codebase-map.md` để biết chính xác file nào đang tồn tại và vai trò của nó.
 
 ```
-E:\Nền tảng vận hành trạm sạc xe điện\
-├── backend/
+<project-root>/
+├── backend/                      <- (Sẽ scaffold ở Bước 03 & 04)
 │   ├── app/
 │   │   ├── api/v1/endpoints/     <- stations, chargers, sessions, wallet, tariffs, ai
-│   │   ├── core/                 <- config.py, database.py, security.py
+│   │   ├── core/                 <- config.py, database.py, security.py, websocket.py
 │   │   ├── models/               <- user, station, charging_point, connector, session, wallet, tariff
 │   │   ├── schemas/              <- pydantic schemas cho request/response
 │   │   ├── services/             <- station_service, session_service, wallet_service, ai_service
@@ -105,7 +105,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   ├── tests/                    <- test_sessions, test_wallet_acid, test_tariffs, test_ai_fallback
 │   ├── requirements.txt
 │   └── .env.example
-├── frontend/
+├── frontend/                     <- (Sẽ scaffold ở Bước 10)
 │   ├── src/
 │   │   ├── components/           <- Navbar, Sidebar, StatCard, ChargingChart, LiveGauge
 │   │   ├── context/              <- AuthContext, NotificationContext
@@ -127,13 +127,16 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 ├── docs/
 │   ├── codebase-map.md           <- Bản đồ mã nguồn
 │   ├── MASTER-ROADMAP.md         <- Lộ trình 8 giai đoạn toàn diện
+│   ├── implementation_plan.md    <- Phân tích yêu cầu & kế hoạch kiến trúc
 │   ├── plans/
 │   │   ├── TIEN-DO.md            <- Trạng thái tiến độ thực tế
-│   │   └── Buoc-NN-*.md          <- Kế hoạch chi tiết từng bước
+│   │   └── Buoc-NN-*.md          <- Kế hoạch chi tiết từng bước (Buoc-01 -> Buoc-11)
 │   └── SDLC/                     <- Hồ sơ mốc đánh giá bài tập cá nhân (KT1, KT2, KT3, Final)
 ├── nentang.md                    <- Đặc tả nghiệp vụ nền tảng trạm sạc xe điện
 ├── Prompt.md                     <- Đặc tả hợp nhất hệ thống
-├── README.md                     <- Hướng dẫn vận hành phiên làm việc
+├── sodo.md                       <- Sơ đồ kiến trúc tổng thể & 2 vòng lặp (Dual-loop)
+├── yêu cầu.md                    <- Bản phản biện kỹ thuật & rủi ro cần xem lại
+├── HUONGDAN.md                   <- Hướng dẫn vận hành phiên làm việc
 └── GEMINI.md                     <- Quy tắc hướng dẫn AI
 ```
 
@@ -156,7 +159,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 
 ## Mở phiên — làm đủ 3 việc này trước khi làm bất cứ gì khác
 
-1. **Làm việc tại `E:\Nền tảng vận hành trạm sạc xe điện`.**
+1. **Làm việc tại thư mục gốc dự án (mặc định: thư mục làm việc hiện tại hoặc biến môi trường `PROJECT_ROOT`; trên máy dev hiện tại là `E:\Nền tảng vận hành trạm sạc xe điện`).**
 2. Đọc [`docs/codebase-map.md`](docs/codebase-map.md) để nắm rõ hiện trạng file.
 3. Đọc [`docs/plans/TIEN-DO.md`](docs/plans/TIEN-DO.md) để biết đang ở bước nào và công việc tiếp theo.
 

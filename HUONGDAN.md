@@ -15,10 +15,11 @@
 2. docs/codebase-map.md — file nào đang có, vai trò gì
 3. docs/plans/TIEN-DO.md — đang ở bước nào, còn gì chưa xong
 4. docs/MASTER-ROADMAP.md — bức tranh toàn cảnh 8 giai đoạn
+5. sodo.md — sơ đồ kiến trúc tổng thể, 2 vòng lặp (Dual-Loop) & máy trạng thái
 ```
 
 > Nếu đang ở giữa 1 bước cụ thể, bổ sung thêm:
-> `5. docs/plans/Buoc-NN-<tên>.md — kế hoạch chi tiết bước đang làm`
+> `6. docs/plans/Buoc-NN-<tên>.md — kế hoạch chi tiết bước đang làm`
 
 ---
 
@@ -63,10 +64,13 @@ Trước khi bắt đầu [Bước XX], hãy trả lời:
 | Tài liệu | Mục đích | Khi nào dùng |
 |---|---|---|
 | [GEMINI.md](GEMINI.md) | Quy tắc toàn dự án | Nhắc AI đọc đầu phiên |
+| [HUONGDAN.md](HUONGDAN.md) | Hướng dẫn vận hành phiên làm việc | Đọc trước khi mở phiên |
 | [docs/MASTER-ROADMAP.md](docs/MASTER-ROADMAP.md) | Bức tranh 8 giai đoạn | Xem tổng thể, điều hướng |
 | [docs/plans/TIEN-DO.md](docs/plans/TIEN-DO.md) | Trạng thái thực tế | Biết đang ở đâu |
 | [docs/codebase-map.md](docs/codebase-map.md) | Bản đồ mã nguồn | Khi AI hỏi "file X ở đâu" |
-| [nentang.md](nentang.md) | Đặc tả nền tảng trạm sạc xe điện | Đối chiếu yêu cầu nghiệp vụ |
+| [sodo.md](sodo.md) | Sơ đồ kiến trúc & luồng vận hành | Đối chiếu kiến trúc, dual-loop, WebSocket, máy trạng thái |
+| [yêu cầu.md](yêu%20cầu.md) | Đánh giá phản biện & rủi ro kỹ thuật | Xem lại 9 điểm rủi ro & đề xuất |
+| [nentang.md](nentang.md) | Đặc tả nền tảng trạm sạc xe điện | Đối chiếu yêu cầu nghiệp vụ gốc |
 | [Prompt.md](Prompt.md) | Đặc tả hợp nhất hệ thống | Khi cần tra chi tiết kỹ thuật |
 
 ---
@@ -74,8 +78,8 @@ Trước khi bắt đầu [Bước XX], hãy trả lời:
 ## 📊 TRẠNG THÁI DỰ ÁN (cập nhật thủ công)
 
 ```
-Giai đoạn hiện tại : 🔄 Giai đoạn 0 — Nền tảng dự án & Đặc tả hệ thống
-Bước đang làm      : Soạn lại kịch bản tài liệu và đặc tả trạm sạc xe điện
+Giai đoạn hiện tại : 🔄 Giai đoạn 0 & 1 — Nền tảng dự án, Sơ đồ kiến trúc & Hồ sơ KT1
+Bước đang làm      : Bước 01 — Hoàn thiện đặc tả yêu cầu, use case và sơ đồ kiến trúc
 Mốc SDLC gần nhất  : KT1 (Đặc tả, Thiết kế ERD & Kiến trúc)
 Ngày cập nhật dòng này: 2026-09-22
 ```

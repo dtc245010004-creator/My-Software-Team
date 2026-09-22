@@ -24,7 +24,7 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | Giai đoạn | Mô tả | Mốc SDLC | Tiến độ |
 |:---:|---|:---:|:---:|
-| **0** | Nền tảng dự án & Scaffold | — | 🔄 Đang thực hiện |
+| **0** | Nền tảng dự án & Khởi tạo tài liệu | — | 🔄 Đang thực hiện |
 | **1** | Đặc tả & Thiết kế CSDL (ERD) | KT1 | ⬜ Chưa bắt đầu |
 | **2** | Backend Auth + Quản lý Hạ tầng trạm | KT2 | ⬜ Chưa bắt đầu |
 | **3** | Biểu giá, Ví tiền & Phiên sạc (ACID) | KT2 | ⬜ Chưa bắt đầu |
@@ -43,15 +43,15 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 ### GIAI ĐOẠN 0 — Nền tảng dự án & Khởi tạo
 
-> **Mục tiêu:** Dựng khung ứng dụng chạy được (FastAPI + React + WebSocket) trước khi viết nghiệp vụ.
+> **Mục tiêu:** Hoàn thiện khung đặc tả, sơ đồ kiến trúc và quy ước làm việc trước khi viết mã nguồn.
 > **Dependency:** Không có — thực hiện đầu tiên.
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 0.1 | Khởi tạo đặc tả `nentang.md` & `Prompt.md` | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `nentang.md`, `Prompt.md` | ✅ |
-| 0.2 | Chuẩn hóa `GEMINI.md`, `CLAUDE.md`, `README.md` | 🔴 P0 | — | File quy tắc & hướng dẫn vận hành | ✅ |
-| 0.3 | Cấu hình Backend: `requirements.txt`, `.env.example`, `database.py` | 🔴 P0 | [Buoc-03](plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) | FastAPI app khởi động được tại `/health` | 🔄 |
-| 0.4 | Khởi tạo Frontend: React 18 + Vite + Tailwind CSS + Lucide Icons | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind.md) | Frontend chạy được tại `localhost:5173` | 🔄 |
+| 0.1 | Khởi tạo đặc tả `nentang.md`, `Prompt.md` & `sodo.md` | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `nentang.md`, `Prompt.md`, `sodo.md` | ✅ |
+| 0.2 | Chuẩn hóa `GEMINI.md`, `CLAUDE.md`, `README.md`, `HUONGDAN.md` | 🔴 P0 | — | File quy tắc & hướng dẫn vận hành | ✅ |
+| 0.3 | Cấu hình Backend: `requirements.txt`, `.env.example`, `database.py` | 🔴 P0 | [Buoc-03](plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) | FastAPI app khởi động được tại `/health` | ⬜ |
+| 0.4 | Khởi tạo Frontend: React 18 + Vite + Tailwind CSS + Lucide Icons | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md) | Frontend chạy được tại `localhost:5173` | ⬜ |
 
 ---
 
@@ -79,8 +79,8 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 |---|---|:---:|---|---|:---:|
 | 2.1 | Pydantic Schemas cho Users, Stations, ChargingPoints, Connectors | 🔴 P0 | [Buoc-04](plans/Buoc-04-Cau-truc-Backend-Cau-hinh-va-Database-Session.md) | `backend/app/schemas/*.py` | ⬜ |
 | 2.2 | Xác thực Auth (JWT, bcrypt) & phân quyền RBAC (`admin`, `operator`, `customer`) | 🔴 P0 | [Buoc-05](plans/Buoc-05-Xac-thuc-Dang-nhap-va-Phan-quyen-RBAC.md) | `api/v1/endpoints/auth.py`, `core/security.py` | ⬜ |
-| 2.3 | CRUD Trạm sạc (`Station`) & cấu hình công suất nguồn lưới | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Hang-hoa-Nhom-hang-va-Nha-cung-cap.md) | `api/v1/endpoints/stations.py` | ⬜ |
-| 2.4 | Quản lý Trụ sạc (`ChargingPoint`) và Cổng sạc (`Connector`: CCS2, Type 2) | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Hang-hoa-Nhom-hang-va-Nha-cung-cap.md) | `api/v1/endpoints/chargers.py` | ⬜ |
+| 2.3 | CRUD Trạm sạc (`Station`) & cấu hình công suất nguồn lưới | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Quan-ly-Ha-tang-Tram-Tru-va-Cong-sac.md) | `api/v1/endpoints/stations.py` | ⬜ |
+| 2.4 | Quản lý Trụ sạc (`ChargingPoint`) và Cổng sạc (`Connector`: CCS2, Type 2) | 🔴 P0 | [Buoc-06](plans/Buoc-06-Module-Quan-ly-Ha-tang-Tram-Tru-va-Cong-sac.md) | `api/v1/endpoints/chargers.py` | ⬜ |
 
 ---
 
@@ -92,10 +92,10 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 3.1 | Cấu hình Biểu giá linh hoạt (`Tariff`: giá TOU theo giờ cao/thấp điểm) | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `api/v1/endpoints/tariffs.py` | ⬜ |
-| 3.2 | Ví điện tử (`Wallet`) & Nạp tiền: Giao dịch ACID chống âm số dư | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `services/wallet_service.py` | ⬜ |
-| 3.3 | Bắt đầu & Dừng phiên sạc (`ChargingSession`): Khóa cổng sạc độc quyền | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `services/session_service.py` | ⬜ |
-| 3.4 | Quyết toán phiên sạc: Trừ tiền ví, xuất hóa đơn điện tử | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Nhap-xuat-kho-va-The-kho-Transaction-ACID.md) | `api/v1/endpoints/sessions.py` | ⬜ |
+| 3.1 | Cấu hình Biểu giá linh hoạt (`Tariff`: giá TOU theo giờ cao/thấp điểm) | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Bieu-gia-Vi-dien-tu-va-Phien-sac-ACID.md) | `api/v1/endpoints/tariffs.py` | ⬜ |
+| 3.2 | Ví điện tử (`Wallet`) & Nạp tiền: Giao dịch ACID chống âm số dư | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Bieu-gia-Vi-dien-tu-va-Phien-sac-ACID.md) | `services/wallet_service.py` | ⬜ |
+| 3.3 | Bắt đầu & Dừng phiên sạc (`ChargingSession`): Khóa cổng sạc độc quyền | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Bieu-gia-Vi-dien-tu-va-Phien-sac-ACID.md) | `services/session_service.py` | ⬜ |
+| 3.4 | Quyết toán phiên sạc: Trừ tiền ví, xuất hóa đơn điện tử | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Bieu-gia-Vi-dien-tu-va-Phien-sac-ACID.md) | `api/v1/endpoints/sessions.py` | ⬜ |
 
 ---
 
@@ -106,9 +106,9 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 4.1 | Thuật toán mô phỏng đường cong sạc pin xe (SoC %, kW, V, A, nhiệt độ) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `app/simulator/charging_simulator.py` | ⬜ |
-| 4.2 | Kết nối WebSocket phát dữ liệu đo đếm realtime định kỳ | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | `app/core/websocket.py`, `/ws/telemetry` | ⬜ |
-| 4.3 | Tự động kích hoạt dừng sạc khi: Pin đầy (100%), Hết tiền ví, hoặc Sự cố | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-AI-Tro-ly-va-Scheduler-Quet-ton-kho.md) | Ngắt sạc an toàn | ⬜ |
+| 4.1 | Thuật toán mô phỏng đường cong sạc pin xe (SoC %, kW, V, A, nhiệt độ) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-Gia-lap-Tram-sac-Simulator-va-Telemetry.md) | `app/simulator/charging_simulator.py` | ⬜ |
+| 4.2 | Kết nối WebSocket phát dữ liệu đo đếm realtime định kỳ | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-Gia-lap-Tram-sac-Simulator-va-Telemetry.md) | `app/core/websocket.py`, `/ws/telemetry` | ⬜ |
+| 4.3 | Tự động kích hoạt dừng sạc khi: Pin đầy (100%), Hết tiền ví, hoặc Sự cố | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-Gia-lap-Tram-sac-Simulator-va-Telemetry.md) | Ngắt sạc an toàn | ⬜ |
 
 ---
 
@@ -120,10 +120,10 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 5.1 | Tích hợp Google Gemini API: Phân tích và tạo khuyến nghị | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `services/ai_service.py` | ⬜ |
-| 5.2 | Smart Charging: Điều phối công suất chống quá tải nguồn trạm | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | API `/api/v1/ai/smart-charging` | ⬜ |
-| 5.3 | Predictive Maintenance: Phát hiện quá nhiệt và cảnh báo trụ sạc xuống cấp | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | API `/api/v1/ai/predictive-maintenance` | ⬜ |
-| 5.4 | Heuristic Fallback Engine: Tự động chia tải và cảnh báo khi mất mạng/hết quota | 🔴 P0 | [Buoc-09](plans/Buoc-09-Xay-dung-Frontend-Web-React-Tailwind.md) | `services/fallback_service.py` | ⬜ |
+| 5.1 | Tích hợp Google Gemini API: Phân tích và tạo khuyến nghị | 🔴 P0 | [Buoc-09](plans/Buoc-09-Module-AI-Dieu-phoi-tai-Bao-tri-va-Fallback.md) | `services/ai_service.py` | ⬜ |
+| 5.2 | Smart Charging: Điều phối công suất chống quá tải nguồn trạm | 🔴 P0 | [Buoc-09](plans/Buoc-09-Module-AI-Dieu-phoi-tai-Bao-tri-va-Fallback.md) | API `/api/v1/ai/smart-charging` | ⬜ |
+| 5.3 | Predictive Maintenance: Phát hiện quá nhiệt và cảnh báo trụ sạc xuống cấp | 🔴 P0 | [Buoc-09](plans/Buoc-09-Module-AI-Dieu-phoi-tai-Bao-tri-va-Fallback.md) | API `/api/v1/ai/predictive-maintenance` | ⬜ |
+| 5.4 | Heuristic Fallback Engine: Tự động chia tải và cảnh báo khi mất mạng/hết quota | 🔴 P0 | [Buoc-09](plans/Buoc-09-Module-AI-Dieu-phoi-tai-Bao-tri-va-Fallback.md) | `services/fallback_service.py` | ⬜ |
 
 ---
 
@@ -134,12 +134,12 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 6.1 | Auth Flow: Đăng nhập, đăng ký, lưu token, bảo vệ Route | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/context/AuthContext.jsx` | ⬜ |
-| 6.2 | Dashboard CPO: Thống kê doanh thu, trạng thái trụ, công suất trạm | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/Dashboard.jsx` | ⬜ |
-| 6.3 | Quản lý Trạm, Trụ sạc & Biểu giá | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/Stations.jsx` | ⬜ |
-| 6.4 | Màn hình Giả lập sạc (Simulator UI) & Đồ thị Realtime Recharts | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/Simulator.jsx` | ⬜ |
-| 6.5 | Driver Portal: Quản lý ví tiền, nạp tiền, phiên sạc của tôi | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/Wallet.jsx`, `Sessions.jsx` | ⬜ |
-| 6.6 | AI Advisor UI: Xem khuyến nghị điều phối công suất & bảo trì | 🔴 P0 | [Buoc-10](plans/Buoc-10-Viet-Bo-Test-Tu-dong-Pytest-va-Seed-Data.md) | `src/pages/AIAdvisor.jsx` | ⬜ |
+| 6.1 | Auth Flow: Đăng nhập, đăng ký, lưu token, bảo vệ Route | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md) | `src/context/AuthContext.jsx` | ⬜ |
+| 6.2 | Dashboard CPO: Thống kê doanh thu, trạng thái trụ, công suất trạm | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md) | `src/pages/Dashboard.jsx` | ⬜ |
+| 6.3 | Quản lý Trạm, Trụ sạc & Biểu giá | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md) | `src/pages/Stations.jsx` | ⬜ |
+| 6.4 | Màn hình Giả lập sạc (Simulator UI) & Đồ thị Realtime Recharts | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md) | `src/pages/Simulator.jsx` | ⬜ |
+| 6.5 | Driver Portal: Quản lý ví tiền, nạp tiền, phiên sạc của tôi | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md) | `src/pages/Wallet.jsx`, `Sessions.jsx` | ⬜ |
+| 6.6 | AI Advisor UI: Xem khuyến nghị điều phối công suất & bảo trì | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md) | `src/pages/AIAdvisor.jsx` | ⬜ |
 
 ---
 
@@ -150,10 +150,10 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 |---|---|:---:|---|---|:---:|
-| 7.1 | Bộ Test Pytest: Test ACID ví tiền, test phiên sạc, test Fallback AI | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | `backend/tests/` pass 100% | ⬜ |
-| 7.2 | Script Seed Data: Tạo trạm sạc, trụ sạc, khách hàng, lịch sử phiên sạc | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | `backend/seed_data.py` | ⬜ |
-| 7.3 | Hoàn thiện tài liệu SDLC (KT1 -> KT2 -> KT3 -> Final) | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | Thư mục `docs/SDLC/` đầy đủ | ⬜ |
-| 7.4 | Kịch bản Demo thực tế phục vụ báo cáo hội đồng | 🔴 P0 | [Buoc-11](plans/Buoc-11-Dong-goi-Tai-lieu-SDLC-va-Kich-ban-Demo.md) | Hướng dẫn chạy & kịch bản demo | ⬜ |
+| 7.1 | Bộ Test Pytest: Test ACID ví tiền, test phiên sạc, test Fallback AI | 🔴 P0 | [Buoc-11](plans/Buoc-11-Bo-Test-Tu-dong-Seed-Data-va-Dong-goi.md) | `backend/tests/` pass 100% | ⬜ |
+| 7.2 | Script Seed Data: Tạo trạm sạc, trụ sạc, khách hàng, lịch sử phiên sạc | 🔴 P0 | [Buoc-11](plans/Buoc-11-Bo-Test-Tu-dong-Seed-Data-va-Dong-goi.md) | `backend/seed_data.py` | ⬜ |
+| 7.3 | Hoàn thiện tài liệu SDLC (KT1 -> KT2 -> KT3 -> Final) | 🔴 P0 | [Buoc-11](plans/Buoc-11-Bo-Test-Tu-dong-Seed-Data-va-Dong-goi.md) | Thư mục `docs/SDLC/` đầy đủ | ⬜ |
+| 7.4 | Kịch bản Demo thực tế phục vụ báo cáo hội đồng | 🔴 P0 | [Buoc-11](plans/Buoc-11-Bo-Test-Tu-dong-Seed-Data-va-Dong-goi.md) | Hướng dẫn chạy & kịch bản demo | ⬜ |
 
 ---
 
@@ -161,4 +161,5 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | Ngày | Người thực hiện | Thay đổi |
 |:---:|:---:|---|
+| 2026-09-22 | AI | Cập nhật đồng bộ Master Roadmap với sodo.md và các file kế hoạch Buoc-01 đến Buoc-11 |
 | 2026-09-22 | AI | Khởi tạo lại toàn bộ Master Roadmap chuyển đổi sang Nền tảng vận hành trạm sạc xe điện (EV CSMS) |

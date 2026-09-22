@@ -18,7 +18,7 @@
 
 | Ngày cập nhật | Mã bước | Tên bước thực hiện | Trạng thái | Sản phẩm bàn giao (Deliverables) đã sinh | Ghi chú / Đánh giá |
 | :---: | :---: | :--- | :---: | :--- | :--- |
-| 2026-09-22 | Bước 01 | Đặc tả Yêu cầu & Phân tích Nghiệp vụ Trạm sạc | Đang thực hiện | `nentang.md`, `Prompt.md`, `docs/SDLC/KT1/01_SRS_and_UseCases.md` | Đặc tả actor, phân hệ trạm sạc, biểu giá, ví và AI |
+| 2026-09-22 | Bước 01 | Đặc tả Yêu cầu & Phân tích Nghiệp vụ Trạm sạc | Đang thực hiện | `nentang.md`, `Prompt.md`, `sodo.md`, `docs/SDLC/KT1/01_SRS_and_UseCases.md` | Đặc tả actor, phân hệ trạm sạc, biểu giá, ví, AI và sơ đồ kiến trúc |
 | 2026-09-22 | Bước 02 | Thiết kế CSDL & Sơ đồ ERD Chuẩn EV CSMS | Chưa bắt đầu | `docs/SDLC/KT1/02_Database_Design_ERD.md` | Thiết kế bảng Station, Charger, Session, Wallet, Tariff |
 | 2026-09-22 | Bước 03 | Cấu hình Môi trường, Docker & CSDL | Chưa bắt đầu | `.env.example`, `docker-compose.yml`, `backend/requirements.txt` | Môi trường FastAPI, SQLite/PostgreSQL, WebSocket |
 | 2026-09-22 | Bước 04 | Cấu trúc Backend, Session & WebSocket Manager | Chưa bắt đầu | `backend/app/main.py`, `core/database.py`, `core/websocket.py` | Scaffold phân tầng API, CORS, quản lý kết nối realtime |
