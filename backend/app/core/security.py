@@ -48,5 +48,8 @@ def decode_access_token(token: str) -> dict[str, Any] | None:
             token, settings.secret_key, algorithms=[settings.jwt_algorithm]
         )
         return payload
+    except jwt.ExpiredSignatureError:
+        # Bắt riêng lỗi hết hạn để xử lý 401 rõ ràng
+        raise
     except jwt.PyJWTError:
         return None
