@@ -111,7 +111,7 @@
 
 ---
 
-#### 9. Ngày 2026-09-23 | Người thực hiện: Antigravity
+#### 9. Ngày 2026-09-23 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** T-10 — Bảng charge_points, connectors (Sprint 1 Backlog).
 * **Nội dung thực hiện cụ thể:** Tạo model `ChargePoint` và `Connector`. Thêm ràng buộc `UNIQUE` cho `charge_points.code` (để tra cứu OCPP) và `UNIQUE(charge_point_id, connector_number)` cho `connectors`. Import vào `__init__.py` và chạy migration Alembic. Cập nhật test case kiểm chứng vi phạm constraint.
 * **Trạng thái T-10:** **Hoàn thành** (2026-09-23).
