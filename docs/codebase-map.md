@@ -25,6 +25,7 @@
 | `test.md` | Báo cáo đối chiếu và đánh giá độc lập cho Hiếu, Study332 và KimiCoNY |
 | `huongdanfix.md` | Hướng dẫn khắc phục và đồng bộ mã nguồn chi tiết từng bước |
 | `docker-compose.yml` | Cấu hình container PostgreSQL 15 cục bộ |
+| `.gitignore` | Bỏ qua thư mục tạm `temp/`, môi trường ảo, cache và các file nhạy cảm |
 
 ### `.github/`
 
