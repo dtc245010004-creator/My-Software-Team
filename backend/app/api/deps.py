@@ -1,4 +1,3 @@
-from typing import Optional
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -11,7 +10,7 @@ from app.models.user import User
 def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
-    session_cookie: Optional[str] = Cookie(None, alias=settings.session_cookie_name),
+    session_cookie: str | None = Cookie(None, alias=settings.session_cookie_name),
 ) -> User:
     """Đọc cookie phiên (hoặc Bearer token), giải mã token, lấy thông tin người dùng từ DB."""
     token = session_cookie
@@ -36,7 +35,7 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id: Optional[str] = payload.get("sub")
+    user_id: str | None = payload.get("sub")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
