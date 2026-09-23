@@ -31,7 +31,7 @@ def get_current_user(
 
     import jwt
     try:
-        payload = decode_access_token(token)
+        payload = decode_access_token(token, raise_on_expired=True)
         if not payload:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

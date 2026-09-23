@@ -57,3 +57,10 @@ class User(Base):
         back_populates="users",
         passive_deletes=True,
     )
+
+    @property
+    def role_names(self) -> list[str]:
+        return [role.name for role in (self.roles or [])]
+
+    def get_role_names(self) -> list[str]:
+        return self.role_names

@@ -43,15 +43,25 @@ def login(
             detail="Email hoặc mật khẩu không chính xác",
         )
 
+    def _as_utc(value: datetime) -> datetime:
+        """Normalize database datetimes to timezone-aware UTC."""
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    locked_until = (
+        _as_utc(user.locked_until) if user.locked_until is not None else None
+    )
+
     # Kiểm tra tài khoản có đang bị khóa tạm thời không
-    if user.locked_until and user.locked_until > now:
+    if locked_until and locked_until > now:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tài khoản tạm thời bị khóa do nhập sai nhiều lần. Vui lòng thử lại sau.",
         )
 
     # Nếu đã hết thời gian khóa tạm thời, reset số lần sai
-    if user.locked_until and user.locked_until <= now:
+    if locked_until and locked_until <= now:
         user.failed_login_count = 0
         user.locked_until = None
 
