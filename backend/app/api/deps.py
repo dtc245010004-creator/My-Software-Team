@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -9,8 +11,8 @@ from app.models.user import User
 
 def get_current_user(
     request: Request,
-    db: Session = Depends(get_db),
-    session_cookie: str | None = Cookie(None, alias=settings.session_cookie_name),
+    db: Annotated[Session, Depends(get_db)],
+    session_cookie: Annotated[str | None, Cookie(alias=settings.session_cookie_name)] = None,
 ) -> User:
     """Đọc cookie phiên (hoặc Bearer token), giải mã token, lấy thông tin người dùng từ DB."""
     token = session_cookie

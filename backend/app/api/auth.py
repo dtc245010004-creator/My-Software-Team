@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session, joinedload
@@ -19,7 +19,7 @@ def login(
     login_data: LoginRequest,
     request: Request,
     response: Response,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
 ) -> Any:
     """Xử lý đăng nhập, khóa tài khoản khi sai 5 lần, tạo cookie phiên httpOnly."""
     client_ip = (
@@ -107,6 +107,6 @@ def logout(response: Response) -> Any:
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)) -> Any:
+def get_me(current_user: Annotated[User, Depends(get_current_user)]) -> Any:
     """Lấy thông tin tài khoản người dùng hiện tại đang đăng nhập."""
     return current_user
