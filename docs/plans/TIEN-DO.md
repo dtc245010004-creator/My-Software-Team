@@ -78,5 +78,33 @@
 
 ---
 
+#### 5. Ngày 2026-09-22 (tối) | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** T-01 — Dựng khung dự án & kết nối DB (Sprint 1 Backlog).
+* **Nội dung thực hiện cụ thể:** Dựng khung dự án, cấu hình kết nối PostgreSQL, chạy được migration đầu tiên. Viết docker-compose.yml gồm ứng dụng + DB. Đặt tên bảng/cột theo snake_case, khóa chính 'id', cột created_at/updated_at — đây là mẫu cho mọi migration sau. AC: chuỗi kết nối đọc từ biến môi trường, migration chạy tiến và lùi được.
 
+---
 
+#### 6. Ngày 2026-09-23 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** T-02 — Pipeline CI cho Backend (Sprint 1 Backlog).
+* **Nội dung thực hiện cụ thể:**
+  - `.github/workflows/main.yml`: Thêm job `backend-ci` chạy song song với `frontend-ci` — checkout, setup Python 3.12, `pip install -r backend/requirements.txt`, `ruff check backend/`, `pytest backend/tests -v`.
+  - `backend/requirements.txt`: Thêm `ruff` cho lint trong CI.
+  - `backend/tests/test_placeholder.py`: Test nhẹ không phụ thuộc DB, đảm bảo pytest luôn có ít nhất 1 test thực thi.
+  - `docs/codebase-map.md`: Bổ sung mục `.github/workflows/` (ghi chú `backend-ci`) và `backend/tests/`.
+* **Trạng thái T-02:** **Hoàn thành** (2026-09-23).
+* **AC đạt được:**
+  - Push code sai lint (biến không dùng, import thừa) → `ruff check` fail → pipeline báo đỏ, chặn merge.
+  - Commit sạch → cả 2 job `frontend-ci` + `backend-ci` chạy xong dưới 5 phút.
+  - Luôn có ít nhất 1 test thật (`test_placeholder.py`) thi hành trong bước pytest.
+
+---
+
+#### 7. Ngày 2026-09-23 (08:58) | Người thực hiện: hungblubu
+* **Nhiệm vụ thực hiện:** T-05 — Xử lý đăng nhập, phiên, khóa tạm (Sprint 1 Backlog).
+* **Nội dung thực hiện cụ thể:** Backend xử lý đăng nhập: kiểm tra thông tin, tạo phiên bằng cookie httpOnly. Lưu số lần sai + thời điểm khóa vào bảng users. AC: sai 5 lần thì lần 6 bị khóa 15 phút, khởi động lại ứng dụng vẫn còn khóa; lỗi không tiết lộ email có tồn tại hay không.
+
+---
+
+#### 8. Ngày 2026-09-23 (11:15) | Người thực hiện: idbibbool-arch
+* **Nhiệm vụ thực hiện:** T-04 — Bảng users, roles + seed 5 vai trò (Sprint 1 Backlog).
+* **Nội dung thực hiện cụ thể:** Thêm bảng users, roles, bảng nối user_roles. Seed sẵn 5 vai trò: tài xế, chủ trạm, vận hành viên, kế toán, quản trị. Cột email có ràng buộc unique. AC: sau seed có đúng 5 dòng trong roles; cột mật khẩu đủ dài cho hash argon2id.

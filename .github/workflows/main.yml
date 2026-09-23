@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  frontend-ci:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,3 +28,24 @@ jobs:
       run: |
         cd frontend
         npm run build
+
+  backend-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install Backend Dependencies
+      run: pip install -r backend/requirements.txt
+
+    - name: Lint with Ruff
+      run: ruff check backend/
+
+    - name: Run Tests
+      run: pytest backend/tests -v
