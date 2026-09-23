@@ -3,7 +3,7 @@ from typing import Any
 
 import jwt
 from argon2 import PasswordHasher, Type
-from argon2.exceptions import InvalidHashError, VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 from app.core.config import settings
 
@@ -20,7 +20,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
     """Kiểm tra mật khẩu khớp với chuỗi băm argon2id."""
     try:
         return ph.verify(hashed_password, password)
-    except (VerifyMismatchError, InvalidHashError):
+    except (VerifyMismatchError, InvalidHashError, VerificationError):
         return False
 
 
@@ -41,15 +41,17 @@ def create_access_token(
     )
 
 
-def decode_access_token(token: str) -> dict[str, Any] | None:
+def decode_access_token(
+    token: str, *, raise_on_expired: bool = False
+) -> dict[str, Any] | None:
     """Giải mã và kiểm tra tính hợp lệ của JWT token."""
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token, settings.secret_key, algorithms=[settings.jwt_algorithm]
         )
-        return payload
     except jwt.ExpiredSignatureError:
-        # Bắt riêng lỗi hết hạn để xử lý 401 rõ ràng
-        raise
+        if raise_on_expired:
+            raise
+        return None
     except jwt.PyJWTError:
         return None
