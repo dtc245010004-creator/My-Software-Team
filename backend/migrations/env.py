@@ -22,12 +22,13 @@ from app.models import Role, User  # noqa: F401
 
 target_metadata = Base.metadata
 
-# nạp DATABASE_URL từ file .env (chạy ngoài Docker nên đổi @db: thành @localhost:)
+# nạp DATABASE_URL từ file .env hoặc biến môi trường
 load_dotenv()
-config.set_main_option(
-    "sqlalchemy.url",
-    os.getenv("DATABASE_URL").replace("@db:", "@localhost:"),
-)
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    db_url = "postgresql+psycopg2://csms:csms@localhost:5432/csms"
+
+config.set_main_option("sqlalchemy.url", db_url)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

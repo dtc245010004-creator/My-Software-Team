@@ -1,4 +1,5 @@
-from typing import Optional
+from typing import Annotated
+
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,8 +11,8 @@ from app.models.user import User
 
 def get_current_user(
     request: Request,
-    db: Session = Depends(get_db),
-    session_cookie: Optional[str] = Cookie(None, alias=settings.session_cookie_name),
+    db: Annotated[Session, Depends(get_db)],
+    session_cookie: Annotated[str | None, Cookie(alias=settings.session_cookie_name)] = None,
 ) -> User:
     """Đọc cookie phiên (hoặc Bearer token), giải mã token, lấy thông tin người dùng từ DB."""
     token = session_cookie
@@ -28,15 +29,23 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_access_token(token)
-    if not payload:
+    import jwt
+    try:
+        payload = decode_access_token(token)
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Phiên đăng nhập không hợp lệ",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Phiên đăng nhập không hợp lệ hoặc đã hết hạn",
+            detail="Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id: Optional[str] = payload.get("sub")
+    user_id: str | None = payload.get("sub")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

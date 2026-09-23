@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 import jwt
 from argon2 import PasswordHasher, Type
@@ -25,7 +25,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(
-    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+    data: dict[str, Any], expires_delta: timedelta | None = None
 ) -> str:
     """Tạo JWT access token chứa payload data."""
     to_encode = data.copy()
@@ -41,12 +41,15 @@ def create_access_token(
     )
 
 
-def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+def decode_access_token(token: str) -> dict[str, Any] | None:
     """Giải mã và kiểm tra tính hợp lệ của JWT token."""
     try:
         payload = jwt.decode(
             token, settings.secret_key, algorithms=[settings.jwt_algorithm]
         )
         return payload
+    except jwt.ExpiredSignatureError:
+        # Bắt riêng lỗi hết hạn để xử lý 401 rõ ràng
+        raise
     except jwt.PyJWTError:
         return None
