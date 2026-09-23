@@ -3,7 +3,7 @@
 > **File này bắt buộc cập nhật mỗi khi thêm, xóa hoặc đổi vai trò một file.**
 > Xem `GEMINI.md §9` — trigger "thêm/xóa/đổi vai trò file bất kỳ" → cập nhật ngay lập tức.
 
-**Cập nhật lần cuối:** 2026-09-22
+**Cập nhật lần cuối:** 2026-09-23
 
 ---
 
@@ -22,7 +22,6 @@
 | `README.md` | Nhật ký vận hành phiên làm việc — hướng dẫn mở/đóng phiên cho người dùng |
 | `HUONGDAN.md` | Bản hướng dẫn vận hành chi tiết đồng bộ cùng README.md |
 | `phân công.md` | Bảng phân chia nhiệm vụ chi tiết cho 3 Backend và 3 Frontend kèm ma trận ghép cặp |
-
 | `test.md` | Báo cáo đối chiếu và đánh giá độc lập cho Hiếu, Study332 và KimiCoNY |
 | `huongdanfix.md` | Hướng dẫn khắc phục và đồng bộ mã nguồn chi tiết từng bước |
 | `docker-compose.yml` | Cấu hình container PostgreSQL 15 cục bộ |
@@ -37,15 +36,25 @@
 
 | File | Vai trò |
 |---|---|
-| `backend/requirements.txt` | Danh sách Python dependencies (FastAPI, SQLAlchemy, Alembic, psycopg2...) |
+| `backend/requirements.txt` | Danh sách Python dependencies (FastAPI, SQLAlchemy, Alembic, psycopg2, argon2-cffi, pyjwt, pytest, httpx...) |
 | `backend/Dockerfile` | Dockerfile đóng gói backend FastAPI (Python 3.12-slim) |
 | `backend/alembic.ini` | Cấu hình công cụ di chuyển CSDL Alembic |
-| `backend/app/main.py` | Điểm vào FastAPI: endpoint `/` health check |
-| `backend/app/core/config.py` | Pydantic Settings đọc cấu hình kết nối CSDL |
+| `backend/app/main.py` | Điểm vào FastAPI: endpoint `/` health check, CORS Middleware, đăng ký Auth router |
+| `backend/app/core/config.py` | Pydantic Settings đọc cấu hình CSDL, Secret Key, JWT và chính sách khóa tài khoản |
 | `backend/app/core/database.py` | SQLAlchemy engine, SessionLocal, dependency `get_db()` |
+| `backend/app/core/security.py` | Băm mật khẩu (argon2id), kiểm tra mật khẩu, sinh & giải mã JWT token |
+| `backend/app/models/user.py` | Model User với failed_login_count, locked_until, last_failed_ip và quan hệ Role |
+| `backend/app/models/role.py` | Model Role cho phân quyền RBAC |
+| `backend/app/schemas/auth.py` | Pydantic Schemas cho LoginRequest và UserResponse |
+| `backend/app/api/deps.py` | Dependency `get_current_user` đọc cookie phiên / token JWT |
+| `backend/app/api/auth.py` | Router API Auth: `/login` (khóa 15p khi sai 5 lần, httpOnly cookie), `/logout`, `/me` |
 | `backend/migrations/env.py` | Môi trường di chuyển Alembic (gắn Base.metadata) |
 | `backend/migrations/script.py.mako` | File template sinh mã migration của Alembic |
 | `backend/migrations/versions/5bd3f74937cd_init.py` | File migration khởi tạo đầu tiên |
+| `backend/migrations/versions/bc3917d064b0_add_users_and_roles.py` | File migration tạo bảng users, roles, user_roles |
+| `backend/migrations/versions/45fd43d6126c_add_login_security_columns_to_users.py` | File migration thêm 3 cột bảo mật đăng nhập cho bảng users |
+| `backend/seed_data.py` | Script nạp sẵn 5 vai trò và 5 tài khoản test với mật khẩu băm argon2id |
+| `backend/tests/test_auth.py` | Bộ test tự động kiểm thử toàn diện quy trình đăng nhập, khóa tài khoản, cookie và AC |
 
 ### `frontend/`
 
@@ -82,51 +91,3 @@
 | `docs/SDLC/KT2/README.md` | Mục tiêu & danh mục deliverable mốc KT2 (Core Backend, Simulator & ACID) |
 | `docs/SDLC/KT3/README.md` | Mục tiêu & danh mục deliverable mốc KT3 (AI Smart Charging & Frontend) |
 | `docs/SDLC/final/README.md` | Mục tiêu & danh mục deliverable mốc Cuối kỳ (Test, Đóng gói & Demo) |
-
----
-
-## Chưa có — Sẽ tạo theo từng bước
-
-### Backend (`backend/`)
-
-| File | Sẽ tạo ở Bước | Vai trò dự kiến |
-|---|:---:|---|
-| `backend/.env.example` | 03 | Mẫu biến môi trường |
-| `backend/app/models/user.py` | 02 / 05 | Model người dùng, phân quyền RBAC (`admin`, `operator`, `customer`) |
-| `backend/app/models/station.py` | 02 / 06 | Model Trạm sạc (`Station`), Trụ sạc (`ChargingPoint`), Cổng (`Connector`) |
-| `backend/app/models/session.py` | 02 / 07 | Model Phiên sạc (`ChargingSession`) |
-| `backend/app/models/wallet.py` | 02 / 07 | Model Ví tiền (`Wallet`) và Nhật ký giao dịch (`WalletTransaction`) |
-| `backend/app/models/tariff.py` | 02 / 07 | Model Biểu giá theo khung giờ (`Tariff`) |
-| `backend/app/core/security.py` | 05 | Mã hóa mật khẩu (bcrypt), sinh & giải mã JWT token |
-| `backend/app/api/v1/endpoints/auth.py` | 05 | API Đăng ký, Đăng nhập, Lấy thông tin cá nhân |
-| `backend/app/schemas/station.py` | 06 | Pydantic Schemas cho Station, Charger, Connector |
-| `backend/app/services/station_service.py` | 06 | Nghiệp vụ quản lý hạ tầng và trạng thái trạm sạc |
-| `backend/app/api/v1/endpoints/stations.py` | 06 | API CRUD Trạm sạc, Trụ sạc và Cổng sạc |
-| `backend/app/services/session_service.py` | 07 | Quản lý vòng đời phiên sạc, chốt số kWh và gọi trừ tiền ví |
-| `backend/app/services/wallet_service.py` | 07 | Nghiệp vụ ví tiền với Database Transaction (chống âm số dư) |
-| `backend/app/api/v1/endpoints/sessions.py` | 07 | API bắt đầu/dừng sạc, xem lịch sử phiên sạc |
-| `backend/app/api/v1/endpoints/wallet.py` | 07 | API nạp tiền vào ví, xem số dư và lịch sử biến động |
-| `backend/app/api/v1/endpoints/tariffs.py` | 07 | API cấu hình biểu giá điện linh hoạt |
-| `backend/app/simulator/charging_simulator.py` | 08 | Module giả lập tín hiệu trụ sạc, sinh dữ liệu đo đếm SoC, kW |
-| `backend/app/api/v1/endpoints/simulator.py` | 08 | API điều khiển giả lập cắm sạc/rút sạc |
-| `backend/app/core/websocket.py` | 08 | Quản lý kết nối WebSocket và phát sóng telemetry thời gian thực |
-| `backend/app/services/ai_service.py` | 09 | Tích hợp Google Gemini: Điều phối tải & Bảo trì dự đoán |
-| `backend/app/services/fallback_service.py` | 09 | Thuật toán Heuristic chia tải & cảnh báo ngưỡng khi offline |
-| `backend/app/api/v1/endpoints/ai.py` | 09 | API yêu cầu AI phân tích tải và khuyến nghị bảo trì |
-| `backend/tests/test_sessions_acid.py` | 11 | Kiểm thử giao dịch trừ tiền ví và trạng thái phiên sạc |
-| `backend/tests/test_ai_fallback.py` | 11 | Kiểm thử năng lực fallback khi Gemini API gặp sự cố |
-| `backend/seed_data.py` | 11 | Script nạp dữ liệu mẫu sinh động (trạm, trụ, phiên sạc, ví) |
-
-### Frontend (`frontend/`)
-
-| File | Sẽ tạo ở Bước | Vai trò dự kiến |
-|---|:---:|---|
-| `frontend/src/context/AuthContext.jsx` | 10 | Context quản lý phiên đăng nhập và phân quyền giao diện |
-| `frontend/src/pages/Dashboard.jsx` | 10 | Trang tổng quan mạng lưới trạm sạc, công suất và doanh thu |
-| `frontend/src/pages/Stations.jsx` | 10 | Trang quản lý danh sách trạm, chi tiết trụ sạc và cổng sạc |
-| `frontend/src/pages/Simulator.jsx` | 10 | Giao diện mô phỏng cắm sạc & đồ thị realtime trực quan |
-| `frontend/src/pages/Sessions.jsx` | 10 | Lịch sử phiên sạc và chi tiết hóa đơn điện tử |
-| `frontend/src/pages/Wallet.jsx` | 10 | Quản lý ví cá nhân, nạp tiền và lịch sử giao dịch |
-| `frontend/src/pages/AIAdvisor.jsx` | 10 | Màn hình phân tích điều phối công suất & gợi ý bảo trì AI |
-| `frontend/src/services/api.js` | 10 | Cấu hình Axios client và interceptor Bearer Token |
-| `frontend/src/services/websocket.js` | 10 | Client kết nối WebSocket nhận telemetry sạc realtime |

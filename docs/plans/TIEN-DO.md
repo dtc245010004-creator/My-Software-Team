@@ -22,7 +22,7 @@
 | 2026-09-22 | Bước 02 | Thiết kế CSDL & Sơ đồ ERD Chuẩn EV CSMS | ⬜ Chưa bắt đầu | `docs/SDLC/KT1/02_Database_Design_ERD.md` | **Đạt 0%**. Chuẩn bị thiết kế bảng Station, Charger, Session, Wallet, Tariff. |
 | 2026-09-22 | Bước 03 | Cấu hình Môi trường, Docker & CSDL | ⚠️ Cần xem xét | `docker-compose.yml`, `backend/Dockerfile`, `backend/requirements.txt`, `.github/workflows/main.yml` | **Mới bắt đầu - Đạt 55%**. Đã có container DB (Hiếu), Dockerfile Backend (KimiCoNY) và CI/CD Pipeline (Study332). **XUNG ĐỘT CSDL:** `docker-compose.yml` đặt DB `ev_charging_system` (user `admin`), `config.py` đặt `csms` (user `csms`), chuẩn tài liệu là **`ev_csms_db`** (user `postgres`). Thiếu `.env.example`. |
 | 2026-09-22 | Bước 04 | Cấu trúc Backend, Session & WebSocket Manager | ⚠️ Cần xem xét | `backend/app/main.py`, `backend/app/core/database.py`, `backend/app/core/config.py`, `alembic.ini`, `migrations/` | **Mới bắt đầu - Đạt 40% toàn bước (75% Task T-01)**. Đã có khung FastAPI, DB engine, Alembic init. **XUNG ĐỘT & LỖI TIỀM ẨN:** Bị lệch DB; thiếu `CORSMiddleware` (chặn web gọi API); `env.py` crash khi thiếu `.env`; thiếu router `/api/v1` và `websocket.py`. |
-| 2026-09-22 | Bước 05 | Xác thực, Đăng nhập & Phân quyền RBAC | ⬜ Chưa bắt đầu | `backend/app/api/v1/endpoints/auth.py`, `core/security.py` | **Đạt 0%**. Sẽ làm JWT, phân quyền Admin, CPO/Operator, Driver/Customer sau khi có CSDL User. |
+| 2026-09-23 | Bước 05 | Xác thực, Đăng nhập & Phân quyền RBAC | ✅ Hoàn thành | `backend/app/api/auth.py`, `backend/app/api/deps.py`, `backend/app/core/security.py`, `backend/app/schemas/auth.py`, `backend/migrations/versions/45fd43d6126c_*.py`, `backend/tests/test_auth.py` | **Đạt 100%**. Băm mật khẩu Argon2id, JWT token, cookie httpOnly, khóa 15p khi sai 5 lần, chống enumeration, 4/4 pytest passed. |
 | 2026-09-22 | Bước 06 | Module Quản lý Hạ tầng Trạm, Trụ & Cổng sạc | ⬜ Chưa bắt đầu | `backend/app/models/station.py`, `api/v1/endpoints/stations.py` | **Đạt 0%**. CRUD Trạm, Trụ sạc (EVSE), Cổng (CCS2, Type 2), kiểm tra quyền sở hữu CPO. |
 | 2026-09-22 | Bước 07 | Module Biểu giá, Ví điện tử & Phiên sạc (ACID) | ⬜ Chưa bắt đầu | `backend/app/services/session_service.py`, `wallet_service.py` | **Đạt 0%**. Quản lý TOU Tariff, trừ tiền ví ACID không bao giờ âm, khóa cổng sạc độc quyền. |
 | 2026-09-22 | Bước 08 | Module Giả lập Trạm sạc (Simulator & Telemetry) | ⬜ Chưa bắt đầu | `backend/app/simulator/charging_simulator.py` | **Đạt 0%**. Giả lập đường cong sạc xe điện CC-CV, rơ-le ngắt an toàn $T > 85^\circ\text{C}$, phát WebSocket realtime. |
@@ -91,14 +91,23 @@
   - `backend/.gitignore`: Bỏ qua môi trường ảo và file `.env`.
 * **Đối chiếu với yêu cầu Plans:**
   - **Bước 03 (`Buoc-03`)**: Bổ sung Dockerfile Backend và danh sách dependencies, nâng mức hoàn thành môi trường lên **55%**. Còn thiếu: tạo `.env.example`, đồng bộ tên DB `ev_csms_db`, và ghép service backend vào `docker-compose.yml`.
-  - **Bước 04 (`Buoc-04`)**: Xét theo phạm vi **Task T-01: Đạt 75%**; xét theo **toàn bộ Bước 04: Đạt 40%**. Đã có khung phân tầng `app/core/`, engine CSDL và endpoint `/`. **CẦN KHẮC PHỤC NGAY:**
-    1. Bổ sung `CORSMiddleware` (để kết nối React Vite port 5173).
-    2. Sửa lỗi tiềm ẩn crash `AttributeError` trong `env.py` khi chưa có file `.env`.
-    3. Đồng bộ thông số CSDL chuẩn `ev_csms_db`.
-    4. Xây dựng router `/api/v1` và WebSocket Hub (`core/websocket.py`).
+  - **Bước 04 (`Buoc-04`)**: Xét theo phạm vi **Task T-01: Đạt 75%**; xét theo **toàn bộ Bước 04: Đạt 40%**.
 
 ---
 
-
-
-
+#### 6. Ngày 2026-09-23 (00:37 – 00:57) | Người thực hiện: AI Pair Programmer (Antigravity)
+* **Nhiệm vụ thực hiện:** Bước 05 – Hiện thực hóa Module Xác thực, Đăng nhập bảo mật và Khóa tài khoản (Task 1 -> 14).
+* **Nội dung thực hiện cụ thể:**
+  - `backend/requirements.txt`: Bổ sung `argon2-cffi`, `pyjwt`, `pytest`, `httpx`.
+  - `backend/app/core/config.py`: Thêm `secret_key`, `jwt_algorithm`, `access_token_expire_minutes`, `session_cookie_name`, `max_failed_logins`, `lockout_duration_minutes`.
+  - `backend/app/core/security.py`: Hiện thực 4 hàm băm mật khẩu `hash_password` (argon2id), `verify_password`, `create_access_token`, `decode_access_token`.
+  - `backend/app/models/user.py`: Thêm cột `failed_login_count`, `locked_until`, `last_failed_ip`, property `role_names` và helper `get_role_names()`.
+  - `backend/migrations/versions/45fd43d6126c_add_login_security_columns_to_users.py`: Migration Alembic áp dụng 3 cột mới vào PostgreSQL.
+  - `backend/app/schemas/auth.py`: Pydantic Schemas `LoginRequest` và `UserResponse`.
+  - `backend/app/api/deps.py`: Dependency `get_current_user` đọc cookie phiên / token JWT, kiểm tra người dùng hợp lệ và active.
+  - `backend/app/api/auth.py`: Router `/api/v1/auth` chứa `/login` (chống enumeration, khóa 15 phút sau 5 lần sai, cấp cookie `httpOnly`), `/logout`, `/me`.
+  - `backend/app/main.py`: Gắn `CORSMiddleware` và đăng ký `auth_router`.
+  - `backend/seed_data.py`: Nạp sẵn 5 vai trò và 5 tài khoản test với mật khẩu băm Argon2id.
+  - `backend/tests/test_auth.py`: Bộ kiểm thử tự động xác thực toàn bộ các tiêu chí AC (4/4 passed 100%).
+* **Đối chiếu với yêu cầu Plans:**
+  - **Bước 05 (`Buoc-05`)**: **Đạt 100%**.
