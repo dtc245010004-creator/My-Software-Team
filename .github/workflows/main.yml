@@ -31,6 +31,22 @@ jobs:
 
   backend-ci:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_DB: ev_charging_system
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d ev_charging_system"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg2://admin@127.0.0.1:5432/ev_charging_system
 
     steps:
     - name: Checkout repository
@@ -46,6 +62,11 @@ jobs:
 
     - name: Lint with Ruff
       run: ruff check backend/
+
+    - name: Run Database Migrations
+      run: |
+        cd backend
+        alembic upgrade head
 
     - name: Run Tests
       run: pytest backend/tests -v
