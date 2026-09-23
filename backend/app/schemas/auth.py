@@ -1,4 +1,3 @@
-from typing import List
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -13,7 +12,7 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: str
-    roles: List[str] = []
+    roles: list[str] = []
 
     model_config = ConfigDict(from_attributes=True)
 
