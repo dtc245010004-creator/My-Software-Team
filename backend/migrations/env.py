@@ -16,9 +16,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
+# Import all models before assigning metadata so Alembic can autogenerate changes.
 from app.core.database import Base
+from app.models import Role, User  # noqa: F401
+
 target_metadata = Base.metadata
 
 # nạp DATABASE_URL từ file .env (chạy ngoài Docker nên đổi @db: thành @localhost:)
