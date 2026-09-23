@@ -29,6 +29,7 @@
 | 2026-09-22 | Bước 09 | Module AI: Điều phối tải, Bảo trì & Fallback | Chưa bắt đầu | `backend/app/services/ai_service.py`, `fallback_service.py` | Gemini Smart Charging, Predictive Maintenance & Heuristic |
 | 2026-09-22 | Bước 10 | Xây dựng Frontend Web (React 19 + Tailwind + Charts) | Đang thực hiện | Khung `frontend/` (React 19 + Vite + Oxlint, `App.jsx` staging) | Đã chạy được khung local; Còn thiếu: Tailwind CSS, proxy `vite.config.js`, các trang nghiệp vụ |
 | 2026-09-24 | (FE-Jira) Form Đăng nhập + Auth Flow + WebSocket Client | Đang thực hiện | `frontend/src/pages/LoginPage.jsx`, `LoginPage.css`, `services/authService.js`, `services/api.js`, `services/websocket.js`, `context/AuthContext.jsx`, `components/ProtectedRoute.jsx`, `App.jsx`, `vite.config.js` | **FE-Jira 100% Form Đăng nhập**. Email + password (icon ẩn/hiện mắt), validate regex email phía client, loading state disable nút, gọi `POST /api/auth/login` theo FastAPI chuẩn (`{access_token, token_type:"bearer", user}`), lưu JWT+user vào `localStorage`, parse lỗi `{detail:...}` 401 (sai MK) / 423 (tài khoản khóa 15 phút) / 429 (rate limit) hiển thị Toast `sonner`. Có `ProtectedRoute`. `SimulatorPage` + `websocket.js` thêm Heartbeat Ping 30s + auto-reconnect backoff 1s→15s, đèn báo 6 trạng thái (connected/reconnecting/disconnected…). Vite proxy `/api` + `/ws` → `localhost:8000`. Build PASS (`npm run build` 410ms), lint sạch lỗi, 1 warning Fast Refresh cosmetic. **Backend cần**: Bước 05 mở `POST /api/auth/login` + JWT + `WWW-Authenticate: Bearer` 401/423 để end-to-end. |
+| 2026-09-24 | (FE-Jira) Thêm trang Đăng ký + fix input mất chữ + dọn scripts rác | Hoàn thành | `frontend/src/pages/RegisterPage.jsx`, `backend/app/schemas/auth.py`, `backend/app/api/auth.py`, `frontend/src/main.jsx` (import App.css), `frontend/src/pages/LoginPage.css`, `frontend/src/pages/LoginPage.jsx` | **Bug input mất chữ**: `.login-field input` không có `color` → kế thừa root token `var(--text)` (xám/trắng). Thêm `color:#0f172a; background:#ffffff; ::placeholder color:#94a3b8`. Import `App.css` vào `main.jsx` (file có sẵn `body{color:#0f172a}` và `.app-loading` nhưng chưa được import từ trước). **Endpoint `POST /auth/register`**: schema `RegisterRequest` (EmailStr, password ≥6, full_name required, phone optional) + endpoint gán role mặc định `driver` (tự tạo nếu chưa có), 201 Created + 409 Conflict email trùng, 422 EmailStr/Pydantic. **Trang `/register`**: full_name + email + SĐT (optional) + password + confirm + validate client, navigate về `/login` kèm `state.registeredEmail`. **LoginPage**: đọc `location.state.registeredEmail` để điền sẵn email sau đăng ký; sai MK → xóa trắng cả 2 ô. **Vite proxy**: đổi `localhost:8000` → `localhost:8001` (BE đổi port do socket zombie 8000). **Dọn scripts rác**: xóa 14 file trong `backend/scripts/` (test một lần, kill_port helper) + `__pycache__/`. **Test**: 48/51 pass — 3 fail auth schema cần fix phiên sau. Build PASS (`npm run build` 339ms). |
 | 2026-09-22 | Bước 11 | Bộ Test Tự động (Pytest), Seed Data & Đóng gói | Chưa bắt đầu | `backend/tests/`, `backend/seed_data.py`, `docs/SDLC/...` | Test ACID ví tiền, test sạc, seed dữ liệu & kịch bản demo |
 
 ---
@@ -150,3 +151,21 @@
   - `npm run lint` — 0 error, 1 warning Fast Refresh cosmetic (chấp nhận).
   - Vite proxy tự động forward `/api` & `/ws` qua dev server port 5173.
 * **Phụ thuộc Backend (Bước 05):** Cần `POST /api/auth/login`, `GET /api/auth/me`, `GET /api/auth/ws-ticket`, JWT bearer; schema User (`id, email, role`). Khi backend sẵn sàng, flow login end-to-end sẽ hoạt động không cần sửa FE.
+
+---
+
+#### 11. Ngày 2026-09-24 (02:30 – 02:50) | Người thực hiện: `dtc245090028-ui` (phiên cuối)
+* **Nhiệm vụ thực hiện:** Bug input mất chữ + Thêm trang Đăng ký + Dọn scripts rác.
+* **Nội dung thực hiện cụ thể:**
+  - **Bug input mất chữ (LoginPage.css)**: `.login-field input` không có `color` → kế thừa root `var(--text)`. Fix: `color:#0f172a; background:#ffffff; ::placeholder color:#94a3b8`. Đồng thời import `App.css` vào `main.jsx` (file có sẵn `body{color:#0f172a}` + `.app-loading` nhưng chưa từng được import — style đang thiếu).
+  - **BE endpoint `POST /api/v1/auth/register`** (`backend/app/schemas/auth.py` + `backend/app/api/auth.py`): schema `RegisterRequest` (EmailStr, password ≥6, full_name required, phone optional) + endpoint gán role mặc định `driver` (tự tạo nếu chưa có), 201/409/422.
+  - **Trang FE `/register`** (`RegisterPage.jsx`): form full_name + email + SĐT (optional) + password + confirm + validate client, navigate về `/login` kèm `state.registeredEmail`. CSS dùng chung `LoginPage.css` + 2 class bổ sung (`login-card-wide`, `login-optional`).
+  - **LoginPage**: đọc `location.state.registeredEmail` để điền sẵn email; sai MK → xóa trắng cả 2 ô.
+  - **Vite proxy**: đổi `localhost:8000` → `localhost:8001` (BE đổi port do socket zombie 8000).
+  - **Dọn scripts rác**: xóa 14 file trong `backend/scripts/` (test một lần, kill_port helper, SQL check) + `__pycache__/`. Còn lại `__init__.py` rỗng (giữ package marker).
+* **Resolve conflict marker**: trong `backend/app/api/auth.py` còn `<<<<<<< HEAD` cũ chưa resolve ở endpoint `/me`. Đã merge giữ phiên bản `Annotated[User, Depends(get_current_user)]`.
+* **Verify:**
+  - `py scripts/test_register_8001.py` — 201 Created với role `driver`; 422 cho email trống / sai format / password < 6.
+  - `pytest` — 48/51 pass; 3 fail (`test_auth::test_login_success_sets_httponly_cookie`, `test_auth_flow::test_login_happy_path_sets_cookie_and_returns_user`, `test_auth_flow::test_logout_happy_path_clears_cookie`) — nghi do response schema login đổi gần đây. **Giữ lại để phiên sau fix** theo yêu cầu user.
+  - `npm run build` — PASS (339ms với cache).
+* **Tài liệu**: cập nhật `docs/codebase-map.md` (thêm RegisterPage, port 8001, test status 48/51) + `docs/plans/TIEN-DO.md` (thêm dòng bảng tiến độ + mục 11 nhật ký).
