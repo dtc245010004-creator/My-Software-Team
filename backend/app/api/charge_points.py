@@ -10,7 +10,9 @@ from app.models.connector import Connector
 from app.models.station import Station
 from app.schemas.charge_point import ChargePointCreate, ChargePointResponse
 
+
 router = APIRouter()
+
 
 @router.post("/", response_model=ChargePointResponse, status_code=status.HTTP_201_CREATED)
 def create_charge_point(
@@ -33,23 +35,23 @@ def create_charge_point(
     cp = ChargePoint(
         station_id=item_in.station_id,
         code=item_in.code,
-        status="offline"
+        status="offline",
     )
     db.add(cp)
-    
+
     try:
         db.flush()
-        
+
         # 3. Tạo Connectors
         for i in range(1, item_in.connector_count + 1):
             conn = Connector(
                 charge_point_id=cp.id,
                 connector_number=i,
                 connector_type="Type2",
-                status="offline"
+                status="offline",
             )
             db.add(conn)
-            
+
         db.commit()
         db.refresh(cp)
         return cp
