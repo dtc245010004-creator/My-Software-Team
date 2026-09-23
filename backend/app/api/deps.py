@@ -29,11 +29,19 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_access_token(token)
-    if not payload:
+    import jwt
+    try:
+        payload = decode_access_token(token)
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Phiên đăng nhập không hợp lệ",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Phiên đăng nhập không hợp lệ hoặc đã hết hạn",
+            detail="Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

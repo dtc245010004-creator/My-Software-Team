@@ -29,6 +29,9 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    failed_login_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_failed_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
 
     roles: Mapped[List["Role"]] = relationship(
         "Role",
