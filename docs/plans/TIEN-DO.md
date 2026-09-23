@@ -28,6 +28,7 @@
 | 2026-09-22 | Bước 08 | Module Giả lập Trạm sạc (Simulator & Telemetry) | Chưa bắt đầu | `backend/app/simulator/charging_simulator.py` | Giả lập đường cong sạc xe điện, phát WebSocket realtime |
 | 2026-09-22 | Bước 09 | Module AI: Điều phối tải, Bảo trì & Fallback | Chưa bắt đầu | `backend/app/services/ai_service.py`, `fallback_service.py` | Gemini Smart Charging, Predictive Maintenance & Heuristic |
 | 2026-09-22 | Bước 10 | Xây dựng Frontend Web (React 19 + Tailwind + Charts) | Đang thực hiện | Khung `frontend/` (React 19 + Vite + Oxlint, `App.jsx` staging) | Đã chạy được khung local; Còn thiếu: Tailwind CSS, proxy `vite.config.js`, các trang nghiệp vụ |
+| 2026-09-24 | (FE-Jira) Form Đăng nhập + Auth Flow + WebSocket Client | Đang thực hiện | `frontend/src/pages/LoginPage.jsx`, `LoginPage.css`, `services/authService.js`, `services/api.js`, `services/websocket.js`, `context/AuthContext.jsx`, `components/ProtectedRoute.jsx`, `App.jsx`, `vite.config.js` | **FE-Jira 100% Form Đăng nhập**. Email + password (icon ẩn/hiện mắt), validate regex email phía client, loading state disable nút, gọi `POST /api/auth/login` theo FastAPI chuẩn (`{access_token, token_type:"bearer", user}`), lưu JWT+user vào `localStorage`, parse lỗi `{detail:...}` 401 (sai MK) / 423 (tài khoản khóa 15 phút) / 429 (rate limit) hiển thị Toast `sonner`. Có `ProtectedRoute`. `SimulatorPage` + `websocket.js` thêm Heartbeat Ping 30s + auto-reconnect backoff 1s→15s, đèn báo 6 trạng thái (connected/reconnecting/disconnected…). Vite proxy `/api` + `/ws` → `localhost:8000`. Build PASS (`npm run build` 410ms), lint sạch lỗi, 1 warning Fast Refresh cosmetic. **Backend cần**: Bước 05 mở `POST /api/auth/login` + JWT + `WWW-Authenticate: Bearer` 401/423 để end-to-end. |
 | 2026-09-22 | Bước 11 | Bộ Test Tự động (Pytest), Seed Data & Đóng gói | Chưa bắt đầu | `backend/tests/`, `backend/seed_data.py`, `docs/SDLC/...` | Test ACID ví tiền, test sạc, seed dữ liệu & kịch bản demo |
 
 ---
@@ -119,3 +120,33 @@
   - Chèn 2 charge_points cùng code -> báo lỗi `IntegrityError`.
   - Chèn 2 connectors cùng `(charge_point_id, connector_number)` -> báo lỗi `IntegrityError`.
   - Alembic `upgrade head`, `downgrade -1`, `upgrade head` hoạt động trơn tru.
+
+---
+
+#### 10. Ngày 2026-09-24 | Người thực hiện: `dtc245090028-ui`
+* **Nhiệm vụ thực hiện:** FE-Jira-Login + FE-Jira-Simulator — Hoàn thiện Form Đăng nhập, Auth Flow và WebSocket Client (theo Mẫu Description Jira trong yêu cầu ngày 24/09).
+* **Nội dung thực hiện cụ thể:**
+  - `frontend/package.json`: Bổ sung `axios`, `react-router-dom`, `sonner`, `lucide-react`.
+  - `frontend/vite.config.js`: Thêm proxy `/api` → `http://localhost:8000` và `/ws` → `ws://localhost:8000` (chuyển tiếp `/ws/telemetry`).
+  - `frontend/src/services/api.js`: axios client + Bearer interceptor + `loginRequest()` + `fetchCurrentUser()`.
+  - `frontend/src/services/authService.js`: `performLogin()` lưu JWT, `loadStoredSession()`, `clearSession()`, `extractApiError()` map 401/423/429/5xx/time-out.
+  - `frontend/src/services/websocket.js`: `createTelemetrySocket()` — Heartbeat Ping 30s, auto-reconnect backoff 1s→15s, status listener (6 trạng thái).
+  - `frontend/src/context/AuthContext.jsx`: Provider với `useAuth()` — `user`, `token`, `isAuthenticated`, `login()`, `logout()`.
+  - `frontend/src/components/ProtectedRoute.jsx`: Guard route — redirect `/login` nếu chưa auth.
+  - `frontend/src/pages/LoginPage.jsx` + `.css`: Form (Mail + Lock icon, nút ẩn/hiện mật khẩu dùng lucide-react `Eye/EyeOff`), validate regex email, disable nút khi loading, Toast `sonner` cho 401/423/429.
+  - `frontend/src/pages/DashboardPage.jsx` + `.css`: Chào user + đèn báo WS (connected/reconnecting/disconnected) + link `/simulator`.
+  - `frontend/src/pages/SimulatorPage.jsx` + `.css`: 4 thẻ telemetry (SoC %, kW, V/A, nhiệt °C với cảnh báo >70/85°C), HTTP mock fallback.
+  - `frontend/src/App.jsx`: BrowserRouter + AuthProvider + Toaster + lazy-load 3 pages + Suspense + 3 routes (`/login`, `/dashboard`, `/simulator`).
+  - `frontend/src/App.css`: Reset cơ bản, dọn sạch template rác.
+  - `docs/codebase-map.md`: Cập nhật toàn bộ bản đồ file (đã được reset, viết lại từ scratch).
+* **Đối chiếu với yêu cầu Jira:**
+  - **Form & Validation**: ✅ email regex, password required, icon ẩn/hiện, loading state.
+  - **API & Token**: ✅ `POST /api/auth/login`, lưu `localStorage`, cập nhật AuthContext, redirect `/dashboard`.
+  - **Error Handling**: ✅ 401 (sai MK) + 423 (khóa 15 phút) + 429 (rate limit) + 5xx + mất mạng.
+  - **FE Deliverables**: ✅ Simulator UI test WS, ✅ Heartbeat Ping/Pong 30s, ✅ Đèn báo 6 trạng thái.
+* **Verify:**
+  - `npm install` — clean (29 packages added, 1 removed).
+  - `npm run build` — PASS (1636 modules → dist, 410ms với cache).
+  - `npm run lint` — 0 error, 1 warning Fast Refresh cosmetic (chấp nhận).
+  - Vite proxy tự động forward `/api` & `/ws` qua dev server port 5173.
+* **Phụ thuộc Backend (Bước 05):** Cần `POST /api/auth/login`, `GET /api/auth/me`, `GET /api/auth/ws-ticket`, JWT bearer; schema User (`id, email, role`). Khi backend sẵn sàng, flow login end-to-end sẽ hoạt động không cần sửa FE.
