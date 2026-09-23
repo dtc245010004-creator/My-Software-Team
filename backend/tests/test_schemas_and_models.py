@@ -5,7 +5,6 @@ from app.models.role import Role
 from app.models.user import User
 from app.schemas.auth import LoginRequest, UserResponse
 
-
 # ==============================================================================
 # 1. KIỂM THỬ SCHEMAS (app/schemas/auth.py)
 # ==============================================================================

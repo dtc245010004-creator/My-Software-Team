@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -15,7 +15,7 @@ router = APIRouter()
 @router.post("/", response_model=ChargePointResponse, status_code=status.HTTP_201_CREATED)
 def create_charge_point(
     *,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
     item_in: ChargePointCreate,
 ) -> Any:
     """

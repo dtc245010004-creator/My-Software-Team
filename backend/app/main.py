@@ -28,6 +28,7 @@ app.include_router(auth_router)  # Hỗ trợ cả đường dẫn /auth
 
 # Gắn Router charge points
 from app.api.charge_points import router as charge_points_router
+
 app.include_router(charge_points_router, prefix="/api/v1/charge-points", tags=["Charge Points"])
 
 

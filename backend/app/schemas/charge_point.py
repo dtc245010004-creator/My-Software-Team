@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class ChargePointCreate(BaseModel):
     station_id: int
     code: str = Field(..., max_length=50)

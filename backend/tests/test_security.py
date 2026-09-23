@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
+
 import jwt
-import pytest
 
 from app.core.config import settings
 from app.core.security import (
@@ -9,7 +9,6 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-
 
 # ==============================================================================
 # 1. KIỂM THỬ HÀM BĂM MẬT KHẨU (hash_password)
