@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+    <!-- Thêm thư viện Tailwind CSS qua CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Thêm đoạn này để xóa bỏ hoàn toàn 2 vệt trắng hai bên -->
+    <style>
+      html, body, #root {
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: none !important;
+        overflow-x: hidden;
+      }
+    </style>
+  </head>
+  <body class="w-full h-full bg-slate-50">
+    <div id="root" class="w-full h-full"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
