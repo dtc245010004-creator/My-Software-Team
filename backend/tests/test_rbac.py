@@ -64,8 +64,9 @@ def client(monkeypatch):
 
     test_client = TestClient(app)
 
+    from app.core.config import settings
     test_client.cookies.set(
-        "session_token",
+        settings.session_cookie_name,
         "test-token",
     )
 

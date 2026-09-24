@@ -68,7 +68,7 @@ def db_session():
 
 
 @pytest.fixture(scope="function")
-def client(db_session):
+def client(db_session, monkeypatch):
     """Override dependency get_db để kết nối tới SQLite in-memory."""
     def override_get_db():
         try:
@@ -77,6 +77,8 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    monkeypatch.setattr("app.core.rbac.get_db", override_get_db)
+
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
