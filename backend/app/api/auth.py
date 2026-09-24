@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import create_access_token, hash_password, verify_password
 from app.core.rbac import roles
+from app.core.security import create_access_token, hash_password, verify_password
 from app.models.role import Role
 from app.models.user import User
 from app.schemas.auth import (

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-import app.core.rbac as rbac
+from app.core import rbac
 from app.main import app
 
 
