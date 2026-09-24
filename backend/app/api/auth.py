@@ -8,6 +8,7 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import create_access_token, verify_password
+from app.core.rbac import roles
 from app.models.user import User
 from app.schemas.auth import LoginRequest, UserResponse
 
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=UserResponse)
+@roles("public")
 def login(
     login_data: LoginRequest,
     request: Request,
@@ -110,6 +112,7 @@ def login(
 
 
 @router.post("/logout")
+@roles("authenticated")
 def logout(response: Response) -> Any:
     """Đăng xuất, xóa cookie phiên."""
     response.delete_cookie(key=settings.session_cookie_name)
@@ -117,6 +120,9 @@ def logout(response: Response) -> Any:
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: Annotated[User, Depends(get_current_user)]) -> Any:
+@roles("authenticated")
+def get_me(
+    current_user: Annotated[User, Depends(get_current_user)]
+) -> Any:
     """Lấy thông tin tài khoản người dùng hiện tại đang đăng nhập."""
     return current_user
