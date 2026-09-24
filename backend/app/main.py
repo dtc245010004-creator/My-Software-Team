@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers.rbac_test import router as rbac_router
@@ -55,3 +55,17 @@ def health_check():
         "status": "ok",
         "service": "ev-csms-backend",
     }
+
+
+@app.websocket("/ws/telemetry")
+async def websocket_telemetry(websocket: WebSocket):
+    """Stub WebSocket endpoint cho telemetry trụ sạc ảo.
+    Echo lại message từ client + ping định kỳ để giữ kết nối.
+    """
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await websocket.send_text(f"echo: {data}")
+    except WebSocketDisconnect:
+        pass
