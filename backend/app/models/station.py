@@ -1,7 +1,6 @@
-from datetime import datetime
-
-from sqlalchemy import DateTime, Integer, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+﻿from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
@@ -9,12 +8,19 @@ from app.core.database import Base
 class Station(Base):
     __tablename__ = "stations"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    address = Column(String(500), nullable=True, default="")
+    latitude = Column(Float, nullable=True, default=0.0)
+    longitude = Column(Float, nullable=True, default=0.0)
+    is_active = Column(Boolean, default=False, nullable=False)
+
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, default=1)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    owner = relationship("User", back_populates="stations")
+
+    __table_args__ = (
+        UniqueConstraint("name", "owner_id", name="uq_station_name_owner"),
     )

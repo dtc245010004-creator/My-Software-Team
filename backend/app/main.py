@@ -38,6 +38,12 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/v1")
 
 
+# Gắn Router trạm sạc
+from app.api.stations import router as stations_router
+
+app.include_router(stations_router, prefix="/api/v1/stations", tags=["Stations"])
+
+
 # Gắn Router kiểm tra RBAC
 app.include_router(rbac_router)
 

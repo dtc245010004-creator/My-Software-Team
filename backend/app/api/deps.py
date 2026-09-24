@@ -1,5 +1,5 @@
 from typing import Annotated
-
+import jwt
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -17,7 +17,7 @@ def get_current_user(
     """Đọc cookie phiên (hoặc Bearer token), giải mã token, lấy thông tin người dùng từ DB."""
     token = session_cookie
     if not token:
-        # Hỗ trợ lấy từ Header Authorization (Bearer token) nếu có
+        # Hỗ trợ lấy từ Header Authorization (Bearer token)
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ", 1)[1]
@@ -29,7 +29,6 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    import jwt
     try:
         payload = decode_access_token(token, raise_on_expired=True)
         if not payload:
@@ -42,6 +41,12 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token không thể giải mã",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -84,3 +89,23 @@ def get_current_user(
         )
 
     return user
+
+
+# Alias hàm lấy user đang hoạt động
+get_current_active_user = get_current_user
+
+
+def require_station_owner(
+    current_user: Annotated[User, Depends(get_current_active_user)]
+) -> User:
+    """Kiểm tra quyền chủ trạm để đáp ứng tiêu chí Scrum 7."""
+    role_names = getattr(current_user, "role_names", [])
+    if not role_names and hasattr(current_user, "roles"):
+        role_names = [role.name for role in current_user.roles]
+
+    if "station_owner" not in role_names and "admin" not in role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ tài khoản Chủ trạm (station_owner) mới có quyền thực hiện thao tác này",
+        )
+    return current_user

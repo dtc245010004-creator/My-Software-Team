@@ -17,6 +17,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.role import Role
+    from app.models.station import Station
 
 user_roles = Table(
     "user_roles",
@@ -56,6 +57,10 @@ class User(Base):
         secondary=user_roles,
         back_populates="users",
         passive_deletes=True,
+    )
+
+    stations: Mapped[list["Station"]] = relationship(
+        "Station", back_populates="owner", passive_deletes=True
     )
 
     @property
