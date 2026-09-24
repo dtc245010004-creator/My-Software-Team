@@ -31,6 +31,7 @@
 | 2026-09-24 | (FE-Jira) Form Đăng nhập + Auth Flow + WebSocket Client | Đang thực hiện | `frontend/src/pages/LoginPage.jsx`, `LoginPage.css`, `services/authService.js`, `services/api.js`, `services/websocket.js`, `context/AuthContext.jsx`, `components/ProtectedRoute.jsx`, `App.jsx`, `vite.config.js` | **FE-Jira 100% Form Đăng nhập**. Email + password (icon ẩn/hiện mắt), validate regex email phía client, loading state disable nút, gọi `POST /api/auth/login` theo FastAPI chuẩn (`{access_token, token_type:"bearer", user}`), lưu JWT+user vào `localStorage`, parse lỗi `{detail:...}` 401 (sai MK) / 423 (tài khoản khóa 15 phút) / 429 (rate limit) hiển thị Toast `sonner`. Có `ProtectedRoute`. `SimulatorPage` + `websocket.js` thêm Heartbeat Ping 30s + auto-reconnect backoff 1s→15s, đèn báo 6 trạng thái (connected/reconnecting/disconnected…). Vite proxy `/api` + `/ws` → `localhost:8000`. Build PASS (`npm run build` 410ms), lint sạch lỗi, 1 warning Fast Refresh cosmetic. **Backend cần**: Bước 05 mở `POST /api/auth/login` + JWT + `WWW-Authenticate: Bearer` 401/423 để end-to-end. |
 | 2026-09-24 | (FE-Jira) Thêm trang Đăng ký + fix input mất chữ + dọn scripts rác | Hoàn thành | `frontend/src/pages/RegisterPage.jsx`, `backend/app/schemas/auth.py`, `backend/app/api/auth.py`, `frontend/src/main.jsx` (import App.css), `frontend/src/pages/LoginPage.css`, `frontend/src/pages/LoginPage.jsx` | **Bug input mất chữ**: `.login-field input` không có `color` → kế thừa root token `var(--text)` (xám/trắng). Thêm `color:#0f172a; background:#ffffff; ::placeholder color:#94a3b8`. Import `App.css` vào `main.jsx` (file có sẵn `body{color:#0f172a}` và `.app-loading` nhưng chưa được import từ trước). **Endpoint `POST /auth/register`**: schema `RegisterRequest` (EmailStr, password ≥6, full_name required, phone optional) + endpoint gán role mặc định `driver` (tự tạo nếu chưa có), 201 Created + 409 Conflict email trùng, 422 EmailStr/Pydantic. **Trang `/register`**: full_name + email + SĐT (optional) + password + confirm + validate client, navigate về `/login` kèm `state.registeredEmail`. **LoginPage**: đọc `location.state.registeredEmail` để điền sẵn email sau đăng ký; sai MK → xóa trắng cả 2 ô. **Vite proxy**: đổi `localhost:8000` → `localhost:8001` (BE đổi port do socket zombie 8000). **Dọn scripts rác**: xóa 14 file trong `backend/scripts/` (test một lần, kill_port helper) + `__pycache__/`. **Test**: 48/51 pass — 3 fail auth schema cần fix phiên sau. Build PASS (`npm run build` 339ms). |
 | 2026-09-22 | Bước 11 | Bộ Test Tự động (Pytest), Seed Data & Đóng gói | Chưa bắt đầu | `backend/tests/`, `backend/seed_data.py`, `docs/SDLC/...` | Test ACID ví tiền, test sạc, seed dữ liệu & kịch bản demo |
+| 2026-09-24 | K-01 / SCRUM-9 | (Spike) Trụ sạc ảo kết nối vào WebSocket server tối giản | Hoàn thành | `spike/ws_server_spike.py`, `spike/simulator_spike.py`, `spike/K-01-ket-qua.md` | Đã thực hiện spike: tạo server WebSocket tối giản bằng python websockets, giả lập phiên sạc hoàn chỉnh bằng ocpp library, ghi lại 8 loại message OCPP cần thiết, và tổng hợp tài liệu kết quả [K-01 Kết quả Spike](file:///c:/Users/Admin/Documents/csms-backend/My-Software-Team/spike/K-01-ket-qua.md) |
 
 ---
 
@@ -169,3 +170,23 @@
   - `pytest` — 48/51 pass; 3 fail (`test_auth::test_login_success_sets_httponly_cookie`, `test_auth_flow::test_login_happy_path_sets_cookie_and_returns_user`, `test_auth_flow::test_logout_happy_path_clears_cookie`) — nghi do response schema login đổi gần đây. **Giữ lại để phiên sau fix** theo yêu cầu user.
   - `npm run build` — PASS (339ms với cache).
 * **Tài liệu**: cập nhật `docs/codebase-map.md` (thêm RegisterPage, port 8001, test status 48/51) + `docs/plans/TIEN-DO.md` (thêm dòng bảng tiến độ + mục 11 nhật ký).
+
+---
+
+#### 12. Ngày 2026-09-24 (Sáng) | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Scrum 8 - Xử lý lỗi CI/CD Test Pipeline (Authentication & RBAC).
+* **Nội dung thực hiện cụ thể:**
+  - Sửa lỗi 401 trên GitHub Actions do `RBACMiddleware` gọi trực tiếp vào DB thật thay vì DB Test: sử dụng `monkeypatch.setattr` cho `app.core.rbac.get_db` trong `test_auth_flow.py`.
+  - Sửa lỗi `test_rbac.py` do hardcode tên cookie `"session_token"` không khớp biến môi trường CI: cập nhật thành `settings.session_cookie_name`.
+  - Cập nhật payload `test_auth.py` và `test_auth_flow.py` để phù hợp định dạng trả về mới chứa thuộc tính `user` lồng nhau. Thêm dependency `email-validator`.
+* **Trạng thái:** **Hoàn thành** (Passed toàn bộ CI/CD Pipeline).
+
+---
+
+#### 13. Ngày 2026-09-24 (Chiều) | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Scrum 9 (Task K-01) - Spike nghiên cứu Trụ sạc ảo kết nối WebSocket.
+* **Nội dung thực hiện cụ thể:**
+  - Xây dựng thành công `spike/ws_server_spike.py` (tối giản) và `spike/simulator_spike.py` sử dụng thư viện `websockets` và `ocpp` Python.
+  - Mô phỏng trọn vẹn 1 phiên sạc và giao tiếp chuẩn 8 loại message OCPP 1.6J. 
+  - Trích xuất thành công log tin nhắn và tài liệu hóa cấu trúc các trường cần thiết để chuẩn bị thiết kế CSDL vào file `spike/K-01-ket-qua.md`. Tuyệt đối không can thiệp thư mục `backend/app` của dự án.
+* **Trạng thái:** **Hoàn thành**.
