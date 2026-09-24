@@ -5,7 +5,6 @@ from app.routers.rbac_test import router as rbac_router
 from app.api.auth import router as auth_router
 from app.core.rbac import RBACMiddleware, roles
 
-
 app = FastAPI(
     title="EV CSMS - Nền tảng Quản lý Trạm Sạc Xe Điện",
     description="Hệ thống Backend FastAPI cho EV CSMS",
@@ -23,6 +22,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175",
         "http://localhost:3000",
     ],
     allow_credentials=True,

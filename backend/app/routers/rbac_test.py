@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from app.core.rbac import roles
 
-
 router = APIRouter(
     prefix="/rbac-test",
     tags=["RBAC Test"],

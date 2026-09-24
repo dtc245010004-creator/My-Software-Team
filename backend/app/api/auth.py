@@ -7,15 +7,64 @@ from sqlalchemy.orm import Session, joinedload
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import create_access_token, verify_password
 from app.core.rbac import roles
+from app.core.security import create_access_token, hash_password, verify_password
+from app.models.role import Role
 from app.models.user import User
-from app.schemas.auth import LoginRequest, UserResponse
+from app.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+    UserResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+DEFAULT_REGISTER_ROLE = "driver"
 
-@router.post("/login", response_model=UserResponse)
+
+def _get_or_create_role(db: Session, role_name: str) -> Role:
+    """Tìm role theo tên, tạo mới nếu chưa tồn tại (chỉ dùng cho role 'driver')."""
+    role = db.query(Role).filter(Role.name == role_name).first()
+    if role:
+        return role
+    role = Role(name=role_name, description="Tài xế sạc xe điện")
+    db.add(role)
+    db.flush()
+    return role
+
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@roles("public")
+def register(
+    payload: RegisterRequest,
+    db: Annotated[Session, Depends(get_db)],
+) -> Any:
+    """Đăng ký tài khoản customer (mặc định role=driver). Không cấp admin/operator."""
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email đã được sử dụng. Vui lòng chọn email khác.",
+        )
+
+    role = _get_or_create_role(db, DEFAULT_REGISTER_ROLE)
+    user = User(
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        full_name=payload.full_name,
+        phone=payload.phone,
+        is_active=True,
+        failed_login_count=0,
+    )
+    user.roles.append(role)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/login", response_model=LoginResponse)
 @roles("public")
 def login(
     login_data: LoginRequest,
@@ -30,7 +79,6 @@ def login(
     )
     now = datetime.now(timezone.utc)
 
-    # Tìm người dùng theo email
     user = (
         db.query(User)
         .options(joinedload(User.roles))
@@ -38,7 +86,6 @@ def login(
         .first()
     )
 
-    # Lỗi chung chung khi không tìm thấy email để tránh tiết lộ thông tin
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -46,7 +93,6 @@ def login(
         )
 
     def _as_utc(value: datetime) -> datetime:
-        """Normalize database datetimes to timezone-aware UTC."""
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
@@ -55,19 +101,16 @@ def login(
         _as_utc(user.locked_until) if user.locked_until is not None else None
     )
 
-    # Kiểm tra tài khoản có đang bị khóa tạm thời không
     if locked_until and locked_until > now:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tài khoản tạm thời bị khóa do nhập sai nhiều lần. Vui lòng thử lại sau.",
         )
 
-    # Nếu đã hết thời gian khóa tạm thời, reset số lần sai
     if locked_until and locked_until <= now:
         user.failed_login_count = 0
         user.locked_until = None
 
-    # Kiểm tra mật khẩu
     if not verify_password(login_data.password, user.password_hash):
         user.failed_login_count += 1
         user.last_failed_ip = client_ip
@@ -88,14 +131,12 @@ def login(
             detail="Email hoặc mật khẩu không chính xác",
         )
 
-    # Đăng nhập thành công: reset số lần sai và thời gian khóa
     user.failed_login_count = 0
     user.locked_until = None
     user.last_failed_ip = None
     db.commit()
     db.refresh(user)
 
-    # Tạo JWT token và set cookie httpOnly
     token = create_access_token(
         data={"sub": str(user.id), "email": user.email}
     )
@@ -108,7 +149,11 @@ def login(
         secure=False,
     )
 
-    return user
+    return LoginResponse(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user),
+    )
 
 
 @router.post("/logout")
@@ -121,8 +166,6 @@ def logout(response: Response) -> Any:
 
 @router.get("/me", response_model=UserResponse)
 @roles("authenticated")
-def get_me(
-    current_user: Annotated[User, Depends(get_current_user)]
-) -> Any:
+def get_me(current_user: Annotated[User, Depends(get_current_user)]) -> Any:
     """Lấy thông tin tài khoản người dùng hiện tại đang đăng nhập."""
     return current_user

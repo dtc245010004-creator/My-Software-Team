@@ -1,13 +1,13 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import iter_route_contexts
+from sqlalchemy.orm import joinedload
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.routing import Match
-from sqlalchemy.orm import joinedload
 
 from app.core.config import settings
-from app.core.security import decode_access_token
 from app.core.database import get_db
+from app.core.security import decode_access_token
 from app.models.user import User
 
 
@@ -35,7 +35,6 @@ class RBACMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
 
-        # Các đường dẫn công khai
         public_paths = {
             "/",
             "/docs",
@@ -47,7 +46,6 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if request.url.path in public_paths:
             return await call_next(request)
 
-        # Tìm endpoint
         endpoint = find_endpoint(request)
 
         if endpoint is None:
@@ -56,26 +54,21 @@ class RBACMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Không tìm thấy route"},
             )
 
-        # Lấy role được khai báo bằng @roles(...)
         allowed_roles = getattr(endpoint, "allowed_roles", None)
 
-        # Route chưa khai báo quyền -> từ chối mặc định
         if allowed_roles is None:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Route chưa khai báo quyền"},
             )
 
-        # Route public
         if "public" in allowed_roles:
             return await call_next(request)
 
-        # Lấy JWT từ cookie
         token = request.cookies.get(
             settings.session_cookie_name
         )
 
-        # Hỗ trợ Bearer token
         if not token:
             auth_header = request.headers.get(
                 "Authorization",
@@ -93,7 +86,6 @@ class RBACMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Chưa xác thực"},
             )
 
-        # Giải mã JWT
         payload = decode_access_token(token)
 
         if not payload:
@@ -123,7 +115,6 @@ class RBACMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Token không hợp lệ"},
             )
 
-        # Lấy user và role từ database
         db_gen = get_db()
         db = next(db_gen)
 
@@ -153,20 +144,16 @@ class RBACMiddleware(BaseHTTPMiddleware):
                 },
             )
 
-        # Lưu user vào request
         request.state.user = user
 
-        # Chỉ yêu cầu đăng nhập
         if "authenticated" in allowed_roles:
             return await call_next(request)
 
-        # Lấy role của user
         user_roles = {
             role.name
             for role in user.roles
         }
 
-        # Kiểm tra role
         if not user_roles.intersection(allowed_roles):
             return JSONResponse(
                 status_code=403,
