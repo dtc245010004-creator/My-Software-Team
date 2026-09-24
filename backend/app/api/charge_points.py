@@ -10,7 +10,6 @@ from app.models.connector import Connector
 from app.models.station import Station
 from app.schemas.charge_point import ChargePointCreate, ChargePointResponse
 
-
 router = APIRouter()
 
 
