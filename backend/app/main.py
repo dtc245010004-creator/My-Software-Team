@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers.rbac_test import router as rbac_router
 from app.api.auth import router as auth_router
 from app.core.rbac import RBACMiddleware, roles
+from app.routers.rbac_test import router as rbac_router
 
 app = FastAPI(
     title="EV CSMS - Nền tảng Quản lý Trạm Sạc Xe Điện",
