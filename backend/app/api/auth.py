@@ -20,7 +20,6 @@ from app.schemas.auth import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Role mặc định cho người dùng tự đăng ký
 DEFAULT_REGISTER_ROLE = "driver"
 
 
@@ -80,7 +79,6 @@ def login(
     )
     now = datetime.now(timezone.utc)
 
-    # Tìm người dùng theo email
     user = (
         db.query(User)
         .options(joinedload(User.roles))
@@ -88,7 +86,6 @@ def login(
         .first()
     )
 
-    # Lỗi chung chung khi không tìm thấy email để tránh tiết lộ thông tin
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -96,7 +93,6 @@ def login(
         )
 
     def _as_utc(value: datetime) -> datetime:
-        """Normalize database datetimes to timezone-aware UTC."""
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
@@ -105,19 +101,16 @@ def login(
         _as_utc(user.locked_until) if user.locked_until is not None else None
     )
 
-    # Kiểm tra tài khoản có đang bị khóa tạm thời không
     if locked_until and locked_until > now:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tài khoản tạm thời bị khóa do nhập sai nhiều lần. Vui lòng thử lại sau.",
         )
 
-    # Nếu đã hết thời gian khóa tạm thời, reset số lần sai
     if locked_until and locked_until <= now:
         user.failed_login_count = 0
         user.locked_until = None
 
-    # Kiểm tra mật khẩu
     if not verify_password(login_data.password, user.password_hash):
         user.failed_login_count += 1
         user.last_failed_ip = client_ip
@@ -138,14 +131,12 @@ def login(
             detail="Email hoặc mật khẩu không chính xác",
         )
 
-    # Đăng nhập thành công: reset số lần sai và thời gian khóa
     user.failed_login_count = 0
     user.locked_until = None
     user.last_failed_ip = None
     db.commit()
     db.refresh(user)
 
-    # Tạo JWT token và set cookie httpOnly
     token = create_access_token(
         data={"sub": str(user.id), "email": user.email}
     )
