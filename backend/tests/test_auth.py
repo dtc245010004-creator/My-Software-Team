@@ -61,9 +61,9 @@ def test_login_success_sets_httponly_cookie():
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["email"] == "test_driver@evcharging.vn"
-        assert data["full_name"] == "Driver Test"
-        assert "driver" in data["roles"]
+        assert data["user"]["email"] == "test_driver@evcharging.vn"
+        assert data["user"]["full_name"] == "Driver Test"
+        assert "driver" in data["user"]["roles"]
 
         # Kiểm tra cookie trong response
         assert settings.session_cookie_name in response.cookies

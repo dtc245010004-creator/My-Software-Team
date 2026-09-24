@@ -5,6 +5,7 @@ psycopg2-binary
 alembic
 python-dotenv
 pydantic-settings
+email-validator
 argon2-cffi
 pyjwt
 pytest

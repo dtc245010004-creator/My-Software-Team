@@ -68,7 +68,7 @@ def db_session():
 
 
 @pytest.fixture(scope="function")
-def client(db_session):
+def client(db_session, monkeypatch):
     """Override dependency get_db để kết nối tới SQLite in-memory."""
     def override_get_db():
         try:
@@ -77,6 +77,8 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    monkeypatch.setattr("app.core.rbac.get_db", override_get_db)
+
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -94,9 +96,9 @@ def test_login_happy_path_sets_cookie_and_returns_user(client):
     )
     assert res.status_code == 200
     data = res.json()
-    assert data["id"] == 1
-    assert data["email"] == "driver@evcsms.vn"
-    assert "driver" in data["roles"]
+    assert data["user"]["id"] == 1
+    assert data["user"]["email"] == "driver@evcsms.vn"
+    assert "driver" in data["user"]["roles"]
 
     # Kiểm tra cookie
     assert settings.session_cookie_name in res.cookies
@@ -105,6 +107,11 @@ def test_login_happy_path_sets_cookie_and_returns_user(client):
 
 def test_logout_happy_path_clears_cookie(client):
     """Happy Path: Gọi /auth/logout xóa cookie phiên và trả về thông báo thành công."""
+    # Login first to get the cookie
+    client.post(
+        "/api/v1/auth/login",
+        json={"email": "driver@evcsms.vn", "password": "DriverPass@123"},
+    )
     res = client.post("/api/v1/auth/logout")
     assert res.status_code == 200
     assert res.json() == {"message": "Đăng xuất thành công"}
