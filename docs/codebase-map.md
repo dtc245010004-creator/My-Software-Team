@@ -96,13 +96,7 @@
 
 ---
 
-## Chưa có — Sẽ tạo theo từng bước
-
-### Backend (`backend/`)
-
-| File | Sẽ tạo ở Bước | Vai trò dự kiến |
-| --- | :---: | --- |
-| `backend/seed_data.py` | 11 | Script nạp dữ liệu mẫu sinh động (trạm, trụ, phiên sạc, ví) |
+### Tài liệu, Kế hoạch & Hồ sơ SDLC (`docs/`)
 
 | File | Vai trò |
 | --- | --- |
@@ -130,16 +124,33 @@
 | `docs/SDLC/KT2/02_Transaction_Design_and_Wallet_ACID.md` | Hồ sơ thiết kế giao dịch ACID ví tiền và phiên sạc mốc KT2 |
 | `docs/SDLC/KT2/03_Simulator_and_Telemetry_Design.md` | Hồ sơ thiết kế bộ giả lập trạm sạc và telemetry thời gian thực mốc KT2 |
 | `docs/SDLC/KT3/README.md` | Mục tiêu & danh mục deliverable mốc KT3 (AI Smart Charging & Frontend) |
+| `docs/SDLC/KT3/01_AI_Integration_and_Prompt_Evaluation.md` | Hồ sơ tích hợp AI Gemini, đánh giá prompt và Heuristic Fallback mốc KT3 |
+| `docs/SDLC/KT3/02_Frontend_Architecture_and_UI_Guide.md` | Kiến trúc Web Frontend React + Tailwind và hướng dẫn giao diện mốc KT3 |
 | `docs/SDLC/final/README.md` | Mục tiêu & danh mục deliverable mốc Cuối kỳ (Test, Đóng gói & Demo) |
-
----
-
-| `backend/seed_data.py` | Script nạp dữ liệu mẫu sinh động (3 trạm lớn, 9 trụ, 18 cổng, 62 phiên sạc, tài khoản demo) |
-| `backend/tests/test_wallet_acid.py` | Bộ 5 test cases kiểm thử tính toàn vẹn ACID của Ví: Pessimistic Lock, Overdraft Limit, Auto Clear Lock |
-| `backend/tests/test_sessions.py` | Bộ 5 test cases kiểm thử vòng đời phiên sạc: 409 Conflict cổng độc quyền, 402 chặn nợ, Idempotency |
 | `docs/SDLC/final/01_Final_Technical_Report.md` | Báo cáo kỹ thuật tổng kết toàn diện 11 bước đề tài EV CSMS mốc Cuối kỳ |
 | `docs/SDLC/final/02_User_Guide_and_Demo_Script.md` | Sổ tay hướng dẫn vận hành 1-click & Kịch bản demo 15 phút bảo vệ trước hội đồng |
 | `docs/SDLC/final/03_Presentation_Slides.md` | Đề cương chi tiết 15 slide thuyết trình bảo vệ đồ án tốt nghiệp/cuối kỳ |
+
+### Seed Data & Kiểm thử Tự động (`backend/`)
+
+| File | Vai trò |
+| --- | --- |
+| `backend/seed_data.py` | Script nạp dữ liệu mẫu sinh động (3 trạm lớn, 9 trụ, 18 cổng, 62 phiên sạc, tài khoản demo) |
+| `backend/tests/conftest.py` | Fixtures cấu hình test in-memory SQLite, override get_db và test clients |
+| `backend/tests/test_auth.py` | Bộ 12 test cases kiểm thử xác thực, bcrypt rounds=12, JWT, RBAC và đăng ký tạo ví nguyên tử |
+| `backend/tests/test_health.py` | Bộ 1 test case kiểm thử endpoint /health |
+| `backend/tests/test_stations.py` | Bộ 12 test cases kiểm thử CRUD trạm/trụ/cổng, Haversine, Oversubscription, IDOR, Soft-delete |
+| `backend/tests/test_sessions_acid.py` | Bộ 9 test cases kiểm thử toàn diện ACID: TOU, Concurrency thật (409 Conflict), nợ âm, IDOR |
+| `backend/tests/test_simulator.py` | Bộ 9 test cases kiểm thử Simulator CC-CV, Auto Cut-off, Checkpoint 30s, Crash Reconciliation |
+| `backend/tests/test_ai_fallback.py` | Bộ 21 test cases kiểm thử Heuristic Fallback, RBAC/IDOR AI, Mock Gemini và Scheduler |
+| `backend/tests/test_wallet_acid.py` | Bộ 5 test cases kiểm thử tính toàn vẹn ACID của Ví: Pessimistic Lock, Overdraft Limit, Debt Lock |
+| `backend/tests/test_sessions.py` | Bộ 5 test cases kiểm thử vòng đời phiên sạc: 409 Conflict cổng độc quyền, 402 chặn nợ, Idempotency |
+
+---
+
+## Chưa có — Sẽ tạo theo từng bước
+
+*(Không còn — Toàn bộ các file trong lộ trình 11 bước đã được hoàn thành 100%)*
 
 ---
 
