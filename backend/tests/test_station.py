@@ -1,163 +1,166 @@
-﻿import sqlite3
-import uuid
+﻿import pytest
 from datetime import datetime, timezone
-from typing import Annotated
-
-import pytest
-from fastapi import Depends, status
+from types import SimpleNamespace
 from fastapi.testclient import TestClient
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from app.api import deps
-from app.core.config import settings
-from app.core.security import create_access_token
 from app.main import app
+from app.core import rbac
+from app.core.database import Base, engine, SessionLocal
 from app.models.user import User
+from app.models.station import Station
+from app.api.deps import get_current_user, get_current_active_user
 
 
-@event.listens_for(Engine, "connect")
-def register_sqlite_now(dbapi_connection, connection_record):
-    if hasattr(dbapi_connection, "create_function"):
-        dbapi_connection.create_function(
-            "now", 0, lambda: datetime.now(timezone.utc).isoformat()
-        )
+class FakeUser:
+    def __init__(self, id, email, full_name, is_active, role_name):
+        self.id = id
+        self.email = email
+        self.full_name = full_name
+        self.is_active = is_active
+        self.roles = [SimpleNamespace(name=role_name)]
+
+
+def fake_get_db(user_obj):
+    class MockQuery:
+        def __init__(self, obj):
+            self.obj = obj
+        def options(self, *args, **kwargs):
+            return self
+        def filter(self, *args, **kwargs):
+            return self
+        def first(self):
+            return self.obj
+
+    class MockDB:
+        def __init__(self, obj):
+            self.obj = obj
+        def query(self, *args, **kwargs):
+            return MockQuery(self.obj)
+
+    def generator():
+        yield MockDB(user_obj)
+
+    return generator()
 
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
-    conn = sqlite3.connect("sql_app.db")
-    conn.create_function("now", 0, lambda: datetime.now(timezone.utc).isoformat())
-    cursor = conn.cursor()
+    Base.metadata.create_all(bind=engine)
+    db: Session = SessionLocal()
     try:
-        cursor.execute("SELECT id FROM roles WHERE name = 'station_owner'")
-        row = cursor.fetchone()
-        if not row:
-            cursor.execute("INSERT INTO roles (name, description) VALUES ('station_owner', 'Chủ trạm')")
-            role_id = cursor.lastrowid
-        else:
-            role_id = row[0]
-
-        cursor.execute("SELECT id FROM users WHERE id = 1")
-        if not cursor.fetchone():
-            cursor.execute("""
-                INSERT OR REPLACE INTO users (id, email, password_hash, full_name, is_active)
-                VALUES (1, 'chutram_test@evcsms.com', 'dummy_hash_for_test', 'Chủ Trạm Mẫu', 1)
-            """)
-
-        try:
-            cursor.execute("INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (1, ?)", (role_id,))
-        except sqlite3.IntegrityError:
-            pass
-
-        conn.commit()
+        owner = db.query(User).filter(User.id == 999).first()
+        if not owner:
+            owner = User(
+                id=999,
+                email="owner_s04_clean@evcharging.vn",
+                password_hash="fakehash123",
+                full_name="Clean Station Owner",
+                is_active=True,
+            )
+            db.add(owner)
+            db.commit()
     finally:
-        conn.close()
-
-
-def get_mock_owner_with_db(db: Annotated[Session, Depends(deps.get_db)]):
-    return db.query(User).options(joinedload(User.roles)).filter(User.id == 1).first()
+        db.close()
 
 
 @pytest.fixture
-def client():
-    token = create_access_token(data={"sub": "1"})
+def client(monkeypatch):
+    test_owner = FakeUser(
+        id=999,
+        email="owner_s04_clean@evcharging.vn",
+        full_name="Clean Station Owner",
+        is_active=True,
+        role_name="station_owner",
+    )
 
-    if hasattr(deps, "get_current_user"):
-        app.dependency_overrides[deps.get_current_user] = get_mock_owner_with_db
-    if hasattr(deps, "get_current_active_user"):
-        app.dependency_overrides[deps.get_current_active_user] = get_mock_owner_with_db
-    if hasattr(deps, "require_station_owner"):
-        app.dependency_overrides[deps.require_station_owner] = get_mock_owner_with_db
+    monkeypatch.setattr(rbac, "get_db", lambda: fake_get_db(test_owner))
+    monkeypatch.setattr(rbac, "decode_access_token", lambda token: {"sub": "999"})
 
-    test_client = TestClient(app)
-    test_client.cookies.set(settings.session_cookie_name, token)
-    test_client.headers.update({"Authorization": f"Bearer {token}"})
+    # Map mock user vào dependency nội bộ của router
+    app.dependency_overrides[get_current_user] = lambda: test_owner
+    app.dependency_overrides[get_current_active_user] = lambda: test_owner
 
-    yield test_client
+    with TestClient(app) as test_client:
+        yield test_client
 
     app.dependency_overrides.clear()
 
 
-BASE_URL = "/api/v1/stations/stations"
+@pytest.fixture
+def auth_headers():
+    return {"Authorization": "Bearer mock_owner_token"}
 
 
-def test_ac1_create_station_valid(client):
-    """AC 1: Tạo trạm hợp lệ -> is_active=False và gắn đúng owner_id."""
-    unique_name = f"Trạm Sạc Thái Nguyên {uuid.uuid4().hex[:6]}"
+def test_ac1_create_station_valid(client, auth_headers):
     payload = {
-        "name": unique_name,
-        "address": "284 Lương Ngọc Quyến, TP. Thái Nguyên",
-        "latitude": 21.5852,
-        "longitude": 105.8412,
+        "name": f"Station Valid {datetime.now(timezone.utc).timestamp()}",
+        "address": "123 Vo Van Ngan, Thu Duc, HCM",
+        "latitude": 10.8505,
+        "longitude": 106.7719
     }
-    response = client.post(f"{BASE_URL}/", json=payload)
-    assert response.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED)
-    data = response.json()
-    assert data["name"] == unique_name
+    res = client.post("/api/v1/stations/", json=payload, headers=auth_headers)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["name"] == payload["name"]
+    assert data["address"] == payload["address"]
+    assert data["latitude"] == payload["latitude"]
+    assert data["longitude"] == payload["longitude"]
     assert data["is_active"] is False
-    assert data.get("owner_id") == 1 or data.get("user_id") == 1
+    assert data["owner_id"] == 999
 
 
-def test_ac2_create_station_invalid_coordinates(client):
-    """AC 2: Toạ độ nằm ngoài dải hợp lệ -> Báo lỗi và không tạo bản ghi."""
-    res_lat = client.post(f"{BASE_URL}/", json={
-        "name": f"Trạm Sai Vĩ Độ {uuid.uuid4().hex[:6]}",
-        "address": "Hà Nội",
+def test_ac2_create_station_invalid_coordinates(client, auth_headers):
+    payload_lat = {
+        "name": "Invalid Lat Station",
+        "address": "123 ABC",
         "latitude": 95.0,
-        "longitude": 105.0,
-    })
-    assert res_lat.status_code in (status.HTTP_422_UNPROCESSABLE_ENTITY, status.HTTP_400_BAD_REQUEST)
+        "longitude": 106.77
+    }
+    res_lat = client.post("/api/v1/stations/", json=payload_lat, headers=auth_headers)
+    assert res_lat.status_code == 422
 
-    res_lng = client.post(f"{BASE_URL}/", json={
-        "name": f"Trạm Sai Kinh Độ {uuid.uuid4().hex[:6]}",
-        "address": "Hà Nội",
-        "latitude": 21.0,
-        "longitude": 190.0,
-    })
-    assert res_lng.status_code in (status.HTTP_422_UNPROCESSABLE_ENTITY, status.HTTP_400_BAD_REQUEST)
+    payload_lng = {
+        "name": "Invalid Lng Station",
+        "address": "123 ABC",
+        "latitude": 10.85,
+        "longitude": 190.0
+    }
+    res_lng = client.post("/api/v1/stations/", json=payload_lng, headers=auth_headers)
+    assert res_lng.status_code == 422
 
 
-def test_ac3_update_station_info(client):
-    """AC 3: Sửa tên hoặc địa chỉ -> Cập nhật thành công."""
-    unique_name = f"Trạm Ban Đầu {uuid.uuid4().hex[:6]}"
-    create_res = client.post(f"{BASE_URL}/", json={
-        "name": unique_name,
-        "address": "Địa chỉ ban đầu",
-        "latitude": 21.0,
-        "longitude": 105.0,
-    })
-    assert create_res.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED)
+def test_ac3_update_station_info(client, auth_headers):
+    create_payload = {
+        "name": f"Station Update Test {datetime.now(timezone.utc).timestamp()}",
+        "address": "Old Address",
+        "latitude": 10.0,
+        "longitude": 106.0
+    }
+    create_res = client.post("/api/v1/stations/", json=create_payload, headers=auth_headers)
+    assert create_res.status_code == 201
     station_id = create_res.json()["id"]
 
-    new_name = f"Trạm Sau Sửa {uuid.uuid4().hex[:6]}"
-    update_res = client.put(f"{BASE_URL}/{station_id}", json={
-        "name": new_name,
-        "address": "Địa chỉ mới đã sửa",
-    })
-    assert update_res.status_code == status.HTTP_200_OK
-
-    get_res = client.get(f"{BASE_URL}/")
-    assert get_res.status_code == status.HTTP_200_OK
-    stations = get_res.json()
-    target = next((s for s in stations if s["id"] == station_id), None)
-    assert target is not None
-    assert target["name"] == new_name
-    assert target["address"] == "Địa chỉ mới đã sửa"
-
-
-def test_ac4_idempotency_duplicate_click(client):
-    """AC 4: Bấm lưu hai lần liên tiếp -> Chỉ tạo một trạm."""
-    unique_name = f"Trạm Trùng {uuid.uuid4().hex[:6]}"
-    payload = {
-        "name": unique_name,
-        "address": "Hải Phòng",
-        "latitude": 20.8449,
-        "longitude": 106.6881,
+    update_payload = {
+        "name": "Updated Station Name",
+        "address": "Updated Address 456"
     }
-    res1 = client.post(f"{BASE_URL}/", json=payload)
-    assert res1.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED)
+    update_res = client.put(f"/api/v1/stations/{station_id}", json=update_payload, headers=auth_headers)
+    assert update_res.status_code == 200
+    data = update_res.json()
+    assert data["name"] == "Updated Station Name"
+    assert data["address"] == "Updated Address 456"
 
-    res2 = client.post(f"{BASE_URL}/", json=payload)
-    assert res2.status_code in (status.HTTP_400_BAD_REQUEST, status.HTTP_409_CONFLICT, status.HTTP_200_OK)
+
+def test_ac4_idempotency_duplicate_click(client, auth_headers):
+    payload = {
+        "name": f"Station Duplicate {datetime.now(timezone.utc).timestamp()}",
+        "address": "789 Unique Path",
+        "latitude": 10.123,
+        "longitude": 106.456
+    }
+    res1 = client.post("/api/v1/stations/", json=payload, headers=auth_headers)
+    assert res1.status_code == 201
+
+    res2 = client.post("/api/v1/stations/", json=payload, headers=auth_headers)
+    assert res2.status_code in [400, 409]
