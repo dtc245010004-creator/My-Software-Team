@@ -10,7 +10,8 @@ from app.models.station import Station
 def test_charge_point_unique_code():
     db = SessionLocal()
     try:
-        # Xóa data cũ
+        # Xóa data cũ: xóa bảng con Connector trước
+        db.query(Connector).delete()
         db.query(ChargePoint).filter(ChargePoint.code.in_(["CP001", "CP002"])).delete()
         db.query(Station).filter(Station.name.in_(["Station 1", "Station 2", "Station 3"])).delete()
         db.commit()
@@ -30,16 +31,19 @@ def test_charge_point_unique_code():
         # Tạo charge_point thứ 2 CÙNG code
         cp2 = ChargePoint(station_id=station2.id, code="CP001")
         db.add(cp2)
-        
+
         with pytest.raises(IntegrityError):
             db.commit()
     finally:
         db.rollback()
         db.close()
 
+
 def test_connector_unique_charge_point_id_and_number():
     db = SessionLocal()
     try:
+        # Xóa data cũ: xóa bảng con Connector trước để không bị đụng UNIQUE constraint
+        db.query(Connector).delete()
         db.query(ChargePoint).filter(ChargePoint.code.in_(["CP001", "CP002"])).delete()
         db.query(Station).filter(Station.name.in_(["Station 1", "Station 2", "Station 3"])).delete()
         db.commit()

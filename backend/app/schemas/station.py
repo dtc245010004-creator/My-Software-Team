@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Union
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -15,17 +15,17 @@ class StationCreate(StationBase):
 
 
 class StationUpdate(BaseModel):
-    name: Optional[str] = None
-    address: Optional[str] = None
-    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    name: str | None = None
+    address: str | None = None
+    latitude: float | None = Field(None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(None, ge=-180.0, le=180.0)
 
 
 class StationResponse(StationBase):
     id: int
     is_active: bool
     owner_id: int
-    created_at: Optional[Union[datetime, str]] = None
-    updated_at: Optional[Union[datetime, str]] = None
+    created_at: datetime | str | None = None
+    updated_at: datetime | str | None = None
 
     model_config = ConfigDict(from_attributes=True)

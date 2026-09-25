@@ -1,16 +1,19 @@
-﻿import uuid
+﻿import sqlite3
+import uuid
 from datetime import datetime, timezone
+from typing import Annotated
+
 import pytest
-import sqlite3
+from fastapi import Depends, status
+from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, joinedload
-from fastapi import status, Depends
-from fastapi.testclient import TestClient
 
-from app.main import app
+from app.api import deps
 from app.core.config import settings
-from app.core.security import create_access_tokengit 
+from app.core.security import create_access_token
+from app.main import app
 from app.models.user import User
 
 
@@ -45,7 +48,7 @@ def setup_test_db():
 
         try:
             cursor.execute("INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (1, ?)", (role_id,))
-        except Exception:
+        except sqlite3.IntegrityError:
             pass
 
         conn.commit()
@@ -53,7 +56,7 @@ def setup_test_db():
         conn.close()
 
 
-def get_mock_owner_with_db(db: Session = Depends(deps.get_db)):
+def get_mock_owner_with_db(db: Annotated[Session, Depends(deps.get_db)]):
     return db.query(User).options(joinedload(User.roles)).filter(User.id == 1).first()
 
 

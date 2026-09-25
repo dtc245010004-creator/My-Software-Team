@@ -1,4 +1,5 @@
 from typing import Annotated
+
 import jwt
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
@@ -43,7 +44,7 @@ def get_current_user(
             detail="Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except Exception:
+    except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token không thể giải mã",

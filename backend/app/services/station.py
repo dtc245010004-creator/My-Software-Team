@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from typing import Any, Union
+from typing import Any
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -40,7 +41,7 @@ def get_stations(session: Session, user: Any) -> list[Station]:
     return session.query(Station).filter(Station.owner_id == user.id).all()
 
 
-def create_station(session: Session, station_data: Union[dict, Any], user: Any) -> Station:
+def create_station(session: Session, station_data: dict | Any, user: Any) -> Station:
     """Xử lý nghiệp vụ tạo trạm sạc mới gắn với chủ trạm (owner_id).
     
     - AC 1: Khởi tạo is_active = False, gắn với tài khoản user.id.
@@ -92,7 +93,7 @@ def create_station(session: Session, station_data: Union[dict, Any], user: Any) 
 
 
 def update_station(
-    session: Session, station_id: int, station_data: Union[dict, Any], user: Any
+    session: Session, station_id: int, station_data: dict | Any, user: Any
 ) -> Station:
     """Xử lý nghiệp vụ cập nhật thông tin trạm sạc.
     
