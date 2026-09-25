@@ -1,4 +1,4 @@
-"""add_station_fields
+﻿"""add_station_fields
 
 Revision ID: 98fa4a593c80
 Revises: 98fa4a593c79
@@ -24,7 +24,7 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column('latitude', sa.Float(), nullable=True))
         batch_op.add_column(sa.Column('longitude', sa.Float(), nullable=True))
         batch_op.add_column(
-            sa.Column('is_active', sa.Boolean(), server_default=sa.false(), nullable=False),
+            sa.Column('is_active', sa.Boolean(), server_default=sa.text('false'), nullable=False),
         )
         batch_op.add_column(
             sa.Column('owner_id', sa.Integer(), nullable=True),
