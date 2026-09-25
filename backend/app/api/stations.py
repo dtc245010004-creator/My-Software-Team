@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+﻿from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -12,7 +12,7 @@ from app.models.user import User
 from app.schemas.station import StationCreate, StationResponse, StationUpdate
 from app.services.station import create_station, update_station
 
-router = APIRouter(prefix="/stations", tags=["Stations"])
+router = APIRouter()
 
 
 @router.get(
