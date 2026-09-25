@@ -89,8 +89,8 @@ docs/SDLC/final/
 
 ## 4. Checklist thực hiện
 
-- [ ] Viết bộ test `tests/test_wallet_acid.py`, `tests/test_sessions.py`, `tests/test_ai_fallback.py`.
-- [ ] Chạy `pytest` xác nhận toàn bộ test cases màu xanh.
-- [ ] Viết `seed_data.py` và kiểm tra nạp dữ liệu thành công vào CSDL.
-- [ ] Hoàn thiện các tài liệu mốc Cuối kỳ trong `docs/SDLC/final/`.
-- [ ] Cập nhật trạng thái Bước 11 trong `docs/plans/TIEN-DO.md`.
+- [x] Viết bộ test `tests/test_wallet_acid.py`, `tests/test_sessions.py`, `tests/test_ai_fallback.py`.
+- [x] Chạy `pytest` xác nhận toàn bộ test cases màu xanh (74/74 passed 100%).
+- [x] Viết `seed_data.py` và kiểm tra nạp dữ liệu thành công vào CSDL (3 trạm, 9 trụ, 18 cổng, 62 phiên).
+- [x] Hoàn thiện các tài liệu mốc Cuối kỳ trong `docs/SDLC/final/` (01 Report, 02 Demo Script, 03 Slides).
+- [x] Cập nhật trạng thái Bước 11 trong `docs/plans/TIEN-DO.md`.

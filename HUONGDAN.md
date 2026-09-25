@@ -78,10 +78,10 @@ Trước khi bắt đầu [Bước XX], hãy trả lời:
 ## 📊 TRẠNG THÁI DỰ ÁN (cập nhật thủ công)
 
 ```text
-Giai đoạn hiện tại : 🔄 Giai đoạn 0 & 1 — Nền tảng dự án, Sơ đồ kiến trúc & Hồ sơ KT1
-Bước đang làm      : Bước 01 — Hoàn thiện đặc tả yêu cầu, use case và sơ đồ kiến trúc
-Mốc SDLC gần nhất  : KT1 (Đặc tả, Thiết kế ERD & Kiến trúc)
-Ngày cập nhật dòng này: 2026-09-22
+Giai đoạn hiện tại : 🔄 Giai đoạn 3 — Biểu giá, Ví điện tử & Phiên sạc (ACID)
+Bước đang làm      : Chuẩn bị Bước 07 — Module Biểu giá, Ví điện tử & Phiên sạc (ACID)
+Mốc SDLC gần nhất  : KT2 (Core Backend, Simulator & ACID)
+Ngày cập nhật dòng này: 2026-09-25
 ```
 
 ---

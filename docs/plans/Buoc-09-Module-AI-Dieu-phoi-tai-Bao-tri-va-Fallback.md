@@ -68,8 +68,8 @@ backend/
 
 ## 4. Checklist thực hiện
 
-- [ ] Cài đặt `ai_service.py` tích hợp Google Gemini API.
-- [ ] Cài đặt `fallback_service.py` với thuật toán chia tải và cảnh báo ngưỡng cứng.
-- [ ] Cài đặt API Endpoints `/api/v1/ai/...`.
-- [ ] Soạn tài liệu bàn giao `docs/SDLC/KT3/01_AI_Integration_and_Prompt_Evaluation.md`.
-- [ ] Cập nhật trạng thái Bước 09 trong `docs/plans/TIEN-DO.md`.
+- [x] Cài đặt `ai_service.py` tích hợp Google Gemini API.
+- [x] Cài đặt `fallback_service.py` với thuật toán chia tải và cảnh báo ngưỡng cứng.
+- [x] Cài đặt API Endpoints `/api/v1/ai/...`.
+- [x] Soạn tài liệu bàn giao `docs/SDLC/KT3/01_AI_Integration_and_Prompt_Evaluation.md`.
+- [x] Cập nhật trạng thái Bước 09 trong `docs/plans/TIEN-DO.md`.

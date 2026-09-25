@@ -74,7 +74,8 @@ erDiagram
         float longitude
         float total_grid_capacity_kw "Công suất nguồn trạm"
         string operating_hours
-        string status "ACTIVE | INACTIVE | MAINTENANCE"
+        string status "ACTIVE | MAINTENANCE"
+        boolean is_active "True: hoạt động, False: đã xóa mềm"
         datetime created_at
     }
 
@@ -87,6 +88,8 @@ erDiagram
         float max_power_kw "Công suất cực đại"
         string firmware_version
         string status "AVAILABLE | CHARGING | FAULTED | UNAVAILABLE"
+        boolean power_sharing_enabled "Hỗ trợ chia sẻ công suất giữa các súng"
+        boolean is_active "True: hoạt động, False: đã xóa mềm"
         datetime created_at
     }
 
@@ -97,6 +100,7 @@ erDiagram
         string connector_type "CCS2 | TYPE_2 | CHADEMO"
         float max_power_kw
         string status "AVAILABLE | PREPARING | CHARGING | FAULTED"
+        boolean is_active "True: hoạt động, False: đã xóa mềm"
         datetime created_at
     }
 
@@ -203,7 +207,8 @@ erDiagram
 | `longitude` | `FLOAT` | | `NOT NULL` | Kinh độ định vị GPS |
 | `total_grid_capacity_kw` | `FLOAT` | | `NOT NULL, CHECK (total_grid_capacity_kw > 0)` | Tổng công suất nguồn lưới cấp cho trạm (kW) |
 | `operating_hours` | `VARCHAR(50)` | | `DEFAULT '24/7'` | Khung giờ mở cửa hoạt động |
-| `status` | `VARCHAR(20)` | | `CHECK IN ('ACTIVE', 'INACTIVE', 'MAINTENANCE')` | Trạng thái sẵn sàng của toàn trạm |
+| `status` | `VARCHAR(20)` | | `CHECK IN ('ACTIVE', 'MAINTENANCE')` | Trạng thái sẵn sàng vận hành của trạm |
+| `is_active` | `BOOLEAN` | | `NOT NULL, DEFAULT 1` | Cờ trạng thái tồn tại logic (False = Soft Deleted) |
 | `created_at` | `TIMESTAMP` | | `DEFAULT CURRENT_TIMESTAMP` | Thời điểm khởi tạo trạm |
 
 ---
@@ -220,6 +225,8 @@ erDiagram
 | `max_power_kw` | `FLOAT` | | `NOT NULL, CHECK (max_power_kw > 0)` | Công suất thiết kế tối đa của trụ sạc (kW) |
 | `firmware_version` | `VARCHAR(50)` | | `DEFAULT '1.0.0'` | Phiên bản firmware điều khiển |
 | `status` | `VARCHAR(20)` | | `CHECK IN ('AVAILABLE', 'CHARGING', 'FAULTED', 'UNAVAILABLE')` | Trạng thái vận hành thời gian thực |
+| `power_sharing_enabled` | `BOOLEAN` | | `NOT NULL, DEFAULT 1` | Bật/tắt tính năng chia sẻ tải động giữa các súng |
+| `is_active` | `BOOLEAN` | | `NOT NULL, DEFAULT 1` | Cờ trạng thái tồn tại logic (False = Soft Deleted) |
 | `created_at` | `TIMESTAMP` | | `DEFAULT CURRENT_TIMESTAMP` | Thời điểm tạo bản ghi |
 
 ---
@@ -234,6 +241,7 @@ erDiagram
 | `connector_type` | `VARCHAR(20)` | | `CHECK IN ('CCS2', 'TYPE_2', 'CHADEMO')` | Chuẩn chân cắm sạc vật lý |
 | `max_power_kw` | `FLOAT` | | `NOT NULL, CHECK (max_power_kw > 0)` | Công suất tối đa cổng hỗ trợ (kW) |
 | `status` | `VARCHAR(20)` | | `CHECK IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED')` | Trạng thái độc quyền kết nối cổng |
+| `is_active` | `BOOLEAN` | | `NOT NULL, DEFAULT 1` | Cờ trạng thái tồn tại logic (False = Soft Deleted) |
 | `created_at` | `TIMESTAMP` | | `DEFAULT CURRENT_TIMESTAMP` | Thời điểm tạo cổng |
 
 ---
@@ -381,7 +389,8 @@ CREATE TABLE IF NOT EXISTS stations (
     longitude FLOAT NOT NULL,
     total_grid_capacity_kw FLOAT NOT NULL CHECK (total_grid_capacity_kw > 0),
     operating_hours VARCHAR(50) NOT NULL DEFAULT '24/7',
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE', 'MAINTENANCE')),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'MAINTENANCE')),
+    is_active BOOLEAN NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (operator_id) REFERENCES users(id) ON DELETE RESTRICT
 );
@@ -396,6 +405,8 @@ CREATE TABLE IF NOT EXISTS charging_points (
     max_power_kw FLOAT NOT NULL CHECK (max_power_kw > 0),
     firmware_version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
     status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE' CHECK (status IN ('AVAILABLE', 'CHARGING', 'FAULTED', 'UNAVAILABLE')),
+    power_sharing_enabled BOOLEAN NOT NULL DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE
 );
@@ -408,8 +419,10 @@ CREATE TABLE IF NOT EXISTS connectors (
     connector_type VARCHAR(20) NOT NULL CHECK (connector_type IN ('CCS2', 'TYPE_2', 'CHADEMO')),
     max_power_kw FLOAT NOT NULL CHECK (max_power_kw > 0),
     status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE' CHECK (status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED')),
+    is_active BOOLEAN NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (charging_point_id) REFERENCES charging_points(id) ON DELETE CASCADE
+    FOREIGN KEY (charging_point_id) REFERENCES charging_points(id) ON DELETE CASCADE,
+    UNIQUE (charging_point_id, connector_number)
 );
 
 -- 7. Bảng tariffs (TOU 3 khung giờ)

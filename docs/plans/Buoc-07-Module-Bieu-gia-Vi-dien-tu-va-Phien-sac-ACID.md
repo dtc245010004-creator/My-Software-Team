@@ -82,10 +82,34 @@ backend/
 
 ---
 
-## 4. Checklist thực hiện
+## 4. Checklist thực hiện & Definition of Done
 
-- [ ] Cài đặt Models & Schemas cho `Tariff`, `Wallet`, `Session`.
-- [ ] Cài đặt `wallet_service.py` với transaction ACID và khóa `with_for_update`.
-- [ ] Cài đặt `session_service.py` với kiểm tra độc quyền cổng sạc.
-- [ ] Soạn tài liệu bàn giao `docs/SDLC/KT2/02_Transaction_Design_and_Wallet_ACID.md`.
-- [ ] Cập nhật trạng thái Bước 07 trong `docs/plans/TIEN-DO.md`.
+- [x] Cài đặt cấu hình tài chính trong `app/core/config.py` (`MIN_START_BALANCE=50000`, `NEGATIVE_BALANCE_LIMIT=-300000`, `MAX_SAFE_DEBT_LIMIT=-1000000`).
+- [x] Cài đặt Models & Schemas cho `Tariff`, `Wallet`, `WalletTransaction`, `ChargingSession` với kiểu dữ liệu `Decimal` chuẩn xác.
+- [x] Cài đặt `wallet_service.py` với transaction ACID, khóa bi quan `with_for_update` và chính sách nợ cho phép âm đến hạn mức, kích hoạt `is_debt_locked`.
+- [x] Cài đặt `session_service.py` với kiểm tra độc quyền cổng sạc (Atomic Conditional Update), tính cước TOU 3 khung giờ chốt 1 lần lúc cắm sạc, chống gọi trùng (Idempotency) và IDOR Guard.
+- [x] Cài đặt Endpoints API cho `/tariffs`, `/wallet`, `/sessions` và đăng ký vào router v1.
+- [x] Khởi tạo Alembic baseline migration `03906fa596ea_initial_schema_step07.py`.
+- [x] Bộ kiểm thử `backend/tests/test_sessions_acid.py` với 9 test cases đặc thù (bao gồm Concurrency THẬT bằng `ThreadPoolExecutor` kiểm chứng xung đột đồng thời 201 vs 409) đạt 100% (9/9 passed).
+- [x] Toàn bộ test suite Backend 34/34 tests pass 100%.
+- [x] Soạn tài liệu bàn giao `docs/SDLC/KT2/02_Transaction_Design_and_Wallet_ACID.md` (đặc tả kiến trúc, sequence diagram, policy và 2 nợ kỹ thuật: client-reported kWh, chưa có giám sát real-time).
+- [x] Cập nhật trạng thái Bước 07 trong `docs/plans/TIEN-DO.md`, `codebase-map.md`, `MASTER-ROADMAP.md`.
+
+---
+
+## 5. Ghi nhận thực tế triển khai & Quyết định kỹ thuật
+
+1. **Khóa cổng sạc độc quyền chống Race Condition:**
+   - Sử dụng câu lệnh SQL nguyên tử: `UPDATE connectors SET status = 'CHARGING' WHERE id = :cid AND status = 'AVAILABLE' AND is_active = 1;`.
+   - Nếu `rowcount == 0` $\rightarrow$ Ném ngay `HTTP 409 Conflict`.
+   - Đã được kiểm thử đa luồng thực tế bằng `concurrent.futures.ThreadPoolExecutor(max_workers=2)`, bảo đảm khi 2 request gửi đồng thời, đúng 1 request nhận HTTP 201 và đúng 1 request nhận HTTP 409.
+2. **Chính sách số dư và kiểm soát nợ (Balance & Debt Policy):**
+   - Tài khoản có `balance < 0`: Chặn bắt đầu phiên mới bằng `HTTP 402 Payment Required` (kèm message: "Tài khoản đang có số dư âm. Vui lòng nạp tiền để tiếp tục sạc").
+   - Tài khoản có `0 <= balance < 50,000 VND`: Chặn bắt đầu phiên mới bằng `HTTP 400 Bad Request`.
+   - Khi kết thúc phiên: Điện năng đã sạc vào xe không thể hoàn tác nên hệ thống trừ đủ tiền cước. Nếu số dư âm vượt quá `NEGATIVE_BALANCE_LIMIT = -300,000 VND`, tài khoản bị gắn cờ `wallet.is_debt_locked = True`. CSDL trang bị `CheckConstraint("balance >= -1000000")` tĩnh để phòng vệ rủi ro.
+3. **Cơ chế biểu giá TOU (Time-of-Use):**
+   - Đơn giá điện được chốt 1 lần tại thời điểm bắt đầu phiên sạc và lưu vào `ChargingSession.applied_price_per_kwh`. Phiên sạc kết thúc ở khung giờ khác vẫn giữ nguyên đơn giá này.
+4. **Ghi nhận 2 nợ kỹ thuật cho mốc KT2:**
+   - Chỉ số `meter_stop_kwh` hiện do client tự báo cáo (sẽ thay bằng Hardware Simulator ở Bước 08).
+   - Chưa có scheduler/worker giám sát real-time ngắt rơ-le giữa chừng khi cạn tiền (sẽ tích hợp ở Bước 08 và Bước 09).
+

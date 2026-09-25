@@ -79,9 +79,9 @@ frontend/src/
 
 ## 4. Checklist thực hiện
 
-- [ ] Hoàn thiện `AuthContext.jsx` và cấu hình Routing trong `App.jsx`.
-- [ ] Xây dựng `Dashboard.jsx`, `Stations.jsx`, `Wallet.jsx`.
-- [ ] Xây dựng `Simulator.jsx` tích hợp đồ thị Recharts và kết nối WebSocket realtime.
-- [ ] Xây dựng `AIAdvisor.jsx` hiển thị kết quả phân tích tải và bảo trì.
-- [ ] Soạn tài liệu bàn giao `docs/SDLC/KT3/02_Frontend_Architecture_and_UI_Guide.md`.
-- [ ] Cập nhật trạng thái Bước 10 trong `docs/plans/TIEN-DO.md`.
+- [x] Hoàn thiện `AuthContext.jsx` và cấu hình Routing trong `App.jsx`.
+- [x] Xây dựng `Dashboard.jsx`, `Stations.jsx`, `Wallet.jsx`.
+- [x] Xây dựng `Simulator.jsx` tích hợp đồ thị Recharts và kết nối WebSocket realtime.
+- [x] Xây dựng `AIAdvisor.jsx` hiển thị kết quả phân tích tải và bảo trì.
+- [x] Soạn tài liệu bàn giao `docs/SDLC/KT3/02_Frontend_Architecture_and_UI_Guide.md`.
+- [x] Cập nhật trạng thái Bước 10 trong `docs/plans/TIEN-DO.md`.

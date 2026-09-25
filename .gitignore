@@ -41,6 +41,7 @@ htmlcov/
 backend/.env
 frontend/.env.local
 frontend/.env.*.local
+.env.example
 
 # Local SQLite Database Files
 *.db

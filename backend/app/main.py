@@ -1,6 +1,8 @@
+import json
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.websocket import ws_manager
@@ -20,8 +22,32 @@ async def lifespan(app: FastAPI):
     logger.info(f"Khởi động {settings.PROJECT_NAME} v{settings.VERSION}")
     logger.info(f"Cơ sở dữ liệu cấu hình: {settings.DATABASE_URL}")
     logger.info(f"CORS cho phép các nguồn: {settings.BACKEND_CORS_ORIGINS}")
+    
+    # Khởi tạo bảng dữ liệu ban đầu cho môi trường phát triển (sẽ chuyển sang Alembic ở Bước 07)
+    from app.core.database import Base, engine, SessionLocal
+    import app.models  # noqa: F401
+    Base.metadata.create_all(bind=engine)
+    logger.info("Đã đồng bộ schema CSDL qua Base.metadata.create_all")
+
+    # Phục hồi các phiên sạc bị gián đoạn nếu server crash trước đó (Crash Reconciliation)
+    from app.services.session_service import reconcile_interrupted_sessions
+    with SessionLocal() as db:
+        reconciled = reconcile_interrupted_sessions(db)
+        if reconciled > 0:
+            logger.warning(f"Đã phục hồi và đóng {reconciled} phiên sạc mồ côi do server crash.")
+
+    # Khởi động dịch vụ lập lịch phân tích AI định kỳ (Slow Loop) ngoài môi trường pytest
+    import os
+    from app.services.scheduler_service import start_scheduler, stop_scheduler
+    is_testing = os.environ.get("PYTEST_CURRENT_TEST") is not None
+    if not is_testing:
+        start_scheduler()
+
     yield
+    if not is_testing:
+        stop_scheduler()
     logger.info("Đang tắt ứng dụng EV CSMS...")
+
 
 
 # Khởi tạo ứng dụng FastAPI
@@ -75,14 +101,33 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
         )
 
         while True:
-            # Lắng nghe thông điệp từ client (heartbeat / ping)
-            data = await websocket.receive_text()
-            logger.debug(f"Nhận tin từ WS client: {data}")
-            # Phản hồi pong nếu client gửi ping
-            if data.strip().lower() == "ping":
+            text_data = await websocket.receive_text()
+            text_strip = text_data.strip()
+            if text_strip.lower() == "ping":
                 await ws_manager.send_personal_message({"event": "PONG"}, websocket)
+                continue
+
+            try:
+                msg = json.loads(text_strip)
+                action = msg.get("action")
+                session_id = msg.get("session_id")
+                if action == "subscribe" and session_id is not None:
+                    ws_manager.subscribe_session(websocket, int(session_id))
+                    await ws_manager.send_personal_message(
+                        {"event": "SUBSCRIBED", "session_id": int(session_id)},
+                        websocket,
+                    )
+                elif action == "unsubscribe" and session_id is not None:
+                    ws_manager.unsubscribe_session(websocket, int(session_id))
+                    await ws_manager.send_personal_message(
+                        {"event": "UNSUBSCRIBED", "session_id": int(session_id)},
+                        websocket,
+                    )
+            except Exception:
+                pass
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
     except Exception as e:
         logger.error(f"Lỗi kết nối WebSocket: {e}")
         ws_manager.disconnect(websocket)
+

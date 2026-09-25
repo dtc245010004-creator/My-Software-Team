@@ -78,7 +78,26 @@ backend/
 
 ## 4. Checklist thực hiện
 
-- [ ] Cài đặt `security.py` với bcrypt và JWT.
-- [ ] Cài đặt Model `User`, Schema và Router `/auth`.
-- [ ] Đảm bảo đăng ký người dùng tự động sinh ví điện tử liên kết.
-- [ ] Cập nhật trạng thái Bước 05 trong `docs/plans/TIEN-DO.md`.
+- [x] Cài đặt `security.py` trực tiếp bằng `bcrypt` (work factor rounds=12) và JWT, loại bỏ hoàn toàn `passlib` cũ.
+- [x] Cài đặt Model `User`, `Wallet`, Schema `UserRegister` (chính sách mật khẩu 8-72 bytes, chặn privilege escalation).
+- [x] Bọc toàn bộ thao tác Đăng ký User + Tạo Wallet trong 1 Database Transaction nguyên tử (Atomic), rollback sạch sẽ khi lỗi.
+- [x] Triển khai Dependencies RBAC (`get_current_user`, `require_roles`) kiểm tra vai trò tức thì từ CSDL.
+- [x] Xây dựng bộ kiểm thử `backend/tests/test_auth.py` gồm 12 test cases function-scoped (SQLite in-memory) đạt 100% pass.
+- [x] Cập nhật trạng thái Bước 05 trong `docs/plans/TIEN-DO.md`, `docs/codebase-map.md` và `docs/MASTER-ROADMAP.md`.
+
+---
+
+## 5. 📝 Cập nhật thực tế so với kế hoạch ban đầu (2026-09-25)
+
+Trong quá trình thực thi, hệ thống đã điều chỉnh và bổ sung 7 điểm cấu trúc quan trọng nhằm khắc phục các rủi ro bảo mật và tương thích môi trường:
+
+| # | Hạng mục thay đổi | So với mô tả ban đầu | Lý do kỹ thuật / Quyết định kiến trúc |
+| :---: | --- | --- | --- |
+| **1** | **Tạo sớm Model `Wallet`** | Ban đầu dự kiến để ở Bước 07 | Đảm bảo tính toán vẹn nguyên tử (Atomicity): Người dùng đăng ký bắt buộc phải có Ví số dư 0 VND ngay từ đầu bằng 1 Database Transaction duy nhất, tránh tình trạng User mồ côi ví hoặc code chắp vá. |
+| **2** | **Dùng trực tiếp `bcrypt` thay vì `passlib`** | Ban đầu dùng `passlib[bcrypt]` | Môi trường Python 3.14.6 + `bcrypt >= 4.1.2` khiến `passlib` (đã ngừng bảo trì) ném ngoại lệ `AttributeError: module 'bcrypt' has no attribute '__about__'`. Chuyển sang gọi trực tiếp `bcrypt.hashpw` / `bcrypt.checkpw` vừa nhanh vừa loại bỏ deprecation warning. |
+| **3** | **Cấu hình `BCRYPT_ROUNDS = 12`** | Ban đầu không có cấu hình work factor | Tránh hardcode magic number trong mã nguồn; đưa vào `app/core/config.py` để dễ dàng tinh chỉnh giữa môi trường dev (nhanh) và production (bảo mật cao). |
+| **4** | **Chính sách mật khẩu 8-72 bytes** | Ban đầu chỉ kiểm tra tồn tại chuỗi | Thuật toán `bcrypt` có giới hạn cứng 72 bytes (dài hơn sẽ bị cắt âm thầm hoặc ném lỗi). Bổ sung Pydantic validator kiểm tra byte length $\le 72$ và regex yêu cầu tối thiểu cả chữ cái và chữ số. |
+| **5** | **Chặn Privilege Escalation (Mass Assignment)** | Ban đầu chưa có cơ chế kiểm soát field `role` ở request body | Loại bỏ hoàn toàn trường `role` khỏi schema `UserRegister`, cấu hình `extra = "ignore"`, và gán cứng `role = "CUSTOMER"` tại tầng service. Quyền `ADMIN`/`OPERATOR` chỉ được cấp qua seed data nội bộ. |
+| **6** | **Chống trễ quyền RBAC (Role Staleness)** | Ban đầu chỉ giải mã role tĩnh từ JWT claim | Dependency `get_current_user` giải mã token nhưng nạp trực tiếp bản ghi `User` từ CSDL theo PK `id`. Giúp triệt tiêu rủi ro trễ quyền 60 phút khi Admin đổi quyền hoặc khóa tài khoản `is_active = False`. |
+| **7** | **Bộ Test tự động sớm (13 tests)** | Ban đầu toàn bộ test dồn về Bước 11 | Tuân thủ nguyên tắc *Goal-Driven Execution* (`GEMINI.md §4`): Dựng ngay `conftest.py` với SQLite in-memory (`StaticPool`), reset DB dạng `scope="function"` và viết đủ 12 test cases bảo mật cho Auth + 1 test cho Health check. |
+

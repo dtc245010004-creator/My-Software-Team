@@ -12,10 +12,16 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
 
-    # JWT Authentication
+    # JWT & Password Hashing
     SECRET_KEY: str = "supersecret_ev_csms_key_for_development_jwt_auth_change_in_production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 giờ
+    BCRYPT_ROUNDS: int = 12
+
+    # Ví tiền & Ràng buộc tài chính (ACID)
+    MIN_START_BALANCE: int = 50000  # 50,000 VND để bắt đầu sạc
+    NEGATIVE_BALANCE_LIMIT: int = -300000  # -300,000 VND hạn mức cho nợ
+    MAX_SAFE_DEBT_LIMIT: int = -1000000  # -1,000,000 VND cho CheckConstraint CSDL
 
     # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"
