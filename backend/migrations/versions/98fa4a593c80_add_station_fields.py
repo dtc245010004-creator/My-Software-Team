@@ -18,13 +18,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Thêm các trường còn thiếu cho bảng stations bằng batch_alter_table (tương thích SQLite)."""
+    """Thêm các trường còn thiếu cho bảng stations bằng batch_alter_table (tương thích SQLite & PostgreSQL)."""
     with op.batch_alter_table('stations', schema=None) as batch_op:
         batch_op.add_column(sa.Column('address', sa.String(length=512), nullable=True))
         batch_op.add_column(sa.Column('latitude', sa.Float(), nullable=True))
         batch_op.add_column(sa.Column('longitude', sa.Float(), nullable=True))
         batch_op.add_column(
-            sa.Column('is_active', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+            sa.Column('is_active', sa.Boolean(), server_default=sa.false(), nullable=False),
         )
         batch_op.add_column(
             sa.Column('owner_id', sa.Integer(), nullable=True),
