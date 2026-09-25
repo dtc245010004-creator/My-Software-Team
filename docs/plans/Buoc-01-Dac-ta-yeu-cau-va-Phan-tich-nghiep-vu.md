@@ -69,7 +69,7 @@ docs/
 
 ## 4. Checklist thực hiện
 
-- [ ] Soạn thảo tài liệu SRS hoàn chỉnh vào `docs/SDLC/KT1/01_SRS_and_UseCases.md`.
-- [ ] Mô tả chi tiết 3 Actor và ma trận quyền hạn (CRUD Matrix).
-- [ ] Vẽ sơ đồ Use Case tổng thể và Use Case chi tiết cho luồng sạc và thanh toán ví.
-- [ ] Cập nhật trạng thái Bước 01 trong `docs/plans/TIEN-DO.md`.
+- [x] Soạn thảo tài liệu SRS hoàn chỉnh vào `docs/SDLC/KT1/01_SRS_and_UseCases.md`.
+- [x] Mô tả chi tiết 3 Actor và ma trận quyền hạn (CRUD Matrix).
+- [x] Vẽ sơ đồ Use Case tổng thể và Use Case chi tiết cho luồng sạc và thanh toán ví.
+- [x] Cập nhật trạng thái Bước 01 trong `docs/plans/TIEN-DO.md`.

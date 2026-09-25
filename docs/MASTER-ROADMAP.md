@@ -26,7 +26,7 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 | Giai đoạn | Mô tả | Mốc SDLC | Tiến độ |
 | :---: | --- | :---: | :---: |
 | **0** | Nền tảng dự án & Khởi tạo tài liệu | — | ✅ Hoàn thành |
-| **1** | Đặc tả & Thiết kế CSDL (ERD) | KT1 | 🔄 Đang thực hiện |
+| **1** | Đặc tả & Thiết kế CSDL (ERD) | KT1 | ✅ Hoàn thành |
 | **2** | Backend Auth + Quản lý Hạ tầng trạm | KT2 | ⬜ Chưa bắt đầu |
 | **3** | Biểu giá, Ví tiền & Phiên sạc (ACID) | KT2 | ⬜ Chưa bắt đầu |
 | **4** | Simulator sạc xe điện & Telemetry WebSocket | KT2 | ⬜ Chưa bắt đầu |
@@ -51,7 +51,7 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 | --- | --- | :---: | --- | --- | :---: |
 | 0.1 | Khởi tạo đặc tả `nentang.md`, `Prompt.md` & `sodo.md` | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `nentang.md`, `Prompt.md`, `sodo.md` | ✅ |
 | 0.2 | Chuẩn hóa `GEMINI.md`, `CLAUDE.md`, `README.md`, `HUONGDAN.md` | 🔴 P0 | — | File quy tắc & hướng dẫn vận hành | ✅ |
-| 0.3 | Cấu hình Backend: `requirements.txt`, `.env.example`, `database.py` | 🔴 P0 | [Buoc-03](plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) | FastAPI app khởi động được tại `/health` | ⬜ |
+| 0.3 | Cấu hình Backend: `requirements.txt`, `.env.example`, `database.py` | 🔴 P0 | [Buoc-03](plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md) | FastAPI app khởi động được tại `/health` | ✅ |
 | 0.4 | Khởi tạo Frontend: React 18 + Vite + Tailwind CSS + Lucide Icons | 🔴 P0 | [Buoc-10](plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md) | Frontend chạy được tại `localhost:5173` | ⬜ |
 
 ---
@@ -63,11 +63,11 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | # | Nhiệm vụ | Ưu tiên | Kế hoạch chi tiết | Deliverable | Trạng thái |
 | --- | --- | :---: | --- | --- | :---: |
-| 1.1 | Tài liệu SRS & Use Case (Admin, Operator/CPO, Driver) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/01_SRS_and_UseCases.md` | ⬜ |
-| 1.2 | Thiết kế CSDL & Sơ đồ ERD (Stations, Chargers, Sessions, Wallets, Tariffs) | 🔴 P0 | [Buoc-02](plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md) | `docs/SDLC/KT1/02_Database_Design_ERD.md` | ⬜ |
-| 1.3 | Kiến trúc AI (Smart Charging, Predictive Maintenance & Heuristic Fallback) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/03_AI_Architecture.md` | ⬜ |
-| 1.4 | Thiết kế Wireframe giao diện (Dashboard CPO, Simulator, Driver Portal) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/04_Wireframes.md` | ⬜ |
-| 1.5 | Cài đặt SQLAlchemy Models tương ứng | 🔴 P0 | [Buoc-02](plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md) | `backend/app/models/*.py` | ⬜ |
+| 1.1 | Tài liệu SRS & Use Case (Admin, Operator/CPO, Driver) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/01_SRS_and_UseCases.md` | ✅ |
+| 1.2 | Thiết kế CSDL & Sơ đồ ERD (Stations, Chargers, Sessions, Wallets, Tariffs) | 🔴 P0 | [Buoc-02](plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md) | `docs/SDLC/KT1/02_Database_Design_ERD.md` | ✅ |
+| 1.3 | Kiến trúc AI (Smart Charging, Predictive Maintenance & Heuristic Fallback) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/03_AI_Architecture_and_Prompts.md` | ✅ |
+| 1.4 | Thiết kế Wireframe giao diện (Dashboard CPO, Simulator, Driver Portal) | 🔴 P0 | [Buoc-01](plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md) | `docs/SDLC/KT1/04_Wireframes.md` | ✅ |
+| 1.5 | Cài đặt SQLAlchemy Models tương ứng | 🔴 P0 | [Buoc-02](plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md) | `backend/app/models/*.py` | 🔄 |
 
 ---
 
@@ -162,5 +162,6 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 
 | Ngày | Người thực hiện | Thay đổi |
 | :---: | :---: | --- |
+| 2026-09-25 | AI | Đồng bộ hoàn thành Giai đoạn 0 (task 0.3) và toàn bộ hồ sơ KT1 Giai đoạn 1 (SRS, ERD, AI, Wireframes) |
 | 2026-09-22 | AI | Cập nhật đồng bộ Master Roadmap với sodo.md và các file kế hoạch Buoc-01 đến Buoc-11 |
 | 2026-09-22 | AI | Khởi tạo lại toàn bộ Master Roadmap chuyển đổi sang Nền tảng vận hành trạm sạc xe điện (EV CSMS) |

@@ -66,7 +66,7 @@ docs/
 
 ## 4. Checklist thực hiện
 
-- [ ] Soạn thảo sơ đồ Mermaid ERD chi tiết 9 bảng.
-- [ ] Viết Data Dictionary đầy đủ kiểu dữ liệu, ràng buộc, mô tả tiếng Việt.
-- [ ] Viết câu lệnh DDL mẫu (SQLite & PostgreSQL compatible).
-- [ ] Cập nhật trạng thái Bước 02 trong `docs/plans/TIEN-DO.md`.
+- [x] Soạn thảo sơ đồ Mermaid ERD chi tiết 9 bảng.
+- [x] Viết Data Dictionary đầy đủ kiểu dữ liệu, ràng buộc, mô tả tiếng Việt.
+- [x] Viết câu lệnh DDL mẫu (SQLite & PostgreSQL compatible).
+- [x] Cập nhật trạng thái Bước 02 trong `docs/plans/TIEN-DO.md`.

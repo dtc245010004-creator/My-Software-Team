@@ -3,7 +3,7 @@
 > **File này bắt buộc cập nhật mỗi khi thêm, xóa hoặc đổi vai trò một file.**
 > Xem `GEMINI.md §9` — trigger "thêm/xóa/đổi vai trò file bất kỳ" → cập nhật ngay lập tức.
 
-**Cập nhật lần cuối:** 2026-09-22
+**Cập nhật lần cuối:** 2026-09-25
 
 ---
 
@@ -32,6 +32,10 @@
 | `backend/requirements.txt` | Danh mục thư viện Python (FastAPI, SQLAlchemy, PyJWT, WebSockets, Pytest...) |
 | `backend/.env.example` | Mẫu cấu hình môi trường cho backend |
 | `backend/app/core/config.py` | Pydantic Settings — nạp biến môi trường cho JWT, SQLite, CORS, Gemini |
+| `backend/app/core/database.py` | SQLAlchemy engine kết nối SQLite (WAL mode, Foreign Keys ON), `SessionLocal` và `get_db()` |
+| `backend/app/core/websocket.py` | `ConnectionManager` quản lý kết nối và phát sóng telemetry realtime |
+| `backend/app/api/v1/__init__.py` | Router tập trung API v1 kèm endpoint kiểm tra sức khỏe `/health` |
+| `backend/app/main.py` | Điểm vào FastAPI: khởi tạo app, cấu hình CORS, router v1 & WebSocket `/ws/telemetry` |
 
 ### `docs/`
 
@@ -53,7 +57,10 @@
 | `docs/plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md` | Kế hoạch Bước 10: Giao diện Web Frontend React + Tailwind |
 | `docs/plans/Buoc-11-Bo-Test-Tu-dong-Seed-Data-va-Dong-goi.md` | Kế hoạch Bước 11: Pytest, Seed Data & Đóng gói SDLC |
 | `docs/SDLC/KT1/README.md` | Mục tiêu & danh mục deliverable mốc KT1 (Đặc tả, ERD & Kiến trúc) |
+| `docs/SDLC/KT1/01_SRS_and_UseCases.md` | Tài liệu đặc tả yêu cầu phần mềm (SRS), 3 Actor, CRUD Matrix & sơ đồ Use Case |
 | `docs/SDLC/KT1/02_Database_Design_ERD.md` | Hồ sơ thiết kế CSDL, sơ đồ Mermaid ERD, Từ điển dữ liệu và DDL cho KT1 |
+| `docs/SDLC/KT1/03_AI_Architecture_and_Prompts.md` | Kiến trúc tích hợp Gemini API, kỹ thuật Prompting và thuật toán Fallback Heuristic |
+| `docs/SDLC/KT1/04_Wireframes.md` | Bản thiết kế cấu trúc giao diện Wireframe cho Dashboard CPO, Simulator, Driver Portal |
 | `docs/SDLC/KT2/README.md` | Mục tiêu & danh mục deliverable mốc KT2 (Core Backend, Simulator & ACID) |
 | `docs/SDLC/KT3/README.md` | Mục tiêu & danh mục deliverable mốc KT3 (AI Smart Charging & Frontend) |
 | `docs/SDLC/final/README.md` | Mục tiêu & danh mục deliverable mốc Cuối kỳ (Test, Đóng gói & Demo) |
@@ -66,8 +73,6 @@
 
 | File | Sẽ tạo ở Bước | Vai trò dự kiến |
 | --- | :---: | --- |
-| `backend/app/main.py` | 04 | Điểm vào FastAPI: khởi tạo app, CORS, routes & WebSocket endpoint |
-| `backend/app/core/database.py` | 04 | SQLAlchemy engine + SessionLocal + `get_db()` |
 | `backend/app/models/user.py` | 02 / 05 | Model người dùng, phân quyền RBAC (`admin`, `operator`, `customer`) |
 | `backend/app/models/station.py` | 02 / 06 | Model Trạm sạc (`Station`), Trụ sạc (`ChargingPoint`), Cổng (`Connector`) |
 | `backend/app/models/session.py` | 02 / 07 | Model Phiên sạc (`ChargingSession`) |

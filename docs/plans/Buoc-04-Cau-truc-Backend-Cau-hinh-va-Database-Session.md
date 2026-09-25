@@ -61,6 +61,6 @@ backend/
 
 ## 4. Checklist thực hiện
 
-- [ ] Hoàn thiện `core/config.py`, `core/database.py`, `core/websocket.py`.
-- [ ] Khởi chạy `app/main.py` kiểm tra `/health` và kết nối WebSocket mẫu.
-- [ ] Cập nhật trạng thái Bước 04 trong `docs/plans/TIEN-DO.md`.
+- [x] Hoàn thiện `core/config.py`, `core/database.py`, `core/websocket.py`.
+- [x] Khởi chạy `app/main.py` kiểm tra `/health` và kết nối WebSocket mẫu.
+- [x] Cập nhật trạng thái Bước 04 trong `docs/plans/TIEN-DO.md`.
