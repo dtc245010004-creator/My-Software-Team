@@ -12,7 +12,7 @@
 
 Hệ thống tích hợp trí tuệ nhân tạo của EV CSMS được xây dựng theo mô hình **Dual-Loop Architecture (Hai vòng lặp song song)** nhằm cân bằng giữa tốc độ phản hồi tức thời (vật lý lưới điện) và khả năng phân tích ngữ cảnh chuyên sâu (kinh tế và kỹ thuật).
 
-```
+```text
                [ EV CSMS Dual-Loop Architecture ]
                            
    Fast Loop (Heuristic Engine)           Slow Loop (Gemini AI Engine)
@@ -86,10 +86,10 @@ Hệ thống tích hợp trí tuệ nhân tạo của EV CSMS được xây dự
   - Heuristic phân tích tỷ lệ lấp đầy (Occupancy Rate) trong 7 ngày qua.
   - **Quy tắc điều chỉnh**:
     Nếu $\text{Occupancy}_{\text{peak}} > 80\%$ VÀ $(\text{Occupancy}_{\text{peak}} - \text{Occupancy}_{\text{offpeak}}) \ge 30\%$:
-    - Giá cao điểm: tăng $+15\%$ (`suggested_peak = price_peak * 1.15`)
-    - Giá thấp điểm: giảm $-10\%$ (`suggested_offpeak = price_offpeak * 0.90`)
-    - Giá bình thường: giữ nguyên
-    - Mục tiêu: Giãn tải giờ cao điểm, dịch chuyển nhu cầu sạc sang ban đêm.
+    + Giá cao điểm: tăng $+15\%$ (`suggested_peak = price_peak * 1.15`)
+    + Giá thấp điểm: giảm $-10\%$ (`suggested_offpeak = price_offpeak * 0.90`)
+    + Giá bình thường: giữ nguyên
+    + Mục tiêu: Giãn tải giờ cao điểm, dịch chuyển nhu cầu sạc sang ban đêm.
     Ngược lại: Giữ nguyên biểu giá hiện tại.
 - **Trợ lý Cố vấn NLP Vận hành (`POST /api/v1/ai/ask`)**:
   - Nhận câu hỏi tự do từ CPO / Quản trị viên.

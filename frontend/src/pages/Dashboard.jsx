@@ -17,10 +17,10 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
+      const token = localStorage.getItem('ev_csms_token');
       const [stRes, sessRes] = await Promise.all([
         api.get('/stations'),
-        api.get('/sessions/me').catch(() => ({ data: [] })),
+        token ? api.get('/sessions/me').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
       ]);
 
       const stationsData = stRes.data || [];

@@ -100,16 +100,15 @@ backend/
 ## 5. Ghi nhận thực tế triển khai & Quyết định kỹ thuật
 
 1. **Khóa cổng sạc độc quyền chống Race Condition:**
-   - Sử dụng câu lệnh SQL nguyên tử: `UPDATE connectors SET status = 'CHARGING' WHERE id = :cid AND status = 'AVAILABLE' AND is_active = 1;`.
-   - Nếu `rowcount == 0` $\rightarrow$ Ném ngay `HTTP 409 Conflict`.
-   - Đã được kiểm thử đa luồng thực tế bằng `concurrent.futures.ThreadPoolExecutor(max_workers=2)`, bảo đảm khi 2 request gửi đồng thời, đúng 1 request nhận HTTP 201 và đúng 1 request nhận HTTP 409.
+   + Sử dụng câu lệnh SQL nguyên tử: `UPDATE connectors SET status = 'CHARGING' WHERE id = :cid AND status = 'AVAILABLE' AND is_active = 1;`.
+   + Nếu `rowcount == 0` $\rightarrow$ Ném ngay `HTTP 409 Conflict`.
+   + Đã được kiểm thử đa luồng thực tế bằng `concurrent.futures.ThreadPoolExecutor(max_workers=2)`, bảo đảm khi 2 request gửi đồng thời, đúng 1 request nhận HTTP 201 và đúng 1 request nhận HTTP 409.
 2. **Chính sách số dư và kiểm soát nợ (Balance & Debt Policy):**
-   - Tài khoản có `balance < 0`: Chặn bắt đầu phiên mới bằng `HTTP 402 Payment Required` (kèm message: "Tài khoản đang có số dư âm. Vui lòng nạp tiền để tiếp tục sạc").
-   - Tài khoản có `0 <= balance < 50,000 VND`: Chặn bắt đầu phiên mới bằng `HTTP 400 Bad Request`.
-   - Khi kết thúc phiên: Điện năng đã sạc vào xe không thể hoàn tác nên hệ thống trừ đủ tiền cước. Nếu số dư âm vượt quá `NEGATIVE_BALANCE_LIMIT = -300,000 VND`, tài khoản bị gắn cờ `wallet.is_debt_locked = True`. CSDL trang bị `CheckConstraint("balance >= -1000000")` tĩnh để phòng vệ rủi ro.
+   + Tài khoản có `balance < 0`: Chặn bắt đầu phiên mới bằng `HTTP 402 Payment Required` (kèm message: "Tài khoản đang có số dư âm. Vui lòng nạp tiền để tiếp tục sạc").
+   + Tài khoản có `0 <= balance < 50,000 VND`: Chặn bắt đầu phiên mới bằng `HTTP 400 Bad Request`.
+   + Khi kết thúc phiên: Điện năng đã sạc vào xe không thể hoàn tác nên hệ thống trừ đủ tiền cước. Nếu số dư âm vượt quá `NEGATIVE_BALANCE_LIMIT = -300,000 VND`, tài khoản bị gắn cờ `wallet.is_debt_locked = True`. CSDL trang bị `CheckConstraint("balance >= -1000000")` tĩnh để phòng vệ rủi ro.
 3. **Cơ chế biểu giá TOU (Time-of-Use):**
-   - Đơn giá điện được chốt 1 lần tại thời điểm bắt đầu phiên sạc và lưu vào `ChargingSession.applied_price_per_kwh`. Phiên sạc kết thúc ở khung giờ khác vẫn giữ nguyên đơn giá này.
+   + Đơn giá điện được chốt 1 lần tại thời điểm bắt đầu phiên sạc và lưu vào `ChargingSession.applied_price_per_kwh`. Phiên sạc kết thúc ở khung giờ khác vẫn giữ nguyên đơn giá này.
 4. **Ghi nhận 2 nợ kỹ thuật cho mốc KT2:**
-   - Chỉ số `meter_stop_kwh` hiện do client tự báo cáo (sẽ thay bằng Hardware Simulator ở Bước 08).
-   - Chưa có scheduler/worker giám sát real-time ngắt rơ-le giữa chừng khi cạn tiền (sẽ tích hợp ở Bước 08 và Bước 09).
-
+   + Chỉ số `meter_stop_kwh` hiện do client tự báo cáo (sẽ thay bằng Hardware Simulator ở Bước 08).
+   + Chưa có scheduler/worker giám sát real-time ngắt rơ-le giữa chừng khi cạn tiền (sẽ tích hợp ở Bước 08 và Bước 09).

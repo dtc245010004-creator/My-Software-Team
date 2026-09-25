@@ -25,8 +25,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Khi token hết hạn, chỉ dọn dẹp nếu không phải đang ở trang login
-      if (!window.location.pathname.includes('/login')) {
+      // Khi token hết hạn, chỉ dọn dẹp nếu ĐÃ CÓ token và không phải đang ở trang login
+      const hadToken = localStorage.getItem('ev_csms_token');
+      if (hadToken && !window.location.pathname.includes('/login')) {
         localStorage.removeItem('ev_csms_token');
         localStorage.removeItem('ev_csms_user');
       }

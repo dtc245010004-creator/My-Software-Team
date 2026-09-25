@@ -12,7 +12,7 @@
 
 Giao diện người dùng của hệ thống **EV CSMS** được xây dựng nhằm phục vụ công tác điều hành năng lượng chuyên sâu của Đơn vị vận hành trạm sạc (CPO) và tài xế xe điện. Hệ thống từ chối phong cách "SaaS Dashboard dập khuôn" (nền trắng kem, bo góc tròn trịa, bóng mờ đục xám nhạt lặp lại, mũi tên trang trí thừa thãi) để hướng đến một **Bảng điều khiển Trung tâm Điều độ Năng lượng (Industrial Power Console)** trực quan, thực tế và chính xác.
 
-```
+```text
                            [ KIẾN TRÚC FRONTEND EV CSMS ]
                                           
      React 18 (Vite) + Tailwind CSS + Lucide Icons + Recharts (Data Visuals)
@@ -43,6 +43,7 @@ Giao diện người dùng của hệ thống **EV CSMS** được xây dựng n
 ## 2. CHI TIẾT 6 TRANG MÀN HÌNH CHỨC NĂNG
 
 ### 2.1. Bảng Điều Khiển Tổng Quan (Dashboard)
+
 - **Đường dẫn**: `/`
 - **Chức năng**:
   + **Thanh cái nguồn lưới phụ tải (Grid Busbar Load)**: Trực quan hóa tổng công suất tiêu thụ tức thời của toàn trạm so với ngưỡng an toàn 95% công suất máy biến áp.
@@ -51,6 +52,7 @@ Giao diện người dùng của hệ thống **EV CSMS** được xây dựng n
   + **Giám sát trực tiếp các trụ sạc (EVSE Bays)**: Danh sách theo dõi rơ-le tức thời của từng mã trụ.
 
 ### 2.2. Hạ Tầng Trạm Sạc (Stations Infrastructure)
+
 - **Đường dẫn**: `/stations`
 - **Chức năng**:
   + Quản lý phân cấp 3 tầng vật lý: **Trạm sạc (Station) $\rightarrow$ Trụ sạc (ChargingPoint) $\rightarrow$ Cổng/Súng sạc (Connector)**.
@@ -58,6 +60,7 @@ Giao diện người dùng của hệ thống **EV CSMS** được xây dựng n
   + Hỗ trợ CPO / Admin tạo thêm trạm sạc mới và cập nhật cấu hình thông số kỹ thuật.
 
 ### 2.3. Bảng Giả Lập Sạc Pin & Giám Sát Telemetry (Simulator Console) ⭐ Trọng tâm Demo
+
 - **Đường dẫn**: `/simulator`
 - **Chức năng tương tác trực tiếp**:
   1. *Khởi động sạc*: Chọn trạm $\rightarrow$ Chọn súng khả dụng $\rightarrow$ Bấm **"KẾT NỐI & BẬT RƠ-LE SẠC"**.
@@ -73,6 +76,7 @@ Giao diện người dùng của hệ thống **EV CSMS** được xây dựng n
      - Ô **"ĐIỀU TIẾT CÔNG SUẤT TRẦN (kW)"**: Can thiệp giảm công suất sạc từ xa.
 
 ### 2.4. Ví Cá Nhân & Quản Trị Cước Phí (Driver Wallet)
+
 - **Đường dẫn**: `/wallet`
 - **Chức năng**:
   + Hiển thị số dư khả dụng tức thời (VND).
@@ -81,6 +85,7 @@ Giao diện người dùng của hệ thống **EV CSMS** được xây dựng n
   + Bảng lịch sử biến động số dư ghi nhận toàn bộ giao dịch nạp ví và trừ cước phiên sạc.
 
 ### 2.5. Nhật Ký Phiên Sạc & Hóa Đơn Điện Tử (Sessions & Invoices)
+
 - **Đường dẫn**: `/sessions`
 - **Chức năng**:
   + Bảng lịch sử phiên sạc: Mã phiên, Cổng sạc, Đơn giá TOU áp dụng, Điện năng kWh, Tổng tiền, Trạng thái và Lý do dừng.
@@ -94,11 +99,13 @@ Giao diện người dùng của hệ thống **EV CSMS** được xây dựng n
 Màn hình **AI Advisor** (`/ai-advisor`) được tổ chức thành 4 không gian làm việc chuyên biệt theo đúng bản chất vật lý của dữ liệu:
 
 ### 3.1. Tab 1: Điều Phối Tải Lưới Điện (Smart Charging Busbar Allocation)
+
 - **Trực quan hóa**: Thay vì bảng số khô cứng, hệ thống sử dụng **Sơ đồ phân bổ thanh cái (Grid Busbar Allocation)**.
 - Một thanh ngang lớn đại diện cho công suất lưới an toàn của trạm ($P_{\text{limit}} = P_{\text{grid}} \times 0.95$). Các cổng sạc đang cắm xe được chia thành các dải màu riêng biệt với độ rộng tỉ lệ chính xác theo công suất được phân bổ (ưu tiên xe pin thấp theo thuật toán Weighted Fair Sharing).
 - Hiển thị rõ cờ metadata: `source` (`"GEMINI_AI"` hoặc `"HEURISTIC_FALLBACK"`) và cảnh báo khi Fallback kích hoạt.
 
 ### 3.2. Tab 2: Bảo Trì Dự Đoán (Thermal Heat Strip & Health Matrix)
+
 - **Trực quan hóa**: **Thước đo dải nhiệt độ cổng sạc (Thermal Heat Strip)** phân tầng 4 vùng nhiệt vật lý:
   + Vùng mát ($<45^\circ\text{C}$): Xanh lam.
   + Vùng bình thường ($45^\circ\text{C} - 65^\circ\text{C}$): Xanh lá.
@@ -108,10 +115,12 @@ Màn hình **AI Advisor** (`/ai-advisor`) được tổ chức thành 4 không g
 - Khung hiển thị `health_score` (0–100) và Vector xu hướng nhiệt độ (`increasing` với biểu tượng mũi tên nghiêng đỏ, `decreasing`, `stable`).
 
 ### 3.3. Tab 3: Tối Ưu Biểu Giá TOU (24-Hour Occupancy Profile)
+
 - **Trực quan hóa**: **Biểu đồ cột phụ tải 24 giờ (Load Profile Histogram)** phân định rõ 3 dải giờ: Cao điểm (Vàng cam), Bình thường (Xám thép), Thấp điểm (Xanh lá).
 - Minh chứng trực quan lý do đề xuất: Giờ cao điểm đang quá tải ($>80\%$) trong khi ban đêm còn trống ($<30\%$) $\rightarrow$ Khuyến nghị tăng giá cao điểm $+15\%$ và giảm giá thấp điểm $-10\%$ để dịch chuyển phụ tải sang ban đêm.
 
 ### 3.4. Tab 4: Trợ Lý Vận Hành AI (Grounding Q&A)
+
 - Khung hội thoại NLP cho phép người vận hành hỏi đáp tự do.
 - Dữ liệu trả lời được **Grounding trực tiếp từ cơ sở dữ liệu thật**: Doanh thu 7 ngày, tổng số phiên sạc, tỉ lệ lấp đầy bình quân, số cảnh báo trụ sạc cần bảo dưỡng.
 
@@ -122,25 +131,31 @@ Màn hình **AI Advisor** (`/ai-advisor`) được tổ chức thành 4 không g
 ### 4.1. Khởi động hệ thống
 
 1. **Khởi động Backend (FastAPI)**:
+
    ```bash
    cd backend
    uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
    ```
+
 2. **Khởi động Frontend (Vite)**:
+
    ```bash
    cd frontend
    npm run dev
    ```
+
    Truy cập trình duyệt tại: `http://localhost:5173`
 
 ### 4.2. Kịch bản Demo 1-Click (Không cần gõ mật khẩu)
 
 Tại thanh Header góc trên bên phải, hệ thống tích hợp bộ chuyển vai trò nhanh (**Demo Role Switcher**):
+
 - Bấm **"Admin"**: Tự động chuyển quyền Quản trị viên hệ thống (xem toàn bộ trạm, điều phối AI).
 - Bấm **"CPO"**: Tự động chuyển quyền Đơn vị vận hành trạm sạc (quản lý trạm/trụ, tối ưu biểu giá, theo dõi bảo trì).
 - Bấm **"Tài xế"**: Tự động chuyển quyền Khách hàng lái xe (giao diện ví tiền, lịch sử sạc cá nhân).
 
 ### 4.3. Kịch bản Demo mô phỏng sạc trực quan
+
 1. Vào tab **"Bảng Giả Lập Sạc (Console)"** (`/simulator`).
 2. Chọn Trạm sạc $\rightarrow$ Chọn Cổng sạc số 1 $\rightarrow$ Bấm **"KẾT NỐI & BẬT RƠ-LE SẠC"**.
 3. Quan sát các con số công suất (kW), pin SoC (%) và đồ thị Recharts nhảy số mượt mà theo nhịp phát WebSocket 2 giây/lần.

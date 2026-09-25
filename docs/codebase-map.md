@@ -146,7 +146,7 @@
 ## Trạng thái hoàn thành toàn diện
 
 Toàn bộ **11/11 bước** trong lộ trình phát triển đã được hoàn thành 100% với chất lượng cao nhất:
+
 - Không còn bất kỳ file dự kiến nào chưa tạo.
 - Bộ kiểm thử tự động đạt 74/74 test cases passed 100% (Zero regression).
 - CSDL đã nạp đầy đủ dữ liệu mẫu sẵn sàng phục vụ trình diễn và bảo vệ đồ án.
-

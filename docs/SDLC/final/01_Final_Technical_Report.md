@@ -1,9 +1,11 @@
 # BÁO CÁO KỸ THUẬT TỔNG KẾT ĐỒ ÁN (FINAL TECHNICAL REPORT)
+
 ## NỀN TẢNG VẬN HÀNH TRẠM SẠC XE ĐIỆN TÍCH HỢP TRÍ TUỆ NHÂN TẠO (AI-POWERED EV CSMS)
 
 ---
 
 ### MỤC LỤC
+
 1. [Tổng Quan Đề Tài & Bối Cảnh Thực Tiễn](#1-tổng-quan-đề-tài--bối-cảnh-thực-tiễn)
 2. [Kiến Trúc Hệ Thống Tổng Thể & Dual-Loop Pattern](#2-kiến-trúc-hệ-thống-tổng-thể--dual-loop-pattern)
 3. [Thiết Kế Cơ Sở Dữ Liệu & Tính Toàn Vẹn Giao Dịch (ACID)](#3-thiết-kế-cơ-sở-dữ-liệu--tính-toàn-vẹn-giao-dịch-acid)
@@ -19,6 +21,7 @@
 ## 1. Tổng Quan Đề Tài & Bối Cảnh Thực Tiễn
 
 Sự bùng nổ của phương tiện giao thông chạy điện (EV) tại Việt Nam và trên thế giới đang đặt ra thách thức khổng lồ cho hạ tầng lưới điện đô thị và các đơn vị vận hành điểm sạc (Charge Point Operators - CPO). Một hệ thống quản lý trạm sạc xe điện tiêu chuẩn không chỉ đơn thuần là phần mềm bật/tắt rơ-le, mà đòi hỏi:
+
 - **Quản lý phân cấp hạ tầng nghiêm ngặt (RBAC & Multi-tenant)**: Trạm sạc (Station) $\rightarrow$ Trụ sạc (EVSE/Charging Point) $\rightarrow$ Cổng sạc vật lý (Connector).
 - **Giao dịch tài chính an toàn tuyệt đối (ACID Transaction)**: Đảm bảo số dư ví tiền điện tử, tính cước linh hoạt theo giờ cao điểm/thấp điểm (TOU Tariff), chính sách quản lý nợ có kiểm soát (Overdraft/Debt Limit).
 - **Giám sát đo đạc thời gian thực (Realtime Telemetry)**: Truyền nhận dữ liệu công suất (kW), điện năng tiêu thụ (kWh), trạng thái sạc pin (SoC %), nhiệt độ đầu nối và biến áp qua WebSocket với tần suất cao.
@@ -47,7 +50,7 @@ Sự bùng nổ của phương tiện giao thông chạy điện (EV) tại Vi�
 
 Để giải quyết mâu thuẫn cố hữu giữa **tính an toàn tức thời** của lưới điện vật lý (yêu cầu phản hồi tính bằng mili-giây) và **độ trễ mạng của các mô hình ngôn ngữ lớn (LLM)** (độ trễ 1-4 giây, rủi ro đứt mạng, cạn quota), hệ thống áp dụng kiến trúc **Dual-Loop**:
 
-```
+```text
                               ┌────────────────────────────────────────────────────────┐
                               │                 EV CSMS ARCHITECTURE                   │
                               └────────────────────────────────────────────────────────┘
@@ -84,6 +87,7 @@ Sự bùng nổ của phương tiện giao thông chạy điện (EV) tại Vi�
 ### 3.1. Mô Hình Thực Thể Quan Hệ (ERD & Data Schema)
 
 Cấu trúc CSDL bao gồm 7 bảng cốt lõi với khóa ngoại và ràng buộc chặt chẽ:
+
 1. `users`: Quản lý tài khoản và định danh phân quyền (ADMIN, OPERATOR, CUSTOMER).
 2. `wallets` & `wallet_transactions`: Quản lý số dư, lịch sử biến động số dư, cờ khóa nợ `is_debt_locked`, ràng buộc `balance >= -1000000`.
 3. `stations`: Quản lý thông tin trạm sạc, tọa độ GPS (kinh độ, vĩ độ), công suất máy biến áp tối đa (`total_grid_capacity_kw`), quyền sở hữu theo `operator_id`.
@@ -97,14 +101,17 @@ Cấu trúc CSDL bao gồm 7 bảng cốt lõi với khóa ngoại và ràng bu�
 Hệ thống tuân thủ 3 nguyên tắc bất khả xâm phạm về nghiệp vụ tài chính và rơ-le sạc:
 
 #### A. Khóa Độc Quyền Cổng Sạc (Exclusive Locking & Race-Condition Prevention)
+
 - Khi bắt đầu sạc, hệ thống thực hiện kiểm tra và cập nhật nguyên tử trạng thái cổng sạc từ `AVAILABLE` $\rightarrow$ `CHARGING`.
 - Nếu phát hiện cổng đang ở trạng thái `CHARGING` hoặc tài xế khác đang sử dụng, hệ thống lập tức từ chối và phản hồi mã lỗi `HTTP 409 Conflict`. Không thể xảy ra tình trạng 2 xe sạc chung 1 cổng vật lý.
 
 #### B. Cơ Chế Chốt Biểu Giá Tại Thời Điểm Cắm (Connect-Time TOU Snapshot)
+
 - Biểu giá điện TOU (VND/kWh) được tính toán và chốt cứng (`unit_price`) tại chính xác thời điểm xe cắm sạc thành công.
 - Ngăn ngừa tình trạng khiếu nại cước khi phiên sạc kéo dài xuyên qua khung giờ thay đổi giá của ngành điện.
 
 #### C. Chính Sách Quản Lý Nợ Ví Linh Hoạt (Overdraft & Debt Protection)
+
 - **Cho phép số dư âm có kiểm soát**: Xe điện khi đã sạc thì điện năng đã được nạp vào pin vật lý, không thể "hoàn tác" dòng điện. Do đó, hệ thống cho phép số dư ví âm đến hạn mức cấu hình (`NEGATIVE_BALANCE_LIMIT = -300,000 VND`).
 - **Khóa nợ tự động (Debt Lock)**: Nếu cước phí vượt quá hạn mức nợ, hệ thống kích hoạt cờ `is_debt_locked = True`. Tài khoản bị chặn ngay lập tức mọi phiên sạc mới (`HTTP 402 Payment Required`).
 - **Giải phóng khóa nợ tự động**: Ngay khi khách hàng thực hiện nạp tiền (Topup) đưa số dư ví trở về $\ge 0$ VND, cờ `is_debt_locked` tự động hạ xuống, tài xế tiếp tục sử dụng dịch vụ bình thường.
@@ -116,16 +123,20 @@ Hệ thống tuân thủ 3 nguyên tắc bất khả xâm phạm về nghiệp v
 Hệ thống tích hợp module giả lập sạc `ChargingSimulator` mô phỏng đầy đủ đặc tính vật lý của pin lithium-ion và trụ sạc nhanh DC:
 
 ### 4.1. Đường Cong Sạc Hai Giai Đoạn (CC/CV Charging Curve)
+
 - **Giai đoạn dòng không đổi (Constant Current - CC)**: Khi dung lượng pin $\text{SoC} < 80\%$, xe nhận công suất tối đa theo khả năng của cổng sạc và biến áp. Nhiệt độ pin tăng tịnh tiến theo định luật Joule.
 - **Giai đoạn áp không đổi (Constant Voltage - CV)**: Khi $\text{SoC} \ge 80\%$, hệ thống quản lý pin xe (BMS) tự động hạ dần dòng sạc nhằm bảo vệ cấu trúc hóa học tế bào pin. Công suất sạc giảm dần tuyến tính từ 100% xuống 20% khi đạt 100% SoC.
 
 ### 4.2. Cơ Chế Bảo Vệ Tự Động (Auto-Cutoff Safeguards)
+
 Bộ simulator giám sát liên tục ở mỗi xung nhịp (tick 2 giây) và tự động ngắt rơ-le trong 3 tình huống khẩn cấp:
+
 1. **Pin đầy (Battery Full)**: Tự động ngắt khi $\text{SoC} = 100\%$, tránh sạc nhồi gây chai pin.
 2. **Quá nhiệt đầu sạc (Emergency Overheat)**: Tự động ngắt khẩn cấp khi nhiệt độ cảm biến vượt ngưỡng nguy hiểm ($\ge 75^\circ\text{C}$), phát cảnh báo mã lỗi phần cứng.
 3. **Cạn hạn mức nợ (Debt Exhaustion)**: Tự động ngắt khi chi phí phiên sạc tích lũy làm số dư ví rơi sâu dưới ngưỡng nợ tối đa cho phép.
 
 ### 4.3. Cơ Chế Chống Mất Mát Dữ Liệu Khi Sự Cố Máy Chủ (Crash Reconciliation & Checkpointing)
+
 - **Định kỳ Checkpointing**: Mỗi 60 giây, bộ simulator thực hiện ghi đồng bộ ảnh chụp (`snapshot`) gồm số kWh đã tích lũy và SoC hiện tại xuống CSDL.
 - **Tự động đối soát khi khởi động lại (Reconciliation on Server Startup)**: Nếu máy chủ FastAPI bị khởi động lại đột ngột giữa lúc phiên sạc đang chạy trong RAM, hàm `reconcile_interrupted_sessions()` chạy lúc startup sẽ tự động quét các phiên `ACTIVE` mồ côi, chuyển trạng thái sang `INTERRUPTED`, quyết toán trừ cước ví theo chỉ số checkpoint gần nhất và mở khóa rơ-le cổng sạc về `AVAILABLE`. Không làm rò rỉ cổng sạc và không thất thoát doanh thu của trạm.
 
@@ -135,7 +146,7 @@ Bộ simulator giám sát liên tục ở mỗi xung nhịp (tick 2 giây) và t
 
 Hệ thống tích hợp trí tuệ nhân tạo theo tôn chỉ: **"AI Cố Vấn - Không Can Thiệp Trực Tiếp Vào Phần Cứng" (AI Advisory Only)**. Mọi quyết định đóng/ngắt rơ-le hoặc trừ tiền tài khoản đều do tầng dịch vụ Deterministic xử lý.
 
-```
+```text
                            ┌──────────────────────────────────────────────┐
                            │               AI MODULE DESIGN               │
                            └──────────────────────────────────────────────┘
@@ -164,6 +175,7 @@ Hệ thống tích hợp trí tuệ nhân tạo theo tôn chỉ: **"AI Cố Vấ
 ```
 
 ### 5.1. Thuật Toán Smart Charging (Weighted Fair Sharing theo SoC)
+
 Khi tổng công suất yêu cầu của các xe đang sạc vượt quá công suất an toàn của máy biến áp ($P_{\text{limit}} = P_{\text{grid}} \times 0.95$), thuật toán Heuristic tính toán trọng số ưu tiên:
 $$w_i = \begin{cases} 1.2 & \text{nếu } \text{SoC}_i < 50\% \text{ (ưu tiên sạc gấp)} \\ 1.0 & \text{nếu } 50\% \le \text{SoC}_i \le 80\% \text{ (sạc tiêu chuẩn)} \\ 0.6 & \text{nếu } \text{SoC}_i > 80\% \text{ (giảm tải giai đoạn CV)} \end{cases}$$
 Công suất phân bổ cho từng cổng sạc:
@@ -171,7 +183,9 @@ $$P_{\text{alloc}}[i] = \min\left(P_{\text{req}}[i], P_{\text{limit}} \times \fr
 Đảm bảo $\sum P_{\text{alloc}} \le P_{\text{limit}}$, ngăn ngừa 100% sự cố nhảy Aptomat tổng của trạm.
 
 ### 5.2. Dự Báo Bảo Trì Kỹ Thuật (Predictive Maintenance)
+
 Hệ thống tính toán ma trận rủi ro phần cứng dựa trên:
+
 - **Ngưỡng nhiệt độ tức thời**: Cảnh báo `MEDIUM` khi nhiệt độ vượt $55^\circ\text{C}$, `CRITICAL` khi vượt $70^\circ\text{C}$.
 - **Tốc độ biến thiên nhiệt ($\Delta T / \Delta t$)**: Cảnh báo khi nhiệt độ tăng nhanh bất thường $> 5^\circ\text{C}/\text{phút}$.
 - **Độ sụt áp qua tiếp điểm ($\Delta V$)**: Nếu hiệu điện thế sụt giảm $> 10\text{V}$ ở cùng mức dòng tải, thuật toán cảnh báo nguy cơ tiếp xúc đầu cắm bị mòn hoặc rơ-le bị oxy hóa.
@@ -181,6 +195,7 @@ Hệ thống tính toán ma trận rủi ro phần cứng dựa trên:
 ## 6. Thiết Kế Giao Diện Người Dùng Chuyên Biệt (Industrial UI/UX)
 
 Khác với các dashboard SaaS thông thường, giao diện EV CSMS được thiết kế theo phong cách điều khiển công nghiệp hiện đại:
+
 - **Bảng màu công nghiệp (Industrial Dark Palette)**: Màu nền chính Obsidian `#0B0F17`, thẻ chức năng Panel Slate `#151D2A`, đường viền Border `#1E293B`, màu nhấn Xanh lưới điện `#10B981` (Ổn định/Sạc tốt) và Cam/Đỏ `#F59E0B`/`#EF4444` (Cảnh báo/Nguy hiểm).
 - **Phông chữ hiển thị số đo (Tabular Numbers Typography)**: Toàn bộ thông số đo lường (kW, kWh, VND, %, °C, V, A) sử dụng font monospace `font-mono tabular-nums`, ngăn hiện tượng nhảy giật layout khi số liệu WebSocket cập nhật liên tục.
 - **Điều hướng tiện ích**: Hỗ trợ chuyển đổi nhanh tài khoản demo (1-click role switcher) giữa Admin, CPO, Khách hàng thường, Khách hàng VIP và Khách hàng nợ tiền, phục vụ tối đa việc nghiệm thu và thuyết trình.
@@ -227,6 +242,7 @@ RESULT: 74 PASSED IN 67.56s (0:01:07) - ZERO REGRESSION
 ## 9. Kết Luận
 
 Đồ án **Nền tảng Vận hành Trạm Sạc Xe Điện Tích hợp Trí tuệ Nhân tạo (EV CSMS)** đã hoàn thành vượt mức toàn bộ mục tiêu đề ra ban đầu:
+
 1. Xây dựng một kiến trúc phần mềm chuẩn mực, phân tầng rõ ràng giữa API, Service, Model và Background Worker.
 2. Giải quyết triệt để bài toán an toàn giao dịch tài chính ACID và khóa rơ-le độc quyền cổng sạc.
 3. Hiện thực hóa thành công mô hình **Dual-Loop AI Architecture**, chứng minh khả năng ứng dụng AI một cách thiết thực, an toàn và luôn có phương án dự phòng (Heuristic Fallback) đáng tin cậy.

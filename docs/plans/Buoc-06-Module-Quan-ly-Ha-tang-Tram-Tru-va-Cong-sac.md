@@ -31,43 +31,43 @@
 *(Đã đồng bộ 100% với [`docs/SDLC/KT1/02_Database_Design_ERD.md`](../SDLC/KT1/02_Database_Design_ERD.md))*
 
 1. **`Station` (`stations`)**:
-   - `id`: Integer, PK.
-   - `operator_id`: Integer, FK `users.id` (Chỉ role `OPERATOR` hoặc `ADMIN`), Index, Not Null.
-   - `name`: String(100), Not Null.
-   - `address`: String(255), Not Null.
-   - `latitude`: Float, Not Null.
-   - `longitude`: Float, Not Null.
-   - `total_grid_capacity_kw`: Float, Not Null (Công suất nguồn cấp từ điện lực, ví dụ 150.0 kW).
-   - `operating_hours`: String(50), default "24/7".
-   - `status`: String(20), default "ACTIVE" (Chỉ gồm 2 giá trị vận hành: `ACTIVE`, `MAINTENANCE` - đã xóa `INACTIVE`).
-   - `is_active`: Boolean, default True (Cờ trạng thái tồn tại logic / Soft Delete).
-   - `created_at`: DateTime(timezone=True), server_default=func.now().
-   - `updated_at`: DateTime(timezone=True), onupdate=func.now().
-   - Quan hệ: `charging_points = relationship("ChargingPoint", back_populates="station", cascade="all, delete-orphan")`.
+   + `id`: Integer, PK.
+   + `operator_id`: Integer, FK `users.id` (Chỉ role `OPERATOR` hoặc `ADMIN`), Index, Not Null.
+   + `name`: String(100), Not Null.
+   + `address`: String(255), Not Null.
+   + `latitude`: Float, Not Null.
+   + `longitude`: Float, Not Null.
+   + `total_grid_capacity_kw`: Float, Not Null (Công suất nguồn cấp từ điện lực, ví dụ 150.0 kW).
+   + `operating_hours`: String(50), default "24/7".
+   + `status`: String(20), default "ACTIVE" (Chỉ gồm 2 giá trị vận hành: `ACTIVE`, `MAINTENANCE` - đã xóa `INACTIVE`).
+   + `is_active`: Boolean, default True (Cờ trạng thái tồn tại logic / Soft Delete).
+   + `created_at`: DateTime(timezone=True), server_default=func.now().
+   + `updated_at`: DateTime(timezone=True), onupdate=func.now().
+   + Quan hệ: `charging_points = relationship("ChargingPoint", back_populates="station", cascade="all, delete-orphan")`.
 
 2. **`ChargingPoint` (`charging_points`)**:
-   - `id`: Integer, PK.
-   - `station_id`: Integer, FK `stations.id`, Index, Not Null.
-   - `code`: String(50), Unique, Index, Not Null (Mã định danh trụ sạc EVSE ID, ví dụ `HN-ST01-CP01`).
-   - `vendor`: String(50), Nullable (Hãng sản xuất: ABB, Schneider, Star Charge...).
-   - `model`: String(50), Nullable.
-   - `max_power_kw`: Float, Not Null (Công suất tối đa của trụ, ví dụ 60.0 kW).
-   - `firmware_version`: String(50), Nullable.
-   - `status`: String(20), default "AVAILABLE" (`AVAILABLE`, `PREPARING`, `CHARGING`, `FAULTED`, `UNAVAILABLE`).
-   - `power_sharing_enabled`: Boolean, default True (Bật/tắt tính năng chia sẻ tải động giữa các súng sạc).
-   - `is_active`: Boolean, default True (Cờ trạng thái tồn tại logic / Soft Delete).
-   - `created_at`: DateTime(timezone=True), server_default=func.now().
-   - Quan hệ: `station`, `connectors = relationship("Connector", back_populates="charging_point", cascade="all, delete-orphan")`.
+   + `id`: Integer, PK.
+   + `station_id`: Integer, FK `stations.id`, Index, Not Null.
+   + `code`: String(50), Unique, Index, Not Null (Mã định danh trụ sạc EVSE ID, ví dụ `HN-ST01-CP01`).
+   + `vendor`: String(50), Nullable (Hãng sản xuất: ABB, Schneider, Star Charge...).
+   + `model`: String(50), Nullable.
+   + `max_power_kw`: Float, Not Null (Công suất tối đa của trụ, ví dụ 60.0 kW).
+   + `firmware_version`: String(50), Nullable.
+   + `status`: String(20), default "AVAILABLE" (`AVAILABLE`, `PREPARING`, `CHARGING`, `FAULTED`, `UNAVAILABLE`).
+   + `power_sharing_enabled`: Boolean, default True (Bật/tắt tính năng chia sẻ tải động giữa các súng sạc).
+   + `is_active`: Boolean, default True (Cờ trạng thái tồn tại logic / Soft Delete).
+   + `created_at`: DateTime(timezone=True), server_default=func.now().
+   + Quan hệ: `station`, `connectors = relationship("Connector", back_populates="charging_point", cascade="all, delete-orphan")`.
 
 3. **`Connector` (`connectors`)**:
-   - `id`: Integer, PK.
-   - `charging_point_id`: Integer, FK `charging_points.id`, Index, Not Null.
-   - `connector_number`: Integer, Not Null (Súng số 1, số 2...).
-   - `connector_type`: String(20), Not Null (`CCS2`, `TYPE_2`, `CHADEMO`).
-   - `max_power_kw`: Float, Not Null (Công suất tối đa cổng hỗ trợ, ví dụ 60.0 kW).
-   - `status`: String(20), default "AVAILABLE" (`AVAILABLE`, `OCCUPIED`, `CHARGING`, `FAULTED`, `UNAVAILABLE`).
-   - `is_active`: Boolean, default True (Cờ trạng thái tồn tại logic / Soft Delete).
-   - Ràng buộc CSDL: `UniqueConstraint("charging_point_id", "connector_number", name="uq_charger_connector_number")`.
+   + `id`: Integer, PK.
+   + `charging_point_id`: Integer, FK `charging_points.id`, Index, Not Null.
+   + `connector_number`: Integer, Not Null (Súng số 1, số 2...).
+   + `connector_type`: String(20), Not Null (`CCS2`, `TYPE_2`, `CHADEMO`).
+   + `max_power_kw`: Float, Not Null (Công suất tối đa cổng hỗ trợ, ví dụ 60.0 kW).
+   + `status`: String(20), default "AVAILABLE" (`AVAILABLE`, `OCCUPIED`, `CHARGING`, `FAULTED`, `UNAVAILABLE`).
+   + `is_active`: Boolean, default True (Cờ trạng thái tồn tại logic / Soft Delete).
+   + Ràng buộc CSDL: `UniqueConstraint("charging_point_id", "connector_number", name="uq_charger_connector_number")`.
 
 ---
 
@@ -99,21 +99,21 @@
 ### 2.4. Endpoints API
 
 1. **`app/api/v1/endpoints/stations.py`**:
-   - `GET /api/v1/stations`: Tìm kiếm, lọc trạm công khai (`is_active=True`, filter: `connector_type`, `status`, `user_lat`, `user_lon`, `radius_km`, phân trang `skip: int = 0, limit: int = 50`).
-   - `GET /api/v1/stations/{id}`: Xem chi tiết trạm và cây phân cấp trụ/cổng.
-   - `POST /api/v1/stations`: Tạo trạm mới (Yêu cầu role `ADMIN` hoặc `OPERATOR`; tự động gắn `operator_id = current_user.id`).
-   - `PUT /api/v1/stations/{id}`: Cập nhật thông tin trạm (Chặn IDOR: chỉ owner hoặc Admin).
-   - `DELETE /api/v1/stations/{id}`: Xóa mềm trạm (Soft delete nguyên tử: `is_active = False` cascade xuống con).
-   - `POST /api/v1/stations/{id}/reactivate`: Phục hồi hoạt động trạm sau soft-delete (`is_active = True` cascade xuống con).
+   + `GET /api/v1/stations`: Tìm kiếm, lọc trạm công khai (`is_active=True`, filter: `connector_type`, `status`, `user_lat`, `user_lon`, `radius_km`, phân trang `skip: int = 0, limit: int = 50`).
+   + `GET /api/v1/stations/{id}`: Xem chi tiết trạm và cây phân cấp trụ/cổng.
+   + `POST /api/v1/stations`: Tạo trạm mới (Yêu cầu role `ADMIN` hoặc `OPERATOR`; tự động gắn `operator_id = current_user.id`).
+   + `PUT /api/v1/stations/{id}`: Cập nhật thông tin trạm (Chặn IDOR: chỉ owner hoặc Admin).
+   + `DELETE /api/v1/stations/{id}`: Xóa mềm trạm (Soft delete nguyên tử: `is_active = False` cascade xuống con).
+   + `POST /api/v1/stations/{id}/reactivate`: Phục hồi hoạt động trạm sau soft-delete (`is_active = True` cascade xuống con).
 
 2. **`app/api/v1/endpoints/chargers.py`**:
-   - `POST /api/v1/stations/{station_id}/chargers`: Thêm trụ sạc mới vào trạm (Chặn IDOR cấp Station).
-   - `GET /api/v1/chargers/{id}`: Xem chi tiết trụ sạc và các cổng sạc.
-   - `PUT /api/v1/chargers/{id}`: Cập nhật cấu hình trụ sạc (Chặn IDOR cấp Charger).
-   - `PATCH /api/v1/chargers/{id}/status`: Cập nhật trạng thái trụ sạc & broadcast WebSocket (Chặn IDOR cấp Charger).
-   - `DELETE /api/v1/chargers/{id}`: Xóa mềm trụ sạc (Soft delete nguyên tử: `is_active = False` cascade xuống súng).
-   - `POST /api/v1/chargers/{id}/reactivate`: Phục hồi trụ sạc (`is_active = True` cascade xuống súng).
-   - `POST /api/v1/chargers/{id}/connectors`: Thêm cổng sạc mới vào trụ (Chặn IDOR).
+   + `POST /api/v1/stations/{station_id}/chargers`: Thêm trụ sạc mới vào trạm (Chặn IDOR cấp Station).
+   + `GET /api/v1/chargers/{id}`: Xem chi tiết trụ sạc và các cổng sạc.
+   + `PUT /api/v1/chargers/{id}`: Cập nhật cấu hình trụ sạc (Chặn IDOR cấp Charger).
+   + `PATCH /api/v1/chargers/{id}/status`: Cập nhật trạng thái trụ sạc & broadcast WebSocket (Chặn IDOR cấp Charger).
+   + `DELETE /api/v1/chargers/{id}`: Xóa mềm trụ sạc (Soft delete nguyên tử: `is_active = False` cascade xuống súng).
+   + `POST /api/v1/chargers/{id}/reactivate`: Phục hồi trụ sạc (`is_active = True` cascade xuống súng).
+   + `POST /api/v1/chargers/{id}/connectors`: Thêm cổng sạc mới vào trụ (Chặn IDOR).
 
 ---
 
@@ -177,4 +177,3 @@ Trong quá trình triển khai Bước 06, hệ thống đã chuẩn hóa các q
 | **5** | **Chống IDOR 2 cấp độ** | Ban đầu chỉ kiểm tra cơ bản | Kiểm soát quyền sở hữu đa CPO ở cả cấp Trạm (Station) và cấp Trụ (Charger), đặc biệt là endpoint `PATCH /chargers/{id}/status`. Operator không thể can thiệp vào tài sản của Operator khác (HTTP 403). |
 | **6** | **Tính toán Oversubscription 2 cấp độ** | Ban đầu chỉ nêu chung | Cung cấp sẵn các trường tính toán: Cấp Trạm (`oversubscription_ratio`, `is_oversubscribed`) và Cấp Trụ (`total_connector_power_kw`, `is_power_sharing`) làm tiền đề cho AI Smart Charging (Bước 09). |
 | **7** | **Định vị Haversine + Phân trang chuẩn** | Ban đầu chỉ ghi tìm kiếm chung | Tích hợp công thức Haversine chính xác kết hợp lọc thô Bounding Box và phân trang `skip/limit` trên `GET /stations`. |
-

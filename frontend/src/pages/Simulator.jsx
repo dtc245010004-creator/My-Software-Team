@@ -84,6 +84,8 @@ export default function Simulator() {
   };
 
   const checkExistingActiveSession = async () => {
+    const token = localStorage.getItem('ev_csms_token');
+    if (!token) return;
     try {
       const res = await api.get('/sessions/me');
       const active = (res.data || []).find((s) => s.status === 'ACTIVE');
@@ -92,7 +94,7 @@ export default function Simulator() {
         setStatusMessage(`Đang kết nối lại phiên sạc đang chạy #${active.id}`);
       }
     } catch (e) {
-      // Bỏ qua nếu chưa đăng nhập
+      // Bỏ qua nếu lỗi
     }
   };
 

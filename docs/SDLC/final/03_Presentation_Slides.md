@@ -1,9 +1,11 @@
 # ĐỀ CƯƠNG SLIDE THUYẾT TRÌNH BẢO VỆ ĐỒ ÁN (15 SLIDES)
+
 ## NỀN TẢNG VẬN HÀNH TRẠM SẠC XE ĐIỆN TÍCH HỢP TRÍ TUỆ NHÂN TẠO (AI-POWERED EV CSMS)
 
 ---
 
 ### SLIDE 1: TRANG TIÊU ĐỀ (TITLE SLIDE)
+
 - **Tên Đề Tài**: XÂY DỰNG NỀN TẢNG VẬN HÀNH TRẠM SẠC XE ĐIỆN TÍCH HỢP TRÍ TUỆ NHÂN TẠO (AI-POWERED EV CSMS)
 - **Học Phần**: Đồ Án Tốt Nghiệp / Đồ Án Chuyên Ngành Kỹ Thuật Phần Mềm
 - **Sinh Viên Thực Hiện**: [Tên Sinh Viên] - MSSV: [Mã Số Sinh Viên]
@@ -13,6 +15,7 @@
 ---
 
 ### SLIDE 2: ĐẶT VẤN ĐỀ & BỐI CẢNH THỰC TIỄN
+
 - **Sự bùng nổ của phương tiện giao thông chạy điện (EV)**:
   + Số lượng xe điện tăng trưởng theo cấp số nhân tại các đô thị lớn.
   + Nhu cầu sạc nhanh công suất lớn (DC 60kW - 300kW) gây áp lực khủng khiếp lên lưới điện khu vực.
@@ -25,6 +28,7 @@
 ---
 
 ### SLIDE 3: MỤC TIÊU & PHẠM VI GIẢI PHÁP
+
 - **Mục tiêu cốt lõi**:
   + Xây dựng nền tảng web toàn diện phục vụ quản lý mạng lưới trạm sạc xe điện theo chuẩn phân quyền (Admin, CPO, Tài xế).
   + Đảm bảo tính toàn vẹn giao dịch tài chính tuyệt đối (ACID Transaction), tính cước TOU và quản lý nợ ví an toàn.
@@ -34,6 +38,7 @@
 ---
 
 ### SLIDE 4: KIẾN TRÚC HỆ THỐNG TỔNG THỂ & TECH STACK
+
 - **Mô hình kiến trúc đa tầng (Multi-tier Architecture)**:
   + **Tầng Giao diện (Presentation Layer)**: React 18, Vite, Tailwind CSS, Lucide Icons, Recharts (Industrial Dark UI).
   + **Tầng API & Realtime (Transport Layer)**: FastAPI (Python 3.10+), Asynchronous I/O, Native WebSockets Hub.
@@ -44,6 +49,7 @@
 ---
 
 ### SLIDE 5: KIẾN TRÚC AI DUAL-LOOP & NGUYÊN TẮC AN TOÀN
+
 - **Nguyên tắc "AI Advisory Only" (Chỉ Cố Vấn)**:
   + AI không bao giờ can thiệp trực tiếp vào rơ-le vật lý hoặc số dư tài khoản người dùng.
 - **Mô hình Vòng Lặp Kép (Dual-Loop Pattern)**:
@@ -55,6 +61,7 @@
 ---
 
 ### SLIDE 6: THIẾT KẾ CƠ SỞ DỮ LIỆU & PHÂN QUYỀN (RBAC)
+
 - **Mô hình quan hệ 7 thực thể chuẩn hóa**:
   + `users` $\rightarrow$ `wallets` $\rightarrow$ `wallet_transactions`
   + `stations` $\rightarrow$ `charging_points` (EVSE) $\rightarrow$ `connectors`
@@ -67,6 +74,7 @@
 ---
 
 ### SLIDE 7: GIAO DỊCH TÀI CHÍNH ACID & QUẢN LÝ NỢ VÍ
+
 - **Khóa độc quyền cổng sạc (Exclusive Locking)**:
   + Trạng thái cổng sạc cập nhật nguyên tử `AVAILABLE` $\rightarrow$ `CHARGING`. Ngăn chặn xung đột 2 xe cắm chung cổng với mã lỗi `HTTP 409 Conflict`.
 - **Chốt biểu giá tại thời điểm cắm (Connect-time TOU Tariff)**:
@@ -79,6 +87,7 @@
 ---
 
 ### SLIDE 8: BỘ GIẢ LẬP ĐO ĐẾM REALTIME (SIMULATOR)
+
 - **Mô phỏng đường cong sạc 2 giai đoạn CC/CV (Constant Current / Constant Voltage)**:
   + $\text{SoC} < 80\%$: Sạc dòng không đổi, công suất đạt đỉnh (Peak Power), nhiệt độ tăng dần.
   + $\text{SoC} \ge 80\%$: Sạc áp không đổi, công suất giảm dần tuyến tính nhằm bảo vệ tế bào pin.
@@ -90,6 +99,7 @@
 ---
 
 ### SLIDE 9: CHECKPOINTING & TỰ ĐỘNG PHỤC HỒI KHI SỰ CỐ
+
 - **Thách thức thực tế**: Máy chủ server bị crash hoặc bị deploy lại giữa lúc hàng chục xe đang cắm sạc.
 - **Giải pháp xử lý triệt để của đề tài**:
   + **Periodic Checkpoint**: Cứ mỗi 60 giây, simulator tự động chụp ảnh snapshot chỉ số kWh và SoC ghi xuống CSDL.
@@ -99,6 +109,7 @@
 ---
 
 ### SLIDE 10: AI SMART CHARGING - ĐIỀU PHỐI PHỤ TẢI THEO SOC
+
 - **Thuật toán chia tải Weighted Fair Sharing**:
   + Giới hạn an toàn thanh cái: $P_{\text{limit}} = P_{\text{grid\_max}} \times 0.95$.
   + Trọng số phân bổ theo mức pin:
@@ -111,6 +122,7 @@
 ---
 
 ### SLIDE 11: PREDICTIVE MAINTENANCE & DYNAMIC PRICING
+
 - **Dự báo bảo trì thiết bị (Predictive Maintenance)**:
   + Phát hiện quá nhiệt tức thời ($\ge 55^\circ\text{C}$ cảnh báo, $\ge 70^\circ\text{C}$ nguy cấp).
   + Giám sát tốc độ gia nhiệt bất thường: $\Delta T / \Delta t > 5^\circ\text{C}/\text{phút}$.
@@ -124,6 +136,7 @@
 ---
 
 ### SLIDE 12: THIẾT KẾ GIAO DIỆN CÔNG NGHIỆP HIỆN ĐẠI
+
 - **Ngôn ngữ thiết kế Industrial Dark Theme**:
   + Bảng màu Obsidian `#0B0F17` và Panel Slate `#151D2A`, đường nét sắc sảo, chống mỏi mắt cho nhân viên trực ca 24/7.
   + Toàn bộ số liệu hiển thị dùng font monospace `tabular-nums`, không rung lắc layout khi nhận dữ liệu realtime.
@@ -137,6 +150,7 @@
 ---
 
 ### SLIDE 13: KẾT QUẢ KIỂM THỬ TỰ ĐỘNG (PYTEST)
+
 - **Phương châm kiểm thử nghiêm ngặt**:
   + Không dùng test giả (Zero Mocking cho lớp đang test).
   + Assert nội dung dữ liệu thật, kiểm tra cả mã lỗi HTTP và nội dung message.
@@ -147,6 +161,7 @@
 ---
 
 ### SLIDE 14: RỦI RO, NỢ KỸ THUẬT & HƯỚNG PHÁT TRIỂN
+
 - **Đánh giá khách quan về nợ kỹ thuật hiện tại**:
   + Nguồn dữ liệu đo đếm hiện do module Simulator phát sinh (chưa có kết nối cổng vật lý RS485/Modbus).
   + Biểu giá TOU chốt một lần lúc bắt đầu cắm sạc (chưa chia nhỏ theo từng mẩu thời gian giao thoa giữa các khung giờ).
@@ -158,6 +173,7 @@
 ---
 
 ### SLIDE 15: TỔNG KẾT & CHUYỂN GIAO SANG PHẦN DEMO
+
 - **Kết luận**:
   + Đề tài đã xây dựng thành công một nền tảng EV CSMS hoàn chỉnh, trực quan, bảo mật và tin cậy cao.
   + Ứng dụng thành công mô hình Dual-Loop AI Architecture giải quyết trọn vẹn bài toán cân bằng tải và an toàn lưới điện.

@@ -82,13 +82,12 @@ backend/
 ## 5. Ghi nhận thực tế triển khai & Quyết định kỹ thuật
 
 1. **Đơn giản hóa mô hình vật lý:**
-   - Thay vì tính vi tích phân nhiệt $I^2 R$ quá phức tạp, hệ thống áp dụng mô hình tuyến tính đơn giản: CC duy trì $P_{\max}$ ($SoC < 80\%$), CV giảm dần về $10\text{ kW}$ tại $100\%$. Nhiệt độ cổng sạc bình thường $45-55^\circ\text{C}$, nhảy lên $82.5^\circ\text{C}$ khi Admin/Tester cố tình kích hoạt lỗi `OVERHEAT`.
+   + Thay vì tính vi tích phân nhiệt $I^2 R$ quá phức tạp, hệ thống áp dụng mô hình tuyến tính đơn giản: CC duy trì $P_{\max}$ ($SoC < 80\%$), CV giảm dần về $10\text{ kW}$ tại $100\%$. Nhiệt độ cổng sạc bình thường $45-55^\circ\text{C}$, nhảy lên $82.5^\circ\text{C}$ khi Admin/Tester cố tình kích hoạt lỗi `OVERHEAT`.
 2. **Cơ chế Checkpoint & Server Crash Reconciliation:**
-   - CSDL được bổ sung 2 cột `current_soc` và `last_checkpoint_at` qua migration `f99adeda980d_add_checkpoint_and_soc_to_sessions.py`.
-   - Khi server khởi động lại, hàm `reconcile_interrupted_sessions` tự động quét các session còn `ACTIVE`, chuyển sang `INTERRUPTED`, trừ ví theo kWh checkpoint và mở khóa connector về `AVAILABLE`, không để rò rỉ cổng sạc và tiền bạc.
+   + CSDL được bổ sung 2 cột `current_soc` và `last_checkpoint_at` qua migration `f99adeda980d_add_checkpoint_and_soc_to_sessions.py`.
+   + Khi server khởi động lại, hàm `reconcile_interrupted_sessions` tự động quét các session còn `ACTIVE`, chuyển sang `INTERRUPTED`, trừ ví theo kWh checkpoint và mở khóa connector về `AVAILABLE`, không để rò rỉ cổng sạc và tiền bạc.
 3. **Time Acceleration trong kiểm thử:**
-   - Hàm `sim.step(dt_seconds=...)` cho phép giả lập bước thời gian bất kỳ (ví dụ 10s, 60s) mà không cần dùng `sleep(2)` thật, giúp suite test 9 ca kiểm thử chạy xong chỉ trong 6 giây.
+   + Hàm `sim.step(dt_seconds=...)` cho phép giả lập bước thời gian bất kỳ (ví dụ 10s, 60s) mà không cần dùng `sleep(2)` thật, giúp suite test 9 ca kiểm thử chạy xong chỉ trong 6 giây.
 4. **Bảo mật phân quyền & Room WebSocket:**
-   - Driver tuyệt đối bị cấm 403 khi cố tình trigger sự cố hoặc can thiệp công suất trần.
-   - Dữ liệu telemetry chỉ phát cho client đã đăng ký đúng `session_id`, loại bỏ hoàn toàn nguy cơ rò rỉ thông tin cá nhân.
-
+   + Driver tuyệt đối bị cấm 403 khi cố tình trigger sự cố hoặc can thiệp công suất trần.
+   + Dữ liệu telemetry chỉ phát cho client đã đăng ký đúng `session_id`, loại bỏ hoàn toàn nguy cơ rò rỉ thông tin cá nhân.

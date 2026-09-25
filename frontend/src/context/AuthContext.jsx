@@ -29,24 +29,19 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = async (username, password) => {
-    const formData = new URLSearchParams();
-    formData.append('username', username);
-    formData.append('password', password);
-
-    const res = await api.post('/auth/login', formData, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    const res = await api.post('/auth/login', {
+      username,
+      password,
     });
 
     const accessToken = res.data.access_token;
     localStorage.setItem('ev_csms_token', accessToken);
     setToken(accessToken);
 
-    const meRes = await api.get('/auth/me', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    setUser(meRes.data);
-    localStorage.setItem('ev_csms_user', JSON.stringify(meRes.data));
-    return meRes.data;
+    const userData = res.data.user;
+    setUser(userData);
+    localStorage.setItem('ev_csms_user', JSON.stringify(userData));
+    return userData;
   };
 
   const register = async (userData) => {

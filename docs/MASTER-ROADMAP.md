@@ -98,7 +98,6 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 | 3.3 | Bắt đầu & Dừng phiên sạc (`ChargingSession`): Khóa cổng sạc độc quyền | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Bieu-gia-Vi-dien-tu-va-Phien-sac-ACID.md) | `services/session_service.py` | ✅ |
 | 3.4 | Quyết toán phiên sạc: Trừ tiền ví, xuất hóa đơn điện tử | 🔴 P0 | [Buoc-07](plans/Buoc-07-Module-Bieu-gia-Vi-dien-tu-va-Phien-sac-ACID.md) | `api/v1/endpoints/sessions.py` | ✅ |
 
-
 ---
 
 ### GIAI ĐOẠN 4 — Module Giả lập Trạm sạc (Charging Simulator & Telemetry)
@@ -111,7 +110,6 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 | 4.1 | Thuật toán mô phỏng đường cong sạc pin xe (SoC %, kW, V, A, nhiệt độ) | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-Gia-lap-Tram-sac-Simulator-va-Telemetry.md) | `app/simulator/charging_simulator.py` | ✅ |
 | 4.2 | Kết nối WebSocket phát dữ liệu đo đếm realtime định kỳ | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-Gia-lap-Tram-sac-Simulator-va-Telemetry.md) | `app/core/websocket.py`, `/ws/telemetry` | ✅ |
 | 4.3 | Tự động kích hoạt dừng sạc khi: Pin đầy (100%), Hết tiền ví, hoặc Sự cố | 🔴 P0 | [Buoc-08](plans/Buoc-08-Module-Gia-lap-Tram-sac-Simulator-va-Telemetry.md) | Ngắt sạc an toàn | ✅ |
-
 
 ---
 
