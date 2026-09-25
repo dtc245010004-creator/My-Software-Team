@@ -9,6 +9,7 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
+
 - State your assumptions explicitly. If uncertain, ask.
 - If multiple interpretations exist, present them - don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
@@ -31,12 +32,14 @@ Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, sim
 **Touch only what you must. Clean up only your own mess.**
 
 When editing existing code:
+
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
 - If you notice unrelated dead code, mention it - don't delete it.
 
 When your changes create orphans:
+
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
 
@@ -47,12 +50,14 @@ The test: Every changed line should trace directly to the user's request.
 **Define success criteria. Loop until verified.**
 
 Transform tasks into verifiable goals:
+
 - "Add validation" -> "Write tests for invalid inputs, then make them pass"
 - "Fix the bug" -> "Write a test that reproduces it, then make it pass"
 - "Refactor X" -> "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
-```
+
+```text
 1. [Step] -> verify: [check]
 2. [Step] -> verify: [check]
 3. [Step] -> verify: [check]
@@ -66,7 +71,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-# 5. Ngữ cảnh dự án
+## 5. Ngữ cảnh dự án
 
 **Nền tảng vận hành trạm sạc xe điện tích hợp AI (EV Charging Station Management System - EV CSMS).**
 Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc xe điện, bao gồm: quản lý trạm sạc, trụ sạc (EVSE), cổng sạc (Connector), cấu hình biểu giá điện linh hoạt (TOU Tariff), ví điện tử khách hàng (Wallet), phiên sạc thời gian thực (Charging Sessions) và giám sát telemetry (SoC %, công suất kW, kWh, chi phí). Đồng thời, tích hợp AI hỗ trợ điều phối công suất thông minh (Smart Charging/Load Balancing), dự báo bảo trì kỹ thuật (Predictive Maintenance) và tư vấn tối ưu biểu giá doanh thu.
@@ -78,7 +83,7 @@ Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc
 ## Stack công nghệ
 
 | Hạng mục | Lựa chọn | Vai trò |
-|---|---|---|
+| --- | --- | --- |
 | Backend | FastAPI (Python 3.10+) + SQLAlchemy 2.0 | REST API hiệu năng cao + WebSocket telemetry |
 | CSDL | SQLite (phát triển/test) / PostgreSQL (sẵn sàng) | Lưu trữ ACID, ràng buộc khóa ngoại & check constraint |
 | Realtime | FastAPI WebSocket | Truyền nhận dữ liệu đo đếm sạc thời gian thực (Telemetry) |
@@ -91,7 +96,7 @@ Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc
 
 > Xem `docs/codebase-map.md` để biết chính xác file nào đang tồn tại và vai trò của nó.
 
-```
+```text
 <project-root>/
 ├── backend/                      <- (Sẽ scaffold ở Bước 03 & 04)
 │   ├── app/
@@ -155,15 +160,15 @@ Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc
 
 ---
 
-# 6. Quy trình mỗi phiên làm việc
+## 6. Quy trình mỗi phiên làm việc
 
-## Mở phiên — làm đủ 3 việc này trước khi làm bất cứ gì khác
+### Mở phiên — làm đủ 3 việc này trước khi làm bất cứ gì khác
 
 1. **Làm việc tại thư mục gốc dự án (mặc định: thư mục làm việc hiện tại hoặc biến môi trường `PROJECT_ROOT`; trên máy dev hiện tại là `E:\Nền tảng vận hành trạm sạc xe điện`).**
 2. Đọc [`docs/codebase-map.md`](docs/codebase-map.md) để nắm rõ hiện trạng file.
 3. Đọc [`docs/plans/TIEN-DO.md`](docs/plans/TIEN-DO.md) để biết đang ở bước nào và công việc tiếp theo.
 
-## Đóng phiên — bắt buộc nếu phiên có thay đổi code
+### Đóng phiên — bắt buộc nếu phiên có thay đổi code
 
 1. Chạy test tại `backend/tests/`, ghi lại kết quả thật.
 2. Cập nhật `docs/codebase-map.md` nếu có thêm/xóa/đổi vai trò file.
@@ -173,21 +178,22 @@ Không được để việc cập nhật tài liệu trôi sang phiên sau.
 
 ---
 
-# 7. Luật kiểm thử & Bảo toàn dữ liệu
+## 7. Luật kiểm thử & Bảo toàn dữ liệu
 
 Bộ test nằm tại `backend/tests/`. Chạy bằng:
+
 ```bash
 cd backend
 pytest
 ```
 
-## Ba luật chống test giả
+### Ba luật chống test giả
 
 1. **Không mock chính lớp đang test.** Mock chỉ dành cho ranh giới ngoài: Gemini API, thời gian hệ thống.
 2. **Mỗi bug fix phải có test tái hiện được bug** — chạy đỏ trước khi sửa, xanh sau khi sửa.
 3. **Test AI phải assert nội dung thật**, không chỉ assert "không ném exception".
 
-## Ba luật bất khả xâm phạm về nghiệp vụ trạm sạc
+### Ba luật bất khả xâm phạm về nghiệp vụ trạm sạc
 
 - **Bảo toàn số dư ví (No Negative Balance)**: Mọi thao tác trừ tiền phiên sạc phải dùng Database Transaction, đảm bảo số dư ví không bao giờ âm bất hợp lệ.
 - **Trạng thái trụ sạc độc quyền**: Không cho phép bắt đầu 2 phiên sạc đồng thời trên cùng một cổng sạc (`connector`).
@@ -195,13 +201,13 @@ pytest
 
 ---
 
-# 8. Ranh giới kiến trúc & An toàn AI
+## 8. Ranh giới kiến trúc & An toàn AI
 
 - `backend/app/api/v1/` chỉ làm HTTP/WebSocket: parse request, kiểm tra quyền, trả response. **Không chứa logic nghiệp vụ.**
 - `backend/app/services/` chứa toàn bộ logic nghiệp vụ (tính cước, trừ ví, cập nhật phiên sạc), test được độc lập.
 - `backend/app/simulator/` chứa logic phát xung nhịp giả lập telemetry sạc (SoC %, công suất, kWh).
 
-## Quy tắc an toàn AI
+### Quy tắc an toàn AI
 
 - **AI chỉ đóng vai trò cố vấn/phân tích**: AI đưa ra khuyến nghị phân bổ công suất hoặc gợi ý biểu giá, không trực tiếp thay đổi số dư ví hay đóng/ngắt rơ-le vật lý ngoài ý muốn.
 - **Bảo mật thông tin**: Tuyệt đối không đưa thông tin nhạy cảm của người dùng (mật khẩu, khóa riêng, thông tin thẻ) vào prompt AI.
@@ -209,20 +215,22 @@ pytest
 
 ---
 
-# 9. Nguồn sự thật & Quy ước cập nhật tài liệu
+## 9. Nguồn sự thật & Quy ước cập nhật tài liệu
 
-## Phân cấp nguồn sự thật
-```
+### Phân cấp nguồn sự thật
+
+```text
 TIEN-DO.md          → THẮNG về trạng thái (bước nào xong, bước nào chưa)
 Buoc-NN.md          → THẮNG về cách làm (spec kỹ thuật, checklist, file cần tạo)
 MASTER-ROADMAP.md   → Bức tranh toàn cảnh; chỉ cập nhật khi TIEN-DO.md đã cập nhật xong
 ```
 
 ## Cấu trúc tài liệu SDLC (Bài tập cá nhân)
+
 - `docs/plans/`: Bản đồ các bước thực hiện chi tiết.
 - `docs/MASTER-ROADMAP.md`: La bàn định hướng 8 giai đoạn.
 - `docs/SDLC/`: Các mốc kiểm tra bài tập cá nhân:
-  - `KT1/`: Đánh giá đặc tả yêu cầu, thiết kế kiến trúc, ERD CSDL và API contract.
-  - `KT2/`: Đánh giá hiện thực hóa Core Backend, mô phỏng sạc (Simulator) và giao dịch ví tiền ACID.
-  - `KT3/`: Đánh giá tích hợp AI (Smart Charging, Predictive Maintenance, Fallback) và giao diện Web Frontend.
-  - `final/`: Đánh giá kiểm thử toàn diện, tối ưu hiệu năng, tài liệu bàn giao và kịch bản demo bảo vệ.
+  + `KT1/`: Đánh giá đặc tả yêu cầu, thiết kế kiến trúc, ERD CSDL và API contract.
+  + `KT2/`: Đánh giá hiện thực hóa Core Backend, mô phỏng sạc (Simulator) và giao dịch ví tiền ACID.
+  + `KT3/`: Đánh giá tích hợp AI (Smart Charging, Predictive Maintenance, Fallback) và giao diện Web Frontend.
+  + `final/`: Đánh giá kiểm thử toàn diện, tối ưu hiệu năng, tài liệu bàn giao và kịch bản demo bảo vệ.

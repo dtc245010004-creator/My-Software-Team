@@ -1,4 +1,5 @@
 # SƠ ĐỒ KIẾN TRÚC VÀ LUỒNG VẬN HÀNH HỆ THỐNG EV CSMS
+>
 > **Tài liệu tổng hợp, trực quan hóa toàn diện bức tranh kiến trúc và giải pháp kỹ thuật giải quyết các rủi ro từ `yêu cầu.md`**
 
 ---
@@ -85,6 +86,7 @@ flowchart TD
 ```
 
 ### Các thành phần then chốt giải quyết rủi ro kiến trúc:
+
 * **`In-Memory State Buffer`**: Giảm tải áp lực I/O lên Database. Telemetry tick (2–5s) chỉ cập nhật RAM; DB chỉ ghi dữ liệu theo chu kỳ chốt số (checkpoint 30–60s) hoặc khi kết thúc phiên.
 * **`Internal Event Bus (asyncio)`**: Khớp nối lỏng (Decoupling) giữa các module. Các sự kiện ngắt sạc khẩn cấp (`EmergencyStop`), hết tiền ví (`OutOfBalance`), hoặc pin đầy (`BatteryFull`) được xử lý bất đồng bộ, không gây nghẽn luồng chính.
 * **`Hardware Safety Cut-off`**: Rơ-le ảo ngắt điện tức thì khi phát hiện nhiệt độ vượt ngưỡng an toàn ($T > 85^\circ\text{C}$), độc lập hoàn toàn với phản hồi từ AI hay CSDL.
@@ -128,7 +130,7 @@ flowchart TD
 ## 3. Ma trận & Ranh giới AI thật vs Heuristic / Rule-based (Điểm 2)
 
 | Nghiệp vụ | Tầng Heuristic / Rule-based (Tức thời, Cố định) | Tầng Gemini AI (Định kỳ, Phân tích sâu) | Rủi ro nếu gán nhãn sai |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Smart Charging (Điều phối tải)** | Chia tỷ lệ công suất dựa trên $\sum P_{i} \le P_{\text{grid\_max}}$. Cắt giảm ngay lập tức khi lưới điện sụt áp. | Dự báo nhu cầu phụ tải theo thời gian, tối ưu hóa biểu giá TOU, đề xuất giờ sạc chi phí thấp cho khách hàng. | Bị bắt bẻ nếu gọi thuật toán chia tỷ lệ toán học là "AI". |
 | **Predictive Maintenance (Bảo trì dự đoán)** | Cảnh báo ngưỡng cứng: $T > 70^\circ\text{C}$ $\implies$ Warning; $T > 85^\circ\text{C}$ $\implies$ Emergency Stop. | Phân tích biến thiên $\Delta T / \Delta t$ kết hợp dòng điện $I(t)$ để phát hiện suy hao tiếp xúc cáp sạc trước khi nóng quá mức. | Ngưỡng cố định là Rule-based thuần túy; AI phải phân tích chuỗi thời gian (trend). |
 | **Tariff & Revenue Optimization** | Áp dụng đúng giá theo khung giờ cao điểm/thấp điểm (TOU cố định). Tính đúng phụ phí phạt. | Phân tích thói quen sạc của tài xế, đề xuất điều chỉnh biểu giá động để kéo giãn phụ tải sang giờ thấp điểm. | Tránh nhầm lẫn giữa tính cước theo công thức với tối ưu hóa doanh thu bằng mô hình học. |
@@ -307,7 +309,7 @@ flowchart TD
 ## 9. Tóm tắt Kỹ thuật Dành cho Buổi Bảo vệ Đồ án
 
 | Vấn đề phản biện | Câu trả lời chuẩn mực kỹ thuật |
-|---|---|
+| --- | --- |
 | **"Tại sao không dùng AI điều khiển từng giây?"** | Mô hình LLM có độ trễ 1-3s và giới hạn rate-limit nên không phù hợp với vòng lặp realtime. Hệ thống dùng **Heuristic toán học nội bộ chạy mỗi tick (2-5s)** để bảo vệ an toàn tức thời, và dùng **Gemini AI định kỳ (mỗi vài phút)** để phân tích xu hướng và cố vấn chiến lược. |
 | **"Cảnh báo nhiệt độ có phải AI không?"** | Không. Ngưỡng cứng $T > 70^\circ\text{C}$ là **Rule-based Fallback** đảm bảo an toàn vật lý. AI đóng vai trò phân tích **chuỗi dữ liệu đa biến** (tốc độ tăng nhiệt kết hợp công suất sạc) để dự báo hỏng hóc trước khi chạm ngưỡng báo động. |
 | **"Hệ thống có chuẩn OCPP 1.6J không?"** | Hệ thống xây dựng **mô hình máy trạng thái lấy cảm hứng từ chuẩn OCPP (OCPP-like)** để quản lý vòng đời cổng sạc, không đóng vai trò là một máy chủ OCPP 1.6J hoàn chỉnh do giới hạn phạm vi mô phỏng web. |

@@ -9,7 +9,7 @@
 
 ### Bước 1 — Nhắc AI đọc ngữ cảnh (copy paste vào chat)
 
-```
+```text
 Đọc các file sau trước khi làm bất cứ gì:
 1. GEMINI.md — quy tắc làm việc, kiến trúc, trigger cập nhật tài liệu
 2. docs/codebase-map.md — file nào đang có, vai trò gì
@@ -36,7 +36,7 @@
 
 Trước khi bảo AI viết code cho bước tiếp theo, hỏi AI những thứ này:
 
-```
+```text
 Trước khi bắt đầu [Bước XX], hãy trả lời:
 1. Bước này phụ thuộc vào gì? Đã đủ chưa?
 2. File nào sẽ được tạo mới / sửa đổi?
@@ -62,14 +62,14 @@ Trước khi bắt đầu [Bước XX], hãy trả lời:
 ## 🗺️ LINK NHANH
 
 | Tài liệu | Mục đích | Khi nào dùng |
-|---|---|---|
+| --- | --- | --- |
 | [GEMINI.md](GEMINI.md) | Quy tắc toàn dự án | Nhắc AI đọc đầu phiên |
 | [HUONGDAN.md](HUONGDAN.md) | Hướng dẫn vận hành phiên làm việc | Đọc trước khi mở phiên |
 | [docs/MASTER-ROADMAP.md](docs/MASTER-ROADMAP.md) | Bức tranh 8 giai đoạn | Xem tổng thể, điều hướng |
 | [docs/plans/TIEN-DO.md](docs/plans/TIEN-DO.md) | Trạng thái thực tế | Biết đang ở đâu |
 | [docs/codebase-map.md](docs/codebase-map.md) | Bản đồ mã nguồn | Khi AI hỏi "file X ở đâu" |
 | [sodo.md](sodo.md) | Sơ đồ kiến trúc & luồng vận hành | Đối chiếu kiến trúc, dual-loop, WebSocket, máy trạng thái |
-| [yêu cầu.md](yêu%20cầu.md) | Đánh giá phản biện & rủi ro kỹ thuật | Xem lại 9 điểm rủi ro & đề xuất |
+| `yêu cầu.md` *(đã tích hợp vào [sodo.md](sodo.md))* | Đánh giá phản biện & rủi ro kỹ thuật | Xem lại 9 điểm rủi ro & đề xuất |
 | [nentang.md](nentang.md) | Đặc tả nền tảng trạm sạc xe điện | Đối chiếu yêu cầu nghiệp vụ gốc |
 | [Prompt.md](Prompt.md) | Đặc tả hợp nhất hệ thống | Khi cần tra chi tiết kỹ thuật |
 
@@ -77,7 +77,7 @@ Trước khi bắt đầu [Bước XX], hãy trả lời:
 
 ## 📊 TRẠNG THÁI DỰ ÁN (cập nhật thủ công)
 
-```
+```text
 Giai đoạn hiện tại : 🔄 Giai đoạn 0 & 1 — Nền tảng dự án, Sơ đồ kiến trúc & Hồ sơ KT1
 Bước đang làm      : Bước 01 — Hoàn thiện đặc tả yêu cầu, use case và sơ đồ kiến trúc
 Mốc SDLC gần nhất  : KT1 (Đặc tả, Thiết kế ERD & Kiến trúc)
@@ -89,13 +89,15 @@ Ngày cập nhật dòng này: 2026-09-22
 ## 💬 CÂU HỎI THƯỜNG HỎI AI
 
 **"Tôi nên làm bước tiếp theo là gì?"**
-```
+
+```text
 Đọc TIEN-DO.md và MASTER-ROADMAP.md, sau đó đề xuất bước tiếp theo
 theo đúng thứ tự dependency. Nêu lý do tại sao bước đó nên làm trước.
 ```
 
 **"Kế hoạch bước này có vấn đề gì không?"**
-```
+
+```text
 Đọc docs/plans/Buoc-NN-<tên>.md và phân tích:
 - Có thiếu dependency nào không?
 - Có rủi ro kỹ thuật nào chưa được xử lý? (Ví dụ: xung đột đồng thời khi nạp/trừ ví tiền)
@@ -103,7 +105,8 @@ theo đúng thứ tự dependency. Nêu lý do tại sao bước đó nên làm 
 ```
 
 **"Review code tôi vừa viết"**
-```
+
+```text
 Review file [tên file] theo tiêu chí trong GEMINI.md §2, §3, §7, §8.
 Đặc biệt kiểm tra: transaction ACID ví tiền, trạng thái độc quyền cổng sạc, không để lọt lỗi chia tải.
 ```

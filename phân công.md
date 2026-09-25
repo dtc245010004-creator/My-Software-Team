@@ -1,7 +1,9 @@
 # BẢNG PHÂN CÔNG NHIỆM VỤ DỰ ÁN EV CSMS
+
 ## Nền tảng vận hành trạm sạc xe điện tích hợp AI
+
 > **Quy mô đội ngũ:** 6 Thành viên (3 Backend Developers + 3 Frontend Developers)  
-> **Căn cứ tài liệu:** [`sodo.md`](sodo.md), [`Prompt.md`](Prompt.md), [`GEMINI.md`](GEMINI.md), và danh mục kế hoạch [`docs/plans/`](docs/plans/).
+> **Căn cứ tài liệu:** [`sodo.md`](sodo.md), [`Prompt.md`](Prompt.md), [`GEMINI.md`](GEMINI.md), và danh mục kế hoạch [`docs/plans/TIEN-DO.md`](docs/plans/TIEN-DO.md).
 
 ---
 
@@ -29,6 +31,7 @@ flowchart LR
 ## II. PHÂN CÔNG CHI TIẾT ĐỘI NGŨ BACKEND (3 THÀNH VIÊN)
 
 ### 1. Backend 1 (Lead Backend): Hạ tầng nền tảng, Xác thực RBAC, WebSocket Hub & Event Bus
+
 * **Vai trò:** Chịu trách nhiệm kiến trúc khung ứng dụng, phân quyền bảo mật, kênh truyền thời gian thực và điều phối sự kiện bất đồng bộ.
 * **Nhiệm vụ cụ thể:**
   1. **Scaffold Backend & Cấu hình CSDL** (Bước 03 & 04):
@@ -53,6 +56,7 @@ flowchart LR
 ---
 
 ### 2. Backend 2: Quản lý Hạ tầng trạm sạc, Biểu giá TOU, Ví tiền & Phiên sạc (ACID)
+
 * **Vai trò:** Hiện thực hóa toàn bộ logic nghiệp vụ cốt lõi của trạm sạc, biểu giá điện linh hoạt và các giao dịch tài chính yêu cầu bảo toàn dữ liệu nghiêm ngặt.
 * **Nhiệm vụ cụ thể:**
   1. **Quản lý Hạ tầng trạm sạc** (Bước 06):
@@ -80,6 +84,7 @@ flowchart LR
 ---
 
 ### 3. Backend 3: Hardware Simulator, In-Memory Buffer, AI Engine & Kiểm thử Tự động
+
 * **Vai trò:** Xây dựng bộ giả lập phần cứng trạm sạc, quản lý nhịp telemetry thời gian thực, tích hợp AI đa tầng và bộ kiểm thử tự động toàn diện.
 * **Nhiệm vụ cụ thể:**
   1. **Charging Simulator & Rơ-le an toàn** (Bước 08):
@@ -110,6 +115,7 @@ flowchart LR
 ## III. PHÂN CÔNG CHI TIẾT ĐỘI NGŨ FRONTEND (3 THÀNH VIÊN)
 
 ### 1. Frontend 1 (Lead Frontend): Kiến trúc Ứng dụng, Auth Flow, Layout & CPO Dashboard
+
 * **Vai trò:** Thiết lập kiến trúc giao diện người dùng, hệ thống design system, quản lý trạng thái đăng nhập và bảng điều khiển tổng quan cho CPO.
 * **Nhiệm vụ cụ thể:**
   1. **Khởi tạo & Cấu hình Project** (Bước 10):
@@ -135,6 +141,7 @@ flowchart LR
 ---
 
 ### 2. Frontend 2: Quản lý Trạm, Trụ, Cổng sạc, Biểu giá TOU & Màn hình AI Advisor
+
 * **Vai trò:** Xây dựng toàn bộ giao diện quản trị tài sản vật lý cho đơn vị vận hành (CPO), cấu hình bảng giá và trực quan hóa các khuyến nghị thông minh từ AI.
 * **Nhiệm vụ cụ thể:**
   1. **Quản lý Mạng lưới Trạm sạc (`Stations.jsx`)** (Bước 10):
@@ -159,6 +166,7 @@ flowchart LR
 ---
 
 ### 3. Frontend 3: Giao diện Mô phỏng (Simulator UI), WebSocket Client & Driver Portal
+
 * **Vai trò:** Xây dựng màn hình tương tác thực nghiệm (Simulator) phục vụ demo hội đồng, kết nối WebSocket realtime và cổng thông tin dành cho tài xế xe điện.
 * **Nhiệm vụ cụ thể:**
   1. **Màn hình Mô phỏng Cắm sạc (`Simulator.jsx`)** (Bước 10 ⭐ Trọng tâm Demo):
@@ -185,7 +193,7 @@ flowchart LR
 ## IV. MA TRẬN TIẾN ĐỘ THEO 4 MỐC ĐÁNH GIÁ (SDLC CHECKPOINTS)
 
 | Mốc SDLC | Nhiệm vụ Backend (BE1, BE2, BE3) | Nhiệm vụ Frontend (FE1, FE2, FE3) | Sản phẩm bàn giao chung |
-|:---:|---|---|---|
+| :---: | --- | --- | --- |
 | **KT1** | - BE1: Thiết kế API Contracts, kiến trúc WebSocket & RBAC.<br>- BE2: Thiết kế sơ đồ ERD & Data Dictionary chi tiết.<br>- BE3: Thiết kế kiến trúc AI 2 vòng lặp & Fallback spec. | - FE1: Thiết kế Wireframe cấu trúc Dashboard & Layout.<br>- FE2: Wireframe quản lý Trạm sạc & AI Advisor.<br>- FE3: Wireframe Simulator UI & Driver Portal. | Bộ tài liệu mốc KT1 tại `docs/SDLC/KT1/` (`01_SRS`, `02_ERD`, `03_AI_Arch`, `04_Wireframes`). |
 | **KT2** | - BE1: Scaffold FastAPI, Auth JWT, WebSocket Ticket Hub.<br>- BE2: CRUD Trạm/Trụ/Cổng, TOU Tariff, Ví ACID Transaction.<br>- BE3: Core Charging Simulator (đường cong CC-CV, an toàn $T > 85^\circ\text{C}$). | - FE1: Dựng khung React Vite, Tailwind, AuthContext.<br>- FE2: Mockup màn hình quản lý trạm sạc.<br>- FE3: Khung màn hình Simulator kết nối thử nghiệm WebSocket. | Hoàn thành Core Backend, Simulator chạy được và giao dịch ví tiền ACID không âm. |
 | **KT3** | - BE1: Ownership check đa CPO, Event Bus bất đồng bộ.<br>- BE2: Logic quyết toán phiên sạc, chốt số kWh & hóa đơn.<br>- BE3: Tích hợp Google Gemini API + Heuristic Fallback. | - FE1: Hoàn thiện CPO Dashboard với Recharts.<br>- FE2: Hoàn thiện CRUD Trạm, Biểu giá & AI Advisor UI.<br>- FE3: Hoàn thiện Simulator UI tương tác cao & Ví tài xế. | Ứng dụng Web hoàn chỉnh kết nối 100% giữa Frontend, Backend, WebSocket và Gemini AI. |
@@ -196,6 +204,7 @@ flowchart LR
 ## V. CHECKLIST TRƯỚC KHI TÍCH HỢP (DEFINITION OF DONE - DoD)
 
 Mỗi thành viên trước khi bàn giao module phải tự kiểm tra 5 tiêu chí sau:
+
 1. **Không vi phạm ranh giới kiến trúc**: Tầng API không chứa logic tính toán; tầng Service không phụ thuộc trực tiếp vào HTTP Request.
 2. **Bảo toàn dữ liệu tuyệt đối**: Mọi thao tác thay đổi số dư ví bắt buộc phải có Database Transaction và khóa dòng `with_for_update`.
 3. **An toàn kết nối Realtime**: WebSocket không truyền token trên query URL; phải có cơ chế ngắt kết nối an toàn và dọn dẹp bộ nhớ đệm In-Memory.

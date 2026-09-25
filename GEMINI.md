@@ -7,6 +7,7 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
+
 - State your assumptions explicitly. If uncertain, ask.
 - If multiple interpretations exist, present them - don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
@@ -29,12 +30,14 @@ Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, sim
 **Touch only what you must. Clean up only your own mess.**
 
 When editing existing code:
+
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
 - If you notice unrelated dead code, mention it - don't delete it.
 
 When your changes create orphans:
+
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
 
@@ -45,12 +48,14 @@ The test: Every changed line should trace directly to the user's request.
 **Define success criteria. Loop until verified.**
 
 Transform tasks into verifiable goals:
+
 - "Add validation" -> "Write tests for invalid inputs, then make them pass"
 - "Fix the bug" -> "Write a test that reproduces it, then make it pass"
 - "Refactor X" -> "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
-```
+
+```text
 1. [Step] -> verify: [check]
 2. [Step] -> verify: [check]
 3. [Step] -> verify: [check]
@@ -76,7 +81,7 @@ Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc
 ## Stack công nghệ
 
 | Hạng mục | Lựa chọn | Vai trò |
-|---|---|---|
+| --- | --- | --- |
 | Backend | FastAPI (Python 3.10+) + SQLAlchemy 2.0 | REST API hiệu năng cao + WebSocket telemetry |
 | CSDL | SQLite (phát triển/test) / PostgreSQL (sẵn sàng) | Lưu trữ ACID, ràng buộc khóa ngoại & check constraint |
 | Realtime | FastAPI WebSocket | Truyền nhận dữ liệu đo đếm sạc thời gian thực (Telemetry) |
@@ -89,7 +94,7 @@ Hệ thống web toàn diện phục vụ quản lý mạng lưới trạm sạc
 
 > Xem `docs/codebase-map.md` để biết chính xác file nào đang tồn tại và vai trò của nó.
 
-```
+```text
 <project-root>/
 ├── backend/                      <- (Sẽ scaffold ở Bước 03 & 04)
 │   ├── app/
@@ -175,6 +180,7 @@ Không được để việc cập nhật tài liệu trôi sang phiên sau.
 # 7. Luật kiểm thử & Bảo toàn dữ liệu
 
 Bộ test nằm tại `backend/tests/`. Chạy bằng:
+
 ```bash
 cd backend
 pytest
@@ -211,17 +217,19 @@ pytest
 # 9. Nguồn sự thật & Quy ước cập nhật tài liệu
 
 ## Phân cấp nguồn sự thật
-```
+
+```text
 TIEN-DO.md          → THẮNG về trạng thái (bước nào xong, bước nào chưa)
 Buoc-NN.md          → THẮNG về cách làm (spec kỹ thuật, checklist, file cần tạo)
 MASTER-ROADMAP.md   → Bức tranh toàn cảnh; chỉ cập nhật khi TIEN-DO.md đã cập nhật xong
 ```
 
 ## Cấu trúc tài liệu SDLC (Bài tập cá nhân)
+
 - `docs/plans/`: Bản đồ các bước thực hiện chi tiết.
 - `docs/MASTER-ROADMAP.md`: La bàn định hướng 8 giai đoạn.
 - `docs/SDLC/`: Các mốc kiểm tra bài tập cá nhân:
-  - `KT1/`: Đánh giá đặc tả yêu cầu, thiết kế kiến trúc, ERD CSDL và API contract.
-  - `KT2/`: Đánh giá hiện thực hóa Core Backend, mô phỏng sạc (Simulator) và giao dịch ví tiền ACID.
-  - `KT3/`: Đánh giá tích hợp AI (Smart Charging, Predictive Maintenance, Fallback) và giao diện Web Frontend.
-  - `final/`: Đánh giá kiểm thử toàn diện, tối ưu hiệu năng, tài liệu bàn giao và kịch bản demo bảo vệ.
+  + `KT1/`: Đánh giá đặc tả yêu cầu, thiết kế kiến trúc, ERD CSDL và API contract.
+  + `KT2/`: Đánh giá hiện thực hóa Core Backend, mô phỏng sạc (Simulator) và giao dịch ví tiền ACID.
+  + `KT3/`: Đánh giá tích hợp AI (Smart Charging, Predictive Maintenance, Fallback) và giao diện Web Frontend.
+  + `final/`: Đánh giá kiểm thử toàn diện, tối ưu hiệu năng, tài liệu bàn giao và kịch bản demo bảo vệ.

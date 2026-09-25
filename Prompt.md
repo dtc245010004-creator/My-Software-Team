@@ -2,7 +2,7 @@
 
 ## 1. Vai trò & Bối cảnh kỹ thuật
 
-```
+```text
 Bạn là Kỹ sư phần mềm Full-Stack Senior, đồng hành cùng sinh viên phát triển đồ án:
 "Nền tảng vận hành trạm sạc xe điện tích hợp AI" (EV Charging Station Management System - EV CSMS).
 
@@ -28,6 +28,7 @@ Ràng buộc & Định hướng phát triển:
 ## 2. Tổng quan bài toán
 
 Thị trường xe điện (EV) đang phát triển bùng nổ, kéo theo nhu cầu cấp thiết về mạng lưới trạm sạc công cộng và dịch vụ. Các đơn vị vận hành trạm sạc (CPO) đối mặt với các bài toán vận hành phức tạp:
+
 1. **Giám sát thời gian thực**: Theo dõi trạng thái hoạt động thực tế của hàng chục trụ sạc, cổng sạc tại nhiều địa điểm qua kênh WebSocket độ trễ thấp.
 2. **Điều phối phụ tải (Smart Charging)**: Nguy cơ quá tải lưới điện cục bộ khi nhiều xe cùng sạc nhanh ở công suất cực đại; cần thuật toán chia tải tự động bảo vệ trạm biến áp.
 3. **Biểu giá linh hoạt & Tài chính minh bạch**: Quản lý giá điện theo giờ cao điểm/thấp điểm (TOU), phí chiếm chỗ (Idle fee), nạp ví mô phỏng (Sandbox Top-up) và thanh toán an toàn qua giao dịch CSDL ACID.
@@ -40,7 +41,7 @@ Hệ thống **EV CSMS** cung cấp giải pháp toàn diện trên nền tảng
 ## 3. Actor & Phân quyền người dùng (RBAC & Multi-tenancy)
 
 | Actor | Quyền hạn & Chức năng chính | Ràng buộc bảo mật & Cô lập dữ liệu |
-|---|---|---|
+| --- | --- | --- |
 | **Quản trị viên (Admin)** | - Quản trị toàn hệ thống, quản lý tài khoản CPO và người dùng.<br>- Cấu hình thông số hệ thống, API Key AI.<br>- Xem báo cáo tổng hợp toàn bộ mạng lưới trạm sạc. | Toàn quyền trên toàn bộ dữ liệu hệ thống (Superuser). |
 | **Đơn vị vận hành trạm (Station Operator / CPO)** | - Quản lý trạm sạc (`Station`), trụ sạc (`ChargingPoint`), cổng sạc (`Connector`).<br>- Thiết lập biểu giá (`Tariff`) theo khung giờ.<br>- Giám sát trạng thái trụ sạc theo thời gian thực (Trống, Đang sạc, Lỗi...).<br>- Nhận cảnh báo bảo trì dự đoán và gợi ý điều phối công suất từ AI. | **Ownership Check**: CPO chỉ xem và sửa đổi các trạm sạc thuộc quyền sở hữu của mình (`station.operator_id == current_user.id`). Không được truy cập trạm của CPO khác. |
 | **Khách hàng lái xe điện (EV Driver / Customer)** | - Tra cứu danh sách trạm sạc công khai theo vị trí, loại cổng, công suất.<br>- Quản lý ví cá nhân: Nạp tiền (Sandbox Demo), xem lịch sử biến động số dư.<br>- Thực hiện phiên sạc: Bắt đầu, theo dõi tiến độ sạc realtime (SoC %, kW, kWh, chi phí tạm tính), dừng sạc.<br>- Xem hóa đơn điện tử từng phiên sạc. | Chỉ truy cập được thông tin ví cá nhân và các phiên sạc do chính mình thực hiện (`session.user_id == current_user.id`). |
@@ -50,6 +51,7 @@ Hệ thống **EV CSMS** cung cấp giải pháp toàn diện trên nền tảng
 ## 4. Đặc tả chi tiết các phân hệ nghiệp vụ
 
 ### 4.1. Quản lý Hạ tầng trạm sạc (Stations, Chargers & Connectors)
+
 1. **Trạm sạc (`Station`)**:
    - `id`, `operator_id` (CPO sở hữu), `name`, `address`, `latitude`, `longitude`, `total_grid_capacity_kw`, `operating_hours`, `status` (`ACTIVE`, `INACTIVE`, `MAINTENANCE`).
 2. **Trụ sạc (`ChargingPoint / EVSE`)**:
@@ -59,6 +61,7 @@ Hệ thống **EV CSMS** cung cấp giải pháp toàn diện trên nền tảng
    - **Ràng buộc độc quyền**: Một cổng sạc chỉ được phép gán cho tối đa một phiên sạc đang hoạt động (`active session`). Chặn xung đột đồng thời bằng Atomic Update / Lock.
 
 ### 4.2. Quản lý Biểu giá, Ví điện tử & Phí chiếm chỗ (Tariffs, Wallet & Idle Fee)
+
 1. **Biểu giá linh hoạt theo khung giờ (TOU Tariff)**:
    - `id`, `name`, `station_id` (áp dụng riêng cho trạm hoặc chung hệ thống).
    - `price_per_kwh_normal`, `price_per_kwh_peak`, `price_per_kwh_offpeak`.
@@ -75,12 +78,13 @@ Hệ thống **EV CSMS** cung cấp giải pháp toàn diện trên nền tảng
    - Nếu sau 15 phút người dùng chưa rút súng sạc, hệ thống bắt đầu tính phí phạt chiếm chỗ (`idle_fee_per_minute` * số phút vượt quá) cho đến khi ngắt kết nối.
 
 ### 4.3. Phiên sạc, Simulator & WebSocket Telemetry
+
 1. **Vòng đời phiên sạc lấy cảm hứng từ OCPP (OCPP-like State Machine)**:
    - `Available` $\rightarrow$ `Preparing` (Cắm súng vào xe) $\rightarrow$ `Charging` (Xác nhận số dư $\ge$ 50.000đ, cấp điện) $\rightarrow$ `SuspendedEV` (Pin đầy 100% / Grace period) $\rightarrow$ `Finishing` (Rút súng) $\rightarrow$ `Available`.
 2. **Bộ mô phỏng trạm sạc (Charging Simulator)**:
    - Mô phỏng đường cong nạp pin xe điện chuẩn CC-CV:
-     - Giai đoạn CC (Dòng không đổi): SoC tăng từ 20% đến 80% với công suất cực đại.
-     - Giai đoạn CV (Áp không đổi): SoC từ 80% đến 100%, công suất giảm dần tuyến tính để bảo vệ pin.
+     + Giai đoạn CC (Dòng không đổi): SoC tăng từ 20% đến 80% với công suất cực đại.
+     + Giai đoạn CV (Áp không đổi): SoC từ 80% đến 100%, công suất giảm dần tuyến tính để bảo vệ pin.
    - **Hardware Safety Cut-off**: Rơ-le ảo tự động ngắt sạc khẩn cấp khi nhiệt độ súng sạc vượt ngưỡng nguy hiểm ($T > 85^\circ\text{C}$).
 3. **Kênh truyền Telemetry thời gian thực qua WebSocket**:
    - **Bảo mật WebSocket an toàn**: Sử dụng cơ chế **Ticket-based Handshake** (Client lấy vé ngắn hạn 30s qua REST rồi gửi ticket khi bắt tay WS, tránh lộ JWT trên URL).
@@ -88,13 +92,14 @@ Hệ thống **EV CSMS** cung cấp giải pháp toàn diện trên nền tảng
    - **Internal Event Bus**: Sử dụng hàng đợi sự kiện bất đồng bộ (`asyncio.Queue`) để truyền phát các sự kiện trọng yếu (`EmergencyStop`, `BatteryFull`, `OutOfBalance`).
 
 ### 4.4. Phân hệ Trí tuệ Nhân tạo (AI Engine & 2 Vòng lặp)
+
 1. **Kiến trúc 2 Vòng lặp (Dual-Loop Architecture)**:
    - **Fast Loop (Heuristic nội bộ: 2–5 giây)**:
-     - Thuật toán Proportional Fair Sharing chia công suất tức thời giữa các trụ sao cho $\sum P_i \le P_{\text{grid\_max}}$.
-     - Cắt giảm công suất ngay lập tức khi lưới điện sụt áp hoặc rơ-le an toàn kích hoạt.
+     + Thuật toán Proportional Fair Sharing chia công suất tức thời giữa các trụ sao cho $\sum P_i \le P_{\text{grid\_max}}$.
+     + Cắt giảm công suất ngay lập tức khi lưới điện sụt áp hoặc rơ-le an toàn kích hoạt.
    - **Slow Loop (Google Gemini API: 1–5 phút hoặc theo sự kiện)**:
-     - Phân tích chuỗi dữ liệu lịch sử 10-30 phút để nhận diện xu hướng biến thiên công suất và nhiệt độ.
-     - Sinh khuyến nghị chiến lược và báo cáo chẩn đoán bằng ngôn ngữ tự nhiên cho CPO.
+     + Phân tích chuỗi dữ liệu lịch sử 10-30 phút để nhận diện xu hướng biến thiên công suất và nhiệt độ.
+     + Sinh khuyến nghị chiến lược và báo cáo chẩn đoán bằng ngôn ngữ tự nhiên cho CPO.
 2. **Ba bài toán AI cốt lõi**:
    - **Smart Charging**: Phân tích biểu đồ phụ tải theo giờ và đề xuất giới hạn công suất động tối ưu.
    - **Predictive Maintenance**: Phân tích tương quan giữa dòng sạc $I(t)$ và độ tăng nhiệt $\Delta T / \Delta t$ để dự báo nguy cơ hỏng cáp trước khi chạm ngưỡng báo động.

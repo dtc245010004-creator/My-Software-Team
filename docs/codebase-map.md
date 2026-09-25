@@ -12,21 +12,31 @@
 ### Gốc dự án
 
 | File | Vai trò |
-|---|---|
+| --- | --- |
 | `nentang.md` | Đặc tả nền tảng trạm sạc xe điện — tài liệu gốc bài toán |
 | `Prompt.md` | Đặc tả hợp nhất đầy đủ — nguồn sự thật về nghiệp vụ và kỹ thuật |
 | `sodo.md` | Sơ đồ kiến trúc tổng thể, 2 vòng lặp (Dual-Loop), ma trận AI/Heuristic, luồng WS và máy trạng thái |
-| `yêu cầu.md` | Bản phản biện kỹ thuật, 9 điểm rủi ro và các đề xuất bổ sung |
+| `yêu cầu.md` | Bản phản biện kỹ thuật, 9 điểm rủi ro và các đề xuất bổ sung (đã hợp nhất vào `sodo.md`) |
 | `GEMINI.md` | Hướng dẫn hành vi AI, quy trình làm việc, quy tắc bảo toàn dữ liệu |
 | `CLAUDE.md` | Quy ước và hướng dẫn agent đồng bộ với GEMINI.md |
 | `README.md` | Nhật ký vận hành phiên làm việc — hướng dẫn mở/đóng phiên cho người dùng |
 | `HUONGDAN.md` | Bản hướng dẫn vận hành chi tiết đồng bộ cùng README.md |
 | `phân công.md` | Bảng phân chia nhiệm vụ chi tiết cho 3 Backend và 3 Frontend kèm ma trận ghép cặp |
+| `.markdownlint.json` | Cấu hình chuẩn hóa định dạng Markdown cho toàn bộ dự án |
+| `.env.example` | Mẫu cấu hình biến môi trường toàn hệ thống |
+
+### `backend/` (Hiện có)
+
+| File | Vai trò |
+| --- | --- |
+| `backend/requirements.txt` | Danh mục thư viện Python (FastAPI, SQLAlchemy, PyJWT, WebSockets, Pytest...) |
+| `backend/.env.example` | Mẫu cấu hình môi trường cho backend |
+| `backend/app/core/config.py` | Pydantic Settings — nạp biến môi trường cho JWT, SQLite, CORS, Gemini |
 
 ### `docs/`
 
 | File | Vai trò |
-|---|---|
+| --- | --- |
 | `docs/codebase-map.md` | File này — bản đồ mã nguồn, bắt buộc cập nhật khi có thay đổi file |
 | `docs/MASTER-ROADMAP.md` | Bức tranh toàn cảnh 8 giai đoạn của Nền tảng trạm sạc xe điện |
 | `docs/implementation_plan.md` | Phân tích yêu cầu kỹ thuật & kế hoạch kiến trúc chi tiết |
@@ -43,6 +53,7 @@
 | `docs/plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md` | Kế hoạch Bước 10: Giao diện Web Frontend React + Tailwind |
 | `docs/plans/Buoc-11-Bo-Test-Tu-dong-Seed-Data-va-Dong-goi.md` | Kế hoạch Bước 11: Pytest, Seed Data & Đóng gói SDLC |
 | `docs/SDLC/KT1/README.md` | Mục tiêu & danh mục deliverable mốc KT1 (Đặc tả, ERD & Kiến trúc) |
+| `docs/SDLC/KT1/02_Database_Design_ERD.md` | Hồ sơ thiết kế CSDL, sơ đồ Mermaid ERD, Từ điển dữ liệu và DDL cho KT1 |
 | `docs/SDLC/KT2/README.md` | Mục tiêu & danh mục deliverable mốc KT2 (Core Backend, Simulator & ACID) |
 | `docs/SDLC/KT3/README.md` | Mục tiêu & danh mục deliverable mốc KT3 (AI Smart Charging & Frontend) |
 | `docs/SDLC/final/README.md` | Mục tiêu & danh mục deliverable mốc Cuối kỳ (Test, Đóng gói & Demo) |
@@ -54,11 +65,8 @@
 ### Backend (`backend/`)
 
 | File | Sẽ tạo ở Bước | Vai trò dự kiến |
-|---|:---:|---|
-| `backend/requirements.txt` | 03 | Danh sách Python dependencies (FastAPI, SQLAlchemy, websockets, etc.) |
-| `backend/.env.example` | 03 | Mẫu biến môi trường |
+| --- | :---: | --- |
 | `backend/app/main.py` | 04 | Điểm vào FastAPI: khởi tạo app, CORS, routes & WebSocket endpoint |
-| `backend/app/core/config.py` | 04 | Pydantic Settings — cấu hình JWT, DB URL, Gemini API Key |
 | `backend/app/core/database.py` | 04 | SQLAlchemy engine + SessionLocal + `get_db()` |
 | `backend/app/models/user.py` | 02 / 05 | Model người dùng, phân quyền RBAC (`admin`, `operator`, `customer`) |
 | `backend/app/models/station.py` | 02 / 06 | Model Trạm sạc (`Station`), Trụ sạc (`ChargingPoint`), Cổng (`Connector`) |
@@ -88,7 +96,7 @@
 ### Frontend (`frontend/`)
 
 | File | Sẽ tạo ở Bước | Vai trò dự kiến |
-|---|:---:|---|
+| --- | :---: | --- |
 | `frontend/package.json` | 10 | Node dependencies: react 18, lucide-react, recharts, axios; devDeps: vite, tailwindcss |
 | `frontend/vite.config.js` | 10 | Vite config (React plugin, proxy `/api` và `/ws` → backend) |
 | `frontend/index.html` | 10 | Entry HTML cho Vite |

@@ -1,4 +1,5 @@
 # PHÂN TÍCH YÊU CẦU & KẾ HOẠCH TRIỂN KHAI CHI TIẾT
+
 ## Nền tảng vận hành trạm sạc xe điện tích hợp AI (EV CSMS)
 
 ---
@@ -8,6 +9,7 @@
 Dựa trên đặc tả hệ thống tại `nentang.md` và `Prompt.md`, các yêu cầu chức năng và kỹ thuật bao gồm:
 
 ### 1.1. Phân hệ Quản lý & Vận hành mạng lưới trạm sạc
+
 1. **Đăng nhập & Phân quyền RBAC**:
    - Quản trị viên hệ thống (Admin): Quản lý người dùng, đối tác trạm sạc (CPO), cấu hình hệ thống, AI API key.
    - Đơn vị vận hành trạm (Station Operator / CPO): Quản lý trạm, trụ sạc (EVSE), cổng sạc (Connector), cấu hình biểu giá, theo dõi trạng thái trụ sạc và bảo trì.
@@ -28,12 +30,14 @@ Dựa trên đặc tả hệ thống tại `nentang.md` và `Prompt.md`, các y�
    - Quyết toán phiên sạc và xuất hóa đơn điện tử.
 
 ### 1.2. Phân hệ Giả lập Trạm sạc (Charging Simulator)
+
 - Mô phỏng hành vi phần cứng trụ sạc xe điện chuẩn OCPP-like:
   - Cắm súng sạc, khởi động phiên, sinh đường cong sạc pin (SoC tăng từ 20% lên 100%).
   - Truyền nhận telemetry qua WebSocket định kỳ 2 giây/lần.
   - Tự động dừng sạc an toàn khi: Pin đầy (100%), Hết tiền ví, hoặc Quá nhiệt súng sạc ($> 75^\circ\text{C}$).
 
 ### 1.3. Phân hệ Trí tuệ Nhân tạo (AI Engine)
+
 1. **Smart Charging & Load Balancing**: Phân bổ động công suất sạc giữa các trụ để không vượt quá giới hạn nguồn cấp trạm (`total_grid_capacity_kw`).
 2. **Predictive Maintenance**: Phân tích telemetry 30 ngày (nhiệt độ, độ ổn định dòng/áp, tỷ lệ ngắt sạc sớm) để phát hiện trụ sạc xuống cấp và cảnh báo bảo dưỡng.
 3. **Dynamic Pricing & AI Advisor**: Gợi ý điều chỉnh biểu giá TOU và trợ lý giải đáp dữ liệu vận hành bằng tiếng Việt tự nhiên.
@@ -58,7 +62,7 @@ Dựa trên đặc tả hệ thống tại `nentang.md` và `Prompt.md`, các y�
 
 ## PHẦN 3: KIẾN TRÚC & CÔNG NGHỆ LỰA CHỌN
 
-```
+```text
 ┌───────────────────────────────────────────────────────────┐
 │                     FRONTEND (React 18)                   │
 │  - CPO Dashboard: Giám sát toàn mạng lưới trạm & doanh thu│
