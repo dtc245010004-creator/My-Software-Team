@@ -236,9 +236,10 @@ async def test_auto_cutoff_on_debt_limit_exceeded(db_session, sim_setup):
     session = start_charging_session(db_session, driver, connector.id)
     sim = simulator_manager.get_simulator(session.id)
 
-    # Giả lập sạc tiêu thụ 120 kWh * 3000 VND/kWh = 360,000 VND
-    # Dự kiến số dư = 50,000 - 360,000 = -310,000 VND (< -300,000 VND limit)
-    sim.current_energy_kwh = Decimal("120.00")
+    # Giả lập sạc tiêu thụ để vượt hạn mức nợ NEGATIVE_BALANCE_LIMIT (-300,000 VND)
+    # Tính số kWh cần thiết dựa theo đơn giá TOU thực tế được áp dụng tại thời điểm sạc
+    kwh_needed = Decimal(str(round(400000.0 / float(session.applied_price_per_kwh), 2)))
+    sim.current_energy_kwh = kwh_needed
 
     await sim.step(dt_seconds=1.0, db=db_session)
 
@@ -397,5 +398,55 @@ def test_session_stop_automatically_takes_simulator_kwh(client, db_session, sim_
     assert res_stop.status_code == 200
     data = res_stop.json()
     assert Decimal(str(data["total_kwh"])) == Decimal("18.50")
-    # Cước = 18.5 * 3000 = 55,500 VND
-    assert Decimal(str(data["total_amount"])) == Decimal("55500.00")
+    # Cước = 18.5 * session.applied_price_per_kwh
+    expected_amount = round(Decimal("18.50") * session.applied_price_per_kwh, 2)
+    assert Decimal(str(data["total_amount"])) == expected_amount
+
+
+def test_simulator_manager_threadsafe_from_worker_thread():
+    """
+    10. Kiểm tra an toàn đa luồng (Thread-safety guard):
+    Khi start_simulation được gọi từ một worker thread (ThreadPoolExecutor không có event loop riêng),
+    hệ thống không bao giờ ném RuntimeError và khởi tạo thành công task ngầm.
+    """
+    import asyncio
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    # Tạo một event loop độc lập làm main loop
+    loop = asyncio.new_event_loop()
+    simulator_manager.set_main_loop(loop)
+
+    result_holder = {}
+
+    def worker():
+        try:
+            # Trong worker thread này, get_running_loop() sẽ ném RuntimeError
+            sim = simulator_manager.start_simulation(
+                session_id=9999,
+                connector_id=1,
+                user_id=1,
+                applied_price_per_kwh=Decimal("3000.0"),
+                max_power_kw=60.0,
+                battery_capacity_kwh=60.0,
+                initial_soc=25.0,
+            )
+            result_holder["success"] = True
+            result_holder["sim"] = sim
+        except Exception as e:
+            result_holder["error"] = e
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(worker)
+        future.result()
+
+    assert "error" not in result_holder, f"Bị lỗi khởi tạo threadsafe: {result_holder.get('error')}"
+    assert result_holder.get("success") is True
+    sim = result_holder["sim"]
+    assert sim is not None
+    assert sim.session_id == 9999
+
+    # Dọn dẹp
+    simulator_manager.stop_simulation(9999)
+    loop.close()
+

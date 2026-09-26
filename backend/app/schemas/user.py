@@ -64,6 +64,9 @@ class UserLogin(BaseModel):
     password: str = Field(..., description="Mật khẩu")
 
 
+from app.core.datetime_utils import UTCDateTime
+
+
 class UserResponse(BaseModel):
     """Schema trả về thông tin người dùng (TUYỆT ĐỐI KHÔNG chứa password hay password_hash)."""
 
@@ -73,7 +76,7 @@ class UserResponse(BaseModel):
     full_name: Optional[str] = None
     role: str
     is_active: bool
-    created_at: datetime
+    created_at: UTCDateTime
     wallet_balance: float = 0.0
 
     model_config = ConfigDict(from_attributes=True)

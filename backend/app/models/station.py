@@ -138,3 +138,29 @@ class Connector(Base):
 
     def __repr__(self) -> str:
         return f"<Connector(id={self.id}, charger_id={self.charging_point_id}, #{self.connector_number}, type='{self.connector_type}')>"
+
+
+class StationPowerMetric(Base):
+    """Bảng lưu trữ lịch sử đo đếm công suất phụ tải trạm sạc theo từng phút (Equalizer 24h)."""
+
+    __tablename__ = "station_power_metrics"
+    __table_args__ = (
+        UniqueConstraint("station_id", "timestamp", name="uq_station_minute_snapshot"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    station_id = Column(
+        Integer,
+        ForeignKey("stations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp = Column(DateTime, nullable=False, index=True)
+    power_kw = Column(Float, nullable=False, default=0.0)
+    active_chargers_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    station = relationship("Station", backref="power_metrics")
+
+    def __repr__(self) -> str:
+        return f"<StationPowerMetric(station_id={self.station_id}, time={self.timestamp}, kw={self.power_kw})>"

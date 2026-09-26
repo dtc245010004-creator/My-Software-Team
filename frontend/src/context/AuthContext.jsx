@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : null;
   });
   const [token, setToken] = useState(() => localStorage.getItem('ev_csms_token'));
+  const [guestName, setGuestName] = useState(() => localStorage.getItem('ev_csms_guest_name') || '');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -56,6 +57,11 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
   };
 
+  const updateGuestName = (name) => {
+    setGuestName(name);
+    localStorage.setItem('ev_csms_guest_name', name);
+  };
+
   // Nút 1-click chuyển nhanh vai trò cho buổi bảo vệ đồ án / demo
   const quickSwitch = async (role) => {
     try {
@@ -64,7 +70,8 @@ export const AuthProvider = ({ children }) => {
       } else if (role === 'OPERATOR') {
         await login('operator_a', 'OpPass123');
       } else {
-        await login('customer_user', 'CusPass123');
+        // Role Tài xế không cần đăng nhập: chuyển trực tiếp sang chế độ tài xế tự do
+        logout();
       }
     } catch (err) {
       console.warn('Tài khoản demo mặc định chưa tồn tại, vui lòng đăng ký hoặc đăng nhập:', err);
@@ -72,8 +79,32 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Nếu chưa đăng nhập, mặc định hoạt động dưới vai trò CUSTOMER (Tài xế sạc không cần đăng nhập)
+  const effectiveRole = user?.role || 'CUSTOMER';
+  const effectiveUser = user || {
+    username: 'driver_guest',
+    full_name: guestName || 'Tài xế sạc (Khách)',
+    role: 'CUSTOMER',
+    is_guest: true,
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, role: user?.role, loading, login, register, logout, quickSwitch }}>
+    <AuthContext.Provider
+      value={{
+        user: effectiveUser,
+        rawUser: user,
+        token,
+        role: effectiveRole,
+        isGuest: !user,
+        guestName,
+        updateGuestName,
+        loading,
+        login,
+        register,
+        logout,
+        quickSwitch,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

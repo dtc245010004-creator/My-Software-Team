@@ -2,12 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
+from app.core.datetime_utils import UTCDateTime
 
 
 class TopupRequest(BaseModel):
     """Yêu cầu nạp tiền vào ví điện tử."""
     amount: Decimal = Field(..., gt=0, description="Số tiền nạp (VND), phải lớn hơn 0")
     note: Optional[str] = Field(default="Nạp tiền vào ví điện tử", max_length=255)
+    full_name: Optional[str] = Field(default=None, max_length=100, description="Họ và tên người nạp / tài xế")
 
 
 class WalletTransactionResponse(BaseModel):
@@ -19,7 +21,7 @@ class WalletTransactionResponse(BaseModel):
     balance_after: Decimal
     reference_id: Optional[str] = None
     note: Optional[str] = None
-    created_at: datetime
+    created_at: UTCDateTime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -31,7 +33,7 @@ class WalletResponse(BaseModel):
     balance: Decimal
     currency: str = "VND"
     is_debt_locked: bool
-    updated_at: datetime
+    updated_at: UTCDateTime
     transactions: List[WalletTransactionResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

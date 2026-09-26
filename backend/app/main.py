@@ -36,6 +36,11 @@ async def lifespan(app: FastAPI):
         if reconciled > 0:
             logger.warning(f"Đã phục hồi và đóng {reconciled} phiên sạc mồ côi do server crash.")
 
+    # Liên kết Main AsyncIO Event Loop cho Simulator Manager
+    import asyncio
+    from app.simulator.charging_simulator import simulator_manager
+    simulator_manager.set_main_loop(asyncio.get_running_loop())
+
     # Khởi động dịch vụ lập lịch phân tích AI định kỳ (Slow Loop) ngoài môi trường pytest
     import os
     from app.services.scheduler_service import start_scheduler, stop_scheduler
@@ -112,11 +117,16 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
                 action = msg.get("action")
                 session_id = msg.get("session_id")
                 if action == "subscribe" and session_id is not None:
-                    ws_manager.subscribe_session(websocket, int(session_id))
+                    sid = int(session_id)
+                    ws_manager.subscribe_session(websocket, sid)
                     await ws_manager.send_personal_message(
-                        {"event": "SUBSCRIBED", "session_id": int(session_id)},
+                        {"event": "SUBSCRIBED", "session_id": sid},
                         websocket,
                     )
+                    from app.simulator.charging_simulator import simulator_manager
+                    sim = simulator_manager.get_simulator(sid)
+                    if sim:
+                        await ws_manager.send_personal_message(sim.to_telemetry_dict(), websocket)
                 elif action == "unsubscribe" and session_id is not None:
                     ws_manager.unsubscribe_session(websocket, int(session_id))
                     await ws_manager.send_personal_message(

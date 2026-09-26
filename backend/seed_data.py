@@ -111,48 +111,53 @@ def seed_database():
         db.add_all(users_to_create)
         db.commit()
 
-        # 3. Tạo Ví tiền điện tử (ACID Wallets)
-        print("[+] Đang tạo ví tiền điện tử và nạp số dư ban đầu...")
+        # 3. Tạo Ví tiền điện tử (ACID Wallets cho toàn bộ người dùng)
+        print("[+] Đang tạo ví tiền điện tử và nạp số dư ban đầu cho toàn bộ người dùng...")
         wallets_map = {}
         for u in users_to_create:
-            if u.role == "CUSTOMER":
-                if u.username == "customer_user":
-                    init_balance = Decimal("250000.00")
-                    is_locked = False
-                elif u.username == "driver_vip":
-                    init_balance = Decimal("1500000.00")
-                    is_locked = False
-                elif u.username == "driver_debt":
-                    init_balance = Decimal("-120000.00")  # Cho nợ hợp lệ trong hạn mức -300k
-                    is_locked = True
-                else:
-                    init_balance = Decimal(str(random.choice([150000, 300000, 450000])))
-                    is_locked = False
+            if u.username == "admin":
+                init_balance = Decimal("5000000.00")
+                is_locked = False
+            elif u.username in ("operator", "operator_a"):
+                init_balance = Decimal("2000000.00")
+                is_locked = False
+            elif u.username == "customer_user":
+                init_balance = Decimal("250000.00")
+                is_locked = False
+            elif u.username == "driver_vip":
+                init_balance = Decimal("1500000.00")
+                is_locked = False
+            elif u.username == "driver_debt":
+                init_balance = Decimal("-120000.00")  # Cho nợ hợp lệ trong hạn mức -300k
+                is_locked = True
+            else:
+                init_balance = Decimal(str(random.choice([150000, 300000, 450000])))
+                is_locked = False
 
-                w = Wallet(user_id=u.id, balance=init_balance, is_debt_locked=is_locked)
-                db.add(w)
-                db.commit()
-                wallets_map[u.id] = w
+            w = Wallet(user_id=u.id, balance=init_balance, is_debt_locked=is_locked)
+            db.add(w)
+            db.commit()
+            wallets_map[u.id] = w
 
-                # Ghi lịch sử giao dịch ban đầu
-                if init_balance > 0:
-                    tx = WalletTransaction(
-                        wallet_id=w.id,
-                        transaction_type="TOPUP",
-                        amount=init_balance,
-                        balance_after=init_balance,
-                        note="Nạp số dư ban đầu qua cổng thanh toán VNPay",
-                    )
-                    db.add(tx)
-                elif init_balance < 0:
-                    tx = WalletTransaction(
-                        wallet_id=w.id,
-                        transaction_type="CHARGE_FEE",
-                        amount=init_balance,
-                        balance_after=init_balance,
-                        note="Trừ cước sạc phiên trước (Ghi nợ hợp lệ)",
-                    )
-                    db.add(tx)
+            # Ghi lịch sử giao dịch ban đầu
+            if init_balance > 0:
+                tx = WalletTransaction(
+                    wallet_id=w.id,
+                    transaction_type="TOPUP",
+                    amount=init_balance,
+                    balance_after=init_balance,
+                    note="Nạp số dư ban đầu qua cổng thanh toán VNPay",
+                )
+                db.add(tx)
+            elif init_balance < 0:
+                tx = WalletTransaction(
+                    wallet_id=w.id,
+                    transaction_type="CHARGE_FEE",
+                    amount=init_balance,
+                    balance_after=init_balance,
+                    note="Trừ cước sạc phiên trước (Ghi nợ hợp lệ)",
+                )
+                db.add(tx)
         db.commit()
 
         # 4. Tạo Hạ tầng Trạm sạc (3 trạm lớn Hà Nội, Đà Nẵng, TP.HCM)
@@ -289,7 +294,7 @@ def seed_database():
         drivers_list = [u for u in users_to_create if u.role == "CUSTOMER"]
 
         sessions_created = 0
-        for day_offset in range(30, 0, -1):
+        for day_offset in range(30, 1, -1):
             day_time = now - timedelta(days=day_offset)
             # Mỗi ngày sinh 2 phiên sạc
             for _ in range(2):
@@ -334,56 +339,14 @@ def seed_database():
 
         db.commit()
 
-        # 8. Tạo 2 Phiên sạc ĐANG HOẠT ĐỘNG (ACTIVE) để demo realtime tức thì
-        print("[+] Đang tạo 2 phiên sạc ACTIVE để kiểm tra đồ thị và phụ tải trực tiếp...")
-        active_driver_1 = next(u for u in users_to_create if u.username == "customer_user")
-        active_driver_2 = next(u for u in users_to_create if u.username == "driver_vip")
-
-        active_conn_1 = all_connectors[0]  # Súng 1 trụ 1 Landmark 81
-        active_conn_2 = all_connectors[2]  # Súng 1 trụ 2 Landmark 81
-
-        active_conn_1.status = "CHARGING"
-        active_conn_2.status = "CHARGING"
-        active_conn_1.charging_point.status = "CHARGING"
-        active_conn_2.charging_point.status = "CHARGING"
-
-        active_sess_1 = ChargingSession(
-            user_id=active_driver_1.id,
-            connector_id=active_conn_1.id,
-            tariff_id=default_tariff.id,
-            applied_price_per_kwh=Decimal("4500.00"),
-            start_time=now - timedelta(minutes=15),
-            meter_start_kwh=Decimal("0.00"),
-            total_kwh=Decimal("14.50"),
-            total_amount=Decimal("65250.00"),
-            current_soc=62.5,
-            status="ACTIVE",
-            created_at=now - timedelta(minutes=15),
-        )
-        active_sess_2 = ChargingSession(
-            user_id=active_driver_2.id,
-            connector_id=active_conn_2.id,
-            tariff_id=default_tariff.id,
-            applied_price_per_kwh=Decimal("4500.00"),
-            start_time=now - timedelta(minutes=8),
-            meter_start_kwh=Decimal("0.00"),
-            total_kwh=Decimal("8.20"),
-            total_amount=Decimal("36900.00"),
-            current_soc=45.0,
-            status="ACTIVE",
-            created_at=now - timedelta(minutes=8),
-        )
-        db.add_all([active_sess_1, active_sess_2])
-        db.commit()
-
         print("==================================================================")
         print("          NẠP DỮ LIỆU MẪU THÀNH CÔNG RỰC RỠ (SUCCESS)!            ")
         print("==================================================================")
         print(f"[*] Tổng số người dùng: {len(users_to_create)} (Admin, CPO, Drivers)")
         print(f"[*] Tổng số trạm sạc:   {len(stations_list)} (Hà Nội, Đà Nẵng, TP.HCM)")
-        print(f"[*] Tổng số trụ sạc:    9 trụ EVSE")
+        print(f"[*] Tổng số trụ sạc:    9 trụ EVSE (100% AVAILABLE sẵn sàng)")
         print(f"[*] Tổng số cổng sạc:   18 cổng sạc vật lý (CCS2, Type 2)")
-        print(f"[*] Tổng phiên sạc:     {sessions_created + 2} phiên ({sessions_created} hoàn thành, 2 đang sạc)")
+        print(f"[*] Tổng phiên sạc:     {sessions_created} phiên lịch sử quá khứ (ngày hôm nay để trống chờ vận hành thật)")
         print("------------------------------------------------------------------")
         print("THÔNG TIN TÀI KHOẢN ĐĂNG NHẬP NHANH:")
         print("1. Quản trị viên:    admin / AdminPass123")

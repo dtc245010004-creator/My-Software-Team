@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import get_current_user, get_current_user_or_driver_guest, require_roles
 from app.core.database import get_db
 from app.models.session import ChargingSession
 from app.models.user import User
@@ -83,7 +83,7 @@ def list_active_simulators(
 def get_session_telemetry(
     session_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_driver_guest),
 ):
     """
     Lấy thông số telemetry tức thời từ RAM:

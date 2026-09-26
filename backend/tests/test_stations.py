@@ -437,3 +437,206 @@ def test_atomic_soft_delete_and_reactivate_station(client, db_session, test_user
     # 5. Trạm xuất hiện trở lại trong tìm kiếm công khai
     res_restored = client.get("/api/v1/stations")
     assert any(s["id"] == st.id for s in res_restored.json())
+
+
+def test_get_live_dashboard_metrics(client, db_session, test_users):
+    """13. Kiểm tra API Live Dashboard Metrics trả về giá trị thực tế khi chạy."""
+    op = test_users["op_a"]
+    st = Station(
+        operator_id=op.id,
+        name="Trạm Live Metrics Test",
+        address="100 Phố Huế, Hà Nội",
+        latitude=21.01,
+        longitude=105.85,
+        total_grid_capacity_kw=180.0,
+        status="ACTIVE",
+        is_active=True,
+    )
+    db_session.add(st)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=st.id,
+        code="LIVE-CP01",
+        vendor="ABB",
+        model="Terra-60",
+        max_power_kw=60.0,
+        status="AVAILABLE",
+        is_active=True,
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    res = client.get("/api/v1/stations/metrics/live")
+    assert res.status_code == 200
+    data = res.json()
+    assert "total_stations" in data
+    assert "total_chargers" in data
+    assert "charging_chargers_count" in data
+    assert "active_power_kw" in data
+    assert "chargers" in data
+    assert data["charging_chargers_count"] == 0
+    assert data["active_power_kw"] == 0.0
+
+
+def test_get_grid_load_profile(client, db_session):
+    """14. Kiểm tra API Load Profile 24h trả về 12 khung giờ TOU thực tế."""
+    res = client.get("/api/v1/stations/metrics/load-profile")
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    assert len(data) == 12
+    # Kiểm tra cấu trúc từng slot
+    first_slot = data[0]
+    assert "time" in first_slot
+    assert "loadKw" in first_slot
+    assert "priceSlot" in first_slot
+    assert first_slot["priceSlot"] in ("PEAK", "NORMAL", "OFFPEAK")
+
+
+def test_get_grid_load_profile_timeline(client, db_session):
+    """15. Kiểm tra API Load Profile Timeline chi tiết 1440 phút (Equalizer 24h)."""
+    res = client.get("/api/v1/stations/metrics/load-profile-timeline")
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    # 1. Đúng 1440 điểm (24 giờ x 60 phút)
+    assert len(data) == 1440
+
+    # 2. Điểm đầu tiên là 00:00, điểm cuối cùng là 23:59
+    assert data[0]["time"] == "00:00"
+    assert data[-1]["time"] == "23:59"
+
+    # 3. Điểm cuối ngày chắc chắn là tương lai (isPlaceholder = True, noData = False)
+    last_point = data[-1]
+    assert last_point["isPlaceholder"] is True
+    assert last_point["noData"] is False
+    assert last_point["powerKw"] == 0.0
+
+    # 4. Kiểm tra cấu trúc từng điểm
+    for point in data[:10]:
+        assert "time" in point
+        assert "powerKw" in point
+        assert "isPlaceholder" in point
+        assert "noData" in point
+        assert isinstance(point["isPlaceholder"], bool)
+
+
+@pytest.mark.anyio
+async def test_cumulative_energy_captures_short_session_under_60s(client, db_session, test_users):
+    """16. Kiểm tra cơ chế lũy kế năng lượng bảo toàn 100% điện năng, bắt trọn các phiên sạc ngắn < 60s."""
+    from app.services.scheduler_service import (
+        record_station_power_metrics_minute_job,
+        reset_cumulative_energy_cache,
+    )
+    from app.models.station import StationPowerMetric
+    from app.models.session import ChargingSession
+    from app.models.tariff import Tariff
+    from datetime import datetime, timezone
+
+    # 1. Chuẩn bị dữ liệu: Tạo trạm và trụ sạc 60 kW
+    op = test_users["op_a"]
+    st = Station(
+        operator_id=op.id,
+        name="Trạm Test Lũy Kế Năng Lượng",
+        address="123 Đường Điện Năng",
+        latitude=21.03,
+        longitude=105.85,
+        total_grid_capacity_kw=180.0,
+        status="ACTIVE",
+        is_active=True,
+    )
+    db_session.add(st)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=st.id,
+        code="CP-CUMULATIVE-TEST",
+        vendor="ABB",
+        model="Terra-60",
+        max_power_kw=60.0,
+        status="AVAILABLE",
+        is_active=True,
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    conn = Connector(
+        charging_point_id=cp.id,
+        connector_number=1,
+        connector_type="CCS2",
+        max_power_kw=60.0,
+        status="AVAILABLE",
+        is_active=True,
+    )
+    db_session.add(conn)
+    db_session.commit()
+
+    tariff = Tariff(
+        station_id=st.id,
+        name="Biểu giá Test",
+        price_normal=3000,
+        price_peak=4000,
+        price_offpeak=2000,
+        is_active=True,
+    )
+    db_session.add(tariff)
+    db_session.commit()
+
+    # 2. Reset cache và kích hoạt lần tick đầu tiên để thiết lập mốc cơ sở (baseline)
+    reset_cumulative_energy_cache()
+    await record_station_power_metrics_minute_job(db=db_session)
+
+    metric_base = (
+        db_session.query(StationPowerMetric)
+        .filter(StationPowerMetric.station_id == st.id)
+        .order_by(StationPowerMetric.timestamp.desc())
+        .first()
+    )
+    assert metric_base is not None
+    assert metric_base.power_kw == 0.0  # Lần đầu chạy ghi nhận 0.0 kW làm mốc baseline
+
+    # 3. Giả lập 1 phiên sạc siêu ngắn (chỉ kéo dài 20 giây ở công suất 60 kW, tiêu thụ 0.3333 kWh)
+    # Phiên sạc bắt đầu VÀ kết thúc hoàn toàn trước lần tick kế tiếp (không còn tồn tại trong RAM)
+    short_session = ChargingSession(
+        user_id=test_users["customer"].id,
+        connector_id=conn.id,
+        tariff_id=tariff.id,
+        applied_price_per_kwh=3000,
+        start_time=datetime.now(timezone.utc),
+        end_time=datetime.now(timezone.utc),
+        meter_start_kwh=100.0,
+        meter_stop_kwh=100.5,
+        total_kwh=0.5,
+        total_amount=1500.0,
+        current_soc=45.0,
+        status="COMPLETED",
+        stop_reason="USER_STOPPED",
+    )
+    db_session.add(short_session)
+    db_session.commit()
+
+    # 4. Kích hoạt lần tick thứ hai của Scheduler
+    await record_station_power_metrics_minute_job(db=db_session)
+
+    # 5. Xác nhận dữ liệu trong bảng station_power_metrics:
+    # ΔkWh = 0.5 kWh -> Công suất trung bình: P_avg = 0.5 * 60 = 30.0 kW
+    metric_after = (
+        db_session.query(StationPowerMetric)
+        .filter(StationPowerMetric.station_id == st.id)
+        .order_by(StationPowerMetric.id.desc())
+        .first()
+    )
+    assert metric_after is not None
+    assert metric_after.power_kw == 30.0  # Khớp chính xác 30.0 kW, KHÔNG bị lọt/ghi 0.0 sai!
+
+    # 6. Gọi endpoint load-profile-timeline để xác nhận API trả về đúng số kW thật
+    res = client.get(f"/api/v1/stations/metrics/load-profile-timeline?station_id={st.id}")
+    assert res.status_code == 200
+    timeline = res.json()
+    non_zero_points = [p for p in timeline if p["powerKw"] > 0]
+    assert len(non_zero_points) >= 1
+    assert non_zero_points[0]["powerKw"] == 30.0
+
+
+

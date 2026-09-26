@@ -15,6 +15,7 @@ import {
 import api from '../services/api';
 import { telemetryWs } from '../services/websocket';
 import { useAuth } from '../context/AuthContext';
+import { formatVNTime } from '../utils/formatTime';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 export default function Simulator() {
@@ -33,6 +34,19 @@ export default function Simulator() {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
 
+  // Cấu hình xe điện & dung lượng pin
+  const [batteryCapacity, setBatteryCapacity] = useState('60');
+  const [customCapacity, setCustomCapacity] = useState('');
+  const [initialSoc, setInitialSoc] = useState('25');
+
+  const batteryOptions = [
+    { label: '42.0 kWh — VinFast VF 5 / VF e34 / Wuling', value: '42' },
+    { label: '60.0 kWh — VinFast VF 6 / Tesla Model 3 / Ioniq 5 (Mặc định)', value: '60' },
+    { label: '87.7 kWh — VinFast VF 8 / Kia EV6 Long Range', value: '87.7' },
+    { label: '123.0 kWh — VinFast VF 9 / Tesla Model X Plaid', value: '123' },
+    { label: 'Tùy chỉnh (kWh)...', value: 'CUSTOM' },
+  ];
+
   useEffect(() => {
     fetchStations();
     checkExistingActiveSession();
@@ -48,7 +62,7 @@ export default function Simulator() {
       if (msg.event === 'TELEMETRY' && msg.session_id === activeSession.id) {
         setTelemetry(msg);
         setChartData((prev) => {
-          const timeLabel = new Date(msg.timestamp).toLocaleTimeString('vi-VN', {
+          const timeLabel = formatVNTime(msg.timestamp, {
             minute: '2-digit',
             second: '2-digit',
           });
@@ -84,8 +98,6 @@ export default function Simulator() {
   };
 
   const checkExistingActiveSession = async () => {
-    const token = localStorage.getItem('ev_csms_token');
-    if (!token) return;
     try {
       const res = await api.get('/sessions/me');
       const active = (res.data || []).find((s) => s.status === 'ACTIVE');
@@ -120,17 +132,35 @@ export default function Simulator() {
       return;
     }
 
+    const finalCapacity = batteryCapacity === 'CUSTOM' ? parseFloat(customCapacity) : parseFloat(batteryCapacity);
+    if (!finalCapacity || finalCapacity <= 0) {
+      alert('Vui lòng chọn hoặc nhập dung lượng pin hợp lệ (> 0 kWh).');
+      return;
+    }
+
+    const finalSoc = parseFloat(initialSoc);
+    if (isNaN(finalSoc) || finalSoc < 0 || finalSoc >= 100) {
+      alert('Vui lòng nhập mức pin hiện có hợp lệ (0% - 99%).');
+      return;
+    }
+
     try {
       setLoading(true);
       setStatusMessage('Đang kiểm tra số dư ví & khóa rơ-le cổng sạc...');
       const res = await api.post('/sessions/start', {
         connector_id: Number(selectedConnectorId),
+        battery_capacity_kwh: finalCapacity,
+        initial_soc: finalSoc,
       });
 
       const session = res.data;
       setActiveSession(session);
       setChartData([]);
-      setStatusMessage(`Phiên sạc #${session.id} đã khởi động thành công (Biểu giá: ${Number(session.applied_price_per_kwh).toLocaleString()} đ/kWh)`);
+      setStatusMessage(
+        `Phiên sạc #${session.id} khởi động: Pin ${finalCapacity} kWh, Bắt đầu từ ${finalSoc}% (Đơn giá: ${Number(
+          session.applied_price_per_kwh
+        ).toLocaleString()} đ/kWh)`
+      );
     } catch (err) {
       const detail = err.response?.data?.detail || err.message;
       setStatusMessage(`Không thể bắt đầu sạc: ${detail}`);
@@ -252,6 +282,88 @@ export default function Simulator() {
                 </select>
               </div>
 
+              {/* 3. MỤC CHỌN DUNG LƯỢNG PIN */}
+              <div>
+                <div className="flex items-center justify-between text-steel-gray mb-1">
+                  <label className="text-tech-white font-bold text-[11px]">DUNG LƯỢNG PIN XE (KWH):</label>
+                  <span className="text-electric-cyan font-bold tabular-nums">
+                    {batteryCapacity === 'CUSTOM' ? (customCapacity || '0') : batteryCapacity} kWh
+                  </span>
+                </div>
+                <select
+                  value={batteryCapacity}
+                  onChange={(e) => setBatteryCapacity(e.target.value)}
+                  className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan text-xs"
+                >
+                  {batteryOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                {batteryCapacity === 'CUSTOM' && (
+                  <div className="mt-1.5">
+                    <input
+                      type="number"
+                      min="10"
+                      max="250"
+                      step="1"
+                      placeholder="Nhập dung lượng tùy chỉnh (VD: 75 kWh)..."
+                      value={customCapacity}
+                      onChange={(e) => setCustomCapacity(e.target.value)}
+                      className="w-full bg-obsidian border border-hairline p-1.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* 4. MỤC ĐIỀN MỨC PIN HIỆN CÓ */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-tech-white font-bold text-[11px]">MỨC PIN HIỆN CÓ (SoC %):</label>
+                  <span className="font-bold text-grid-green tabular-nums">{initialSoc}%</span>
+                </div>
+
+                <div className="grid grid-cols-5 gap-1 text-[10px]">
+                  {['10', '20', '35', '50', '70'].map((socVal) => (
+                    <button
+                      key={socVal}
+                      type="button"
+                      onClick={() => setInitialSoc(socVal)}
+                      className={`py-1 rounded border text-center transition-colors ${
+                        initialSoc === socVal
+                          ? 'bg-grid-green text-white border-grid-green font-bold'
+                          : 'bg-obsidian text-steel-gray border-hairline hover:text-tech-white'
+                      }`}
+                    >
+                      {socVal}%
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center space-x-2 pt-0.5">
+                  <input
+                    type="range"
+                    min="5"
+                    max="90"
+                    step="1"
+                    value={initialSoc}
+                    onChange={(e) => setInitialSoc(e.target.value)}
+                    className="w-full accent-grid-green cursor-pointer"
+                  />
+                  <div className="w-14 shrink-0">
+                    <input
+                      type="number"
+                      min="1"
+                      max="95"
+                      value={initialSoc}
+                      onChange={(e) => setInitialSoc(e.target.value)}
+                      className="w-full bg-obsidian border border-hairline p-1 rounded text-center text-tech-white font-bold focus:outline-none focus:border-grid-green tabular-nums text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-2">
                 <button
                   onClick={handleStartCharging}
@@ -276,6 +388,7 @@ export default function Simulator() {
                   <div>Mã phiên: #{activeSession.id}</div>
                   <div>Cổng sạc ID: #{activeSession.connector_id}</div>
                   <div>Đơn giá: {Number(activeSession.applied_price_per_kwh).toLocaleString()} đ/kWh</div>
+                  <div>Pin ban đầu: {activeSession.current_soc}%</div>
                 </div>
               </div>
 
@@ -328,6 +441,26 @@ export default function Simulator() {
 
         {/* Middle & Right Column: Realtime Telemetry Indicators & CC-CV Chart */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Status Indicator Banner */}
+          <div className="flex items-center justify-between bg-panel border border-hairline px-4 py-2.5 rounded-sm font-mono text-xs">
+            <div className="flex items-center space-x-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${activeSession ? 'bg-grid-green animate-pulse' : 'bg-steel-gray'}`} />
+              <span className="text-steel-gray">TRẠNG THÁI RƠ-LE:</span>
+              <span className={`font-bold ${activeSession ? 'text-grid-green' : 'text-caution-amber'}`}>
+                {activeSession ? 'ĐÃ ĐÓNG RƠ-LE — ĐANG TRUYỀN PHÁT DỮ LIỆU SẠC' : 'MỞ (CHỜ BẮT ĐẦU PHIÊN SẠC)'}
+              </span>
+            </div>
+            {activeSession ? (
+              <span className="text-electric-cyan font-bold">
+                MÃ PHIÊN #{activeSession.id} (Chu kỳ đo 2s)
+              </span>
+            ) : (
+              <span className="text-steel-gray text-[11px] hidden sm:inline">
+                Nhấn [KẾT NỐI & BẬT RƠ-LE SẠC] để cấp điện & chạy mô phỏng
+              </span>
+            )}
+          </div>
+
           {/* Telemetry 4 Metric Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-panel border border-hairline p-3 rounded-sm font-mono">
@@ -338,7 +471,9 @@ export default function Simulator() {
               <div className="text-xl font-bold text-electric-cyan tabular-nums">
                 {telemetry ? telemetry.power_kw.toFixed(1) : '0.0'} <span className="text-xs text-steel-gray font-normal">kW</span>
               </div>
-              <div className="text-[10px] text-steel-gray mt-1">Đo đếm theo chu kỳ 2s</div>
+              <div className="text-[10px] text-steel-gray mt-1">
+                {telemetry ? 'Đo đếm theo chu kỳ 2s' : 'Chưa cấp điện tải'}
+              </div>
             </div>
 
             <div className="bg-panel border border-hairline p-3 rounded-sm font-mono">
@@ -347,9 +482,16 @@ export default function Simulator() {
                 <Battery className="w-3.5 h-3.5 text-grid-green" />
               </div>
               <div className="text-xl font-bold text-grid-green tabular-nums">
-                {telemetry ? telemetry.soc.toFixed(1) : '0.0'} <span className="text-xs text-steel-gray font-normal">%</span>
+                {telemetry
+                  ? telemetry.soc.toFixed(1)
+                  : activeSession
+                  ? (activeSession.current_soc != null ? Number(activeSession.current_soc).toFixed(1) : '0.0')
+                  : parseFloat(initialSoc || '25').toFixed(1)}{' '}
+                <span className="text-xs text-steel-gray font-normal">%</span>
               </div>
-              <div className="text-[10px] text-steel-gray mt-1">Ngắt khi đạt 100%</div>
+              <div className="text-[10px] text-steel-gray mt-1">
+                {telemetry ? 'Ngắt khi đạt 100%' : 'Mức pin xe hiện có'}
+              </div>
             </div>
 
             <div className="bg-panel border border-hairline p-3 rounded-sm font-mono">
@@ -376,7 +518,9 @@ export default function Simulator() {
               >
                 {telemetry ? telemetry.temp_c.toFixed(1) : '30.0'} <span className="text-xs text-steel-gray font-normal">°C</span>
               </div>
-              <div className="text-[10px] text-steel-gray mt-1">Ngưỡng ngắt: 75°C</div>
+              <div className="text-[10px] text-steel-gray mt-1">
+                {telemetry ? 'Ngưỡng ngắt: 75°C' : 'Nhiệt độ môi trường'}
+              </div>
             </div>
 
             <div className="bg-panel border border-hairline p-3 rounded-sm font-mono">
@@ -388,7 +532,7 @@ export default function Simulator() {
                 {telemetry ? telemetry.cost_estimate?.toLocaleString() : '0'} <span className="text-xs text-steel-gray font-normal">đ</span>
               </div>
               <div className="text-[10px] text-steel-gray mt-1">
-                {telemetry ? telemetry.energy_kwh.toFixed(3) : '0.000'} kWh
+                {telemetry ? `${telemetry.energy_kwh.toFixed(3)} kWh` : '0.000 kWh'}
               </div>
             </div>
           </div>
@@ -416,9 +560,12 @@ export default function Simulator() {
 
             <div className="h-72 w-full">
               {chartData.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-steel-gray font-mono text-xs">
-                  <Radio className="w-6 h-6 mb-2 text-hairline animate-pulse" />
-                  Đang chờ kết nối phiên sạc để vẽ đồ thị đường cong...
+                <div className="h-full flex flex-col items-center justify-center text-steel-gray font-mono text-xs space-y-2">
+                  <Radio className="w-8 h-8 text-steel-gray/50 animate-pulse" />
+                  <div className="text-tech-white font-medium">Chưa có xung nhịp truyền phát telemetry</div>
+                  <div className="text-[11px] text-steel-gray max-w-sm text-center">
+                    Cổng sạc đang ở trạng thái chờ. Vui lòng bấm <strong className="text-electric-cyan">"KẾT NỐI & BẬT RƠ-LE SẠC"</strong> ở cột bên trái để cấp điện và theo dõi đồ thị thời gian thực.
+                  </div>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">

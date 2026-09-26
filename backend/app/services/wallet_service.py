@@ -36,10 +36,10 @@ def topup_wallet(
         .first()
     )
     if not wallet:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy ví điện tử của người dùng.",
-        )
+        # Tự động khởi tạo ví 0 VND nếu tài khoản chưa có ví (chống tài khoản mồ côi ví)
+        wallet = Wallet(user_id=user_id, balance=Decimal("0.00"), is_debt_locked=False)
+        db.add(wallet)
+        db.flush()
 
     wallet.balance += amount
     if wallet.balance >= 0:

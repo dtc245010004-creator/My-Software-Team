@@ -3,7 +3,7 @@
 > **File này bắt buộc cập nhật mỗi khi thêm, xóa hoặc đổi vai trò một file.**
 > Xem `GEMINI.md §9` — trigger "thêm/xóa/đổi vai trò file bất kỳ" → cập nhật ngay lập tức.
 
-**Cập nhật lần cuối:** 2026-09-25
+**Cập nhật lần cuối:** 2026-09-26
 
 ---
 
@@ -36,6 +36,7 @@
 | `backend/app/core/database.py` | SQLAlchemy engine kết nối SQLite (WAL mode, Foreign Keys ON), `SessionLocal` và `get_db()` |
 | `backend/app/core/security.py` | Mã hóa mật khẩu trực tiếp bằng bcrypt (rounds=12), sinh & giải mã JWT access token |
 | `backend/app/core/websocket.py` | `ConnectionManager` quản lý kết nối và phát sóng telemetry realtime |
+| `backend/app/core/datetime_utils.py` | Tiện ích chuẩn hóa múi giờ Việt Nam (`get_vn_now`, `to_vn_time`, `UTCDateTime` Pydantic serializer có `Z`) |
 | `backend/app/models/__init__.py` | Export các SQLAlchemy Models (`User`, `Wallet`, `Station`, `ChargingPoint`, `Connector`) |
 | `backend/app/models/user.py` | Model người dùng `User`, phân quyền RBAC (`ADMIN`, `OPERATOR`, `CUSTOMER`) và quan hệ 1-1 với `Wallet` |
 | `backend/alembic.ini` | Cấu hình Alembic database migrations |
@@ -44,6 +45,7 @@
 | `backend/app/models/wallet.py` | Model Ví điện tử `Wallet` (ràng buộc `balance >= -1000000`, `is_debt_locked`) và `WalletTransaction` |
 | `backend/app/models/tariff.py` | Model Biểu giá điện TOU 3 khung giờ (`Tariff`: Peak, Off-peak, Normal) |
 | `backend/app/models/session.py` | Model Phiên sạc xe điện (`ChargingSession`: `applied_price_per_kwh`, chỉ số kWh, trạng thái, tiền cước) |
+| `backend/app/models/station.py` | Model Trạm sạc `Station`, Trụ sạc `ChargingPoint`, Cổng sạc `Connector` và `StationPowerMetric` (đo đếm phụ tải từng phút) |
 | `backend/app/schemas/wallet.py` | Pydantic Schemas nạp tiền (`TopupRequest`), số dư ví và nhật ký giao dịch dùng `Decimal` |
 | `backend/app/schemas/tariff.py` | Pydantic Schemas cấu hình biểu giá TOU (`TariffCreate`, `TariffUpdate`, `TariffResponse`) |
 | `backend/app/schemas/session.py` | Pydantic Schemas bắt đầu (`SessionStartRequest`), dừng (`SessionStopRequest`) và chi tiết phiên sạc |
@@ -56,11 +58,11 @@
 | `backend/app/simulator/__init__.py` | Export module simulator |
 | `backend/app/simulator/charging_simulator.py` | Core ChargingSimulator: đường cong CC-CV, an toàn Auto Cut-off (Pin đầy, Quá nhiệt >75°C, Nợ ví -300k), Checkpoint DB 30s |
 | `backend/app/api/v1/endpoints/simulator.py` | REST API điều khiển giả lập (trigger-event, set-power-limit, get telemetry từ RAM), bảo vệ RBAC Admin/CPO |
-| `backend/tests/test_simulator.py` | Bộ 9 test cases kiểm thử Simulator, CC-CV, Auto Cut-off, Checkpoint, Startup Crash Reconciliation, RBAC |
+| `backend/tests/test_simulator.py` | Bộ 10 test cases kiểm thử Simulator, CC-CV, Auto Cut-off, Checkpoint, Startup Crash Reconciliation, RBAC, Threadsafe Coroutine |
 | `backend/app/schemas/ai.py` | Pydantic schemas cho Smart Charging, Maintenance, Pricing Advice và AI Ask |
 | `backend/app/services/fallback_service.py` | Động cơ Heuristic Fallback độc lập 100%: Weighted Fair Sharing theo SoC, ngưỡng cứng nhiệt độ, TOU occupancy |
 | `backend/app/services/ai_service.py` | AI Service gọi Google Gemini API, bọc timeout 5s, prompt grounding và tự động fallback sang Heuristic |
-| `backend/app/services/scheduler_service.py` | APScheduler lập lịch phân tích tải định kỳ 3 phút và phát sóng WebSocket realtime |
+| `backend/app/services/scheduler_service.py` | APScheduler lập lịch phân tích tải định kỳ 3 phút và đo đếm phụ tải 1 phút bằng năng lượng lũy kế bảo toàn 100% điện năng ($P_{avg} = \Delta kWh \times 60$) |
 | `backend/app/api/v1/endpoints/ai.py` | REST API cho 4 chức năng AI (smart-charging, predictive-maintenance, pricing-advice, ask) kèm RBAC/IDOR |
 | `backend/tests/test_ai_fallback.py` | Bộ 21 test cases kiểm thử Heuristic, RBAC/IDOR, Fallback khi offline, Mock Gemini AI và Scheduler |
 | `docs/SDLC/KT2/02_Transaction_Design_and_Wallet_ACID.md` | Tài liệu bàn giao kỹ thuật mốc KT2: Thiết kế giao dịch ví điện tử và phiên sạc ACID |
@@ -82,11 +84,12 @@
 | `frontend/src/context/AuthContext.jsx` | Quản lý JWT Token, phân quyền và nút 1-click chuyển đổi vai trò Demo |
 | `frontend/src/services/api.js` | Axios instance tự động chèn JWT Bearer Token |
 | `frontend/src/services/websocket.js` | Client WebSocket truyền phát telemetry thời gian thực và subscribe theo session |
+| `frontend/src/utils/formatTime.js` | Tiện ích format ngày giờ Việt Nam (`formatVNDateTime`, `formatVNTime`, `formatVNDate`), tự động bù UTC |
 | `frontend/src/components/Header.jsx` | Thanh điều hướng đầu trang, hiển thị tín hiệu WebSocket live và Demo Role Switcher |
 | `frontend/src/components/Navigation.jsx` | Menu điều hướng các không gian làm việc |
 | `frontend/src/components/BusbarLoadIndicator.jsx` | Thanh cái phụ tải lưới điện phân tầng màu theo % công suất an toàn 95% |
 | `frontend/src/components/MetricBox.jsx` | Khung hiển thị thông số kỹ thuật chuẩn công nghiệp |
-| `frontend/src/pages/Dashboard.jsx` | Bảng điều khiển phụ tải lưới, trạng thái trụ sạc và đồ thị phụ tải 24h |
+| `frontend/src/pages/Dashboard.jsx` | Bảng điều khiển phụ tải lưới, trạng thái trụ sạc và đồ thị phụ tải Equalizer 1440 phút (2 layer riêng biệt, domain Y chuẩn tối thiểu 120 kW) & TOU 2h |
 | `frontend/src/pages/Stations.jsx` | Quản lý danh mục trạm sạc, trụ sạc (EVSE bays) và cổng sạc (connectors) |
 | `frontend/src/pages/Simulator.jsx` | Bảng điều khiển sạc CC-CV realtime, đồ thị Recharts, nút quá nhiệt khẩn cấp |
 | `frontend/src/pages/Wallet.jsx` | Quản lý ví cá nhân, nạp tiền nhanh (+50k đến +500k), cảnh báo nợ và lịch sử ACID |
@@ -139,12 +142,13 @@
 | `backend/tests/conftest.py` | Fixtures cấu hình test in-memory SQLite, override get_db và test clients |
 | `backend/tests/test_auth.py` | Bộ 12 test cases kiểm thử xác thực, bcrypt rounds=12, JWT, RBAC và đăng ký tạo ví nguyên tử |
 | `backend/tests/test_health.py` | Bộ 1 test case kiểm thử endpoint /health |
-| `backend/tests/test_stations.py` | Bộ 12 test cases kiểm thử CRUD trạm/trụ/cổng, Haversine, Oversubscription, IDOR, Soft-delete |
+| `backend/tests/test_stations.py` | Bộ 16 test cases kiểm thử CRUD trạm/trụ/cổng, Haversine, Oversubscription, IDOR, Soft-delete, Live Metrics, Load Profile TOU 12h, Load Profile Timeline 1440m và Bảo toàn 100% năng lượng lũy kế (P_avg = ΔkWh * 60) bắt trọn phiên ngắn <60s |
 | `backend/tests/test_sessions_acid.py` | Bộ 9 test cases kiểm thử toàn diện ACID: TOU, Concurrency thật (409 Conflict), nợ âm, IDOR |
-| `backend/tests/test_simulator.py` | Bộ 9 test cases kiểm thử Simulator CC-CV, Auto Cut-off, Checkpoint 30s, Crash Reconciliation |
+| `backend/tests/test_simulator.py` | Bộ 10 test cases kiểm thử Simulator CC-CV, Auto Cut-off, Checkpoint 30s, Crash Reconciliation, Time Acceleration, Threadsafe Coroutine |
 | `backend/tests/test_ai_fallback.py` | Bộ 21 test cases kiểm thử Heuristic Fallback, RBAC/IDOR AI, Mock Gemini và Scheduler |
 | `backend/tests/test_wallet_acid.py` | Bộ 5 test cases kiểm thử tính toàn vẹn ACID của Ví: Pessimistic Lock, Overdraft Limit, Debt Lock |
 | `backend/tests/test_sessions.py` | Bộ 5 test cases kiểm thử vòng đời phiên sạc: 409 Conflict cổng độc quyền, 402 chặn nợ, Idempotency |
+| `backend/tests/test_driver_unauthenticated.py` | Bộ 4 test cases kiểm thử luồng Tài xế không cần đăng nhập: xem ví, nạp tiền QR ghi tên, cấu hình dung lượng pin & mức pin ban đầu, sạc và ngắt sạc |
 
 ---
 
@@ -159,5 +163,7 @@
 Toàn bộ **11/11 bước** trong lộ trình phát triển đã được hoàn thành 100% với chất lượng cao nhất:
 
 - Không còn bất kỳ file dự kiến nào chưa tạo.
-- Bộ kiểm thử tự động đạt 74/74 test cases passed 100% (Zero regression).
-- CSDL đã nạp đầy đủ dữ liệu mẫu sẵn sàng phục vụ trình diễn và bảo vệ đồ án.
+- Bộ kiểm thử tự động đạt **83/83 test cases passed 100%** (Zero regression).
+- Hỗ trợ đầy đủ phân quyền linh hoạt: Quản trị viên/CPO bảo mật RBAC, Tài xế sử dụng tự do không cần đăng nhập, nạp tiền qua cổng chuyển khoản QR kèm ghi tên và cộng số dư khả dụng tức thì.
+- Bộ giả lập sạc pin xe điện cho phép tùy biến linh hoạt dung lượng pin xe (kWh) và mức pin hiện có (SoC %) khi cắm sạc.
+- CSDL đã nạp đầy đủ dữ liệu mẫu sẵn sàng phục vụ trình diễn và bảo vệ đồ án, hỗ trợ số liệu đo đếm và đồ thị phụ tải thời gian thực (Runtime Dynamic Values).

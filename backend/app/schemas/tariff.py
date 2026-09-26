@@ -35,10 +35,13 @@ class TariffUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+from app.core.datetime_utils import UTCDateTime
+
+
 class TariffResponse(TariffBase):
     id: int
     station_id: Optional[int] = None
     is_active: bool
-    created_at: datetime
+    created_at: UTCDateTime
 
     model_config = ConfigDict(from_attributes=True)

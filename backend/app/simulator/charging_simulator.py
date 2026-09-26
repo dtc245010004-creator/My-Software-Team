@@ -70,7 +70,7 @@ class ChargingSimulator:
         self.checkpoint_interval = checkpoint_interval
         self.time_since_last_checkpoint = 0.0
         self.is_running = False
-        self.task: Optional[asyncio.Task] = None
+        self.task: Optional[Any] = None
 
     def compute_physics(self, dt_seconds: float) -> Optional[str]:
         """
@@ -216,6 +216,20 @@ class ChargingSimulator:
             telemetry_data = self.to_telemetry_dict()
             await ws_manager.broadcast_to_session(self.session_id, telemetry_data)
 
+            # Phát telemetry tổng phụ tải lưới tức thời cho toàn bộ Dashboard
+            try:
+                total_active_kw = round(sum(s.power_kw for s in simulator_manager.active_simulators.values()), 1)
+                await ws_manager.broadcast({
+                    "event": "GRID_TELEMETRY",
+                    "active_kw": total_active_kw,
+                    "active_chargers_count": len(simulator_manager.active_simulators),
+                    "session_id": self.session_id,
+                    "connector_id": self.connector_id,
+                    "power_kw": round(self.power_kw, 2),
+                })
+            except Exception:
+                pass
+
             # Kích hoạt Fast Loop Load Balancing (Event-driven Heuristic) khi SoC đổi >= 5%
             if abs(self.soc - self.last_load_balance_soc) >= 5.0:
                 self.last_load_balance_soc = self.soc
@@ -262,6 +276,21 @@ class ChargingSimulator:
                     "status": "COMPLETED",
                 }
                 await ws_manager.broadcast_to_session(self.session_id, stopped_event)
+                try:
+                    remaining_kw = round(sum(s.power_kw for sid, s in simulator_manager.active_simulators.items() if sid != self.session_id), 1)
+                    await ws_manager.broadcast({
+                        "event": "SESSION_STOPPED",
+                        "session_id": self.session_id,
+                        "connector_id": self.connector_id,
+                        "stop_reason": stop_reason,
+                    })
+                    await ws_manager.broadcast({
+                        "event": "GRID_TELEMETRY",
+                        "active_kw": remaining_kw,
+                        "active_chargers_count": max(0, len(simulator_manager.active_simulators) - 1),
+                    })
+                except Exception:
+                    pass
 
             return telemetry_data
         finally:
@@ -310,6 +339,12 @@ class SimulatorManager:
 
     def __init__(self):
         self.active_simulators: Dict[int, ChargingSimulator] = {}
+        self.main_loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def set_main_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Đăng ký main asyncio event loop từ FastAPI Lifespan."""
+        self.main_loop = loop
+        logger.info("SimulatorManager đã liên kết với Main AsyncIO Event Loop.")
 
     def start_simulation(
         self,
@@ -340,9 +375,33 @@ class SimulatorManager:
         )
         self.active_simulators[session_id] = sim
 
-        # Tạo background asyncio task
-        loop = asyncio.get_event_loop()
-        sim.task = loop.create_task(sim.run_loop())
+        # Tạo background asyncio task an toàn từ bất kỳ thread nào
+        target_loop = None
+        if self.main_loop and self.main_loop.is_running():
+            target_loop = self.main_loop
+        else:
+            try:
+                target_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+
+        if target_loop and target_loop.is_running():
+            try:
+                current_loop = asyncio.get_running_loop()
+                if current_loop is target_loop:
+                    sim.task = target_loop.create_task(sim.run_loop())
+                else:
+                    sim.task = asyncio.run_coroutine_threadsafe(sim.run_loop(), target_loop)
+            except RuntimeError:
+                # Đang gọi từ worker thread (ThreadPoolExecutor của sync FastAPI endpoint)
+                sim.task = asyncio.run_coroutine_threadsafe(sim.run_loop(), target_loop)
+        else:
+            try:
+                loop = asyncio.get_event_loop()
+                sim.task = loop.create_task(sim.run_loop())
+            except Exception as e:
+                logger.error(f"Không thể khởi động simulator loop cho Session #{session_id}: {e}")
+
         logger.info(f"Đã đăng ký và chạy simulator cho Session #{session_id}")
         return sim
 
@@ -351,8 +410,12 @@ class SimulatorManager:
         sim = self.active_simulators.pop(session_id, None)
         if sim:
             sim.is_running = False
-            if sim.task and not sim.task.done():
-                sim.task.cancel()
+            if sim.task:
+                try:
+                    if hasattr(sim.task, "done") and not sim.task.done():
+                        sim.task.cancel()
+                except Exception as cancel_err:
+                    logger.debug(f"Hủy simulator task Session #{session_id}: {cancel_err}")
             logger.info(f"Đã hủy simulator cho Session #{session_id}")
 
     def get_simulator(self, session_id: int) -> Optional[ChargingSimulator]:

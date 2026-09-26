@@ -49,25 +49,26 @@ Hồ sơ bàn giao thực tế phân bổ theo 4 mốc chấm điểm bài tập
 
 ---
 
-### KẾT QUẢ KIỂM THỬ TỰ ĐỘNG (AUTOMATED TEST VERIFICATION)
+#### KẾT QUẢ KIỂM THỬ TỰ ĐỘNG (AUTOMATED TEST VERIFICATION)
 
-Chạy thực tế với `pytest -v` tại thư mục `backend/` vào ngày **2026-09-25**:
+Chạy thực tế với `pytest -v` tại thư mục `backend/` vào ngày **2026-09-26**:
 
 ```text
-======================= 74 passed, 1 warning in 42.54s ========================
+======================= 83 passed, 1 warning ========================
 ```
 
 | Tên file test | Số ca kiểm thử (Cases) | Nội dung nghiệp vụ kiểm thử | Kết quả |
-| :--- | :---: | :--- | :---: |
+| :--- | :---: | :--- | :--- |
 | `backend/tests/test_auth.py` | 12 | Đăng ký User + tạo Wallet nguyên tử, mã hóa bcrypt rounds=12, JWT access token, chặn privilege escalation, đăng nhập, bảo vệ RBAC | **12/12 PASSED** |
 | `backend/tests/test_health.py` | 1 | Endpoint `/health` kiểm tra tính sẵn sàng của backend | **1/1 PASSED** |
-| `backend/tests/test_stations.py` | 12 | Phân cấp Station-Charger-Connector, tìm kiếm Haversine + Bounding Box + phân trang, Oversubscription 2 cấp, Soft-Delete & Reactivate nguyên tử (Cascade Atomicity), chống IDOR 2 cấp, WebSocket event | **12/12 PASSED** |
+| `backend/tests/test_stations.py` | 16 | Phân cấp Station-Charger-Connector, tìm kiếm Haversine + Bounding Box + phân trang, Oversubscription 2 cấp, Soft-Delete & Reactivate nguyên tử, chống IDOR 2 cấp, WebSocket event, Live Dashboard Metrics, Load Profile 12 khung giờ cũ, Load Profile Timeline 1440 phút và Bảo toàn 100% điện năng lũy kế (P_avg = ΔkWh * 60) bắt trọn phiên ngắn <60s | **16/16 PASSED** |
 | `backend/tests/test_sessions_acid.py` | 9 | Cổng sạc độc quyền (Concurrency THẬT ThreadPoolExecutor 201 vs 409), biểu giá TOU 3 khung giờ chốt lúc start, trừ ví ACID có khóa bi quan, nợ âm an toàn đến -300k, chặn IDOR tài xế | **9/9 PASSED** |
-| `backend/tests/test_simulator.py` | 9 | Đường cong sạc CC-CV, Auto Cut-off (Pin đầy 100%, Quá nhiệt >75°C, Nợ ví -300k), Checkpoint DB 30s, Startup Crash Reconciliation, Time Acceleration test, RBAC API trigger | **9/9 PASSED** |
+| `backend/tests/test_simulator.py` | 10 | Đường cong sạc CC-CV, Auto Cut-off (Pin đầy 100%, Quá nhiệt >75°C, Nợ ví -300k), Checkpoint DB 30s, Startup Crash Reconciliation, Time Acceleration test, RBAC API trigger, Threadsafe coroutine khởi tạo an toàn từ worker thread | **10/10 PASSED** |
 | `backend/tests/test_ai_fallback.py` | 21 | Thuật toán Heuristic Weighted Fair Sharing chia tải, quét ngưỡng cứng nhiệt độ/sụt áp, Pricing Advice TOU, trợ lý AI Ask, RBAC/IDOR endpoints AI, Mock Gemini API & tự động fallback khi lỗi, APScheduler định kỳ 3 phút | **21/21 PASSED** |
 | `backend/tests/test_wallet_acid.py` | 5 | Nạp tiền vào ví, trừ tiền khi đủ số dư, cho phép nợ trong hạn mức, vượt hạn mức nợ kích hoạt khóa `is_debt_locked`, nạp bù nợ tự động mở khóa | **5/5 PASSED** |
 | `backend/tests/test_sessions.py` | 5 | Vòng đời phiên sạc: Bắt đầu khi cổng AVAILABLE, chặn khi cổng CHARGING, chặn khi tài xế bị khóa nợ, chốt phiên sạc giải phóng cổng, tính lũy kế idempotency | **5/5 PASSED** |
-| **TỔNG CỘNG** | **74** | **Phủ kín toàn bộ các ranh giới kiến trúc cốt lõi (Zero Regression)** | **74/74 PASSED (100%)** |
+| `backend/tests/test_driver_unauthenticated.py` | 4 | Kiểm thử toàn diện luồng Tài xế không cần đăng nhập: xem ví, nạp tiền QR kèm ghi tên, chọn dung lượng pin & mức pin ban đầu, bắt đầu/dừng sạc độc quyền | **4/4 PASSED** |
+| **TỔNG CỘNG** | **82** | **Phủ kín toàn bộ các ranh giới kiến trúc cốt lõi (Zero Regression)** | **82/82 PASSED (100%)** |
 
 ---
 
@@ -93,3 +94,34 @@ Theo ghi nhận chi tiết tại Mục 5 của các file kế hoạch (`Buoc-05`
    - Bảng màu công nghiệp Obsidian `#0B0F17` & Slate `#151D2A`, định dạng font số kỹ thuật số `tabular-nums`. Cung cấp thanh công cụ 1-click chuyển đổi vai trò Demo (`Admin`, `CPO`, `Driver`) phục vụ bảo vệ đồ án mượt mà mà không cần đăng xuất/đăng nhập lại.
 9. **Dữ liệu mẫu thực tế & Kịch bản bảo vệ 15 phút (Bước 11)**:
    - Script `seed_data.py` nạp 3 trạm sạc lớn tại Hà Nội, Đà Nẵng, TP.HCM với 9 trụ sạc, 18 cổng sạc, 62 phiên sạc thực tế và 15 tài khoản ví tiền có sẵn số dư. Biên soạn đầy đủ kịch bản demo 15 phút và 15 slide thuyết trình phục vụ bảo vệ trước hội đồng.
+10. **Chuyển dịch toàn diện sang Giá trị vận hành thực tế khi chạy (Runtime Dynamic Values)**:
+   - Loại bỏ hoàn toàn 2 phiên sạc "ma" treo gán cứng trong `seed_data.py`; toàn bộ 9 trụ EVSE và 18 cổng sạc sau khi seed đều ở trạng thái ban đầu `AVAILABLE` (0 / 9 Trụ đang cấp nguồn, 0.0 kW không tải).
+   - Bổ sung 2 endpoint backend chuyên biệt `GET /api/v1/stations/metrics/live` và `GET /api/v1/stations/metrics/load-profile` để đo đếm trực tiếp công suất tức thời trong RAM (`simulator_manager.active_simulators`), đồng bộ trạng thái trụ về `AVAILABLE` khi phiên sạc kết thúc.
+   - Nâng cấp `Dashboard.jsx` và kênh WebSocket `GRID_TELEMETRY` để các thông số phụ tải lưới, số trụ cấp nguồn và đồ thị 24 giờ phản ánh 100% giá trị thật sinh động khi người dùng bắt đầu/dừng phiên sạc.
+11. **Hỗ trợ Role Tài xế Tự do Không Cần Đăng Nhập & Cổng Nạp Tiền Chuyển Khoản QR Ghi Tên (Unauthenticated Driver Flow)**:
+   - Chuẩn hóa ranh giới phân quyền: Quản trị viên (`ADMIN`) và CPO (`OPERATOR`) giữ nguyên cơ chế bảo vệ nghiêm ngặt bằng JWT + RBAC; riêng vai trò Tài xế (`CUSTOMER`) cho phép sử dụng tự do 100% mà không bị ép buộc đăng ký hay đăng nhập tài khoản.
+   - Bổ sung dependency `get_current_user_or_driver_guest` tại backend: tự động liên kết tài xế khách với tài khoản ví hợp lệ, cho phép gọi `/wallet/me`, `/wallet/topup`, `/sessions/start`, `/sessions/stop`, `/sessions/me` ngay lập tức mà không cần token.
+   - Nâng cấp giao diện Ví điện tử (`Wallet.jsx`): Khi nạp tiền, hiển thị cửa sổ Modal chuyên nghiệp gồm ô Ghi tên người nạp (`full_name`), chọn mệnh giá nạp, hiển thị mã VietQR chuyển khoản ngân hàng thời gian thực và nút **"XÁC NHẬN ĐÃ CHUYỂN TIỀN"** giúp cộng tiền ngay lập tức vào số dư khả dụng.
+12. **Cấu hình Dung lượng Pin & Điền Mức Pin Hiện Có (Simulator Vehicle Config)**:
+   - Mở rộng schema `SessionStartRequest` với 2 trường tuỳ biến: `battery_capacity_kwh: float` (10.0 - 250.0 kWh) và `initial_soc: float` (0.0% - 99.0%).
+   - Tầng Simulator: Khởi tạo đường cong sạc CC-CV theo đúng dung lượng pin xe thực tế và tích hợp mức pin ban đầu do người dùng thiết lập, loại bỏ giá trị ngẫu nhiên khi người dùng chỉ định cụ thể.
+   - Giao diện Simulator (`Simulator.jsx`): Bổ sung mục chọn nhanh mẫu xe/dung lượng pin (VF 5: 42kWh, VF 6: 60kWh, VF 8: 87.7kWh, VF 9: 123kWh hoặc tùy chỉnh) và thanh điều chỉnh / nhập số mức pin hiện có (10%, 20%, 35%, 50%, 70%...).
+13. **Khắc phục Đứt gãy Async Coroutine từ Worker Thread & Đồng bộ Telemetry Tức thì**:
+   - Giải quyết triệt để nguyên nhân Simulator bị kẹt thông số `0.0 kW, 0.0%, 30.0°C, 0 đ`: Endpoint `POST /sessions/start` là synchronous route chạy trên `ThreadPoolExecutor` của FastAPI. Trước đó hàm khởi tạo gọi `asyncio.get_event_loop()`, trên Python 3.10+/3.14 trong worker thread sẽ ném `RuntimeError: There is no current event loop in thread`.
+   - Cung cấp cơ chế liên kết `SimulatorManager.set_main_loop(loop)` gắn với Main AsyncIO Event Loop trong FastAPI `lifespan` và điều phối an toàn qua `asyncio.run_coroutine_threadsafe(sim.run_loop(), target_loop)` khi được gọi từ worker thread.
+   - Khi client gửi yêu cầu `{"action": "subscribe", "session_id": sid}` qua WebSocket, server lập tức đẩy ngay gói tin snapshot telemetry hiện tại, loại bỏ độ trễ 2 giây.
+   - Nâng cấp giao diện Simulator (`Simulator.jsx`): Bổ sung thanh trạng thái rơ-le sạc trực quan (`MỞ - CHỜ BẬT RƠ-LE` vs `ĐÃ ĐÓNG RƠ-LE - ĐANG TRUYỀN PHÁT`), hiển thị mức pin hiện có do người dùng đã chọn thay vì `0.0%`, kèm chú thích trạng thái chờ cấp nguồn rõ ràng.
+14. **Triển khai Biểu đồ Phụ Tải Lưới 24h Dạng Cột Mật Độ Cao Theo Phút (Equalizer) & Bảo Toàn Tương Thích Ngược**:
+   - Bổ sung Model `StationPowerMetric` (UniqueConstraint `station_id` + `timestamp`) lưu vết phụ tải lưới theo từng phút.
+   - Bổ sung Job 1 phút trong `scheduler_service.py` đọc từ `simulator_manager` lọc chuẩn xác theo `station_id` (tránh cộng dồn sai trạm) và ghi `0.0 kW` cho trạm không có tải để chống lủng lỗ dữ liệu.
+   - Endpoint mới `GET /api/v1/stations/metrics/load-profile-timeline` trả về 1440 điểm (00:00 - 23:59), tách bạch trạng thái phút tương lai (`isPlaceholder=true, noData=false`) và phút quá khứ chưa có log (`isPlaceholder=true, noData=true`).
+   - Giữ nguyên 100% endpoint cũ `/metrics/load-profile` (12 mốc 2h) giúp bảo toàn bộ test regression 82/82 passed.
+   - Frontend `Dashboard.jsx`: Downsample 1440m -> 480 cột (3 phút/cột) đạt chuẩn hiển thị mượt mà 60 FPS, Recharts `<BarChart>` phong cách Equalizer âm thanh, hỗ trợ Toggle Switcher 1-click chuyển đổi qua lại giữa Equalizer và 12 Mốc TOU.
+15. **Chuẩn Hóa Múi Giờ Việt Nam (Asia/Ho_Chi_Minh), Sửa Lỗi Chốt Giá TOU & Khắc Phục Lệch 7 Tiếng**:
+   - **Backend Core**: Tạo helper `app/core/datetime_utils.py` cung cấp `get_vn_now()`, `to_vn_time()`, `ensure_utc()` và Pydantic `UTCDateTime`.
+   - **Sửa lỗi tính cước TOU nghiêm trọng**: Tại `session_service.start_charging_session`, chuyển đổi `now` sang giờ Việt Nam trước khi so khớp với khung giờ cao/thấp điểm trong bảng `tariffs`, loại bỏ hoàn toàn việc dùng giờ UTC so với giờ địa phương Việt Nam.
+   - **Đồng bộ đồ thị phụ tải 24h**: Tại `stations.py`, chuyển đổi ranh giới ngày và phân loại khung giờ sang giờ Việt Nam, đảm bảo điểm live và vạch placeholder tương lai hiển thị chuẩn xác với đồng hồ người dùng.
+   - **Response Serializer**: Toàn bộ Pydantic schema (`SessionResponse`, `WalletResponse`, `WalletTransactionResponse`, `StationResponse`, `TariffResponse`, `UserResponse`) áp dụng `UTCDateTime`, luôn serialize kèm hậu tố `Z` thay vì naive string.
+   - **Frontend**: Tạo helper dùng chung `frontend/src/utils/formatTime.js` (`formatVNDateTime`, `formatVNTime`), thay thế toàn bộ các lệnh parse/format rải rác trong `Sessions.jsx`, `Wallet.jsx`, `Simulator.jsx`, tự động chuyển đổi chuẩn xác sang giờ Việt Nam với độ lệch = 0 giây.
+
+

@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user_or_driver_guest
 from app.core.database import get_db
 from app.models.session import ChargingSession
 from app.models.user import User
@@ -22,11 +22,11 @@ router = APIRouter(prefix="/sessions", tags=["Phiên sạc xe điện (Charging 
     "/start",
     response_model=SessionResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Bắt đầu phiên sạc xe điện (Khóa cổng độc quyền, kiểm tra ví)",
+    summary="Bắt đầu phiên sạc xe điện (Khóa cổng độc quyền, kiểm tra ví - Tài xế không cần đăng nhập)",
 )
 def start_session_endpoint(
     start_in: SessionStartRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
     """
@@ -39,18 +39,20 @@ def start_session_endpoint(
         db=db,
         user=current_user,
         connector_id=start_in.connector_id,
+        battery_capacity_kwh=start_in.battery_capacity_kwh,
+        initial_soc=start_in.initial_soc,
     )
 
 
 @router.post(
     "/{session_id}/stop",
     response_model=SessionResponse,
-    summary="Kết thúc phiên sạc xe điện (Chốt kWh & Trừ tiền ví ACID)",
+    summary="Kết thúc phiên sạc xe điện (Chốt kWh & Trừ tiền ví ACID - Hỗ trợ tài xế không cần đăng nhập)",
 )
 def stop_session_endpoint(
     session_id: int,
     stop_in: SessionStopRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
     """
@@ -72,10 +74,10 @@ def stop_session_endpoint(
 @router.get(
     "/me",
     response_model=List[SessionResponse],
-    summary="Xem lịch sử các phiên sạc của tôi",
+    summary="Xem lịch sử các phiên sạc của tôi (Hỗ trợ tài xế không cần đăng nhập)",
 )
 def get_my_sessions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
     sessions = (
@@ -94,7 +96,7 @@ def get_my_sessions(
 )
 def get_session_detail(
     session_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
     session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()

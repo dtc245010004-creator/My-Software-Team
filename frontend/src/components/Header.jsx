@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { telemetryWs } from '../services/websocket';
 
 export default function Header() {
-  const { user, role, logout, quickSwitch } = useAuth();
+  const { user, rawUser, role, isGuest, logout, quickSwitch } = useAuth();
   const [wsOnline, setWsOnline] = useState(false);
   const [switching, setSwitching] = useState(false);
 
@@ -93,12 +93,12 @@ export default function Header() {
           </button>
         </div>
 
-        {/* User Info & Logout */}
-        {user ? (
+        {/* User Info & Role State */}
+        {!isGuest && rawUser ? (
           <div className="flex items-center space-x-3 pl-2 border-l border-hairline">
             <div className="text-right">
-              <p className="text-xs font-medium text-tech-white">{user.full_name || user.username}</p>
-              <p className="text-[10px] text-steel-gray font-mono uppercase">{user.role}</p>
+              <p className="text-xs font-medium text-tech-white">{rawUser.full_name || rawUser.username}</p>
+              <p className="text-[10px] text-steel-gray font-mono uppercase">{rawUser.role}</p>
             </div>
             <button
               onClick={logout}
@@ -109,12 +109,18 @@ export default function Header() {
             </button>
           </div>
         ) : (
-          <a
-            href="/login"
-            className="text-xs px-3 py-1.5 rounded bg-electric-cyan text-white hover:bg-electric-cyan-hover font-medium transition-colors"
-          >
-            Đăng nhập
-          </a>
+          <div className="flex items-center space-x-3 pl-2 border-l border-hairline">
+            <div className="text-right">
+              <p className="text-xs font-medium text-tech-white">{user.full_name || 'Tài xế sạc'}</p>
+              <p className="text-[10px] text-grid-green font-mono">Tự do (Không cần đăng nhập)</p>
+            </div>
+            <a
+              href="/login"
+              className="text-xs px-2.5 py-1 rounded bg-obsidian border border-hairline text-steel-gray hover:text-tech-white hover:bg-hairline font-mono transition-colors"
+            >
+              Đăng nhập CPO/Admin
+            </a>
+          </div>
         )}
       </div>
     </header>

@@ -1,4 +1,5 @@
-from typing import Callable, List
+from typing import Callable, List, Optional
+from decimal import Decimal
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
@@ -7,11 +8,66 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.user import User
+from app.models.wallet import Wallet
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login",
     auto_error=True,
 )
+
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login",
+    auto_error=False,
+)
+
+
+def get_current_user_or_driver_guest(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    Dependency lấy người dùng hiện tại:
+    - Nếu có Token hợp lệ: trả về User tương ứng (Admin, Operator, Customer).
+    - Nếu không có Token (Role Tài xế không cần đăng nhập): tự động kết nối tài khoản
+      tài xế vãng lai / khách (customer_user), đảm bảo luôn có Ví điện tử sẵn sàng giao dịch.
+    """
+    if token:
+        try:
+            payload = decode_access_token(token)
+            user_id_str = payload.get("sub")
+            if user_id_str is not None:
+                user = db.query(User).filter(User.id == int(user_id_str)).first()
+                if user and user.is_active:
+                    return user
+        except Exception:
+            pass
+
+    # Role Tài xế không cần đăng nhập: tìm hoặc tự tạo tài khoản tài xế mặc định
+    guest_user = db.query(User).filter(User.username == "customer_user").first()
+    if not guest_user:
+        guest_user = db.query(User).filter(User.role == "CUSTOMER", User.is_active == True).first()
+    if not guest_user:
+        guest_user = User(
+            username="customer_user",
+            email="driver@evcsms.vn",
+            full_name="Tài Xế Khách Vãng Lai",
+            password_hash="guest_unauthenticated",
+            role="CUSTOMER",
+            is_active=True,
+        )
+        db.add(guest_user)
+        db.commit()
+        db.refresh(guest_user)
+
+    # Đảm bảo tài khoản tài xế khách luôn có ví điện tử
+    wallet = db.query(Wallet).filter(Wallet.user_id == guest_user.id).first()
+    if not wallet:
+        wallet = Wallet(user_id=guest_user.id, balance=Decimal("0.00"), is_debt_locked=False)
+        db.add(wallet)
+        db.commit()
+        db.refresh(guest_user)
+
+    return guest_user
 
 
 def get_current_user(

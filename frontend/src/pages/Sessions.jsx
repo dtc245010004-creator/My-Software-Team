@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { History, Zap, CheckCircle2, AlertOctagon, XCircle, FileText } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { formatVNDateTime } from '../utils/formatTime';
 
 export default function Sessions() {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -10,7 +13,7 @@ export default function Sessions() {
 
   useEffect(() => {
     fetchSessions();
-  }, []);
+  }, [user]);
 
   const fetchSessions = async () => {
     try {
@@ -114,7 +117,7 @@ export default function Sessions() {
                         {sess.stop_reason || (isActive ? 'Đang cấp dòng' : 'N/A')}
                       </td>
                       <td className="py-3 px-4 text-[11px] text-steel-gray">
-                        {new Date(sess.start_time).toLocaleString('vi-VN')}
+                        {formatVNDateTime(sess.start_time)}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <button
@@ -152,12 +155,12 @@ export default function Sessions() {
               </div>
               <div className="flex justify-between">
                 <span>Bắt đầu sạc:</span>
-                <span className="text-tech-white">{new Date(selectedSession.start_time).toLocaleString('vi-VN')}</span>
+                <span className="text-tech-white">{formatVNDateTime(selectedSession.start_time)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Kết thúc sạc:</span>
                 <span className="text-tech-white">
-                  {selectedSession.end_time ? new Date(selectedSession.end_time).toLocaleString('vi-VN') : 'Đang sạc'}
+                  {selectedSession.end_time ? formatVNDateTime(selectedSession.end_time) : 'Đang sạc'}
                 </span>
               </div>
               <div className="flex justify-between">

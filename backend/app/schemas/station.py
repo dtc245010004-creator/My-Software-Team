@@ -24,12 +24,15 @@ class ConnectorCreate(ConnectorBase):
     pass
 
 
+from app.core.datetime_utils import UTCDateTime
+
+
 class ConnectorResponse(ConnectorBase):
     id: int
     charging_point_id: int
     status: str
     is_active: bool
-    created_at: datetime
+    created_at: UTCDateTime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,7 +89,7 @@ class ChargingPointResponse(ChargingPointBase):
     station_id: int
     status: str
     is_active: bool
-    created_at: datetime
+    created_at: UTCDateTime
     connectors: List[ConnectorResponse] = Field(default_factory=list)
 
     # Chỉ số tính toán tại tầng Charger (Charger vs Connectors)
@@ -145,8 +148,8 @@ class StationResponse(StationBase):
     id: int
     operator_id: int
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
     charging_points: List[ChargingPointResponse] = Field(default_factory=list)
 
     # Chỉ số tính toán tại tầng Station (Station vs Chargers - Oversubscription)
