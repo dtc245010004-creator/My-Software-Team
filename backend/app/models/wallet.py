@@ -8,7 +8,7 @@ class Wallet(Base):
 
     __tablename__ = "wallets"
     __table_args__ = (
-        CheckConstraint("balance >= -1000000", name="ck_wallet_balance_max_debt"),
+        CheckConstraint("balance >= -500000", name="ck_wallet_balance_max_debt"),
     )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)

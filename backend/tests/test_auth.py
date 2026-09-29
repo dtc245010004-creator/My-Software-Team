@@ -265,3 +265,35 @@ def test_rbac_forbidden_for_insufficient_role(client, db_session):
     )
     assert res_admin_updated.status_code == 200
     assert "Xin chào Quản trị viên standard_driver" in res_admin_updated.json()["message"]
+
+
+def test_login_debt_locked_shows_error(client, db_session):
+    """13. Tài khoản bị khóa nợ (is_debt_locked = True) -> Chặn đăng nhập với thông báo rõ ràng."""
+    from decimal import Decimal
+    # Tạo user và ví bị khóa nợ do âm quá 300k
+    u = User(
+        username="debt_locked_user",
+        email="debt_locked@test.com",
+        password_hash=get_password_hash("Password123"),
+        role="CUSTOMER",
+        is_active=True,
+    )
+    db_session.add(u)
+    db_session.flush()
+
+    w = Wallet(
+        user_id=u.id,
+        balance=Decimal("-350000.00"),
+        is_debt_locked=True,
+    )
+    db_session.add(w)
+    db_session.commit()
+
+    # Thử đăng nhập
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "debt_locked_user", "password": "Password123"},
+    )
+    assert res.status_code == 403
+    assert res.json()["detail"] == "tài khoản bị khóa vì - quá 300k"
+

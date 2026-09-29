@@ -68,27 +68,35 @@ export default function Login() {
         {/* 1-Click Fast Login for Demo */}
         <div className="bg-obsidian border border-hairline p-3 rounded space-y-2 text-xs">
           <span className="text-steel-gray font-bold block text-[11px]">ĐĂNG NHẬP NHANH BẢO VỆ ĐỒ ÁN (DEMO 1-CLICK):</span>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-1.5">
             <button
               type="button"
               onClick={() => handleQuickDemo('ADMIN')}
-              className="py-1.5 px-2 bg-critical-red/20 text-critical-red border border-critical-red/40 hover:bg-critical-red/30 rounded font-bold text-center transition-colors"
+              className="py-1.5 px-1 bg-critical-red/20 text-critical-red border border-critical-red/40 hover:bg-critical-red/30 rounded font-bold text-center transition-colors text-[10px]"
             >
               Quản trị viên
             </button>
             <button
               type="button"
               onClick={() => handleQuickDemo('OPERATOR')}
-              className="py-1.5 px-2 bg-caution-amber/20 text-caution-amber border border-caution-amber/40 hover:bg-caution-amber/30 rounded font-bold text-center transition-colors"
+              className="py-1.5 px-1 bg-caution-amber/20 text-caution-amber border border-caution-amber/40 hover:bg-caution-amber/30 rounded font-bold text-center transition-colors text-[10px]"
             >
               Vận hành CPO
             </button>
             <button
               type="button"
               onClick={() => handleQuickDemo('CUSTOMER')}
-              className="py-1.5 px-2 bg-grid-green/20 text-grid-green border border-grid-green/40 hover:bg-grid-green/30 rounded font-bold text-center transition-colors"
+              className="py-1.5 px-1 bg-grid-green/20 text-grid-green border border-grid-green/40 hover:bg-grid-green/30 rounded font-bold text-center transition-colors text-[10px]"
             >
               Tài xế sạc
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickDemo('DEBT')}
+              className="py-1.5 px-1 bg-critical-red/30 text-critical-red border border-critical-red/60 hover:bg-critical-red/40 rounded font-bold text-center transition-colors text-[10px]"
+              title="Mô phỏng tài khoản nợ -330.000đ bị khóa"
+            >
+              Tài xế nợ (-300k)
             </button>
           </div>
         </div>

@@ -126,6 +126,12 @@ def login(
             detail="Tài khoản người dùng đã bị vô hiệu hóa.",
         )
 
+    if user.wallet and user.wallet.is_debt_locked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="tài khoản bị khóa vì - quá 300k",
+        )
+
     # Cấp access token nhúng sub (user.id) và role
     access_token = create_access_token(
         data={"sub": str(user.id), "role": user.role}
