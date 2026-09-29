@@ -57,6 +57,7 @@ class User(Base):
         back_populates="users",
         passive_deletes=True,
     )
+    role_assignments = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def role_names(self) -> list[str]:

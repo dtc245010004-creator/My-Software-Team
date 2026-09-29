@@ -1,0 +1,14 @@
+{"at":"2026-09-29T03:04:52.397767+00:00","direction":"charge-point-to-csms","frame":[2,"e7f9ea94-3101-488f-a088-40e18e401232","BootNotification",{"chargePointVendor":"CSMS Spike","chargePointModel":"Virtual-1"}]}
+{"at":"2026-09-29T03:04:52.476869+00:00","direction":"charge-point-to-csms","frame":[2,"e925eee6-4320-47b4-a37c-ecb15295f8b9","Heartbeat",{}]}
+{"at":"2026-09-29T03:04:52.484883+00:00","direction":"charge-point-to-csms","frame":[2,"1d32eda8-4725-464a-8328-8fe4c2f8f7f0","StatusNotification",{"connectorId":1,"errorCode":"NoError","status":"Available"}]}
+{"at":"2026-09-29T03:04:52.487571+00:00","direction":"charge-point-to-csms","frame":[2,"bf81b824-ab56-4299-952d-e368a851a383","Authorize",{"idTag":"K01-DEMO-TAG"}]}
+{"at":"2026-09-29T03:04:52.489578+00:00","direction":"charge-point-to-csms","frame":[2,"96a57124-3970-4f52-8b5a-e8b84820e42c","StatusNotification",{"connectorId":1,"errorCode":"NoError","status":"Preparing"}]}
+{"at":"2026-09-29T03:04:52.492720+00:00","direction":"charge-point-to-csms","frame":[2,"91eddae7-4c87-4e1d-97ff-63296bbc8517","StartTransaction",{"connectorId":1,"idTag":"K01-DEMO-TAG","meterStart":137700,"timestamp":"2026-09-29T03:04:52.490Z"}]}
+{"at":"2026-09-29T03:04:52.497172+00:00","direction":"charge-point-to-csms","frame":[2,"e7abe2a8-648d-4d3c-bbde-c6dd200128c4","StatusNotification",{"connectorId":1,"errorCode":"NoError","status":"Charging"}]}
+{"at":"2026-09-29T03:04:52.501573+00:00","direction":"charge-point-to-csms","frame":[2,"7f07cddd-8b75-4cd8-adaf-031d846f9782","MeterValues",{"connectorId":1,"transactionId":7001,"meterValue":[{"timestamp":"2026-09-29T03:04:52.499Z","sampledValue":[{"value":"137710","measurand":"Energy.Active.Import.Register","unit":"Wh"}]}]}]}
+{"at":"2026-09-29T03:04:52.504003+00:00","direction":"charge-point-to-csms","frame":[2,"7e02ff1c-888d-46ee-9fd6-aa05f900565b","StopTransaction",{"transactionId":7001,"meterStop":137710,"timestamp":"2026-09-29T03:04:52.502Z","idTag":"K01-DEMO-TAG"}]}
+{"at":"2026-09-29T03:04:52.506161+00:00","direction":"charge-point-to-csms","frame":[2,"6131f662-4d83-4e5e-98e6-76542c19ee4a","StatusNotification",{"connectorId":1,"errorCode":"NoError","status":"Finishing"}]}
+{"at":"2026-09-29T03:04:52.508007+00:00","direction":"charge-point-to-csms","frame":[2,"6a87bc13-c862-401c-901f-95892a73f08a","StatusNotification",{"connectorId":1,"errorCode":"NoError","status":"Available"}]}
+{"at":"2026-09-29T03:04:52.508775+00:00","direction":"csms-to-charge-point","frame":[2,"csms-k01-reset-1","Reset",{"type":"Soft"}]}
+{"at":"2026-09-29T03:04:52.512881+00:00","direction":"charge-point-to-csms","frame":[3,"csms-k01-reset-1",{"status":"Accepted"}]}
+{"at":"2026-09-29T03:04:52.515281+00:00","direction":"charge-point-to-csms","frame":[2,"aab5221c-d224-4ffa-a429-37a166e7ca05","BootNotification",{"chargePointVendor":"CSMS Spike","chargePointModel":"Virtual-1"}]}

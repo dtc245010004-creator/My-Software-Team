@@ -18,3 +18,140 @@ class Station(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+<<<<<<< Updated upstream
+=======
+    name = Column(String(150), nullable=False)
+    address = Column(String(255), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    total_grid_capacity_kw = Column(Float, nullable=False)
+    operating_hours = Column(String(50), default="24/7", nullable=False)
+    status = Column(String(20), default="ACTIVE", nullable=False)  # ACTIVE, MAINTENANCE
+    is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Quan hệ
+    operator = relationship("User", foreign_keys=[operator_id])
+    charging_points = relationship(
+        "ChargingPoint",
+        back_populates="station",
+        cascade="all, delete-orphan",
+        order_by="ChargingPoint.id",
+    )
+
+    def __repr__(self) -> str:
+        return f"<Station(id={self.id}, name='{self.name}', status='{self.status}', is_active={self.is_active})>"
+
+
+class ChargingPoint(Base):
+    """Mô hình Trụ sạc (EVSE - Electric Vehicle Supply Equipment)."""
+
+    __tablename__ = "charging_points"
+    __table_args__ = (
+        CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
+        CheckConstraint(
+            "status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
+            name="ck_charger_status_valid",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    station_id = Column(
+        Integer,
+        ForeignKey("stations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    code = Column(String(50), unique=True, index=True, nullable=False)  # EVSE ID toàn hệ thống
+    vendor = Column(String(100), nullable=False, default="VinFast/ABB")
+    model = Column(String(100), nullable=True)
+    max_power_kw = Column(Float, nullable=False)
+    firmware_version = Column(String(50), default="1.0.0", nullable=True)
+    status = Column(String(20), default="AVAILABLE", nullable=False)
+    power_sharing_enabled = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Quan hệ
+    station = relationship("Station", back_populates="charging_points")
+    connectors = relationship(
+        "Connector",
+        back_populates="charging_point",
+        cascade="all, delete-orphan",
+        order_by="Connector.connector_number",
+    )
+
+    def __repr__(self) -> str:
+        return f"<ChargingPoint(id={self.id}, code='{self.code}', status='{self.status}')>"
+
+
+class Connector(Base):
+    """Mô hình Cổng / Súng sạc vật lý (CCS2, Type 2, CHAdeMO)."""
+
+    __tablename__ = "connectors"
+    __table_args__ = (
+        CheckConstraint("connector_number >= 1", name="ck_connector_number_positive"),
+        CheckConstraint("max_power_kw > 0", name="ck_connector_max_power_positive"),
+        CheckConstraint(
+            "connector_type IN ('CCS2', 'TYPE_2', 'CHADEMO')",
+            name="ck_connector_type_valid",
+        ),
+        CheckConstraint(
+            "status IN ('UNKNOWN', 'AVAILABLE', 'OCCUPIED', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
+            name="ck_connector_status_valid",
+        ),
+        UniqueConstraint("charging_point_id", "connector_number", name="uq_charger_connector_number"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    charging_point_id = Column(
+        Integer,
+        ForeignKey("charging_points.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    connector_number = Column(Integer, nullable=False)  # Súng số 1, số 2...
+    connector_type = Column(String(20), nullable=False)  # CCS2, TYPE_2, CHADEMO
+    max_power_kw = Column(Float, nullable=False)
+    status = Column(String(20), default="UNKNOWN", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Quan hệ
+    charging_point = relationship("ChargingPoint", back_populates="connectors")
+
+    def __repr__(self) -> str:
+        return f"<Connector(id={self.id}, charger_id={self.charging_point_id}, #{self.connector_number}, type='{self.connector_type}')>"
+
+
+class StationPowerMetric(Base):
+    """Bảng lưu trữ lịch sử đo đếm công suất phụ tải trạm sạc theo từng phút (Equalizer 24h)."""
+
+    __tablename__ = "station_power_metrics"
+    __table_args__ = (
+        UniqueConstraint("station_id", "timestamp", name="uq_station_minute_snapshot"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    station_id = Column(
+        Integer,
+        ForeignKey("stations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp = Column(DateTime, nullable=False, index=True)
+    power_kw = Column(Float, nullable=False, default=0.0)
+    active_chargers_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    station = relationship("Station", backref="power_metrics")
+
+    def __repr__(self) -> str:
+        return f"<StationPowerMetric(station_id={self.station_id}, time={self.timestamp}, kw={self.power_kw})>"
+>>>>>>> Stashed changes
