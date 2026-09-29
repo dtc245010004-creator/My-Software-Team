@@ -1,7 +1,8 @@
 import concurrent.futures
-from datetime import datetime, time, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import patch
+
 import pytest
 
 from app.core.config import settings
@@ -10,7 +11,7 @@ from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
-from app.models.wallet import Wallet, WalletTransaction
+from app.models.wallet import Wallet
 
 
 @pytest.fixture
@@ -42,8 +43,12 @@ def setup_data(db_session):
     db_session.commit()
 
     # 2. Wallets cho Drivers (Mặc định 0 VND)
-    wallet_a = Wallet(user_id=driver_a.id, balance=Decimal("0.00"), is_debt_locked=False)
-    wallet_b = Wallet(user_id=driver_b.id, balance=Decimal("0.00"), is_debt_locked=False)
+    wallet_a = Wallet(
+        user_id=driver_a.id, balance=Decimal("0.00"), is_debt_locked=False
+    )
+    wallet_b = Wallet(
+        user_id=driver_b.id, balance=Decimal("0.00"), is_debt_locked=False
+    )
     db_session.add_all([wallet_a, wallet_b])
 
     # 3. Trạm sạc, trụ sạc, cổng sạc
@@ -99,7 +104,6 @@ def setup_data(db_session):
     db_session.add(tariff)
     db_session.commit()
 
-
     # Tokens
     token_a = create_access_token({"sub": str(driver_a.id), "role": driver_a.role})
     token_b = create_access_token({"sub": str(driver_b.id), "role": driver_b.role})
@@ -119,7 +123,6 @@ def setup_data(db_session):
         "token_b": token_b,
         "token_cpo": token_cpo,
     }
-
 
 
 def test_topup_wallet_success(client, db_session, setup_data):
@@ -152,7 +155,11 @@ def test_start_session_requires_minimum_balance(client, db_session, setup_data):
     connector = setup_data["connector"]
 
     # Nạp 30,000 VND (dưới mức tối thiểu 50,000 VND)
-    client.post("/api/v1/wallet/topup", json={"amount": 30000.0, "note": "Nạp ít"}, headers=headers)
+    client.post(
+        "/api/v1/wallet/topup",
+        json={"amount": 30000.0, "note": "Nạp ít"},
+        headers=headers,
+    )
 
     res = client.post(
         "/api/v1/sessions/start",
@@ -197,8 +204,16 @@ def test_start_session_locks_connector_exclusively(client, db_session, setup_dat
     station_id = setup_data["station_id"]
 
     # Nạp 100k cho cả 2 tài xế
-    client.post("/api/v1/wallet/topup", json={"amount": 100000.0}, headers={"Authorization": f"Bearer {token_a}"})
-    client.post("/api/v1/wallet/topup", json={"amount": 100000.0}, headers={"Authorization": f"Bearer {token_b}"})
+    client.post(
+        "/api/v1/wallet/topup",
+        json={"amount": 100000.0},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    client.post(
+        "/api/v1/wallet/topup",
+        json={"amount": 100000.0},
+        headers={"Authorization": f"Bearer {token_b}"},
+    )
 
     def attempt_start(token):
         return client.post(
@@ -226,10 +241,6 @@ def test_start_session_locks_connector_exclusively(client, db_session, setup_dat
     st_data = res_st.json()
     conn_status = st_data["charging_points"][0]["connectors"][0]["status"]
     assert conn_status == "CHARGING"
-
-
-
-
 
 
 def test_calculate_bill_with_tou_tariff_at_connect_time(client, db_session, setup_data):
@@ -335,7 +346,9 @@ def test_stop_session_deducts_wallet_atomically(client, db_session, setup_data):
     res_wallet = client.get("/api/v1/wallet/me", headers=headers)
     w_data = res_wallet.json()
     assert Decimal(str(w_data["balance"])) == expected_balance
-    tx_fee = [t for t in w_data["transactions"] if t["transaction_type"] == "CHARGE_FEE"][0]
+    tx_fee = [
+        t for t in w_data["transactions"] if t["transaction_type"] == "CHARGE_FEE"
+    ][0]
     assert Decimal(str(tx_fee["amount"])) == -expected_amount
 
     # Kiểm tra connector về AVAILABLE
@@ -355,7 +368,9 @@ def test_stop_session_deducts_wallet_atomically(client, db_session, setup_data):
     assert Decimal(str(res_wallet2.json()["balance"])) == expected_balance
 
 
-def test_stop_session_allows_negative_balance_within_limit(client, db_session, setup_data):
+def test_stop_session_allows_negative_balance_within_limit(
+    client, db_session, setup_data
+):
     """
     7. Trừ cước làm số dư ví bị âm nhưng còn trong hạn mức NEGATIVE_BALANCE_LIMIT (-300,000 VND):
     - Cho phép hoàn tất bình thường.
@@ -465,7 +480,11 @@ def test_driver_cannot_stop_another_drivers_session(client, db_session, setup_da
     connector = setup_data["connector"]
 
     # Tài xế A nạp tiền và bắt đầu sạc
-    client.post("/api/v1/wallet/topup", json={"amount": 100000.0}, headers={"Authorization": f"Bearer {token_a}"})
+    client.post(
+        "/api/v1/wallet/topup",
+        json={"amount": 100000.0},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
     res_start = client.post(
         "/api/v1/sessions/start",
         json={"connector_id": connector.id},
@@ -481,9 +500,16 @@ def test_driver_cannot_stop_another_drivers_session(client, db_session, setup_da
         headers={"Authorization": f"Bearer {token_b}"},
     )
     assert res_hack.status_code == 403
-    assert "Bạn không có quyền can thiệp vào phiên sạc của tài xế khác" in res_hack.json()["detail"]
+    assert (
+        "Bạn không có quyền can thiệp vào phiên sạc của tài xế khác"
+        in res_hack.json()["detail"]
+    )
 
     # Phiên sạc vẫn tiếp tục ACTIVE
     db_session.expire_all()
-    s = db_session.query(ChargingSession).filter(ChargingSession.id == session_id).first()
+    s = (
+        db_session.query(ChargingSession)
+        .filter(ChargingSession.id == session_id)
+        .first()
+    )
     assert s.status == "ACTIVE"

@@ -6,6 +6,7 @@ class ChargePointCreate(BaseModel):
     code: str = Field(..., max_length=50)
     connector_count: int = Field(..., ge=1, le=4, description="Số lượng đầu nối (1-4)")
 
+
 class ConnectorResponse(BaseModel):
     id: int
     connector_number: int
@@ -13,6 +14,7 @@ class ConnectorResponse(BaseModel):
     status: str
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class ChargePointResponse(BaseModel):
     id: int

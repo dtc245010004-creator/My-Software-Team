@@ -14,6 +14,7 @@ from app.core.security import (
 # 1. KIỂM THỬ HÀM BĂM MẬT KHẨU (hash_password)
 # ==============================================================================
 
+
 def test_hash_password_returns_valid_argon2id_hash():
     """Happy Path: Mật khẩu thông thường được băm theo đúng chuẩn Argon2id."""
     raw_pass = "SecureP@ssword2026"
@@ -67,6 +68,7 @@ def test_hash_password_handles_long_string():
 # 2. KIỂM THỬ XÁC THỰC MẬT KHẨU (verify_password)
 # ==============================================================================
 
+
 def test_verify_password_returns_true_for_correct_password():
     """Happy Path: Khớp đúng mật khẩu và chuỗi hash -> trả về True."""
     password = "CorrectPass@123"
@@ -114,6 +116,7 @@ def test_verify_password_returns_false_for_empty_hash():
 # ==============================================================================
 # 3. KIỂM THỬ TẠO JWT ACCESS TOKEN (create_access_token)
 # ==============================================================================
+
 
 def test_create_access_token_with_default_expiration():
     """Happy Path: Sinh token với thời gian hết hạn mặc định từ cấu hình."""
@@ -171,6 +174,7 @@ def test_create_access_token_preserves_nested_data():
 # ==============================================================================
 # 4. KIỂM THỬ GIẢI MÃ JWT ACCESS TOKEN (decode_access_token)
 # ==============================================================================
+
 
 def test_decode_access_token_success_for_valid_token():
     """Happy Path: Giải mã thành công token hợp lệ và trả về dict payload."""

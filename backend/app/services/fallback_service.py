@@ -1,5 +1,5 @@
-import math
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from app.schemas.ai import (
     AIAskResponse,
     PredictiveMaintenanceResponse,
@@ -17,7 +17,7 @@ class FallbackService:
     def calculate_load_balancing_heuristic(
         station_id: int,
         grid_capacity_kw: float,
-        active_requests: List[Dict[str, Any]],
+        active_requests: list[dict[str, Any]],
     ) -> SmartChargingResponse:
         """Thuật toán Weighted Fair Sharing theo SoC điều phối tải trạm sạc.
 
@@ -72,7 +72,7 @@ class FallbackService:
             )
 
         total_requested = round(total_requested, 2)
-        recommendations: List[str] = []
+        recommendations: list[str] = []
 
         # 2. Phân bổ công suất
         if total_requested <= p_limit:
@@ -90,25 +90,40 @@ class FallbackService:
                 "Đã kích hoạt thuật toán Heuristic chia tải ưu tiên xe có SoC thấp."
             )
 
-            denom = sum(item["weight"] * item["requested_power_kw"] for item in items_with_weights)
+            denom = sum(
+                item["weight"] * item["requested_power_kw"]
+                for item in items_with_weights
+            )
             if denom > 0:
                 # Vòng 1: Phân bổ theo trọng số
                 for item in items_with_weights:
                     share = (item["weight"] * item["requested_power_kw"]) / denom
                     calc_alloc = p_limit * share
-                    item["allocated_power_kw"] = min(item["requested_power_kw"], calc_alloc)
+                    item["allocated_power_kw"] = min(
+                        item["requested_power_kw"], calc_alloc
+                    )
 
                 # Vòng 2: Phân phối phần công suất dư thừa (nếu có xe bị min() chặn)
-                current_sum = sum(item["allocated_power_kw"] for item in items_with_weights)
+                current_sum = sum(
+                    item["allocated_power_kw"] for item in items_with_weights
+                )
                 remaining_power = p_limit - current_sum
 
                 if remaining_power > 0.01:
                     # Các xe chưa đạt yêu cầu
-                    unmet = [it for it in items_with_weights if it["allocated_power_kw"] < it["requested_power_kw"]]
-                    unmet_denom = sum(it["weight"] * it["requested_power_kw"] for it in unmet)
+                    unmet = [
+                        it
+                        for it in items_with_weights
+                        if it["allocated_power_kw"] < it["requested_power_kw"]
+                    ]
+                    unmet_denom = sum(
+                        it["weight"] * it["requested_power_kw"] for it in unmet
+                    )
                     if unmet_denom > 0:
                         for it in unmet:
-                            extra = remaining_power * ((it["weight"] * it["requested_power_kw"]) / unmet_denom)
+                            extra = remaining_power * (
+                                (it["weight"] * it["requested_power_kw"]) / unmet_denom
+                            )
                             it["allocated_power_kw"] = min(
                                 it["requested_power_kw"],
                                 it["allocated_power_kw"] + extra,
@@ -147,7 +162,7 @@ class FallbackService:
     def calculate_maintenance_heuristic(
         charger_id: int,
         charger_code: str,
-        telemetry_history: List[Dict[str, Any]],
+        telemetry_history: list[dict[str, Any]],
     ) -> PredictiveMaintenanceResponse:
         """Thuật toán Heuristic dự báo bảo trì và chẩn đoán sức khỏe trụ sạc."""
         if not telemetry_history:
@@ -165,7 +180,9 @@ class FallbackService:
                 is_fallback=True,
             )
 
-        temperatures = [float(rec.get("temperature_c", 45.0)) for rec in telemetry_history]
+        temperatures = [
+            float(rec.get("temperature_c", 45.0)) for rec in telemetry_history
+        ]
         max_temp = round(max(temperatures), 1)
         avg_temp = round(sum(temperatures) / len(temperatures), 1)
 
@@ -189,7 +206,9 @@ class FallbackService:
         # 1. Xác định Risk Level theo ngưỡng cứng bắt buộc
         if max_temp > 85.0:
             risk_level = "CRITICAL"
-            recommended_action = "Ngắt sạc khẩn cấp và cử kỹ thuật viên kiểm tra phần cứng ngay lập tức."
+            recommended_action = (
+                "Ngắt sạc khẩn cấp và cử kỹ thuật viên kiểm tra phần cứng ngay lập tức."
+            )
         elif max_temp > 75.0 or max_voltage_drop > 10.0:
             risk_level = "HIGH"
             recommended_action = "Cảnh báo quá nhiệt hoặc sụt áp cao. Khuyến nghị kiểm tra hệ thống làm mát và dây dẫn."
@@ -202,8 +221,12 @@ class FallbackService:
 
         # 2. Tính Health Score (0 - 100)
         temp_penalty = min(50.0, (max_temp - 45.0) * 1.5) if max_temp > 45.0 else 0.0
-        voltage_penalty = min(30.0, (max_voltage_drop - 2.0) * 3.0) if max_voltage_drop > 2.0 else 0.0
-        health_score = round(max(0.0, min(100.0, 100.0 - temp_penalty - voltage_penalty)), 1)
+        voltage_penalty = (
+            min(30.0, (max_voltage_drop - 2.0) * 3.0) if max_voltage_drop > 2.0 else 0.0
+        )
+        health_score = round(
+            max(0.0, min(100.0, 100.0 - temp_penalty - voltage_penalty)), 1
+        )
 
         # 3. Phân tích xu hướng nhiệt (Thermal Trend)
         if len(temperatures) >= 6:
@@ -247,7 +270,7 @@ class FallbackService:
     @staticmethod
     def calculate_pricing_advice_heuristic(
         station_id: int,
-        current_tariff_id: Optional[int],
+        current_tariff_id: int | None,
         price_peak: float,
         price_normal: float,
         price_offpeak: float,
@@ -329,7 +352,7 @@ class FallbackService:
     @staticmethod
     def get_fallback_ai_ask(
         question: str,
-        basic_stats: Optional[Dict[str, Any]] = None,
+        basic_stats: dict[str, Any] | None = None,
     ) -> AIAskResponse:
         """Cung cấp câu trả lời dự phòng khi Gemini AI ngoại tuyến hoặc lỗi API."""
         stats = basic_stats or {}

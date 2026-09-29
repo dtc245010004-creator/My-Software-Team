@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from app.models.auth import Role, UserRole
 from app.models.user import User
 
-
 ROLE_NAMES = {
     "CUSTOMER": "Tài xế",
     "STATION_OWNER": "Chủ trạm",

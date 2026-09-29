@@ -12,7 +12,9 @@ def test_charge_point_unique_code():
     try:
         # Xóa data cũ
         db.query(ChargePoint).filter(ChargePoint.code.in_(["CP001", "CP002"])).delete()
-        db.query(Station).filter(Station.name.in_(["Station 1", "Station 2", "Station 3"])).delete()
+        db.query(Station).filter(
+            Station.name.in_(["Station 1", "Station 2", "Station 3"])
+        ).delete()
         db.commit()
 
         # Tạo station
@@ -30,18 +32,21 @@ def test_charge_point_unique_code():
         # Tạo charge_point thứ 2 CÙNG code
         cp2 = ChargePoint(station_id=station2.id, code="CP001")
         db.add(cp2)
-        
+
         with pytest.raises(IntegrityError):
             db.commit()
     finally:
         db.rollback()
         db.close()
 
+
 def test_connector_unique_charge_point_id_and_number():
     db = SessionLocal()
     try:
         db.query(ChargePoint).filter(ChargePoint.code.in_(["CP001", "CP002"])).delete()
-        db.query(Station).filter(Station.name.in_(["Station 1", "Station 2", "Station 3"])).delete()
+        db.query(Station).filter(
+            Station.name.in_(["Station 1", "Station 2", "Station 3"])
+        ).delete()
         db.commit()
 
         # Tạo station và charge_point
@@ -54,12 +59,16 @@ def test_connector_unique_charge_point_id_and_number():
         db.commit()
 
         # Tạo connector thứ 1
-        conn1 = Connector(charge_point_id=cp.id, connector_number=1, connector_type="Type2")
+        conn1 = Connector(
+            charge_point_id=cp.id, connector_number=1, connector_type="Type2"
+        )
         db.add(conn1)
         db.commit()
 
         # Tạo connector thứ 2 CÙNG số trên cùng charge point
-        conn2 = Connector(charge_point_id=cp.id, connector_number=1, connector_type="CCS2")
+        conn2 = Connector(
+            charge_point_id=cp.id, connector_number=1, connector_type="CCS2"
+        )
         db.add(conn2)
 
         with pytest.raises(IntegrityError):

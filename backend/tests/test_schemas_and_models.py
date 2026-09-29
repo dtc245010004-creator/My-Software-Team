@@ -9,6 +9,7 @@ from app.schemas.auth import LoginRequest, UserResponse
 # 1. KIỂM THỬ SCHEMAS (app/schemas/auth.py)
 # ==============================================================================
 
+
 def test_login_request_valid_data():
     """Happy Path: Schema LoginRequest nhận dữ liệu hợp lệ."""
     data = {"email": "driver@evcsms.vn", "password": "SecurePassword123"}
@@ -76,6 +77,7 @@ def test_user_response_handles_empty_roles():
 # ==============================================================================
 # 2. KIỂM THỬ MODELS (app/models/user.py & app/models/role.py)
 # ==============================================================================
+
 
 def test_user_model_role_names_property_and_helper():
     """Happy Path: Thuộc tính role_names và helper get_role_names() trả về đúng danh sách tên vai trò."""

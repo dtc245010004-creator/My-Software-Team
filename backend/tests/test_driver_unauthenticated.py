@@ -1,10 +1,11 @@
 from decimal import Decimal
+
 import pytest
-from app.core.security import create_access_token, get_password_hash
+
+from app.core.security import get_password_hash
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
-from app.models.wallet import Wallet
 
 
 @pytest.fixture
@@ -113,7 +114,9 @@ def test_driver_topup_with_name_without_login(client, db_session):
     assert tx_list[0]["transaction_type"] == "TOPUP"
 
 
-def test_driver_start_and_stop_session_without_login(client, db_session, station_for_unauth):
+def test_driver_start_and_stop_session_without_login(
+    client, db_session, station_for_unauth
+):
     """3. Tài xế không cần đăng nhập có thể bắt đầu phiên sạc và dừng phiên sạc."""
     conn = station_for_unauth["connector"]
 
@@ -149,7 +152,9 @@ def test_driver_start_and_stop_session_without_login(client, db_session, station
     assert Decimal(str(stopped_data["total_kwh"])) == Decimal("5.00")
 
 
-def test_driver_start_session_with_custom_battery_and_initial_soc(client, db_session, station_for_unauth):
+def test_driver_start_session_with_custom_battery_and_initial_soc(
+    client, db_session, station_for_unauth
+):
     """4. Kiểm thử thiết lập dung lượng pin xe và mức pin ban đầu (SoC %) khi bắt đầu sạc."""
     conn = station_for_unauth["connector"]
 
@@ -176,6 +181,7 @@ def test_driver_start_session_with_custom_battery_and_initial_soc(client, db_ses
 
     # Kiểm tra bộ giả lập trong RAM nhận đúng cấu hình pin
     from app.simulator.charging_simulator import simulator_manager
+
     sim = simulator_manager.get_simulator(session_id)
     assert sim is not None
     assert sim.battery_capacity_kwh == 87.7
@@ -186,4 +192,3 @@ def test_driver_start_session_with_custom_battery_and_initial_soc(client, db_ses
         f"/api/v1/sessions/{session_id}/stop",
         json={"meter_stop_kwh": 2.0},
     )
-

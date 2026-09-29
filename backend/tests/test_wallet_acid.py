@@ -1,13 +1,12 @@
 from decimal import Decimal
+
 import pytest
-from fastapi import HTTPException
-from app.core.config import settings
+
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
 from app.services.wallet_service import (
     deduct_charging_fee,
-    get_or_create_wallet,
     topup_wallet,
 )
 
@@ -104,7 +103,9 @@ class TestWalletServiceACID:
         assert debt_locked is False  # Chưa vượt -300k
         assert tx.balance_after == Decimal("-100000.00")
 
-    def test_deduct_fee_exceeding_debt_limit_triggers_debt_lock(self, db_session, wallet_users):
+    def test_deduct_fee_exceeding_debt_limit_triggers_debt_lock(
+        self, db_session, wallet_users
+    ):
         """4. Trừ cước vượt quá hạn mức nợ (-300,000 VND) -> Cho trừ hết số điện nhưng kích hoạt khóa nợ."""
         u2 = wallet_users["u2"]  # balance = 20,000 VND
         fee = Decimal("350000.00")  # balance_after = -330,000 VND < -300,000 VND

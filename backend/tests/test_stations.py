@@ -1,7 +1,8 @@
 import pytest
-from app.models.user import User
-from app.models.station import Station, ChargingPoint, Connector
+
 from app.core.security import create_access_token, get_password_hash
+from app.models.station import ChargingPoint, Connector, Station
+from app.models.user import User
 
 
 @pytest.fixture
@@ -46,7 +47,9 @@ def test_users(db_session):
         "token_admin": create_access_token({"sub": str(admin.id), "role": admin.role}),
         "token_op_a": create_access_token({"sub": str(op_a.id), "role": op_a.role}),
         "token_op_b": create_access_token({"sub": str(op_b.id), "role": op_b.role}),
-        "token_customer": create_access_token({"sub": str(customer.id), "role": customer.role}),
+        "token_customer": create_access_token(
+            {"sub": str(customer.id), "role": customer.role}
+        ),
     }
 
 
@@ -56,8 +59,8 @@ def test_public_list_stations_and_pagination(client, db_session, test_users):
     for i in range(5):
         st = Station(
             operator_id=op.id,
-            name=f"Trạm Sạc Số {i+1}",
-            address=f"Số {i+1} Đường ABC",
+            name=f"Trạm Sạc Số {i + 1}",
+            address=f"Số {i + 1} Đường ABC",
             latitude=21.0 + i * 0.01,
             longitude=105.8 + i * 0.01,
             total_grid_capacity_kw=100.0,
@@ -261,8 +264,12 @@ def test_oversubscription_calculation(client, db_session, test_users):
     db_session.commit()
 
     # Thêm 2 trụ 60kW -> Tổng 120kW
-    cp1 = ChargingPoint(station_id=st.id, code="CG-CP01", max_power_kw=60.0, vendor="ABB")
-    cp2 = ChargingPoint(station_id=st.id, code="CG-CP02", max_power_kw=60.0, vendor="ABB")
+    cp1 = ChargingPoint(
+        station_id=st.id, code="CG-CP01", max_power_kw=60.0, vendor="ABB"
+    )
+    cp2 = ChargingPoint(
+        station_id=st.id, code="CG-CP02", max_power_kw=60.0, vendor="ABB"
+    )
     db_session.add_all([cp1, cp2])
     db_session.commit()
 
@@ -274,7 +281,9 @@ def test_oversubscription_calculation(client, db_session, test_users):
     assert data["is_oversubscribed"] is True
 
 
-def test_unique_constraint_charger_code_and_connector_number(client, db_session, test_users):
+def test_unique_constraint_charger_code_and_connector_number(
+    client, db_session, test_users
+):
     """9. Ràng buộc duy nhất: Trùng mã code trụ sạc hoặc trùng số súng -> HTTP 400."""
     st = Station(
         operator_id=test_users["op_a"].id,
@@ -358,7 +367,9 @@ def test_idor_patch_charger_status(client, db_session, test_users):
     db_session.add(st)
     db_session.commit()
 
-    cp = ChargingPoint(station_id=st.id, code="STATUS-CP01", max_power_kw=60.0, status="AVAILABLE")
+    cp = ChargingPoint(
+        station_id=st.id, code="STATUS-CP01", max_power_kw=60.0, status="AVAILABLE"
+    )
     db_session.add(cp)
     db_session.commit()
 
@@ -395,11 +406,19 @@ def test_atomic_soft_delete_and_reactivate_station(client, db_session, test_user
     db_session.add(st)
     db_session.commit()
 
-    cp = ChargingPoint(station_id=st.id, code="VD-CP01", max_power_kw=60.0, is_active=True)
+    cp = ChargingPoint(
+        station_id=st.id, code="VD-CP01", max_power_kw=60.0, is_active=True
+    )
     db_session.add(cp)
     db_session.commit()
 
-    conn = Connector(charging_point_id=cp.id, connector_number=1, connector_type="CCS2", max_power_kw=60.0, is_active=True)
+    conn = Connector(
+        charging_point_id=cp.id,
+        connector_number=1,
+        connector_type="CCS2",
+        max_power_kw=60.0,
+        is_active=True,
+    )
     db_session.add(conn)
     db_session.commit()
 
@@ -523,16 +542,19 @@ def test_get_grid_load_profile_timeline(client, db_session):
 
 
 @pytest.mark.anyio
-async def test_cumulative_energy_captures_short_session_under_60s(client, db_session, test_users):
+async def test_cumulative_energy_captures_short_session_under_60s(
+    client, db_session, test_users
+):
     """16. Kiểm tra cơ chế lũy kế năng lượng bảo toàn 100% điện năng, bắt trọn các phiên sạc ngắn < 60s."""
+    from datetime import datetime, timezone
+
+    from app.models.session import ChargingSession
+    from app.models.station import StationPowerMetric
+    from app.models.tariff import Tariff
     from app.services.scheduler_service import (
         record_station_power_metrics_minute_job,
         reset_cumulative_energy_cache,
     )
-    from app.models.station import StationPowerMetric
-    from app.models.session import ChargingSession
-    from app.models.tariff import Tariff
-    from datetime import datetime, timezone
 
     # 1. Chuẩn bị dữ liệu: Tạo trạm và trụ sạc 60 kW
     op = test_users["op_a"]
@@ -628,15 +650,16 @@ async def test_cumulative_energy_captures_short_session_under_60s(client, db_ses
         .first()
     )
     assert metric_after is not None
-    assert metric_after.power_kw == 30.0  # Khớp chính xác 30.0 kW, KHÔNG bị lọt/ghi 0.0 sai!
+    assert (
+        metric_after.power_kw == 30.0
+    )  # Khớp chính xác 30.0 kW, KHÔNG bị lọt/ghi 0.0 sai!
 
     # 6. Gọi endpoint load-profile-timeline để xác nhận API trả về đúng số kW thật
-    res = client.get(f"/api/v1/stations/metrics/load-profile-timeline?station_id={st.id}")
+    res = client.get(
+        f"/api/v1/stations/metrics/load-profile-timeline?station_id={st.id}"
+    )
     assert res.status_code == 200
     timeline = res.json()
     non_zero_points = [p for p in timeline if p["powerKw"] > 0]
     assert len(non_zero_points) >= 1
     assert non_zero_points[0]["powerKw"] == 30.0
-
-
-

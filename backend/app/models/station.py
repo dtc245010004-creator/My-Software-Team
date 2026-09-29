@@ -11,6 +11,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
 
 
@@ -19,8 +20,12 @@ class Station(Base):
 
     __tablename__ = "stations"
     __table_args__ = (
-        CheckConstraint("total_grid_capacity_kw > 0", name="ck_station_grid_capacity_positive"),
-        CheckConstraint("status IN ('ACTIVE', 'MAINTENANCE')", name="ck_station_status_valid"),
+        CheckConstraint(
+            "total_grid_capacity_kw > 0", name="ck_station_grid_capacity_positive"
+        ),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'MAINTENANCE')", name="ck_station_status_valid"
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -38,7 +43,9 @@ class Station(Base):
     operating_hours = Column(String(50), default="24/7", nullable=False)
     status = Column(String(20), default="ACTIVE", nullable=False)  # ACTIVE, MAINTENANCE
     is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -78,7 +85,9 @@ class ChargingPoint(Base):
         nullable=False,
         index=True,
     )
-    code = Column(String(50), unique=True, index=True, nullable=False)  # EVSE ID toàn hệ thống
+    code = Column(
+        String(50), unique=True, index=True, nullable=False
+    )  # EVSE ID toàn hệ thống
     vendor = Column(String(100), nullable=False, default="VinFast/ABB")
     model = Column(String(100), nullable=True)
     max_power_kw = Column(Float, nullable=False)
@@ -86,7 +95,9 @@ class ChargingPoint(Base):
     status = Column(String(20), default="AVAILABLE", nullable=False)
     power_sharing_enabled = Column(Boolean, default=True, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     # Quan hệ
     station = relationship("Station", back_populates="charging_points")
@@ -98,7 +109,9 @@ class ChargingPoint(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<ChargingPoint(id={self.id}, code='{self.code}', status='{self.status}')>"
+        return (
+            f"<ChargingPoint(id={self.id}, code='{self.code}', status='{self.status}')>"
+        )
 
 
 class Connector(Base):
@@ -116,7 +129,9 @@ class Connector(Base):
             "status IN ('AVAILABLE', 'OCCUPIED', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
             name="ck_connector_status_valid",
         ),
-        UniqueConstraint("charging_point_id", "connector_number", name="uq_charger_connector_number"),
+        UniqueConstraint(
+            "charging_point_id", "connector_number", name="uq_charger_connector_number"
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -131,7 +146,9 @@ class Connector(Base):
     max_power_kw = Column(Float, nullable=False)
     status = Column(String(20), default="AVAILABLE", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     # Quan hệ
     charging_point = relationship("ChargingPoint", back_populates="connectors")
@@ -158,7 +175,9 @@ class StationPowerMetric(Base):
     timestamp = Column(DateTime, nullable=False, index=True)
     power_kw = Column(Float, nullable=False, default=0.0)
     active_chargers_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     station = relationship("Station", backref="power_metrics")
 

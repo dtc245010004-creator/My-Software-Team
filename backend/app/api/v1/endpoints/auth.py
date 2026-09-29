@@ -1,7 +1,9 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.core.security import create_access_token, get_password_hash, verify_password
@@ -73,9 +75,9 @@ def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Xung đột dữ liệu: Tên đăng nhập hoặc email đã tồn tại.",
         )
-    except Exception as e:
+    except SQLAlchemyError:
         db.rollback()
-        logger.error(f"Lỗi hệ thống khi tạo tài khoản & ví: {e}")
+        logger.exception("Lỗi hệ thống khi tạo tài khoản và ví")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Lỗi hệ thống khi khởi tạo tài khoản và ví điện tử.",
@@ -109,7 +111,9 @@ def login(
     """
     user = (
         db.query(User)
-        .filter((User.username == login_in.username) | (User.email == login_in.username))
+        .filter(
+            (User.username == login_in.username) | (User.email == login_in.username)
+        )
         .first()
     )
 
@@ -127,9 +131,7 @@ def login(
         )
 
     # Cấp access token nhúng sub (user.id) và role
-    access_token = create_access_token(
-        data={"sub": str(user.id), "role": user.role}
-    )
+    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
 
     wallet_balance = float(user.wallet.balance) if user.wallet else 0.0
     user_response = UserResponse(
@@ -179,4 +181,6 @@ def get_me(
 )
 def test_admin_access(current_user: User = Depends(get_current_user)):
     """Endpoint bảo vệ kiểm thử phân quyền RBAC cho ADMIN."""
-    return {"message": f"Xin chào Quản trị viên {current_user.username}. Truy cập hợp lệ!"}
+    return {
+        "message": f"Xin chào Quản trị viên {current_user.username}. Truy cập hợp lệ!"
+    }

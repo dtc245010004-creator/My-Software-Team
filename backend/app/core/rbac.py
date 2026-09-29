@@ -32,7 +32,6 @@ def find_endpoint(request: Request):
 
 
 class RBACMiddleware(BaseHTTPMiddleware):
-
     async def dispatch(self, request: Request, call_next):
 
         public_paths = {
@@ -65,9 +64,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if "public" in allowed_roles:
             return await call_next(request)
 
-        token = request.cookies.get(
-            settings.session_cookie_name
-        )
+        token = request.cookies.get(settings.session_cookie_name)
 
         if not token:
             auth_header = request.headers.get(
@@ -76,9 +73,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
             )
 
             if auth_header.startswith("Bearer "):
-                token = auth_header.split(
-                    " ", 1
-                )[1]
+                token = auth_header.split(" ", 1)[1]
 
         if not token:
             return JSONResponse(
@@ -91,12 +86,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if not payload:
             return JSONResponse(
                 status_code=401,
-                content={
-                    "detail": (
-                        "Phiên đăng nhập không hợp lệ "
-                        "hoặc đã hết hạn"
-                    )
-                },
+                content={"detail": ("Phiên đăng nhập không hợp lệ hoặc đã hết hạn")},
             )
 
         user_id = payload.get("sub")
@@ -137,11 +127,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if not user.is_active:
             return JSONResponse(
                 status_code=401,
-                content={
-                    "detail": (
-                        "Tài khoản đã bị vô hiệu hóa"
-                    )
-                },
+                content={"detail": ("Tài khoản đã bị vô hiệu hóa")},
             )
 
         request.state.user = user
@@ -149,19 +135,12 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if "authenticated" in allowed_roles:
             return await call_next(request)
 
-        user_roles = {
-            role.name
-            for role in user.roles
-        }
+        user_roles = {role.name for role in user.roles}
 
         if not user_roles.intersection(allowed_roles):
             return JSONResponse(
                 status_code=403,
-                content={
-                    "detail": (
-                        "Bạn không có quyền thực hiện thao tác này"
-                    )
-                },
+                content={"detail": ("Bạn không có quyền thực hiện thao tác này")},
             )
 
         return await call_next(request)

@@ -1,12 +1,13 @@
-from datetime import datetime, time, timedelta, timezone
-from typing import Annotated, Optional
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
+from typing import Annotated
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from pydantic import AfterValidator
 
 # Múi giờ Việt Nam chuẩn (UTC+7, Asia/Ho_Chi_Minh)
 try:
     VIETNAM_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
-except Exception:
+except ZoneInfoNotFoundError:
     VIETNAM_TZ = timezone(timedelta(hours=7))
 
 
@@ -20,7 +21,7 @@ def get_vn_now() -> datetime:
     return datetime.now(VIETNAM_TZ)
 
 
-def to_vn_time(dt: Optional[datetime]) -> Optional[datetime]:
+def to_vn_time(dt: datetime | None) -> datetime | None:
     """
     Chuyển đổi một đối tượng datetime sang múi giờ Việt Nam (Asia/Ho_Chi_Minh).
     Nếu dt là naive (không có tzinfo), giả định dữ liệu trong CSDL được lưu ở dạng UTC.
@@ -32,7 +33,7 @@ def to_vn_time(dt: Optional[datetime]) -> Optional[datetime]:
     return dt.astimezone(VIETNAM_TZ)
 
 
-def ensure_utc(v: Optional[datetime]) -> Optional[datetime]:
+def ensure_utc(v: datetime | None) -> datetime | None:
     """
     Đảm bảo datetime object luôn có tzinfo là UTC (dùng cho Pydantic serialize).
     Nếu naive, gắn tzinfo=timezone.utc để Pydantic tự động serialize thành chuỗi ISO có hậu tố Z.

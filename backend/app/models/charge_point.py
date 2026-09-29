@@ -21,16 +21,24 @@ class ChargePoint(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     station_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("stations.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer,
+        ForeignKey("stations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
-    code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    code: Mapped[str] = mapped_column(
+        String(50), nullable=False, unique=True, index=True
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="offline")
-    
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
     connectors: Mapped[list["Connector"]] = relationship(

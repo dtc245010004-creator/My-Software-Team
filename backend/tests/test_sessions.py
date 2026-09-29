@@ -1,8 +1,9 @@
 from decimal import Decimal
+
 import pytest
 from fastapi import HTTPException
+
 from app.core.security import get_password_hash
-from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
@@ -48,9 +49,15 @@ def session_env(db_session):
     db_session.commit()
 
     # Ví tiền
-    w_normal = Wallet(user_id=driver_normal.id, balance=Decimal("100000.00"), is_debt_locked=False)
-    w_normal_2 = Wallet(user_id=driver_normal_2.id, balance=Decimal("100000.00"), is_debt_locked=False)
-    w_debt = Wallet(user_id=driver_debt.id, balance=Decimal("-50000.00"), is_debt_locked=True)
+    w_normal = Wallet(
+        user_id=driver_normal.id, balance=Decimal("100000.00"), is_debt_locked=False
+    )
+    w_normal_2 = Wallet(
+        user_id=driver_normal_2.id, balance=Decimal("100000.00"), is_debt_locked=False
+    )
+    w_debt = Wallet(
+        user_id=driver_debt.id, balance=Decimal("-50000.00"), is_debt_locked=True
+    )
     db_session.add_all([w_normal, w_normal_2, w_debt])
 
     # Hạ tầng
@@ -163,7 +170,9 @@ class TestSessionLifecycle:
         conn = session_env["conn2"]
 
         with pytest.raises(HTTPException) as exc_info:
-            start_charging_session(db=db_session, user=driver_debt, connector_id=conn.id)
+            start_charging_session(
+                db=db_session, user=driver_debt, connector_id=conn.id
+            )
 
         assert exc_info.value.status_code == 402
         assert "vui lòng nạp tiền" in exc_info.value.detail.lower()
@@ -174,7 +183,9 @@ class TestSessionLifecycle:
         conn = session_env["conn2"]
 
         # Start session
-        session = start_charging_session(db=db_session, user=driver, connector_id=conn.id)
+        session = start_charging_session(
+            db=db_session, user=driver, connector_id=conn.id
+        )
 
         # Stop session với 15.0 kWh
         stopped_session = stop_charging_session(
@@ -202,7 +213,9 @@ class TestSessionLifecycle:
         driver = session_env["driver_normal"]
         conn = session_env["conn2"]
 
-        session = start_charging_session(db=db_session, user=driver, connector_id=conn.id)
+        session = start_charging_session(
+            db=db_session, user=driver, connector_id=conn.id
+        )
         stopped_1 = stop_charging_session(
             db=db_session,
             user=driver,

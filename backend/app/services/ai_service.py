@@ -1,13 +1,9 @@
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Optional
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from typing import Any
+
 from app.core.config import settings
-from app.models.session import ChargingSession
-from app.models.station import ChargingPoint, Connector, Station
-from app.models.tariff import Tariff
 from app.schemas.ai import (
     AIAskResponse,
     PredictiveMaintenanceResponse,
@@ -21,6 +17,7 @@ logger = logging.getLogger("ev_csms.ai_service")
 # Khởi tạo Google Gemini nếu có thư viện
 try:
     import google.generativeai as genai
+
     HAS_GENAI = True
 except ImportError:
     genai = None
@@ -28,7 +25,7 @@ except ImportError:
 
 
 # Cache kết quả điều phối gần nhất theo station_id
-latest_smart_charging_cache: Dict[int, SmartChargingResponse] = {}
+latest_smart_charging_cache: dict[int, SmartChargingResponse] = {}
 
 
 class AIService:
@@ -37,14 +34,16 @@ class AIService:
     @classmethod
     def _is_gemini_available(cls) -> bool:
         """Kiểm tra Gemini API Key có sẵn sàng và hợp lệ không."""
-        return bool(HAS_GENAI and settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip())
+        return bool(
+            HAS_GENAI and settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip()
+        )
 
     @classmethod
     async def get_smart_charging(
         cls,
         station_id: int,
         grid_capacity_kw: float,
-        active_requests: List[Dict[str, Any]],
+        active_requests: list[dict[str, Any]],
     ) -> SmartChargingResponse:
         """Điều phối công suất trạm sạc: Thử gọi Gemini AI để tối ưu; nếu lỗi hoặc timeout 5s -> Heuristic."""
         # 1. Luôn tính toán Heuristic sẵn sàng làm baseline
@@ -79,10 +78,14 @@ class AIService:
                 return response.text
 
             raw_text = await asyncio.wait_for(_call_gemini(), timeout=5.0)
-            cleaned_text = raw_text.strip().replace("```json", "").replace("```", "").strip()
+            cleaned_text = (
+                raw_text.strip().replace("```json", "").replace("```", "").strip()
+            )
             parsed = json.loads(cleaned_text)
 
-            recommendations = parsed.get("recommendations", heuristic_res.recommendations)
+            recommendations = parsed.get(
+                "recommendations", heuristic_res.recommendations
+            )
 
             result = SmartChargingResponse(
                 station_id=heuristic_res.station_id,
@@ -94,20 +97,22 @@ class AIService:
                 source="GEMINI_AI",
                 is_fallback=False,
             )
-            latest_smart_charging_cache[station_id] = result
-            return result
-
-        except Exception as exc:
-            logger.warning(f"Gemini Smart Charging gặp sự cố ({exc!r}), chuyển sang Heuristic Fallback.")
+        except Exception as exc:  # noqa: BLE001 - preserve heuristic fallback on SDK/transport errors
+            logger.warning(
+                f"Gemini Smart Charging gặp sự cố ({exc!r}), chuyển sang Heuristic Fallback."
+            )
             latest_smart_charging_cache[station_id] = heuristic_res
             return heuristic_res
+        else:
+            latest_smart_charging_cache[station_id] = result
+            return result
 
     @classmethod
     async def get_predictive_maintenance(
         cls,
         charger_id: int,
         charger_code: str,
-        telemetry_history: List[Dict[str, Any]],
+        telemetry_history: list[dict[str, Any]],
     ) -> PredictiveMaintenanceResponse:
         """Dự báo bảo trì trụ sạc: Thử gọi Gemini AI; nếu lỗi hoặc timeout 5s -> Heuristic."""
         heuristic_res = FallbackService.calculate_maintenance_heuristic(
@@ -158,15 +163,17 @@ class AIService:
                 is_fallback=False,
             )
 
-        except Exception as exc:
-            logger.warning(f"Gemini Maintenance gặp sự cố ({exc!r}), chuyển sang Heuristic Fallback.")
+        except Exception as exc:  # noqa: BLE001 - preserve heuristic fallback on SDK/transport errors
+            logger.warning(
+                f"Gemini Maintenance gặp sự cố ({exc!r}), chuyển sang Heuristic Fallback."
+            )
             return heuristic_res
 
     @classmethod
     async def get_pricing_advice(
         cls,
         station_id: int,
-        current_tariff_id: Optional[int],
+        current_tariff_id: int | None,
         price_peak: float,
         price_normal: float,
         price_offpeak: float,
@@ -223,15 +230,17 @@ class AIService:
                 is_fallback=False,
             )
 
-        except Exception as exc:
-            logger.warning(f"Gemini Pricing Advice gặp sự cố ({exc!r}), chuyển sang Heuristic Fallback.")
+        except Exception as exc:  # noqa: BLE001 - preserve heuristic fallback on SDK/transport errors
+            logger.warning(
+                f"Gemini Pricing Advice gặp sự cố ({exc!r}), chuyển sang Heuristic Fallback."
+            )
             return heuristic_res
 
     @classmethod
     async def ask_advisor(
         cls,
         question: str,
-        basic_stats: Dict[str, Any],
+        basic_stats: dict[str, Any],
     ) -> AIAskResponse:
         """Hỏi đáp NLP tự do với AI: Sử dụng Gemini grounded dữ liệu thực tế từ DB; nếu lỗi -> Heuristic."""
         fallback_res = FallbackService.get_fallback_ai_ask(
@@ -250,7 +259,7 @@ class AIService:
                 f"- Tổng số phiên sạc: {basic_stats.get('total_sessions', 0)}\n"
                 f"- Tỷ lệ lấp đầy trạm trung bình: {basic_stats.get('avg_occupancy', 0)}%\n"
                 f"- Số cảnh báo lỗi thiết bị cần bảo trì: {basic_stats.get('open_maintenance_alerts', 0)}\n\n"
-                f"Câu hỏi của người quản trị: \"{question}\"\n\n"
+                f'Câu hỏi của người quản trị: "{question}"\n\n'
                 f"Quy tắc trả lời:\n"
                 f"1. Trả lời trực tiếp, chính xác, súc tích bằng tiếng Việt.\n"
                 f"2. Bám sát dữ liệu vận hành thực tế được cung cấp ở trên.\n"
@@ -273,6 +282,8 @@ class AIService:
                 basic_stats=basic_stats,
             )
 
-        except Exception as exc:
-            logger.warning(f"Gemini Ask gặp sự cố ({exc!r}), chuyển sang Heuristic Fallback.")
+        except Exception as exc:  # noqa: BLE001 - preserve heuristic fallback on SDK/transport errors
+            logger.warning(
+                f"Gemini Ask gặp sự cố ({exc!r}), chuyển sang Heuristic Fallback."
+            )
             return fallback_res

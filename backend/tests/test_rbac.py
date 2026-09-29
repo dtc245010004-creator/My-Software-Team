@@ -40,9 +40,7 @@ def make_user(role_name):
     return SimpleNamespace(
         id=1,
         is_active=True,
-        roles=[
-            SimpleNamespace(name=role_name)
-        ],
+        roles=[SimpleNamespace(name=role_name)],
     )
 
 
@@ -65,6 +63,7 @@ def client(monkeypatch):
     test_client = TestClient(app)
 
     from app.core.config import settings
+
     test_client.cookies.set(
         settings.session_cookie_name,
         "test-token",
@@ -77,9 +76,7 @@ def test_admin_role_allowed(client):
     response = client.get("/rbac-test/admin")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "Bạn có quyền admin"
-    }
+    assert response.json() == {"message": "Bạn có quyền admin"}
 
 
 def test_admin_cannot_access_operator(client, monkeypatch):
@@ -111,14 +108,10 @@ def test_admin_cannot_access_owner(client, monkeypatch):
 
 
 def test_route_without_permission_is_denied(client):
-    response = client.get(
-        "/rbac-test/no-permission"
-    )
+    response = client.get("/rbac-test/no-permission")
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "Route chưa khai báo quyền"
-    }
+    assert response.json() == {"detail": "Route chưa khai báo quyền"}
 
 
 def test_unauthenticated_is_rejected(monkeypatch):
@@ -138,8 +131,6 @@ def test_unauthenticated_is_rejected(monkeypatch):
 
     test_client = TestClient(app)
 
-    response = test_client.get(
-        "/rbac-test/admin"
-    )
+    response = test_client.get("/rbac-test/admin")
 
     assert response.status_code == 401

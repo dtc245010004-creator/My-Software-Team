@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Any, Dict, List, Set
+from typing import Any
+
 from fastapi import WebSocket
 
 logger = logging.getLogger("ev_csms.websocket")
@@ -11,21 +12,25 @@ class ConnectionManager:
 
     def __init__(self):
         # Danh sách toàn bộ các WebSocket client đang kết nối
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
         # Phân kênh: session_id -> Set[WebSocket]
-        self.session_subscriptions: Dict[int, Set[WebSocket]] = {}
+        self.session_subscriptions: dict[int, set[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket):
         """Chấp nhận kết nối từ client."""
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.info(f"WebSocket client kết nối. Tổng số kết nối: {len(self.active_connections)}")
+        logger.info(
+            f"WebSocket client kết nối. Tổng số kết nối: {len(self.active_connections)}"
+        )
 
     def disconnect(self, websocket: WebSocket):
         """Hủy đăng ký khi client ngắt kết nối và dọn dẹp mọi kênh subscription."""
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            logger.info(f"WebSocket client ngắt kết nối. Còn lại: {len(self.active_connections)}")
+            logger.info(
+                f"WebSocket client ngắt kết nối. Còn lại: {len(self.active_connections)}"
+            )
 
         # Dọn dẹp khỏi các kênh phiên sạc
         for session_id, subs in list(self.session_subscriptions.items()):
@@ -48,14 +53,16 @@ class ConnectionManager:
             if not self.session_subscriptions[session_id]:
                 del self.session_subscriptions[session_id]
 
-    async def send_personal_message(self, message: Dict[str, Any], websocket: WebSocket):
+    async def send_personal_message(
+        self, message: dict[str, Any], websocket: WebSocket
+    ):
         """Gửi thông điệp riêng cho 1 client."""
         try:
             await websocket.send_text(json.dumps(message, ensure_ascii=False))
-        except Exception as e:
-            logger.error(f"Lỗi gửi thông điệp riêng: {e}")
+        except (OSError, RuntimeError):
+            logger.exception("Lỗi gửi thông điệp riêng")
 
-    async def broadcast_to_session(self, session_id: int, message: Dict[str, Any]):
+    async def broadcast_to_session(self, session_id: int, message: dict[str, Any]):
         """Phát sóng thông số đo đếm telemetry độc quyền tới các client đang theo dõi phiên sạc đó."""
         subscribers = self.session_subscriptions.get(session_id, set())
         if not subscribers:
@@ -67,14 +74,14 @@ class ConnectionManager:
         for connection in subscribers:
             try:
                 await connection.send_text(payload)
-            except Exception as e:
-                logger.warning(f"Lỗi gửi telemetry session #{session_id} tới client: {e}")
+            except (OSError, RuntimeError):
+                logger.exception("Lỗi gửi telemetry session #%s tới client", session_id)
                 disconnected.append(connection)
 
         for conn in disconnected:
             self.disconnect(conn)
 
-    async def broadcast(self, message: Dict[str, Any]):
+    async def broadcast(self, message: dict[str, Any]):
         """Phát sóng thông điệp chung tới toàn bộ client (cập nhật trạng thái trạm/trụ)."""
         if not self.active_connections:
             return
@@ -85,8 +92,8 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_text(payload)
-            except Exception as e:
-                logger.warning(f"Không thể gửi broadcast tới client: {e}")
+            except (OSError, RuntimeError):
+                logger.exception("Không thể gửi broadcast tới client")
                 disconnected.append(connection)
 
         for connection in disconnected:
@@ -95,4 +102,3 @@ class ConnectionManager:
 
 # Singleton instance toàn hệ thống
 ws_manager = ConnectionManager()
-

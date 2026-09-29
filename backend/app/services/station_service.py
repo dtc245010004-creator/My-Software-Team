@@ -1,14 +1,22 @@
 import math
-from typing import List, Optional
+
 from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+
 from app.core.websocket import ws_manager
-from app.models.station import ChargingPoint, Connector, Station
+from app.models.station import ChargingPoint, Station
 from app.models.user import User
-from app.schemas.station import ChargingPointResponse, ConnectorResponse, StationResponse
+from app.schemas.station import (
+    ChargingPointResponse,
+    ConnectorResponse,
+    StationResponse,
+)
 
 
-def calculate_haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+def calculate_haversine_distance(
+    lat1: float, lon1: float, lat2: float, lon2: float
+) -> float:
     """Tính khoảng cách đường chim bay giữa 2 tọa độ GPS (km) theo công thức Haversine."""
     R = 6371.0  # Bán kính Trái Đất (km)
     dlat = math.radians(lat2 - lat1)
@@ -47,9 +55,8 @@ def enrich_charger_response(charger: ChargingPoint) -> ChargingPointResponse:
         ConnectorResponse.model_validate(c) for c in charger.connectors if c.is_active
     ]
     total_connector_power = round(sum(c.max_power_kw for c in connectors_resp), 2)
-    is_power_sharing = (
-        charger.power_sharing_enabled
-        and (total_connector_power > charger.max_power_kw)
+    is_power_sharing = charger.power_sharing_enabled and (
+        total_connector_power > charger.max_power_kw
     )
 
     resp = ChargingPointResponse.model_validate(charger)
@@ -98,12 +105,12 @@ def atomic_soft_delete_station(db: Session, station: Station) -> None:
                 conn.status = "UNAVAILABLE"
         db.commit()
         db.refresh(station)
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi hệ thống khi xóa mềm trạm sạc: {str(e)}",
-        )
+            detail=f"Lỗi hệ thống khi xóa mềm trạm sạc: {exc!s}",
+        ) from exc
 
 
 def atomic_reactivate_station(db: Session, station: Station) -> None:
@@ -124,12 +131,12 @@ def atomic_reactivate_station(db: Session, station: Station) -> None:
                 conn.status = "AVAILABLE"
         db.commit()
         db.refresh(station)
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi hệ thống khi phục hồi trạm sạc: {str(e)}",
-        )
+            detail=f"Lỗi hệ thống khi phục hồi trạm sạc: {exc!s}",
+        ) from exc
 
 
 def atomic_soft_delete_charger(db: Session, charger: ChargingPoint) -> None:
@@ -142,12 +149,12 @@ def atomic_soft_delete_charger(db: Session, charger: ChargingPoint) -> None:
             conn.status = "UNAVAILABLE"
         db.commit()
         db.refresh(charger)
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi hệ thống khi xóa mềm trụ sạc: {str(e)}",
-        )
+            detail=f"Lỗi hệ thống khi xóa mềm trụ sạc: {exc!s}",
+        ) from exc
 
 
 def atomic_reactivate_charger(db: Session, charger: ChargingPoint) -> None:
@@ -160,15 +167,17 @@ def atomic_reactivate_charger(db: Session, charger: ChargingPoint) -> None:
             conn.status = "AVAILABLE"
         db.commit()
         db.refresh(charger)
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi hệ thống khi phục hồi trụ sạc: {str(e)}",
-        )
+            detail=f"Lỗi hệ thống khi phục hồi trụ sạc: {exc!s}",
+        ) from exc
 
 
-async def broadcast_status_change(entity_type: str, entity_id: int, new_status: str, extra: Optional[dict] = None) -> None:
+async def broadcast_status_change(
+    entity_type: str, entity_id: int, new_status: str, extra: dict | None = None
+) -> None:
     """Phát sóng sự kiện thay đổi trạng thái qua WebSocket Hub."""
     payload = {
         "event": "STATUS_CHANGED",

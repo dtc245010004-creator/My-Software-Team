@@ -11,28 +11,21 @@ router = APIRouter(
 @router.get("/admin")
 @roles("admin")
 def admin_test():
-    return {
-        "message": "Bạn có quyền admin"
-    }
+    return {"message": "Bạn có quyền admin"}
 
 
 @router.get("/operator")
 @roles("operator")
 def operator_test():
-    return {
-        "message": "Bạn có quyền operator"
-    }
+    return {"message": "Bạn có quyền operator"}
 
 
 @router.get("/owner")
 @roles("station_owner")
 def owner_test():
-    return {
-        "message": "Bạn có quyền station_owner"
-    }
+    return {"message": "Bạn có quyền station_owner"}
+
 
 @router.get("/no-permission")
 def no_permission_test():
-    return {
-        "message": "Route này không khai báo quyền"
-    }
+    return {"message": "Route này không khai báo quyền"}

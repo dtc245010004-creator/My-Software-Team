@@ -1,10 +1,8 @@
 from decimal import Decimal
-from unittest.mock import AsyncMock
+
 import pytest
 
-from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash
-from app.core.websocket import ws_manager
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
@@ -13,7 +11,6 @@ from app.models.wallet import Wallet
 from app.services.session_service import (
     reconcile_interrupted_sessions,
     start_charging_session,
-    stop_charging_session,
 )
 from app.simulator.charging_simulator import ChargingSimulator, simulator_manager
 
@@ -57,7 +54,9 @@ def sim_setup(db_session):
     db_session.commit()
 
     # Tạo Wallet
-    wallet = Wallet(user_id=driver.id, balance=Decimal("100000.00"), is_debt_locked=False)
+    wallet = Wallet(
+        user_id=driver.id, balance=Decimal("100000.00"), is_debt_locked=False
+    )
     db_session.add(wallet)
 
     # Tạo Station & Charger thuộc Operator A
@@ -140,7 +139,9 @@ def test_simulator_initialization_and_random_soc():
         applied_price_per_kwh=Decimal("3000.00"),
         max_power_kw=120.0,
     )
-    assert 20.0 <= sim.soc <= 40.0, f"SoC tự sinh {sim.soc} phải nằm trong khoảng 20-40%"
+    assert 20.0 <= sim.soc <= 40.0, (
+        f"SoC tự sinh {sim.soc} phải nằm trong khoảng 20-40%"
+    )
     assert sim.current_energy_kwh == Decimal("0.00")
     assert sim.power_kw == 0.0
 
@@ -187,9 +188,12 @@ async def test_auto_cutoff_on_battery_full(db_session, sim_setup):
     # Bước nhảy giả lập nạp điện đẩy SoC lên >= 100%
     await sim.step(dt_seconds=60.0, db=db_session)
 
-
     db_session.expire_all()
-    updated_session = db_session.query(ChargingSession).filter(ChargingSession.id == session.id).first()
+    updated_session = (
+        db_session.query(ChargingSession)
+        .filter(ChargingSession.id == session.id)
+        .first()
+    )
     assert updated_session.status == "COMPLETED"
     assert updated_session.stop_reason == "BATTERY_FULL"
     assert updated_session.current_soc == 100.0
@@ -214,7 +218,11 @@ async def test_auto_cutoff_on_overheat_emergency(db_session, sim_setup):
     await sim.step(dt_seconds=2.0, db=db_session)
 
     db_session.expire_all()
-    updated_session = db_session.query(ChargingSession).filter(ChargingSession.id == session.id).first()
+    updated_session = (
+        db_session.query(ChargingSession)
+        .filter(ChargingSession.id == session.id)
+        .first()
+    )
     assert updated_session.status == "COMPLETED"
     assert updated_session.stop_reason == "OVERHEAT_EMERGENCY"
 
@@ -244,12 +252,18 @@ async def test_auto_cutoff_on_debt_limit_exceeded(db_session, sim_setup):
     await sim.step(dt_seconds=1.0, db=db_session)
 
     db_session.expire_all()
-    updated_session = db_session.query(ChargingSession).filter(ChargingSession.id == session.id).first()
+    updated_session = (
+        db_session.query(ChargingSession)
+        .filter(ChargingSession.id == session.id)
+        .first()
+    )
     assert updated_session.status == "COMPLETED"
     assert updated_session.stop_reason == "DEBT_LIMIT_REACHED"
 
     # Kiểm tra tài khoản đã bị khóa nợ
-    updated_wallet = db_session.query(Wallet).filter(Wallet.user_id == driver.id).first()
+    updated_wallet = (
+        db_session.query(Wallet).filter(Wallet.user_id == driver.id).first()
+    )
     assert updated_wallet.is_debt_locked is True
 
 
@@ -267,7 +281,11 @@ async def test_checkpoint_saves_snapshot_to_db(db_session, sim_setup):
     await sim.step(dt_seconds=6.0, db=db_session)
 
     db_session.expire_all()
-    updated_session = db_session.query(ChargingSession).filter(ChargingSession.id == session.id).first()
+    updated_session = (
+        db_session.query(ChargingSession)
+        .filter(ChargingSession.id == session.id)
+        .first()
+    )
     assert updated_session.total_kwh > Decimal("0.00")
     assert updated_session.current_soc > 0.0
     assert updated_session.last_checkpoint_at is not None
@@ -306,7 +324,11 @@ def test_server_crash_reconciliation(db_session, sim_setup):
 
     # Kiểm tra session đã được chốt an toàn
     db_session.expire_all()
-    repaired_session = db_session.query(ChargingSession).filter(ChargingSession.id == crash_session.id).first()
+    repaired_session = (
+        db_session.query(ChargingSession)
+        .filter(ChargingSession.id == crash_session.id)
+        .first()
+    )
     assert repaired_session.status == "INTERRUPTED"
     assert repaired_session.stop_reason == "SERVER_CRASH_RECONCILED"
     assert repaired_session.total_amount == Decimal("60000.00")  # 20 kWh * 3000 VND
@@ -410,7 +432,6 @@ def test_simulator_manager_threadsafe_from_worker_thread():
     hệ thống không bao giờ ném RuntimeError và khởi tạo thành công task ngầm.
     """
     import asyncio
-    import threading
     from concurrent.futures import ThreadPoolExecutor
 
     # Tạo một event loop độc lập làm main loop
@@ -433,14 +454,16 @@ def test_simulator_manager_threadsafe_from_worker_thread():
             )
             result_holder["success"] = True
             result_holder["sim"] = sim
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - capture any worker failure for assertion
             result_holder["error"] = e
 
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(worker)
         future.result()
 
-    assert "error" not in result_holder, f"Bị lỗi khởi tạo threadsafe: {result_holder.get('error')}"
+    assert "error" not in result_holder, (
+        f"Bị lỗi khởi tạo threadsafe: {result_holder.get('error')}"
+    )
     assert result_holder.get("success") is True
     sim = result_holder["sim"]
     assert sim is not None
@@ -449,4 +472,3 @@ def test_simulator_manager_threadsafe_from_worker_thread():
     # Dọn dẹp
     simulator_manager.stop_simulation(9999)
     loop.close()
-

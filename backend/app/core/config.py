@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Union
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # JWT & Password Hashing
-    SECRET_KEY: str = "supersecret_ev_csms_key_for_development_jwt_auth_change_in_production"
+    SECRET_KEY: str = (
+        "supersecret_ev_csms_key_for_development_jwt_auth_change_in_production"
+    )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 giờ
     BCRYPT_ROUNDS: int = 12
@@ -27,7 +29,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./ev_csms.db"
 
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
+    BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
@@ -35,7 +37,7 @@ class Settings(BaseSettings):
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+    def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:
         if isinstance(v, str):
             if v.startswith("["):
                 return json.loads(v)
@@ -50,7 +52,9 @@ class Settings(BaseSettings):
     SIMULATOR_INTERVAL_SECONDS: int = 2
 
     model_config = SettingsConfigDict(
-        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),
+        env_file=os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        ),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",

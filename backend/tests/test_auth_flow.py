@@ -70,6 +70,7 @@ def db_session():
 @pytest.fixture(scope="function")
 def client(db_session, monkeypatch):
     """Override dependency get_db để kết nối tới SQLite in-memory."""
+
     def override_get_db():
         try:
             yield db_session
@@ -87,6 +88,7 @@ def client(db_session, monkeypatch):
 # ==============================================================================
 # 1. HAPPY PATH TESTS
 # ==============================================================================
+
 
 def test_login_happy_path_sets_cookie_and_returns_user(client):
     """Happy Path: Đăng nhập thành công trả về UserResponse và set cookie httpOnly."""
@@ -133,6 +135,7 @@ def test_auth_me_happy_path_with_bearer_token(client):
 # ==============================================================================
 # 2. EDGE CASES & BUSINESS LOGIC TESTS
 # ==============================================================================
+
 
 def test_account_lockout_after_consecutive_failed_attempts(client, db_session):
     """Edge Case: Nhập sai mật khẩu liên tiếp đúng max_failed_logins (5 lần) thì khóa 15 phút."""
@@ -197,6 +200,7 @@ def test_lockout_auto_reset_after_lockout_duration_expired(client, db_session):
 # ==============================================================================
 # 3. NEGATIVE & ERROR HANDLING TESTS
 # ==============================================================================
+
 
 def test_login_non_existing_email_returns_identical_error(client):
     """Negative Case (Security): Email không tồn tại trả về đúng 401 như mật khẩu sai để chống User Enumeration."""

@@ -1,6 +1,6 @@
 import os
-import sys
 import random
+import sys
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -12,17 +12,17 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+    except (AttributeError, OSError) as exc:
+        print(f"Không thể cấu hình UTF-8 console: {exc}", file=sys.stderr)
 
-from app.core.database import SessionLocal, engine, Base
-from app.core.security import get_password_hash
 import app.models  # noqa: F401
+from app.core.database import Base, SessionLocal, engine
+from app.core.security import get_password_hash
+from app.models.session import ChargingSession
+from app.models.station import ChargingPoint, Connector, Station
+from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
-from app.models.station import Station, ChargingPoint, Connector
-from app.models.tariff import Tariff
-from app.models.session import ChargingSession
 
 
 def seed_database():
@@ -38,7 +38,6 @@ def seed_database():
 
     db = SessionLocal()
     try:
-
         # 2. Tạo Tài khoản người dùng (RBAC)
         print("[+] Đang tạo tài khoản người dùng theo chuẩn phân quyền (RBAC)...")
         users_to_create = [
@@ -112,7 +111,9 @@ def seed_database():
         db.commit()
 
         # 3. Tạo Ví tiền điện tử (ACID Wallets cho toàn bộ người dùng)
-        print("[+] Đang tạo ví tiền điện tử và nạp số dư ban đầu cho toàn bộ người dùng...")
+        print(
+            "[+] Đang tạo ví tiền điện tử và nạp số dư ban đầu cho toàn bộ người dùng..."
+        )
         wallets_map = {}
         for u in users_to_create:
             if u.username == "admin":
@@ -128,7 +129,9 @@ def seed_database():
                 init_balance = Decimal("1500000.00")
                 is_locked = False
             elif u.username == "driver_debt":
-                init_balance = Decimal("-120000.00")  # Cho nợ hợp lệ trong hạn mức -300k
+                init_balance = Decimal(
+                    "-120000.00"
+                )  # Cho nợ hợp lệ trong hạn mức -300k
                 is_locked = True
             else:
                 init_balance = Decimal(str(random.choice([150000, 300000, 450000])))
@@ -220,7 +223,9 @@ def seed_database():
         db.commit()
 
         # 6. Tạo Trụ sạc (Charging Points) & Cổng sạc (Connectors)
-        print("[+] Đang cấu hình các trụ sạc EVSE (AC 22kW, DC 60kW, DC 150kW, DC 300kW)...")
+        print(
+            "[+] Đang cấu hình các trụ sạc EVSE (AC 22kW, DC 60kW, DC 150kW, DC 300kW)..."
+        )
         stations_list = [st_hcm, st_hanoi, st_danang]
         all_connectors = []
 
@@ -331,7 +336,9 @@ def seed_database():
                     total_amount=amount,
                     current_soc=100.0,
                     status="COMPLETED",
-                    stop_reason="BATTERY_FULL" if random.random() > 0.3 else "USER_STOPPED",
+                    stop_reason="BATTERY_FULL"
+                    if random.random() > 0.3
+                    else "USER_STOPPED",
                     created_at=sess_start,
                 )
                 db.add(sess)
@@ -344,9 +351,11 @@ def seed_database():
         print("==================================================================")
         print(f"[*] Tổng số người dùng: {len(users_to_create)} (Admin, CPO, Drivers)")
         print(f"[*] Tổng số trạm sạc:   {len(stations_list)} (Hà Nội, Đà Nẵng, TP.HCM)")
-        print(f"[*] Tổng số trụ sạc:    9 trụ EVSE (100% AVAILABLE sẵn sàng)")
-        print(f"[*] Tổng số cổng sạc:   18 cổng sạc vật lý (CCS2, Type 2)")
-        print(f"[*] Tổng phiên sạc:     {sessions_created} phiên lịch sử quá khứ (ngày hôm nay để trống chờ vận hành thật)")
+        print("[*] Tổng số trụ sạc:    9 trụ EVSE (100% AVAILABLE sẵn sàng)")
+        print("[*] Tổng số cổng sạc:   18 cổng sạc vật lý (CCS2, Type 2)")
+        print(
+            f"[*] Tổng phiên sạc:     {sessions_created} phiên lịch sử quá khứ (ngày hôm nay để trống chờ vận hành thật)"
+        )
         print("------------------------------------------------------------------")
         print("THÔNG TIN TÀI KHOẢN ĐĂNG NHẬP NHANH:")
         print("1. Quản trị viên:    admin / AdminPass123")
@@ -356,10 +365,10 @@ def seed_database():
         print("5. Khách nợ tiền:    driver_debt / DriverPass123 (Số dư -120,000 đ)")
         print("==================================================================")
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - top-level seed failure must roll back
         db.rollback()
         print(f"[!] Lỗi nạp dữ liệu: {exc}")
-        raise exc
+        raise
     finally:
         db.close()
 

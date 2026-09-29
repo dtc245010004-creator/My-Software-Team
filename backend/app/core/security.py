@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any
+
 import bcrypt
 import jwt
+
 from app.core.config import settings
 
 
@@ -19,13 +21,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             plain_password.encode("utf-8"),
             hashed_password.encode("utf-8"),
         )
-    except Exception:
+    except (TypeError, ValueError):
         return False
 
 
 def create_access_token(
-    data: Dict[str, Any],
-    expires_delta: Optional[timedelta] = None,
+    data: dict[str, Any],
+    expires_delta: timedelta | None = None,
 ) -> str:
     """Tạo JWT access token có thời hạn và nhúng claims."""
     to_encode = data.copy()
@@ -44,7 +46,7 @@ def create_access_token(
     return encoded_jwt
 
 
-def decode_access_token(token: str) -> Dict[str, Any]:
+def decode_access_token(token: str) -> dict[str, Any]:
     """Giải mã và xác thực chữ ký JWT access token. Ném ngoại lệ jwt.PyJWTError nếu lỗi."""
     return jwt.decode(
         token,

@@ -1,6 +1,6 @@
-from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.tariff import Tariff
@@ -12,16 +12,18 @@ router = APIRouter(prefix="/tariffs", tags=["Biểu giá điện linh hoạt (Ta
 
 @router.get(
     "",
-    response_model=List[TariffResponse],
+    response_model=list[TariffResponse],
     summary="Xem danh sách biểu giá điện áp dụng",
 )
 def list_tariffs(
-    station_id: Optional[int] = None,
+    station_id: int | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(Tariff).filter(Tariff.is_active == True)
+    query = db.query(Tariff).filter(Tariff.is_active.is_(True))
     if station_id is not None:
-        query = query.filter((Tariff.station_id == station_id) | (Tariff.station_id == None))
+        query = query.filter(
+            (Tariff.station_id == station_id) | Tariff.station_id.is_(None)
+        )
     return query.all()
 
 
@@ -33,7 +35,9 @@ def list_tariffs(
 def get_tariff(tariff_id: int, db: Session = Depends(get_db)):
     tariff = db.query(Tariff).filter(Tariff.id == tariff_id).first()
     if not tariff:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy biểu giá.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy biểu giá."
+        )
     return tariff
 
 
@@ -68,7 +72,9 @@ def update_tariff(
 ):
     tariff = db.query(Tariff).filter(Tariff.id == tariff_id).first()
     if not tariff:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy biểu giá.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy biểu giá."
+        )
 
     update_data = tariff_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -90,7 +96,9 @@ def delete_tariff(
 ):
     tariff = db.query(Tariff).filter(Tariff.id == tariff_id).first()
     if not tariff:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy biểu giá.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy biểu giá."
+        )
 
     tariff.is_active = False
     db.commit()

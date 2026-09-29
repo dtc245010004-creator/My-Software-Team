@@ -1,8 +1,6 @@
-import pytest
 from unittest.mock import patch
+
 from app.models.user import User
-from app.models.wallet import Wallet
-from app.core.security import get_password_hash
 
 
 def test_register_success_creates_wallet_atomically(client, db_session):
@@ -38,10 +36,16 @@ def test_register_atomicity_rollback_on_wallet_failure(client, db_session):
     }
 
     # Giả lập lỗi ném ra khi khởi tạo Wallet
-    with patch("app.api.v1.endpoints.auth.Wallet", side_effect=RuntimeError("Mô phỏng lỗi CSDL khi tạo Ví")):
+    with patch(
+        "app.api.v1.endpoints.auth.Wallet",
+        side_effect=RuntimeError("Mô phỏng lỗi CSDL khi tạo Ví"),
+    ):
         response = client.post("/api/v1/auth/register", json=payload)
         assert response.status_code == 500
-        assert "Lỗi hệ thống khi khởi tạo tài khoản và ví điện tử" in response.json()["detail"]
+        assert (
+            "Lỗi hệ thống khi khởi tạo tài khoản và ví điện tử"
+            in response.json()["detail"]
+        )
 
     # Khẳng định không có User rác nào tồn tại trong DB
     user = db_session.query(User).filter(User.username == "crash_test_user").first()
@@ -119,7 +123,11 @@ def test_register_password_lacks_digits_or_letters(client):
     # Thiếu số
     res1 = client.post(
         "/api/v1/auth/register",
-        json={"username": "no_digit_user", "email": "d1@test.com", "password": "OnlyLettersPass"},
+        json={
+            "username": "no_digit_user",
+            "email": "d1@test.com",
+            "password": "OnlyLettersPass",
+        },
     )
     assert res1.status_code == 422
     assert "phải chứa ít nhất một chữ số" in res1.text
@@ -127,7 +135,11 @@ def test_register_password_lacks_digits_or_letters(client):
     # Thiếu chữ cái
     res2 = client.post(
         "/api/v1/auth/register",
-        json={"username": "no_letter_user", "email": "l1@test.com", "password": "1234567890"},
+        json={
+            "username": "no_letter_user",
+            "email": "l1@test.com",
+            "password": "1234567890",
+        },
     )
     assert res2.status_code == 422
     assert "phải chứa ít nhất một chữ cái" in res2.text
@@ -183,7 +195,11 @@ def test_login_wrong_credentials(client):
     # Đăng ký tài khoản mẫu
     client.post(
         "/api/v1/auth/register",
-        json={"username": "login_victim", "email": "victim@test.com", "password": "Password123"},
+        json={
+            "username": "login_victim",
+            "email": "victim@test.com",
+            "password": "Password123",
+        },
     )
 
     # Thử sai mật khẩu
@@ -206,7 +222,11 @@ def test_login_success_and_get_me(client):
     """11. Đăng nhập đúng nhận Token -> Dùng token gọi /me lấy thông tin và số dư ví."""
     client.post(
         "/api/v1/auth/register",
-        json={"username": "valid_user", "email": "valid@test.com", "password": "Password123"},
+        json={
+            "username": "valid_user",
+            "email": "valid@test.com",
+            "password": "Password123",
+        },
     )
 
     # Đăng nhập bằng email hoặc username
@@ -228,7 +248,9 @@ def test_login_success_and_get_me(client):
     assert me_data["wallet_balance"] == 0.0
 
     # Gọi /me với token giả mạo -> 401
-    res_invalid = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer fake.token.here"})
+    res_invalid = client.get(
+        "/api/v1/auth/me", headers={"Authorization": "Bearer fake.token.here"}
+    )
     assert res_invalid.status_code == 401
 
 
@@ -237,7 +259,11 @@ def test_rbac_forbidden_for_insufficient_role(client, db_session):
     # 1. Đăng ký tài khoản thường (CUSTOMER)
     client.post(
         "/api/v1/auth/register",
-        json={"username": "standard_driver", "email": "driver_rbac@test.com", "password": "Password123"},
+        json={
+            "username": "standard_driver",
+            "email": "driver_rbac@test.com",
+            "password": "Password123",
+        },
     )
     res_login = client.post(
         "/api/v1/auth/login",
@@ -264,4 +290,6 @@ def test_rbac_forbidden_for_insufficient_role(client, db_session):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert res_admin_updated.status_code == 200
-    assert "Xin chào Quản trị viên standard_driver" in res_admin_updated.json()["message"]
+    assert (
+        "Xin chào Quản trị viên standard_driver" in res_admin_updated.json()["message"]
+    )

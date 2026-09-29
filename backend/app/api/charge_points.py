@@ -13,7 +13,9 @@ from app.schemas.charge_point import ChargePointCreate, ChargePointResponse
 router = APIRouter()
 
 
-@router.post("/", response_model=ChargePointResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=ChargePointResponse, status_code=status.HTTP_201_CREATED
+)
 def create_charge_point(
     *,
     db: Annotated[Session, Depends(get_db)],
@@ -53,10 +55,11 @@ def create_charge_point(
 
         db.commit()
         db.refresh(cp)
-        return cp
     except IntegrityError:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Mã trụ sạc đã được dùng",
         )
+    else:
+        return cp

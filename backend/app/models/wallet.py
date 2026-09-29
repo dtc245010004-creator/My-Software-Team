@@ -1,5 +1,16 @@
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    func,
+)
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
 
 
@@ -21,7 +32,9 @@ class Wallet(Base):
     )
     balance = Column(Numeric(12, 2), default=0.00, nullable=False)
     currency = Column(String(10), default="VND", nullable=False)
-    is_debt_locked = Column(Boolean, default=False, nullable=False)  # Bị khóa nợ nếu âm quá hạn mức
+    is_debt_locked = Column(
+        Boolean, default=False, nullable=False
+    )  # Bị khóa nợ nếu âm quá hạn mức
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -60,7 +73,9 @@ class WalletTransaction(Base):
         nullable=False,
         index=True,
     )
-    amount = Column(Numeric(12, 2), nullable=False)  # Số tiền biến động (+ nạp, - trừ cước)
+    amount = Column(
+        Numeric(12, 2), nullable=False
+    )  # Số tiền biến động (+ nạp, - trừ cước)
     transaction_type = Column(String(20), nullable=False)  # TOPUP, CHARGE_FEE, REFUND
     balance_after = Column(Numeric(12, 2), nullable=False)
     reference_id = Column(String(50), nullable=True)  # Mã tham chiếu (VD: session_123)
