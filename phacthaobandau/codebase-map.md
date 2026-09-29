@@ -17,11 +17,7 @@
 | `Prompt.md` | Đặc tả hợp nhất đầy đủ — nguồn sự thật về nghiệp vụ và kỹ thuật |
 | `sodo.md` | Sơ đồ kiến trúc tổng thể, 2 vòng lặp (Dual-Loop), ma trận AI/Heuristic, luồng WS và máy trạng thái |
 | `yêu cầu.md` | Bản phản biện kỹ thuật, 9 điểm rủi ro và các đề xuất bổ sung (đã hợp nhất vào `sodo.md`) |
-| `GEMINI.md` | Hướng dẫn hành vi AI, quy trình làm việc, quy tắc bảo toàn dữ liệu |
-| `CLAUDE.md` | Quy ước và hướng dẫn agent đồng bộ với GEMINI.md |
-| `README.md` | Nhật ký vận hành phiên làm việc — hướng dẫn mở/đóng phiên cho người dùng |
-| `HUONGDAN.md` | Bản hướng dẫn vận hành chi tiết đồng bộ cùng README.md |
-| `phân công.md` | Bảng phân chia nhiệm vụ chi tiết cho 3 Backend và 3 Frontend kèm ma trận ghép cặp |
+| `phacthaobandau/` | Thư mục lưu trữ tài liệu phác thảo ban đầu, quy chuẩn AI, lộ trình, kế hoạch 11 bước và hồ sơ SDLC |
 | `.markdownlint.json` | Cấu hình chuẩn hóa định dạng Markdown cho toàn bộ dự án |
 | `.env.example` | Mẫu cấu hình biến môi trường toàn hệ thống |
 
@@ -99,40 +95,46 @@
 
 ---
 
-### Tài liệu, Kế hoạch & Hồ sơ SDLC (`docs/`)
+### Tài liệu, Kế hoạch & Hồ sơ SDLC (`phacthaobandau/`)
 
 | File | Vai trò |
 | --- | --- |
-| `docs/codebase-map.md` | File này — bản đồ mã nguồn, bắt buộc cập nhật khi có thay đổi file |
-| `docs/MASTER-ROADMAP.md` | Bức tranh toàn cảnh 8 giai đoạn của Nền tảng trạm sạc xe điện |
-| `docs/implementation_plan.md` | Phân tích yêu cầu kỹ thuật & kế hoạch kiến trúc chi tiết |
-| `docs/plans/TIEN-DO.md` | Nhật ký tiến độ — **nguồn sự thật về trạng thái** các bước |
-| `docs/plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md` | Kế hoạch Bước 01: Đặc tả yêu cầu & SRS |
-| `docs/plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md` | Kế hoạch Bước 02: Thiết kế CSDL & ERD |
-| `docs/plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md` | Kế hoạch Bước 03: Cấu hình môi trường & Docker |
-| `docs/plans/Buoc-04-Cau-truc-Backend-Cau-hinh-va-Database-Session.md` | Kế hoạch Bước 04: Scaffold Backend & WebSocket Hub |
-| `docs/plans/Buoc-05-Xac-thuc-Dang-nhap-va-Phan-quyen-RBAC.md` | Kế hoạch Bước 05: Auth & RBAC |
-| `docs/plans/Buoc-06-Module-Quan-ly-Ha-tang-Tram-Tru-va-Cong-sac.md` | Kế hoạch Bước 06: Quản lý hạ tầng Trạm, Trụ, Cổng sạc |
-| `docs/plans/Buoc-07-Module-Bieu-gia-Vi-dien-tu-va-Phien-sac-ACID.md` | Kế hoạch Bước 07: Biểu giá TOU, Ví tiền & Phiên sạc ACID |
-| `docs/plans/Buoc-08-Module-Gia-lap-Tram-sac-Simulator-va-Telemetry.md` | Kế hoạch Bước 08: Bộ giả lập sạc & Telemetry realtime |
-| `docs/plans/Buoc-09-Module-AI-Dieu-phoi-tai-Bao-tri-va-Fallback.md` | Kế hoạch Bước 09: AI Smart Charging, Bảo trì & Heuristic Fallback |
-| `docs/plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md` | Kế hoạch Bước 10: Giao diện Web Frontend React + Tailwind |
-| `docs/plans/Buoc-11-Bo-Test-Tu-dong-Seed-Data-va-Dong-goi.md` | Kế hoạch Bước 11: Pytest, Seed Data & Đóng gói SDLC |
-| `docs/SDLC/KT1/README.md` | Mục tiêu & danh mục deliverable mốc KT1 (Đặc tả, ERD & Kiến trúc) |
-| `docs/SDLC/KT1/01_SRS_and_UseCases.md` | Tài liệu đặc tả yêu cầu phần mềm (SRS), 3 Actor, CRUD Matrix & sơ đồ Use Case |
-| `docs/SDLC/KT1/02_Database_Design_ERD.md` | Hồ sơ thiết kế CSDL, sơ đồ Mermaid ERD, Từ điển dữ liệu và DDL cho KT1 |
-| `docs/SDLC/KT1/03_AI_Architecture_and_Prompts.md` | Kiến trúc tích hợp Gemini API, kỹ thuật Prompting và thuật toán Fallback Heuristic |
-| `docs/SDLC/KT1/04_Wireframes.md` | Bản thiết kế cấu trúc giao diện Wireframe cho Dashboard CPO, Simulator, Driver Portal |
-| `docs/SDLC/KT2/README.md` | Mục tiêu & danh mục deliverable mốc KT2 (Core Backend, Simulator & ACID) |
-| `docs/SDLC/KT2/02_Transaction_Design_and_Wallet_ACID.md` | Hồ sơ thiết kế giao dịch ACID ví tiền và phiên sạc mốc KT2 |
-| `docs/SDLC/KT2/03_Simulator_and_Telemetry_Design.md` | Hồ sơ thiết kế bộ giả lập trạm sạc và telemetry thời gian thực mốc KT2 |
-| `docs/SDLC/KT3/README.md` | Mục tiêu & danh mục deliverable mốc KT3 (AI Smart Charging & Frontend) |
-| `docs/SDLC/KT3/01_AI_Integration_and_Prompt_Evaluation.md` | Hồ sơ tích hợp AI Gemini, đánh giá prompt và Heuristic Fallback mốc KT3 |
-| `docs/SDLC/KT3/02_Frontend_Architecture_and_UI_Guide.md` | Kiến trúc Web Frontend React + Tailwind và hướng dẫn giao diện mốc KT3 |
-| `docs/SDLC/final/README.md` | Mục tiêu & danh mục deliverable mốc Cuối kỳ (Test, Đóng gói & Demo) |
-| `docs/SDLC/final/01_Final_Technical_Report.md` | Báo cáo kỹ thuật tổng kết toàn diện 11 bước đề tài EV CSMS mốc Cuối kỳ |
-| `docs/SDLC/final/02_User_Guide_and_Demo_Script.md` | Sổ tay hướng dẫn vận hành 1-click & Kịch bản demo 15 phút bảo vệ trước hội đồng |
-| `docs/SDLC/final/03_Presentation_Slides.md` | Đề cương chi tiết 15 slide thuyết trình bảo vệ đồ án tốt nghiệp/cuối kỳ |
+| `phacthaobandau/00_MUC_LUC_TAI_LIEU.md` | Bảng mục lục & Sơ đồ điều hướng thứ tự đọc tài liệu toàn diện |
+| `phacthaobandau/README.md` | Bản tóm tắt điều hướng nhanh trong thư mục phác thảo |
+| `phacthaobandau/GEMINI.md` | Hướng dẫn hành vi AI, quy trình làm việc, quy tắc bảo toàn dữ liệu |
+| `phacthaobandau/CLAUDE.md` | Quy ước và hướng dẫn agent đồng bộ với GEMINI.md |
+| `phacthaobandau/HUONGDAN.md` | Bản hướng dẫn vận hành chi tiết đồng bộ |
+| `phacthaobandau/codebase-map.md` | File này — bản đồ mã nguồn, bắt buộc cập nhật khi có thay đổi file |
+| `phacthaobandau/MASTER-ROADMAP.md` | Bức tranh toàn cảnh 8 giai đoạn của Nền tảng trạm sạc xe điện |
+| `phacthaobandau/implementation_plan.md` | Phân tích yêu cầu kỹ thuật & kế hoạch kiến trúc chi tiết |
+| `phacthaobandau/plans/TIEN-DO.md` | Nhật ký tiến độ — **nguồn sự thật về trạng thái** các bước |
+| `phacthaobandau/plans/Buoc-01-Dac-ta-yeu-cau-va-Phan-tich-nghiep-vu.md` | Kế hoạch Bước 01: Đặc tả yêu cầu & SRS |
+| `phacthaobandau/plans/Buoc-02-Thiet-ke-CSDL-va-So-do-ERD.md` | Kế hoạch Bước 02: Thiết kế CSDL & ERD |
+| `phacthaobandau/plans/Buoc-03-Cau-hinh-Moi-truong-Docker-va-CSDL.md` | Kế hoạch Bước 03: Cấu hình môi trường & Docker |
+| `phacthaobandau/plans/Buoc-04-Cau-truc-Backend-Cau-hinh-va-Database-Session.md` | Kế hoạch Bước 04: Scaffold Backend & WebSocket Hub |
+| `phacthaobandau/plans/Buoc-05-Xac-thuc-Dang-nhap-va-Phan-quyen-RBAC.md` | Kế hoạch Bước 05: Auth & RBAC |
+| `phacthaobandau/plans/Buoc-06-Module-Quan-ly-Ha-tang-Tram-Tru-va-Cong-sac.md` | Kế hoạch Bước 06: Quản lý hạ tầng Trạm, Trụ, Cổng sạc |
+| `phacthaobandau/plans/Buoc-07-Module-Bieu-gia-Vi-dien-tu-va-Phien-sac-ACID.md` | Kế hoạch Bước 07: Biểu giá TOU, Ví tiền & Phiên sạc ACID |
+| `phacthaobandau/plans/Buoc-08-Module-Gia-lap-Tram-sac-Simulator-va-Telemetry.md` | Kế hoạch Bước 08: Bộ giả lập sạc & Telemetry realtime |
+| `phacthaobandau/plans/Buoc-09-Module-AI-Dieu-phoi-tai-Bao-tri-va-Fallback.md` | Kế hoạch Bước 09: AI Smart Charging, Bảo trì & Heuristic Fallback |
+| `phacthaobandau/plans/Buoc-10-Xay-dung-Frontend-Web-React-Tailwind-Charts.md` | Kế hoạch Bước 10: Giao diện Web Frontend React + Tailwind |
+| `phacthaobandau/plans/Buoc-11-Bo-Test-Tu-dong-Seed-Data-va-Dong-goi.md` | Kế hoạch Bước 11: Pytest, Seed Data & Đóng gói SDLC |
+| `phacthaobandau/SDLC/KT1/README.md` | Mục tiêu & danh mục deliverable mốc KT1 (Đặc tả, ERD & Kiến trúc) |
+| `phacthaobandau/SDLC/KT1/01_SRS_and_UseCases.md` | Tài liệu đặc tả yêu cầu phần mềm (SRS), 3 Actor, CRUD Matrix & sơ đồ Use Case |
+| `phacthaobandau/SDLC/KT1/02_Database_Design_ERD.md` | Hồ sơ thiết kế CSDL, sơ đồ Mermaid ERD, Từ điển dữ liệu và DDL cho KT1 |
+| `phacthaobandau/SDLC/KT1/03_AI_Architecture_and_Prompts.md` | Kiến trúc tích hợp Gemini API, kỹ thuật Prompting và thuật toán Fallback Heuristic |
+| `phacthaobandau/SDLC/KT1/04_Wireframes.md` | Bản thiết kế cấu trúc giao diện Wireframe cho Dashboard CPO, Simulator, Driver Portal |
+| `phacthaobandau/SDLC/KT2/README.md` | Mục tiêu & danh mục deliverable mốc KT2 (Core Backend, Simulator & ACID) |
+| `phacthaobandau/SDLC/KT2/02_Transaction_Design_and_Wallet_ACID.md` | Hồ sơ thiết kế giao dịch ACID ví tiền và phiên sạc mốc KT2 |
+| `phacthaobandau/SDLC/KT2/03_Simulator_and_Telemetry_Design.md` | Hồ sơ thiết kế bộ giả lập trạm sạc và telemetry thời gian thực mốc KT2 |
+| `phacthaobandau/SDLC/KT3/README.md` | Mục tiêu & danh mục deliverable mốc KT3 (AI Smart Charging & Frontend) |
+| `phacthaobandau/SDLC/KT3/01_AI_Integration_and_Prompt_Evaluation.md` | Hồ sơ tích hợp AI Gemini, đánh giá prompt và Heuristic Fallback mốc KT3 |
+| `phacthaobandau/SDLC/KT3/02_Frontend_Architecture_and_UI_Guide.md` | Kiến trúc Web Frontend React + Tailwind và hướng dẫn giao diện mốc KT3 |
+| `phacthaobandau/SDLC/final/README.md` | Mục tiêu & danh mục deliverable mốc Cuối kỳ (Test, Đóng gói & Demo) |
+| `phacthaobandau/SDLC/final/01_Final_Technical_Report.md` | Báo cáo kỹ thuật tổng kết toàn diện 11 bước đề tài EV CSMS mốc Cuối kỳ |
+| `phacthaobandau/SDLC/final/02_User_Guide_and_Demo_Script.md` | Sổ tay hướng dẫn vận hành 1-click & Kịch bản demo 15 phút bảo vệ trước hội đồng |
+| `phacthaobandau/SDLC/final/03_Presentation_Slides.md` | Đề cương chi tiết 15 slide thuyết trình bảo vệ đồ án tốt nghiệp/cuối kỳ |
+| `phacthaobandau/screenshots/README.md` | Danh mục 18 ảnh chụp màn hình giao diện hệ thống thực tế |
 
 ### Seed Data & Kiểm thử Tự động (`backend/`)
 
