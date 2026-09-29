@@ -1,7 +1,8 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from app.api.deps import get_optional_current_user, require_roles
+from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
@@ -34,7 +35,7 @@ router = APIRouter(tags=["Quản lý Trụ sạc & Cổng sạc (Chargers & Conn
 def create_charger_for_station(
     station_id: int,
     charger_in: ChargingPointCreate,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """
@@ -86,7 +87,7 @@ def create_charger_for_station(
                 connector_number=conn_in.connector_number,
                 connector_type=conn_in.connector_type,
                 max_power_kw=conn_in.max_power_kw,
-                status="UNKNOWN",
+                status="AVAILABLE",
                 is_active=True,
             )
             db.add(new_conn)
@@ -104,34 +105,14 @@ def create_charger_for_station(
 
 
 @router.get(
-    "/chargers/check-code",
-    summary="Kiểm tra mã trụ sạc đã được sử dụng chưa",
-)
-def check_charger_code(
-    code: str,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
-    db: Session = Depends(get_db),
-):
-    normalized_code = code.strip().upper()
-    exists = db.query(ChargingPoint.id).filter(ChargingPoint.code == normalized_code).first() is not None
-    return {"available": not exists}
-
-
-@router.get(
     "/chargers/{charger_id}",
     response_model=ChargingPointResponse,
     summary="Xem chi tiết trụ sạc và các cổng sạc trực thuộc",
 )
-def get_charger(
-    charger_id: int,
-    db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
-):
+def get_charger(charger_id: int, db: Session = Depends(get_db)):
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc.")
-    if current_user and current_user.role in ("OPERATOR", "STATION_OWNER"):
-        verify_charger_ownership(charger, current_user)
     return enrich_charger_response(charger)
 
 
@@ -143,7 +124,7 @@ def get_charger(
 def update_charger(
     charger_id: int,
     charger_in: ChargingPointUpdate,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """Cập nhật thông tin cấu hình trụ sạc: Chỉ Owner trạm cha hoặc Admin mới có quyền."""
@@ -170,7 +151,7 @@ def update_charger(
 async def update_charger_status(
     charger_id: int,
     status_in: ChargingPointStatusUpdate,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """
@@ -205,7 +186,7 @@ async def update_charger_status(
 )
 def delete_charger(
     charger_id: int,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """Xóa mềm trụ sạc: Gán is_active = False cascade cho các súng sạc trong 1 Transaction."""
@@ -225,7 +206,7 @@ def delete_charger(
 )
 def reactivate_charger(
     charger_id: int,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """Phục hồi hoạt động trụ sạc và các súng sạc con."""
@@ -247,7 +228,7 @@ def reactivate_charger(
 def add_connector(
     charger_id: int,
     conn_in: ConnectorCreate,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """Thêm cổng sạc vào trụ: Kiểm tra trùng lặp connector_number."""

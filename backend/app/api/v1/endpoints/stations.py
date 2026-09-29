@@ -1,9 +1,9 @@
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 import math
 from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from app.api.deps import get_optional_current_user, require_roles
+from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.core.datetime_utils import get_vn_now, to_vn_time
 from app.models.session import ChargingSession
@@ -41,7 +41,6 @@ def list_stations(
     user_lon: Optional[float] = Query(None, ge=-180.0, le=180.0, description="Kinh độ người dùng để tính khoảng cách"),
     radius_km: Optional[float] = Query(None, gt=0, description="Bán kính tìm kiếm xung quanh (km)"),
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     API tìm kiếm công khai dành cho cả khách vãng lai và tài xế:
@@ -50,10 +49,6 @@ def list_stations(
     - Hỗ trợ phân trang chuẩn qua skip & limit.
     """
     query = db.query(Station).filter(Station.is_active == True)
-    if current_user is None or current_user.role == "CUSTOMER":
-        query = query.filter(Station.status == "ACTIVE")
-    if current_user and current_user.role in ("OPERATOR", "STATION_OWNER"):
-        query = query.filter(Station.operator_id == current_user.id)
 
     if status_filter:
         query = query.filter(Station.status == status_filter.upper())
@@ -355,20 +350,10 @@ def get_grid_load_profile_timeline(
     response_model=StationResponse,
     summary="Xem thông tin chi tiết trạm sạc cùng các trụ và cổng sạc",
 )
-def get_station(
-    station_id: int,
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user),
-):
+def get_station(station_id: int, db: Session = Depends(get_db)):
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
-    if station.status != "ACTIVE" and (
-        current_user is None or current_user.role not in ("ADMIN", "OPERATOR", "STATION_OWNER")
-    ):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
-    if current_user and current_user.role in ("OPERATOR", "STATION_OWNER"):
-        verify_station_ownership(station, current_user)
     return enrich_station_response(station)
 
 
@@ -380,7 +365,7 @@ def get_station(
 )
 def create_station(
     station_in: StationCreate,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """
@@ -396,7 +381,7 @@ def create_station(
         longitude=station_in.longitude,
         total_grid_capacity_kw=station_in.total_grid_capacity_kw,
         operating_hours=station_in.operating_hours,
-        status="MAINTENANCE",
+        status=station_in.status,
         is_active=True,
     )
     db.add(new_station)
@@ -413,7 +398,7 @@ def create_station(
 def update_station(
     station_id: int,
     station_in: StationUpdate,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """Cập nhật trạm sạc: Kiểm tra quyền sở hữu (Owner hoặc Admin)."""
@@ -438,7 +423,7 @@ def update_station(
 )
 def delete_station(
     station_id: int,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """
@@ -462,7 +447,7 @@ def delete_station(
 )
 def reactivate_station(
     station_id: int,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "STATION_OWNER"])),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
     """

@@ -1,6 +1,6 @@
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from app.core.datetime_utils import UTCDateTime
 
 
 # ==========================================
@@ -24,6 +24,9 @@ class ConnectorCreate(ConnectorBase):
     pass
 
 
+from app.core.datetime_utils import UTCDateTime
+
+
 class ConnectorResponse(ConnectorBase):
     id: int
     charging_point_id: int
@@ -45,16 +48,9 @@ class ChargingPointBase(BaseModel):
     firmware_version: Optional[str] = Field(default="1.0.0", max_length=50)
     power_sharing_enabled: bool = Field(default=True, description="Bật tính năng chia tải động giữa các súng")
 
-    @field_validator("code")
-    @classmethod
-    def normalize_charger_code(cls, value: str) -> str:
-        return value.strip().upper()
-
 
 class ChargingPointCreate(ChargingPointBase):
-    connectors: List[ConnectorCreate] = Field(
-        ..., min_length=1, max_length=4, description="Từ 1 đến 4 đầu nối được tạo cùng trụ sạc"
-    )
+    connectors: Optional[List[ConnectorCreate]] = Field(default_factory=list, description="Danh sách súng sạc ban đầu")
 
 
 class ChargingPointUpdate(BaseModel):

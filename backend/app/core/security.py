@@ -1,91 +1,53 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any
-
+from typing import Any, Dict, Optional
+import bcrypt
 import jwt
-<<<<<<< Updated upstream
-from argon2 import PasswordHasher, Type
-from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
-
 from app.core.config import settings
-
-# Khởi tạo PasswordHasher với thuật toán argon2id
-ph = PasswordHasher(type=Type.ID)
-
-
-def hash_password(password: str) -> str:
-    """Băm mật khẩu sử dụng thuật toán argon2id."""
-    return ph.hash(password)
-
-
-def verify_password(password: str, hashed_password: str) -> bool:
-    """Kiểm tra mật khẩu khớp với chuỗi băm argon2id."""
-    try:
-        return ph.verify(hashed_password, password)
-    except (VerifyMismatchError, InvalidHashError, VerificationError):
-=======
-from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
-from app.core.config import settings
-
-password_hasher = PasswordHasher()
 
 
 def get_password_hash(password: str) -> str:
-    """Băm mật khẩu bằng Argon2id; bcrypt chỉ được dùng để xác minh dữ liệu cũ."""
-    return password_hasher.hash(password)
+    """Băm mật khẩu sử dụng trực tiếp bcrypt với work factor cấu hình."""
+    salt = bcrypt.gensalt(rounds=settings.BCRYPT_ROUNDS)
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Xác thực hash Argon2id hoặc bcrypt cũ trong giai đoạn chuyển đổi."""
+    """Xác thực mật khẩu thô với chuỗi băm bcrypt."""
     try:
-        if hashed_password.startswith("$argon2"):
-            return password_hasher.verify(hashed_password, plain_password)
-        if hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
-            return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-    except (InvalidHashError, VerificationError, VerifyMismatchError, ValueError):
->>>>>>> Stashed changes
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8"),
+        )
+    except Exception:
         return False
-    return False
-
-
-def password_needs_rehash(hashed_password: str) -> bool:
-    """Báo hash bcrypt cũ cần được nâng cấp sau lần đăng nhập thành công."""
-    if not hashed_password.startswith("$argon2"):
-        return True
-    try:
-        return password_hasher.check_needs_rehash(hashed_password)
-    except (InvalidHashError, ValueError):
-        return True
 
 
 def create_access_token(
-    data: dict[str, Any], expires_delta: timedelta | None = None
+    data: Dict[str, Any],
+    expires_delta: Optional[timedelta] = None,
 ) -> str:
-    """Tạo JWT access token chứa payload data."""
+    """Tạo JWT access token có thời hạn và nhúng claims."""
     to_encode = data.copy()
     now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
     else:
-        expire = now + timedelta(minutes=settings.access_token_expire_minutes)
+        expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    to_encode.update({"iat": now, "exp": expire})
-    return jwt.encode(
-        to_encode, settings.secret_key, algorithm=settings.jwt_algorithm
+    to_encode.update({"exp": expire, "iat": now})
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
     )
+    return encoded_jwt
 
 
-def decode_access_token(
-    token: str, *, raise_on_expired: bool = False
-) -> dict[str, Any] | None:
-    """Giải mã và kiểm tra tính hợp lệ của JWT token."""
-    try:
-        return jwt.decode(
-            token, settings.secret_key, algorithms=[settings.jwt_algorithm]
-        )
-    except jwt.ExpiredSignatureError:
-        if raise_on_expired:
-            raise
-        return None
-    except jwt.PyJWTError:
-        return None
+def decode_access_token(token: str) -> Dict[str, Any]:
+    """Giải mã và xác thực chữ ký JWT access token. Ném ngoại lệ jwt.PyJWTError nếu lỗi."""
+    return jwt.decode(
+        token,
+        settings.SECRET_KEY,
+        algorithms=[settings.ALGORITHM],
+    )

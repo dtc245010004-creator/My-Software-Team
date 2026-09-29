@@ -8,7 +8,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState('operator_a');
   const [password, setPassword] = useState('OpPass123');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -31,7 +31,7 @@ export default function Login() {
         alert('Đăng ký tài khoản thành công! Vui lòng đăng nhập.');
         setIsRegisterMode(false);
       } else {
-        await login(email, password);
+        await login(username, password);
         navigate('/');
       }
     } catch (err) {
@@ -102,26 +102,14 @@ export default function Login() {
         {/* Form Login/Register */}
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="text-steel-gray block mb-1">{isRegisterMode ? 'TÊN ĐĂNG NHẬP' : 'ĐỊA CHỈ EMAIL'}</label>
-            {isRegisterMode ? (
-              <input
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-obsidian border border-hairline p-2.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
-              />
-            ) : (
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ten@congty.vn"
-                className="w-full bg-obsidian border border-hairline p-2.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
-              />
-            )}
+            <label className="text-steel-gray block mb-1">TÊN ĐĂNG NHẬP / USERNAME</label>
+            <input
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full bg-obsidian border border-hairline p-2.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+            />
           </div>
 
           {isRegisterMode && (
@@ -137,7 +125,7 @@ export default function Login() {
                 />
               </div>
               <div>
-                  <label className="text-steel-gray block mb-1">ĐỊA CHỈ EMAIL</label>
+                <label className="text-steel-gray block mb-1">ĐỊA CHỈ EMAIL</label>
                 <input
                   type="email"
                   required

@@ -1,14 +1,11 @@
 import math
-import logging
-from typing import Optional
+from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.websocket import ws_manager
-from app.models.station import ChargingPoint, Station
+from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
 from app.schemas.station import ChargingPointResponse, ConnectorResponse, StationResponse
-
-audit_logger = logging.getLogger("ev_csms.audit")
 
 
 def calculate_haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -29,12 +26,6 @@ def calculate_haversine_distance(lat1: float, lon1: float, lat2: float, lon2: fl
 def verify_station_ownership(station: Station, user: User) -> None:
     """Kiểm tra quyền sở hữu trạm (IDOR Guard): Admin có toàn quyền, Operator chỉ sở hữu trạm của mình."""
     if user.role != "ADMIN" and station.operator_id != user.id:
-        audit_logger.warning(
-            "authorization_denied actor_id=%s role=%s action=station_access station_id=%s",
-            user.id,
-            user.role,
-            station.id,
-        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bạn không có quyền thao tác trên trạm sạc này.",
@@ -44,13 +35,6 @@ def verify_station_ownership(station: Station, user: User) -> None:
 def verify_charger_ownership(charger: ChargingPoint, user: User) -> None:
     """Kiểm tra quyền sở hữu trụ sạc thông qua trạm cha (IDOR Guard cấp Charger)."""
     if user.role != "ADMIN" and charger.station.operator_id != user.id:
-        audit_logger.warning(
-            "authorization_denied actor_id=%s role=%s action=charger_access charger_id=%s station_id=%s",
-            user.id,
-            user.role,
-            charger.id,
-            charger.station_id,
-        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bạn không có quyền thao tác trên trụ sạc này.",

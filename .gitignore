@@ -1,8 +1,7 @@
+# ========================================================
+# EV CSMS - Git Ignore Rules
+# ========================================================
 
-<<<<<<< Updated upstream
-system
-test-results
-=======
 # --- Python ---
 __pycache__/
 *.py[cod]
@@ -42,7 +41,6 @@ htmlcov/
 backend/.env
 frontend/.env.local
 frontend/.env.*.local
-.csms-image-tag
 .env.example
 
 # Local SQLite Database Files
@@ -74,4 +72,3 @@ Thumbs.db
 
 # Antigravity CLI / Temp
 temp/
->>>>>>> Stashed changes

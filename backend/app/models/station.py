@@ -1,25 +1,35 @@
-from datetime import datetime
-
-from sqlalchemy import DateTime, Integer, String, func
-from sqlalchemy.orm import Mapped, mapped_column
-
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
 class Station(Base):
-    __tablename__ = "stations"
+    """Mô hình Trạm sạc xe điện (Quản lý nguồn điện lưới và tập hợp các trụ sạc)."""
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+    __tablename__ = "stations"
+    __table_args__ = (
+        CheckConstraint("total_grid_capacity_kw > 0", name="ck_station_grid_capacity_positive"),
+        CheckConstraint("status IN ('ACTIVE', 'MAINTENANCE')", name="ck_station_status_valid"),
     )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    operator_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
-<<<<<<< Updated upstream
-=======
     name = Column(String(150), nullable=False)
     address = Column(String(255), nullable=False)
     latitude = Column(Float, nullable=False)
@@ -103,7 +113,7 @@ class Connector(Base):
             name="ck_connector_type_valid",
         ),
         CheckConstraint(
-            "status IN ('UNKNOWN', 'AVAILABLE', 'OCCUPIED', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
+            "status IN ('AVAILABLE', 'OCCUPIED', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
             name="ck_connector_status_valid",
         ),
         UniqueConstraint("charging_point_id", "connector_number", name="uq_charger_connector_number"),
@@ -119,7 +129,7 @@ class Connector(Base):
     connector_number = Column(Integer, nullable=False)  # Súng số 1, số 2...
     connector_type = Column(String(20), nullable=False)  # CCS2, TYPE_2, CHADEMO
     max_power_kw = Column(Float, nullable=False)
-    status = Column(String(20), default="UNKNOWN", nullable=False)
+    status = Column(String(20), default="AVAILABLE", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -154,4 +164,3 @@ class StationPowerMetric(Base):
 
     def __repr__(self) -> str:
         return f"<StationPowerMetric(station_id={self.station_id}, time={self.timestamp}, kw={self.power_kw})>"
->>>>>>> Stashed changes

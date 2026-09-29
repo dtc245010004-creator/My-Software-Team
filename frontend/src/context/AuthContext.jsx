@@ -1,52 +1,43 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { clearSession, loadStoredSession, performLogin } from '../services/authService'
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from '../services/api';
 
-const AuthContext = createContext(null)
+const AuthContext = createContext(null);
 
-<<<<<<< Updated upstream
-export function AuthProvider({ children }) {
-  const [session, setSession] = useState(() => loadStoredSession())
-  const [status, setStatus] = useState('idle')
-
-  const login = useCallback(async (email, password) => {
-    setStatus('loading')
-    try {
-      const result = await performLogin(email, password)
-      setSession({ token: result.token, user: result.user })
-      setStatus('idle')
-      return result
-=======
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('ev_csms_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem('ev_csms_token'));
   const [guestName, setGuestName] = useState(() => localStorage.getItem('ev_csms_guest_name') || '');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const verifyUser = async () => {
-      try {
-        const res = await api.get('/auth/me');
-        setUser(res.data);
-        setToken('cookie-session');
-        localStorage.setItem('ev_csms_user', JSON.stringify(res.data));
-      } catch (err) {
-        setUser(null);
-        setToken(null);
-        localStorage.removeItem('ev_csms_user');
+      if (token) {
+        try {
+          const res = await api.get('/auth/me');
+          setUser(res.data);
+          localStorage.setItem('ev_csms_user', JSON.stringify(res.data));
+        } catch (err) {
+          // Token hỏng hoặc hết hạn
+          logout();
+        }
       }
       setLoading(false);
     };
     verifyUser();
-  }, []);
+  }, [token]);
 
-  const login = async (identifier, password) => {
-    const credential = identifier.includes('@') ? { email: identifier } : { username: identifier };
-    const res = await api.post('/auth/login', { ...credential, password });
+  const login = async (username, password) => {
+    const res = await api.post('/auth/login', {
+      username,
+      password,
+    });
 
-    setToken('cookie-session');
+    const accessToken = res.data.access_token;
+    localStorage.setItem('ev_csms_token', accessToken);
+    setToken(accessToken);
 
     const userData = res.data.user;
     setUser(userData);
@@ -59,12 +50,8 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
-  const logout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (err) {
-      // Xóa trạng thái cục bộ kể cả khi phiên đã hết hạn.
-    }
+  const logout = () => {
+    localStorage.removeItem('ev_csms_token');
     localStorage.removeItem('ev_csms_user');
     setUser(null);
     setToken(null);
@@ -79,42 +66,48 @@ export const AuthProvider = ({ children }) => {
   const quickSwitch = async (role) => {
     try {
       if (role === 'ADMIN') {
-        await login('admin@evcsms.vn', 'AdminPass123');
+        await login('admin', 'AdminPass123');
       } else if (role === 'OPERATOR') {
-        await login('cpo_vinfast@evcsms.vn', 'OpPass123');
+        await login('operator_a', 'OpPass123');
       } else {
         // Role Tài xế không cần đăng nhập: chuyển trực tiếp sang chế độ tài xế tự do
         logout();
       }
->>>>>>> Stashed changes
     } catch (err) {
-      setStatus('idle')
-      throw err
+      console.warn('Tài khoản demo mặc định chưa tồn tại, vui lòng đăng ký hoặc đăng nhập:', err);
+      throw err;
     }
-  }, [])
+  };
 
-  const logout = useCallback(() => {
-    clearSession()
-    setSession(null)
-  }, [])
+  // Nếu chưa đăng nhập, mặc định hoạt động dưới vai trò CUSTOMER (Tài xế sạc không cần đăng nhập)
+  const effectiveRole = user?.role || 'CUSTOMER';
+  const effectiveUser = user || {
+    username: 'driver_guest',
+    full_name: guestName || 'Tài xế sạc (Khách)',
+    role: 'CUSTOMER',
+    is_guest: true,
+  };
 
-  const value = useMemo(
-    () => ({
-      user: session?.user ?? null,
-      token: session?.token ?? null,
-      isAuthenticated: Boolean(session?.token),
-      status,
-      login,
-      logout,
-    }),
-    [session, status, login, logout],
-  )
+  return (
+    <AuthContext.Provider
+      value={{
+        user: effectiveUser,
+        rawUser: user,
+        token,
+        role: effectiveRole,
+        isGuest: !user,
+        guestName,
+        updateGuestName,
+        loading,
+        login,
+        register,
+        logout,
+        quickSwitch,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
-}
+export const useAuth = () => useContext(AuthContext);

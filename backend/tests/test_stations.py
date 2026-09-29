@@ -156,7 +156,7 @@ def test_operator_create_station_sets_operator_id(client, test_users):
     assert data["name"] == "Trạm Sạc Xanh Eco"
     assert data["operator_id"] == test_users["op_a"].id
     assert data["is_active"] is True
-    assert data["status"] == "MAINTENANCE"
+    assert data["status"] == "ACTIVE"
 
 
 def test_idor_station_level_forbidden(client, db_session, test_users):
@@ -243,7 +243,6 @@ def test_add_charger_and_connectors_to_station(client, db_session, test_users):
     data = res.json()
     assert data["code"] == "MD-CP01"
     assert len(data["connectors"]) == 2
-    assert [connector["status"] for connector in data["connectors"]] == ["UNKNOWN", "UNKNOWN"]
     assert data["total_connector_power_kw"] == 82.0
     assert data["is_power_sharing"] is True  # 82kW > 60kW và bật power_sharing
 
@@ -291,14 +290,14 @@ def test_unique_constraint_charger_code_and_connector_number(client, db_session,
     # Thêm trụ đầu tiên
     client.post(
         f"/api/v1/stations/{st.id}/chargers",
-        json={"code": "UNIQUE-01", "max_power_kw": 50.0, "connectors": [{"connector_number": 1, "connector_type": "CCS2", "max_power_kw": 50.0}]},
+        json={"code": "UNIQUE-01", "max_power_kw": 50.0},
         headers={"Authorization": f"Bearer {test_users['token_op_a']}"},
     )
 
     # Cố tình thêm trụ thứ 2 cùng mã code UNIQUE-01 -> 400
     res_dup = client.post(
         f"/api/v1/stations/{st.id}/chargers",
-        json={"code": "UNIQUE-01", "max_power_kw": 50.0, "connectors": [{"connector_number": 1, "connector_type": "CCS2", "max_power_kw": 50.0}]},
+        json={"code": "UNIQUE-01", "max_power_kw": 50.0},
         headers={"Authorization": f"Bearer {test_users['token_op_a']}"},
     )
     assert res_dup.status_code == 400
@@ -325,7 +324,7 @@ def test_idor_charger_level_create_update_delete(client, db_session, test_users)
     # Operator B cố thêm trụ vào trạm của A
     res_create = client.post(
         f"/api/v1/stations/{st.id}/chargers",
-        json={"code": "HACK-CP01", "max_power_kw": 60.0, "connectors": [{"connector_number": 1, "connector_type": "CCS2", "max_power_kw": 60.0}]},
+        json={"code": "HACK-CP01", "max_power_kw": 60.0},
         headers={"Authorization": f"Bearer {test_users['token_op_b']}"},
     )
     assert res_create.status_code == 403

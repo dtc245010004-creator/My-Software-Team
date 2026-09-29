@@ -1,104 +1,95 @@
-const HEARTBEAT_INTERVAL_MS = 30000
-const RECONNECT_BASE_DELAY_MS = 1000
-const RECONNECT_MAX_DELAY_MS = 15000
+class TelemetryWebSocket {
+  constructor() {
+    this.ws = null;
+    this.listeners = new Set();
+    this.subscribedSessions = new Set();
+    this.reconnectTimer = null;
+    this.isConnected = false;
+  }
 
-export function createTelemetrySocket({
-  url = '/ws/telemetry',
-  onMessage,
-  onStatusChange,
-  heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS,
-} = {}) {
-  let socket = null
-  let heartbeatTimer = null
-  let reconnectTimer = null
-  let reconnectDelay = RECONNECT_BASE_DELAY_MS
-  let manuallyClosed = false
-
-  function emitStatus(status, detail = null) {
-    if (typeof onStatusChange === 'function') {
-      onStatusChange({ status, detail })
+  connect() {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
     }
-  }
 
-  function clearTimers() {
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer)
-      heartbeatTimer = null
-    }
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer)
-      reconnectTimer = null
-    }
-  }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws/telemetry`;
 
-  function scheduleReconnect() {
-    if (manuallyClosed) return
-    clearTimers()
-    emitStatus('reconnecting')
-    reconnectTimer = setTimeout(() => {
-      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_DELAY_MS)
-      connect()
-    }, reconnectDelay)
-  }
-
-  function startHeartbeat(ws) {
-    heartbeatTimer = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        try {
-          ws.send(JSON.stringify({ type: 'ping', ts: Date.now() }))
-        } catch {
-          // ignore — onclose sẽ lo phần reconnect
-        }
-      }
-    }, heartbeatIntervalMs)
-  }
-
-  function connect() {
-    clearTimers()
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const fullUrl = url.startsWith('/') ? `${protocol}//${window.location.host}${url}` : url
     try {
-      socket = new WebSocket(fullUrl)
-    } catch (err) {
-      emitStatus('disconnected', err)
-      scheduleReconnect()
-      return
-    }
-    emitStatus('connecting')
-    socket.onopen = () => {
-      reconnectDelay = RECONNECT_BASE_DELAY_MS
-      emitStatus('connected')
-      startHeartbeat(socket)
-    }
-    socket.onmessage = (event) => {
-      if (typeof onMessage === 'function') {
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        this.isConnected = true;
+        // Gửi lại các session đã subscribe trước khi mất kết nối
+        this.subscribedSessions.forEach((sessionId) => {
+          this.send({ action: 'subscribe', session_id: sessionId });
+        });
+      };
+
+      this.ws.onmessage = (event) => {
         try {
-          const payload = JSON.parse(event.data)
-          onMessage(payload)
-        } catch {
-          onMessage(event.data)
+          const data = JSON.parse(event.data);
+          this.listeners.forEach((listener) => listener(data));
+        } catch (e) {
+          // Bỏ qua tin nhắn không phải JSON (như PONG)
         }
-      }
-    }
-    socket.onerror = (event) => {
-      emitStatus('disconnected', event)
-    }
-    socket.onclose = () => {
-      clearTimers()
-      if (!manuallyClosed) scheduleReconnect()
+      };
+
+      this.ws.onclose = () => {
+        this.isConnected = false;
+        this.scheduleReconnect();
+      };
+
+      this.ws.onerror = () => {
+        this.ws?.close();
+      };
+    } catch (err) {
+      this.scheduleReconnect();
     }
   }
 
-  connect()
+  scheduleReconnect() {
+    if (this.reconnectTimer) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, 3000);
+  }
 
-  return {
-    close() {
-      manuallyClosed = true
-      clearTimers()
-      if (socket && socket.readyState <= WebSocket.OPEN) {
-        socket.close()
-      }
-      emitStatus('closed')
-    },
+  send(payload) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(payload));
+    }
+  }
+
+  subscribeSession(sessionId) {
+    const id = Number(sessionId);
+    this.subscribedSessions.add(id);
+    this.send({ action: 'subscribe', session_id: id });
+  }
+
+  unsubscribeSession(sessionId) {
+    const id = Number(sessionId);
+    this.subscribedSessions.delete(id);
+    this.send({ action: 'unsubscribe', session_id: id });
+  }
+
+  addListener(callback) {
+    this.listeners.add(callback);
+    return () => this.listeners.delete(callback);
+  }
+
+  disconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
   }
 }
+
+export const telemetryWs = new TelemetryWebSocket();

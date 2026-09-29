@@ -1,46 +1,56 @@
-import { Suspense, lazy } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { Toaster } from 'sonner'
-import { AuthProvider } from './context/AuthContext'
-import ProtectedRoute from './components/ProtectedRoute'
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Header from './components/Header';
+import Navigation from './components/Navigation';
 
-const LoginPage = lazy(() => import('./pages/LoginPage'))
-const RegisterPage = lazy(() => import('./pages/RegisterPage'))
-const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const SimulatorPage = lazy(() => import('./pages/SimulatorPage'))
+import Dashboard from './pages/Dashboard';
+import Stations from './pages/Stations';
+import Simulator from './pages/Simulator';
+import Wallet from './pages/Wallet';
+import Sessions from './pages/Sessions';
+import AIAdvisor from './pages/AIAdvisor';
+import Login from './pages/Login';
 
-function App() {
+function AppLayout() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-obsidian flex items-center justify-center font-mono text-xs text-steel-gray">
+        Khởi tạo hệ thống điều phối EV CSMS...
+      </div>
+    );
+  }
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Toaster richColors position="top-right" closeButton duration={4000} />
-        <Suspense fallback={<div className="app-loading">Đang tải…</div>}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/simulator"
-              element={
-                <ProtectedRoute>
-                  <SimulatorPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Suspense>
-      </AuthProvider>
-    </BrowserRouter>
-  )
+    <div className="min-h-screen bg-obsidian text-tech-white flex flex-col font-sans">
+      <Header />
+      <Navigation />
+      <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/stations" element={<Stations />} />
+          <Route path="/simulator" element={<Simulator />} />
+          <Route path="/wallet" element={<Wallet />} />
+          <Route path="/sessions" element={<Sessions />} />
+          <Route path="/ai-advisor" element={<AIAdvisor />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/*" element={<AppLayout />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}

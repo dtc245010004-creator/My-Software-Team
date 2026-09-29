@@ -1,7 +1,7 @@
 import re
+from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
-from app.core.datetime_utils import UTCDateTime
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class UserRegister(BaseModel):
@@ -21,7 +21,7 @@ class UserRegister(BaseModel):
     )
     password: str = Field(
         ...,
-        description="Mật khẩu tối thiểu 8 ký tự, gồm cả chữ và số",
+        description="Mật khẩu (tối thiểu 8 ký tự, tối đa 72 bytes, gồm cả chữ và số)",
         examples=["Password123"],
     )
     full_name: Optional[str] = Field(
@@ -41,7 +41,14 @@ class UserRegister(BaseModel):
         if len(v) < 8:
             raise ValueError("Mật khẩu phải có độ dài tối thiểu 8 ký tự.")
 
-        # Kiểm tra độ phức tạp: phải chứa ít nhất 1 chữ cái và 1 chữ số
+        # 2. Kiểm tra giới hạn cứng 72 bytes của thuật toán bcrypt
+        byte_length = len(v.encode("utf-8"))
+        if byte_length > 72:
+            raise ValueError(
+                f"Mật khẩu quá dài ({byte_length} bytes). Thuật toán mã hóa giới hạn tối đa 72 bytes."
+            )
+
+        # 3. Kiểm tra độ phức tạp: phải chứa ít nhất 1 chữ cái và 1 chữ số
         if not re.search(r"[A-Za-z]", v):
             raise ValueError("Mật khẩu phải chứa ít nhất một chữ cái.")
         if not re.search(r"\d", v):
@@ -51,26 +58,13 @@ class UserRegister(BaseModel):
 
 
 class UserLogin(BaseModel):
-    """Schema đăng nhập bằng email, giữ trường username để tương thích API cũ."""
+    """Schema đăng nhập nhận username (hoặc email) và mật khẩu."""
 
-    email: Optional[str] = Field(default=None, description="Email tài khoản")
-    username: Optional[str] = Field(default=None, description="Tên đăng nhập (tương thích client cũ)")
+    username: str = Field(..., description="Tên đăng nhập hoặc Email")
     password: str = Field(..., description="Mật khẩu")
 
-    @field_validator("email", "username")
-    @classmethod
-    def normalize_identifier(cls, value: Optional[str]) -> Optional[str]:
-        return value.strip() if value else value
 
-    @model_validator(mode="after")
-    def require_identifier(self):
-        if not (self.email or self.username):
-            raise ValueError("Vui lòng nhập email.")
-        return self
-
-    @property
-    def identifier(self) -> str:
-        return self.email or self.username or ""
+from app.core.datetime_utils import UTCDateTime
 
 
 class UserResponse(BaseModel):
@@ -89,7 +83,8 @@ class UserResponse(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    """Thông tin tài khoản; thông tin phiên chỉ được đặt trong cookie HttpOnly."""
+    """Schema trả về JWT token sau khi xác thực thành công."""
 
-    token_type: str = "cookie"
+    access_token: str
+    token_type: str = "bearer"
     user: UserResponse

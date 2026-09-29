@@ -1,18 +1,13 @@
+import json
+import os
+from typing import List, Union
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg2://postgres:1234@localhost:5432/sprint1_db"
-    secret_key: str = "doi-secret-nay-trong-production-ev-csms-secret-key-super-secure"
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 1440
-    session_cookie_name: str = "session_token"
-    max_failed_logins: int = 5
-    lockout_duration_minutes: int = 15
+    """Cấu hình ứng dụng EV CSMS nạp từ biến môi trường."""
 
-<<<<<<< Updated upstream
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-=======
     PROJECT_NAME: str = "EV Charging Station Management System"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
@@ -22,14 +17,6 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 giờ
     BCRYPT_ROUNDS: int = 12
-    COOKIE_SECURE: bool = False
-    AUTO_CREATE_SCHEMA: bool = True
-    BOOTSTRAP_ADMIN_EMAIL: str = ""
-    BOOTSTRAP_ADMIN_USERNAME: str = ""
-    BOOTSTRAP_ADMIN_PASSWORD: str = ""
-    BOOTSTRAP_STATION_OWNER_EMAIL: str = ""
-    BOOTSTRAP_STATION_OWNER_USERNAME: str = ""
-    BOOTSTRAP_STATION_OWNER_PASSWORD: str = ""
 
     # Ví tiền & Ràng buộc tài chính (ACID)
     MIN_START_BALANCE: int = 50000  # 50,000 VND để bắt đầu sạc
@@ -68,7 +55,6 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
->>>>>>> Stashed changes
 
 
 settings = Settings()

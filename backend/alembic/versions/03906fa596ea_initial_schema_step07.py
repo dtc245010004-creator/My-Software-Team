@@ -1,7 +1,7 @@
 """initial_schema_step07
 
 Revision ID: 03906fa596ea
-Revises: a1b2c3d4e5f6
+Revises: 
 Create Date: 2026-09-25 19:59:33.200296
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '03906fa596ea'
-down_revision: Union[str, None] = 'a1b2c3d4e5f6'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -73,7 +73,7 @@ def upgrade() -> None:
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('stop_reason', sa.String(length=100), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.CheckConstraint("status IN ('ACTIVE', 'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED')", name='ck_session_status_valid'),
+    sa.CheckConstraint("status IN ('ACTIVE', 'COMPLETED', 'FAILED', 'CANCELLED')", name='ck_session_status_valid'),
     sa.CheckConstraint('total_amount >= 0', name='ck_session_total_amount_non_negative'),
     sa.CheckConstraint('total_kwh >= 0', name='ck_session_total_kwh_non_negative'),
     sa.ForeignKeyConstraint(['connector_id'], ['connectors.id'], ondelete='RESTRICT'),
@@ -85,7 +85,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_charging_sessions_id'), 'charging_sessions', ['id'], unique=False)
     op.create_index(op.f('ix_charging_sessions_tariff_id'), 'charging_sessions', ['tariff_id'], unique=False)
     op.create_index(op.f('ix_charging_sessions_user_id'), 'charging_sessions', ['user_id'], unique=False)
-    op.add_column('wallets', sa.Column('is_debt_locked', sa.Boolean(), nullable=False, server_default=sa.false()))
+    op.add_column('wallets', sa.Column('is_debt_locked', sa.Boolean(), nullable=False))
     # ### end Alembic commands ###
 
 

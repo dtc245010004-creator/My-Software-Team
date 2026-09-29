@@ -1,79 +1,33 @@
-from fastapi import FastAPI
+import json
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
 from fastapi.middleware.cors import CORSMiddleware
-<<<<<<< Updated upstream
-=======
-from fastapi.routing import APIRoute, Match
-from app.api.deps import get_current_user, get_current_user_or_driver_guest, get_optional_current_user
 from app.core.config import settings
 from app.core.websocket import ws_manager
 from app.api.v1 import api_router
->>>>>>> Stashed changes
 
-from app.api.auth import router as auth_router
-from app.core.rbac import RBACMiddleware, roles
-from app.routers.rbac_test import router as rbac_router
+# Thiết lập ghi log
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - [%(levelname)s] - %(name)s: %(message)s",
+)
+logger = logging.getLogger("ev_csms.main")
 
-<<<<<<< Updated upstream
-=======
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Vòng đời khởi động và kết thúc của ứng dụng FastAPI."""
     logger.info(f"Khởi động {settings.PROJECT_NAME} v{settings.VERSION}")
-    logger.info("Loại cơ sở dữ liệu: %s", settings.DATABASE_URL.split(":", 1)[0])
+    logger.info(f"Cơ sở dữ liệu cấu hình: {settings.DATABASE_URL}")
     logger.info(f"CORS cho phép các nguồn: {settings.BACKEND_CORS_ORIGINS}")
     
-    # Tạo schema tự động chỉ cho SQLite local; staging dùng Alembic trước khi chạy app.
+    # Khởi tạo bảng dữ liệu ban đầu cho môi trường phát triển (sẽ chuyển sang Alembic ở Bước 07)
     from app.core.database import Base, engine, SessionLocal
     import app.models  # noqa: F401
-    if settings.AUTO_CREATE_SCHEMA:
-        Base.metadata.create_all(bind=engine)
-        logger.info("Đã đồng bộ schema CSDL local qua Base.metadata.create_all")
-
-    from app.models.auth import UserRole
-    from app.models.user import User
-    from app.core.security import get_password_hash
-    from app.services.rbac_service import assign_user_role, ensure_role_catalog
-    with SessionLocal() as db:
-        roles = ensure_role_catalog(db)
-        for code, role in roles.items():
-            for user in db.query(User).filter(User.role == code).all():
-                assignment = db.query(UserRole).filter_by(user_id=user.id, role_id=role.id).first()
-                if assignment is None:
-                    db.add(UserRole(user_id=user.id, role_id=role.id))
-        bootstrap_accounts = [
-            (
-                settings.BOOTSTRAP_ADMIN_EMAIL,
-                settings.BOOTSTRAP_ADMIN_USERNAME,
-                settings.BOOTSTRAP_ADMIN_PASSWORD,
-                "ADMIN",
-            ),
-            (
-                settings.BOOTSTRAP_STATION_OWNER_EMAIL,
-                settings.BOOTSTRAP_STATION_OWNER_USERNAME,
-                settings.BOOTSTRAP_STATION_OWNER_PASSWORD,
-                "STATION_OWNER",
-            ),
-        ]
-        for email, username, password, role_code in bootstrap_accounts:
-            if not (email and username and password):
-                continue
-            account = db.query(User).filter((User.email == email) | (User.username == username)).first()
-            if account is not None:
-                continue
-            user = User(
-                email=email,
-                username=username,
-                full_name="Tài khoản khởi tạo",
-                password_hash=get_password_hash(password),
-                role=role_code,
-                is_active=True,
-            )
-            db.add(user)
-            db.flush()
-            assign_user_role(db, user, role_code)
-        db.commit()
-        db.commit()
+    Base.metadata.create_all(bind=engine)
+    logger.info("Đã đồng bộ schema CSDL qua Base.metadata.create_all")
 
     # Phục hồi các phiên sạc bị gián đoạn nếu server crash trước đó (Crash Reconciliation)
     from app.services.session_service import reconcile_interrupted_sessions
@@ -102,96 +56,88 @@ async def lifespan(app: FastAPI):
 
 
 # Khởi tạo ứng dụng FastAPI
->>>>>>> Stashed changes
 app = FastAPI(
-    title="EV CSMS - Nền tảng Quản lý Trạm Sạc Xe Điện",
-    description="Hệ thống Backend FastAPI cho EV CSMS",
-    version="1.0.0",
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description="API quản lý mạng lưới trạm sạc xe điện, biểu giá TOU, ví tiền ACID và telemetry realtime",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
-
-<<<<<<< Updated upstream
-# RBAC Middleware
-app.add_middleware(RBACMiddleware)
-=======
-
-PUBLIC_API_ROUTES = {
-    ("POST", "/api/v1/auth/register"),
-    ("POST", "/api/v1/auth/login"),
-    ("POST", "/api/v1/auth/logout"),
-    ("GET", "/api/v1/health"),
-}
-
-
-def _route_has_access_policy(dependant) -> bool:
-    if dependant.call in (get_current_user, get_current_user_or_driver_guest, get_optional_current_user):
-        return True
-    return any(_route_has_access_policy(child) for child in dependant.dependencies)
-
-
-@app.middleware("http")
-async def deny_unclassified_api_routes(request, call_next):
-    """Mặc định chặn route API mới cho đến khi có dependency quyền hoặc khai công khai."""
-    if request.url.path.startswith("/api/v1/") and request.method != "OPTIONS":
-        matched_route = None
-        for route in app.router.routes:
-            if isinstance(route, APIRoute):
-                match, _ = route.matches(request.scope)
-                if match == Match.FULL:
-                    matched_route = route
-                    break
-        if matched_route and not _route_has_access_policy(matched_route.dependant):
-            policy_key = (request.method, matched_route.path)
-            if policy_key not in PUBLIC_API_ROUTES:
-                from fastapi.responses import JSONResponse
-
-                return JSONResponse(
-                    status_code=403,
-                    content={"detail": "Route chưa khai báo quyền truy cập."},
-                )
-    return await call_next(request)
+# Cấu hình Middleware CORS
+if settings.BACKEND_CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.BACKEND_CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Đăng ký API router v1
 app.include_router(api_router)
->>>>>>> Stashed changes
 
 
-# Cấu hình CORS Middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5175",
-        "http://localhost:3000",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# Gắn Router xác thực
-app.include_router(auth_router, prefix="/api/v1")
-
-
-# Gắn Router kiểm tra RBAC
-app.include_router(rbac_router)
-
-# Gắn Router charge points
-from app.api.charge_points import router as charge_points_router
-
-app.include_router(charge_points_router, prefix="/api/v1/charge-points", tags=["Charge Points"])
-
-
-@app.get("/")
-@roles("public")
-def health_check():
-    """Trang chủ dùng làm health check."""
+@app.get("/", summary="Trang chủ API")
+def root():
+    """Thông tin tổng quan dịch vụ."""
     return {
-        "status": "ok",
-        "service": "ev-csms-backend",
+        "message": f"Chào mừng đến với {settings.PROJECT_NAME}",
+        "version": settings.VERSION,
+        "docs": "/docs",
+        "health": f"{settings.API_V1_STR}/health",
+        "websocket": "/ws/telemetry",
     }
+
+
+@app.websocket("/ws/telemetry")
+async def websocket_telemetry_endpoint(websocket: WebSocket):
+    """Kênh WebSocket truyền phát telemetry sạc xe thời gian thực."""
+    await ws_manager.connect(websocket)
+    try:
+        # Gửi thông điệp chào mừng khi client kết nối thành công
+        await ws_manager.send_personal_message(
+            {
+                "event": "CONNECTED",
+                "message": "Kết nối kênh Telemetry EV CSMS thành công",
+            },
+            websocket,
+        )
+
+        while True:
+            text_data = await websocket.receive_text()
+            text_strip = text_data.strip()
+            if text_strip.lower() == "ping":
+                await ws_manager.send_personal_message({"event": "PONG"}, websocket)
+                continue
+
+            try:
+                msg = json.loads(text_strip)
+                action = msg.get("action")
+                session_id = msg.get("session_id")
+                if action == "subscribe" and session_id is not None:
+                    sid = int(session_id)
+                    ws_manager.subscribe_session(websocket, sid)
+                    await ws_manager.send_personal_message(
+                        {"event": "SUBSCRIBED", "session_id": sid},
+                        websocket,
+                    )
+                    from app.simulator.charging_simulator import simulator_manager
+                    sim = simulator_manager.get_simulator(sid)
+                    if sim:
+                        await ws_manager.send_personal_message(sim.to_telemetry_dict(), websocket)
+                elif action == "unsubscribe" and session_id is not None:
+                    ws_manager.unsubscribe_session(websocket, int(session_id))
+                    await ws_manager.send_personal_message(
+                        {"event": "UNSUBSCRIBED", "session_id": int(session_id)},
+                        websocket,
+                    )
+            except Exception:
+                pass
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"Lỗi kết nối WebSocket: {e}")
+        ws_manager.disconnect(websocket)
+
