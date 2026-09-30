@@ -6,59 +6,59 @@ from app.core.config import settings
 from app.core.security import (
     create_access_token,
     decode_access_token,
-    hash_password,
+    get_password_hash,
     verify_password,
 )
 
 # ==============================================================================
-# 1. KIỂM THỬ HÀM BĂM MẬT KHẨU (hash_password)
+# 1. KIỂM THỬ HÀM BĂM MẬT KHẨU (get_password_hash)
 # ==============================================================================
 
 
-def test_hash_password_returns_valid_argon2id_hash():
+def test_get_password_hash_returns_valid_argon2id_hash():
     """Happy Path: Mật khẩu thông thường được băm theo đúng chuẩn Argon2id."""
     raw_pass = "SecureP@ssword2026"
-    hashed = hash_password(raw_pass)
+    hashed = get_password_hash(raw_pass)
 
     assert isinstance(hashed, str)
     assert hashed.startswith("$argon2id$")
     assert raw_pass not in hashed
 
 
-def test_hash_password_generates_unique_salt():
+def test_get_password_hash_generates_unique_salt():
     """Edge Case: Cùng một mật khẩu khi băm 2 lần phải sinh ra 2 chuỗi hash khác nhau do salt ngẫu nhiên."""
     raw_pass = "IdenticalPass#999"
-    hash1 = hash_password(raw_pass)
-    hash2 = hash_password(raw_pass)
+    hash1 = get_password_hash(raw_pass)
+    hash2 = get_password_hash(raw_pass)
 
     assert hash1 != hash2
     assert hash1.startswith("$argon2id$")
     assert hash2.startswith("$argon2id$")
 
 
-def test_hash_password_handles_empty_string():
+def test_get_password_hash_handles_empty_string():
     """Edge Case: Cho phép băm chuỗi rỗng và sinh ra chuỗi hash Argon2id hợp lệ."""
     empty_pass = ""
-    hashed = hash_password(empty_pass)
+    hashed = get_password_hash(empty_pass)
 
     assert isinstance(hashed, str)
     assert hashed.startswith("$argon2id$")
     assert verify_password(empty_pass, hashed) is True
 
 
-def test_hash_password_handles_unicode_characters():
+def test_get_password_hash_handles_unicode_characters():
     """Edge Case: Xử lý chính xác mật khẩu chứa ký tự tiếng Việt có dấu và emoji."""
     unicode_pass = "TrạmSạcXeĐiện_HàNội_🔋⚡2026"
-    hashed = hash_password(unicode_pass)
+    hashed = get_password_hash(unicode_pass)
 
     assert hashed.startswith("$argon2id$")
     assert verify_password(unicode_pass, hashed) is True
 
 
-def test_hash_password_handles_long_string():
+def test_get_password_hash_handles_long_string():
     """Edge Case: Xử lý mật khẩu độ dài cực lớn (1000 ký tự) không bị crash."""
     long_pass = "A" * 1000
-    hashed = hash_password(long_pass)
+    hashed = get_password_hash(long_pass)
 
     assert hashed.startswith("$argon2id$")
     assert verify_password(long_pass, hashed) is True
@@ -72,7 +72,7 @@ def test_hash_password_handles_long_string():
 def test_verify_password_returns_true_for_correct_password():
     """Happy Path: Khớp đúng mật khẩu và chuỗi hash -> trả về True."""
     password = "CorrectPass@123"
-    hashed = hash_password(password)
+    hashed = get_password_hash(password)
 
     assert verify_password(password, hashed) is True
 
@@ -81,7 +81,7 @@ def test_verify_password_returns_false_for_wrong_password():
     """Negative Case: Mật khẩu sai so với hash -> trả về False."""
     password = "CorrectPass@123"
     wrong_password = "WrongPass@123"
-    hashed = hash_password(password)
+    hashed = get_password_hash(password)
 
     assert verify_password(wrong_password, hashed) is False
 
@@ -89,7 +89,7 @@ def test_verify_password_returns_false_for_wrong_password():
 def test_verify_password_is_case_sensitive():
     """Edge Case: Phân biệt chính xác chữ hoa và chữ thường."""
     password = "CaseSensitivePassword"
-    hashed = hash_password(password)
+    hashed = get_password_hash(password)
 
     assert verify_password("casesensitivepassword", hashed) is False
     assert verify_password("CASESENSITIVEPASSWORD", hashed) is False

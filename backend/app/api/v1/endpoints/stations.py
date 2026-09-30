@@ -1,9 +1,11 @@
-from datetime import datetime, timedelta, timezone
 import math
+from datetime import timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from app.api.deps import get_current_user, require_roles
+
+from app.api.deps import require_roles
 from app.core.database import get_db
 from app.core.datetime_utils import get_vn_now, to_vn_time
 from app.models.session import ChargingSession
@@ -48,7 +50,7 @@ def list_stations(
     - Hỗ trợ lọc Bounding Box nhanh tại CSDL kết hợp tính khoảng cách Haversine chuẩn xác.
     - Hỗ trợ phân trang chuẩn qua skip & limit.
     """
-    query = db.query(Station).filter(Station.is_active == True)
+    query = db.query(Station).filter(Station.is_active)
 
     if status_filter:
         query = query.filter(Station.status == status_filter.upper())
@@ -59,8 +61,8 @@ def list_stations(
             .join(ChargingPoint.connectors)
             .filter(
                 Connector.connector_type == connector_type.upper(),
-                Connector.is_active == True,
-                ChargingPoint.is_active == True,
+                Connector.is_active,
+                ChargingPoint.is_active,
             )
             .distinct()
         )
@@ -109,8 +111,8 @@ def get_live_dashboard_metrics(db: Session = Depends(get_db)):
     - Công suất tiêu thụ tức thời thực tế (kW) lấy trực tiếp từ các phiên sạc đang chạy.
     - Số trụ sẵn sàng (AVAILABLE) và số trụ cảnh báo lỗi/bảo trì.
     """
-    stations = db.query(Station).filter(Station.is_active == True).all()
-    chargers = db.query(ChargingPoint).filter(ChargingPoint.is_active == True).all()
+    stations = db.query(Station).filter(Station.is_active).all()
+    chargers = db.query(ChargingPoint).filter(ChargingPoint.is_active).all()
 
     # Tra cứu simulator đang chạy thực tế trong RAM
     active_sims = list(simulator_manager.active_simulators.values())

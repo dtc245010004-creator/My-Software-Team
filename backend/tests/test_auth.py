@@ -1,8 +1,8 @@
-import pytest
 from unittest.mock import patch
+
+from app.core.security import get_password_hash
 from app.models.user import User
 from app.models.wallet import Wallet
-from app.core.security import get_password_hash
 
 
 def test_register_success_creates_wallet_atomically(client, db_session):
@@ -372,6 +372,7 @@ def test_login_blocked_during_lockout_without_checking_password(client, db_sessi
 def test_login_auto_unlock_after_lockout_duration(client, db_session):
     """17. Sau khi hết thời gian khóa tạm (locked_until trong quá khứ) -> Tự động mở khóa khi đăng nhập đúng."""
     from datetime import timedelta
+
     from app.core.datetime_utils import get_utc_now
 
     client.post(

@@ -1,7 +1,8 @@
 import pytest
-from app.models.user import User
-from app.models.station import Station, ChargingPoint, Connector
+
 from app.core.security import create_access_token, get_password_hash
+from app.models.station import ChargingPoint, Connector, Station
+from app.models.user import User
 
 
 @pytest.fixture
@@ -525,14 +526,15 @@ def test_get_grid_load_profile_timeline(client, db_session):
 @pytest.mark.anyio
 async def test_cumulative_energy_captures_short_session_under_60s(client, db_session, test_users):
     """16. Kiểm tra cơ chế lũy kế năng lượng bảo toàn 100% điện năng, bắt trọn các phiên sạc ngắn < 60s."""
+    from datetime import datetime, timezone
+
+    from app.models.session import ChargingSession
+    from app.models.station import StationPowerMetric
+    from app.models.tariff import Tariff
     from app.services.scheduler_service import (
         record_station_power_metrics_minute_job,
         reset_cumulative_energy_cache,
     )
-    from app.models.station import StationPowerMetric
-    from app.models.session import ChargingSession
-    from app.models.tariff import Tariff
-    from datetime import datetime, timezone
 
     # 1. Chuẩn bị dữ liệu: Tạo trạm và trụ sạc 60 kW
     op = test_users["op_a"]
