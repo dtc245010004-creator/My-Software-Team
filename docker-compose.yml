@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend
+    container_name: ev_frontend_staging
+    ports:
+      - "3000:80"
+    restart: always

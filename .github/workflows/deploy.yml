@@ -1,0 +1,20 @@
+name: Frontend Staging Pipeline
+
+on:
+  push:
+    branches: [ "main", "staging", "feature/FE-quan-ly-tram-sac" ]
+  pull_request:
+    branches: [ "main", "staging" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        run: |
+          cd frontend
+          docker build -t frontend-staging .

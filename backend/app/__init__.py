@@ -1,2 +1,0 @@
-"""EV CSMS Backend Application Package."""
-__version__ = "1.0.0"

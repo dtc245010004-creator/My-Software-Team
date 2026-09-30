@@ -1,179 +1,134 @@
-# CSMS — EV Charging Station Management System
+<div align="center">
 
-> **Nguồn xác thực chính**: Mã nguồn thực tế `backend/app/core/config.py`, `backend/app/main.py`, `backend/seed_data.py`, `frontend/package.json` và kết quả thực thi kiểm thử `pytest`.  
-> **Dấu vết tham khảo**: [nguồn tạm: nentang.md], [nguồn tạm: Prompt.md]
+# Charging-Station-Management-System-CSMS-
+
+Đơn vị vận hành mạng lưới trạm sạc nắm được mọi phiên sạc theo thời gian thực qua giao thức OCPP, tính đúng tiền theo biểu giá nhiều khung, không để trạm vượt công suất, và đối soát được doanh thu khớp với số kWh đã cấp.
+
+</div>
+
+## Quy ước làm việc
+
+> **Áp dụng cho cả nhóm từ Sprint 1.**  
+> Muốn đổi quy ước: nêu trong Daily hoặc Retrospective, rồi cập nhật mục này bằng một Pull Request.
 
 ---
 
-## Trạng thái nhanh (29/09/2026)
+## 1. Nguyên tắc chung
 
-- **Backend**: Python 3.14+ / FastAPI 1.0.0, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py:11-27`)*
-- **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json:12-20`)*
-- **Kiểm thử tự động**: **84/84 test cases passed**, thời gian chạy 92.75s, 0 lỗi hồi quy (Zero regression). *(Nguồn: Kết quả thực thi `pytest backend/tests` ngày 29/09/2026)*
-- **Kiến trúc dữ liệu**: 9 bảng CSDL quan hệ (`users`, `wallets`, `wallet_transactions`, `stations`, `charging_points`, `connectors`, `station_power_metrics`, `tariffs`, `charging_sessions`). *(Nguồn: `backend/app/models/`)*
+- **Nhánh `main` luôn chạy được:** Không push trực tiếp vào `main`, mọi thay đổi đều đi qua Pull Request (PR).
+- **Một việc trên Jira = một nhánh = một PR:** Việc lớn thì tách nhỏ, PR nhỏ thì review nhanh.
+- **Luôn ghi mã Jira** (ví dụ `GYM-19`) vào tên nhánh, commit và tiêu đề PR để truy vết được.
+- **Không commit bí mật:** mật khẩu, khoá API, chuỗi kết nối cơ sở dữ liệu, file `.env`. Đọc từ biến môi trường và chỉ commit file mẫu `.env.example`.
 
 ---
 
-## 1. Chạy dự án (môi trường phát triển)
+## 2. Đặt tên nhánh
 
-### Bước 1: Khởi động Backend (FastAPI)
-*(Nguồn: `backend/requirements.txt`, `backend/app/main.py:20`)*
+**Cú pháp:** `<loại>/<MÃ-JIRA>-<mô-tả-ngắn>`
 
+| Loại | Dùng khi |
+| :--- | :--- |
+| `feature` | Thêm hoặc mở rộng chức năng |
+| `fix` | Sửa lỗi |
+| `docs` | Sửa tài liệu, README |
+| `test` | Thêm hoặc sửa test |
+| `chore` | Cấu hình, dọn dẹp, việc không đổi hành vi |
+
+**Quy tắc:**
+- Chữ thường, không dấu tiếng Việt, nối các từ bằng dấu gạch ngang (`-`).
+- Mô tả tối đa khoảng 5 từ.
+- Mã Jira giữ chữ in hoa.
+
+**Ví dụ đúng:**
+- `feature/GYM-19-form-tao-tram`
+- `fix/GYM-25-loi-khoa-dang-nhap`
+- `docs/GYM-13-quy-uoc-lam-viec`
+
+**Ví dụ sai:** `test1`, `nhanh-cua-an`, `feature/them chuc nang`, `feature/tao-tram` (thiếu mã Jira).
+
+---
+
+## 3. Viết commit
+
+**Cú pháp:** `<type>(<phạm vi>): <mô tả ngắn> [MÃ-JIRA]`
+
+| Type | Ý nghĩa |
+| :--- | :--- |
+| `feat` | Thêm chức năng |
+| `fix` | Sửa lỗi |
+| `docs` | Thay đổi tài liệu |
+| `refactor` | Viết lại code, không đổi hành vi |
+| `test` | Thêm hoặc sửa test |
+| `chore` | Cấu hình, thư viện, việc lặt vặt |
+
+**Phạm vi (tùy chọn):** `auth`, `station`, `charge-point`, `db`, `ui`, `readme`,...
+
+**Quy tắc:**
+- Mô tả viết tiếng Việt, bắt đầu bằng động từ (*thêm, sửa, xoá, đổi*), tối đa 72 ký tự, không có dấu chấm cuối câu.
+- Một commit là một thay đổi có ý nghĩa. Commit thường xuyên, không dồn cả ngày làm việc vào một commit.
+
+**Ví dụ đúng:**
+- `feat(station): thêm form tạo trạm sạc [GYM-19]`
+- `fix(auth): sửa lỗi không khoá đăng nhập sau 5 lần sai [GYM-16]`
+- `docs(readme): thêm quy ước làm việc [GYM-13]`
+
+**Ví dụ sai:** `update`, `fix bug`, `done`, `abc`, `sửa nhiều thứ`.
+
+---
+
+## 4. Quy trình làm một việc và mở Pull Request
+
+1. Trên **Jira**, kéo thẻ sang `In Progress` và gán tên mình.
+2. Cập nhật `main` rồi tạo nhánh mới:
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feature/GYM-19-form-tao-tram
+
+```
+
+3. Làm việc và commit theo quy ước ở mục 3.
+4. Trước khi mở PR, lấy code mới nhất của `main` về nhánh của mình, tự xử lý xung đột nếu có, chạy thử ứng dụng trên máy và tự xem lại phần thay đổi:
 ```bash
-cd backend
-pip install -r requirements.txt
-python seed_data.py                # Khởi tạo CSDL SQLite và nạp dữ liệu mẫu
-uvicorn app.main:app --reload --port 8000
+git fetch origin
+git merge origin/main
+
 ```
-- API Swagger UI: `http://localhost:8000/docs`
-- Kiểm tra sức khỏe hệ thống: `http://localhost:8000/api/v1/health`
 
-### Bước 2: Khởi động Frontend (React + Vite)
-*(Nguồn: `frontend/package.json:6-9`)*
 
+5. Đẩy nhánh và mở PR vào `main` trên GitHub:
 ```bash
-cd frontend
-npm install
-npm run dev
-```
-- Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
+git push -u origin feature/GYM-19-form-tao-tram
 
----
-
-## 2. Dùng thử hệ thống
-
-### Tài khoản có sẵn (tạo tự động từ `backend/seed_data.py`)
-*(Nguồn: `backend/seed_data.py:44-95`)*
-
-| Vai trò (Role) | Tên đăng nhập | Email | Mật khẩu mặc định | Chức năng chính |
-| :--- | :--- | :--- | :--- | :--- |
-| **Quản trị viên (ADMIN)** | `admin` | `admin@evcsms.vn` | `AdminPass123` | Quản trị toàn hệ thống, cấu hình tham số, giám sát tải busbar |
-| **Chủ trạm (OPERATOR)** | `operator` | `operator@evcsms.vn` | `OpPass123` | Quản lý trạm sạc, trụ sạc, cổng sạc, xem telemetry, AI Advisor |
-| **Chủ trạm VinFast** | `operator_a` | `cpo_vinfast@evcsms.vn` | `OpPass123` | Quản trị mạng lưới trạm sạc khu vực |
-| **Tài xế chuẩn (CUSTOMER)** | `customer_user` | `driver1@gmail.com` | `CusPass123` | Xem ví điện tử, nạp tiền, theo dõi phiên sạc trực tiếp |
-| **Tài xế VIP (CUSTOMER)** | `driver_vip` | `driver_vip@gmail.com` | `DriverPass123` | Tài xế số dư lớn, sạc xe VF9 |
-| **Tài xế nợ (CUSTOMER)** | `driver_debt` | `driver_debt@gmail.com` | `DriverPass123` | Tài khoản mô phỏng trường hợp nợ âm ví quá hạn mức |
-
-### Đăng ký công khai — luôn ra tài khoản Tài xế, không gửi "role"
-*(Nguồn: `backend/app/api/v1/endpoints/auth.py:28-32`)*
-- Endpoint `POST /api/v1/auth/register` bắt buộc gán cứng `role = "CUSTOMER"` để ngăn chặn tấn công leo thang đặc quyền (Privilege Escalation).
-- Quá trình đăng ký bọc trong 1 Transaction nguyên tử (Atomic): Tạo User + Tạo Wallet với số dư ban đầu 0 VND.
-
-### Thử bằng dòng lệnh (không cần giao diện)
-*(Nguồn: `backend/app/api/v1/endpoints/auth.py:53`, `backend/app/api/v1/__init__.py:22`)*
-
-```bash
-# 1. Kiểm tra sức khỏe dịch vụ
-curl -X GET "http://localhost:8000/api/v1/health"
-
-# 2. Đăng nhập lấy Bearer JWT Token
-curl -X POST "http://localhost:8000/api/v1/auth/login" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=operator&password=OpPass123"
 ```
 
-### Dữ liệu demo
-*(Nguồn: `backend/seed_data.py:28-360`)*
-- Script `backend/seed_data.py` tự động tái tạo bảng và nạp:
-  - 3 trạm sạc quy mô lớn tại Hà Nội (Vincom Smart City, Ecopark, Mỹ Đình).
-  - 9 trụ sạc vật lý (công suất từ 11kW đến 250kW Ultra-Fast).
-  - 18 cổng sạc chuẩn CCS2, Type 2, CHAdeMO.
-  - Biểu giá điện TOU 3 khung giờ (Thấp điểm, Bình thường, Cao điểm).
-  - 62 phiên sạc mẫu có đầy đủ đường cong chỉ số kWh và lịch sử dòng tiền.
+
+6. **Tiêu đề PR:** `[GYM-19] Thêm form tạo trạm sạc`. Điền đầy đủ mẫu PR và chọn reviewer (mục 5).
+7. Sửa theo góp ý của reviewer, đẩy commit mới lên cùng nhánh.
+8. Khi đã có approve: tác giả bấm **Squash and merge**, xoá nhánh, rồi chuyển thẻ Jira sang `Done`.
 
 ---
 
-## 3. Kiểm thử
+## 5. Ai review và review thế nào
 
-*(Nguồn: `backend/pytest.ini:1-6`, `backend/tests/`)*
-
-```bash
-cd backend
-pytest -v
-```
-Kết quả đo kiểm thực tế:
-- `test_ai_fallback.py`: 21 passed (Kiểm thử Heuristic Fallback, Mock Gemini, Scheduler)
-- `test_auth.py`: 13 passed (Kiểm thử JWT, Bcrypt rounds=12, RBAC, Đăng ký atomic, Khóa nợ đăng nhập)
-- `test_driver_unauthenticated.py`: 4 passed (Kiểm thử tài xế cắm sạc không cần login)
-- `test_health.py`: 1 passed (Endpoint `/health`)
-- `test_sessions.py`: 5 passed (Vòng đời phiên sạc, chốt chặn cổng)
-- `test_sessions_acid.py`: 9 passed (ACID Concurrency, tranh chấp 409, trừ cước TOU)
-- `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
-- `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
-- `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Tổng số: 84/84 test cases passed (0 failed).**
+* Mỗi PR cần ít nhất **1 approve** từ một thành viên khác (không phải tác giả), theo Definition of Done.
+* Tác giả chọn reviewer, xoay vòng giữa các thành viên, ưu tiên người hiểu phần việc đó. PR đụng tới cấu trúc cơ sở dữ liệu (*migration*) hoặc phân quyền thì thêm trưởng dev làm reviewer.
+* Reviewer phản hồi trong ngày làm việc. Ai đang chờ review của ai thì nêu trong Daily, Scrum Master theo dõi.
+* **Reviewer kiểm tra:** code chạy đúng tiêu chí chấp nhận (AC) của việc trên Jira, không có bí mật, tên nhánh và commit đúng quy ước, code dễ đọc.
+* Góp ý tập trung vào code, không nhắm vào người viết. Nêu rõ, mang tính xây dựng, và phân biệt "cần sửa" với "gợi ý".
+* Không tự merge khi chưa có approve. Xung đột merge do tác giả tự xử lý, cần giúp thì hỏi trên nhóm chat.
 
 ---
 
-## 4. Gặp lỗi thường gặp
+## 6. Việc phải đạt trước khi coi là xong
 
-*(Nguồn: `backend/app/core/database.py:15-25`, `backend/app/core/config.py:30-43`)*
+*(Trích từ Definition of Done của dự án, phần liên quan tới code)*
 
-1. **Lỗi `sqlite3.OperationalError: database is locked`**:
-   - Hệ thống đã bật sẵn chế độ WAL (`PRAGMA journal_mode=WAL;`) và `PRAGMA busy_timeout=5000;` trong `backend/app/core/database.py`. Nếu gặp lỗi khi chạy nhiều tiến trình ngoài, hãy đảm bảo đóng các kết nối treo SQLite Explorer.
-2. **Lỗi `CORS policy` khi gọi API từ trình duyệt**:
-   - Kiểm tra cổng frontend trong `BACKEND_CORS_ORIGINS` tại `backend/app/core/config.py:30`. Mặc định hỗ trợ `http://localhost:5173`, `http://localhost:3000`, `http://127.0.0.1:5173`.
+* [ ] Đã được ít nhất 1 thành viên khác review và approve.
+* [ ] Có unit test cho logic mới. *(Khung test và CI sẽ bổ sung từ Sprint 2)*.
+* [ ] Không có bí mật trong mã nguồn.
+* [ ] README được cập nhật nếu đổi cách chạy hoặc thêm biến môi trường.
 
----
-
-## 5. Tổng quan hệ thống
-
-### Kiến trúc thực tế
-*(Nguồn: `backend/app/main.py:20-56`, `backend/app/core/websocket.py:10-50`)*
-- **Dual-Loop**:
-  - *Fast Loop (Telemetry & Heuristic)*: Cập nhật chỉ số sạc mỗi 2 giây (`SIMULATOR_INTERVAL_SECONDS = 2`), phát sóng trực tiếp qua WebSocket `/ws/telemetry`. Tự động ngắt khẩn cấp khi nhiệt độ $> 75^\circ\text{C}$ hoặc pin đầy.
-  - *Slow Loop (AI Engine)*: Lập lịch phân tích phụ tải trạm định kỳ, điều phối chia sẻ công suất thông minh (Dynamic Load Balancing) qua Google Gemini API hoặc chuyển đổi Heuristic Fallback khi mất kết nối mạng.
-- **Ràng buộc tài chính ACID & Khóa nợ**:
-  - Sử dụng khóa bi quan `with_for_update()` khi trừ tiền ví (`backend/app/services/wallet_service.py:35,80`).
-  - **Chính sách khóa nợ âm**: Khi số dư ví rơi xuống dưới ngưỡng `-300,000` VND (`backend/app/core/config.py:23`), hệ thống tự động khóa tài khoản (`is_debt_locked = True`).
-  - **Chặn cứng chống tràn CSDL**: CSDL chỉ cho phép tràn tối đa 200.000 VND sau ngưỡng khóa nợ (`CheckConstraint("balance >= -500000")` tại `backend/app/models/wallet.py:11`, `MAX_SAFE_DEBT_LIMIT = -500000`).
-  - **Cảnh báo đăng nhập**: Khi tài khoản bị khóa do nợ đăng nhập, hệ thống từ chối (HTTP 403) và hiển thị thông báo lỗi lên màn hình: `"tài khoản bị khóa vì - quá 300k"` (`backend/app/api/v1/endpoints/auth.py:129`, `frontend/src/pages/Login.jsx:97`).
-
-### Giao diện — thao tác được ở đâu
-*(Nguồn: `frontend/src/pages/`)*
-- `Login.jsx`: Đăng nhập, phân quyền RBAC và chuyển hướng Workspace.
-- `Dashboard.jsx`: Bảng điều hành tổng quan cho Quản trị viên và CPO.
-- `Stations.jsx`: Quản lý danh mục trạm, trụ và cổng sạc.
-- `Sessions.jsx`: Theo dõi nhật ký phiên sạc và chi tiết hóa đơn TOU.
-- `Wallet.jsx`: Tra cứu số dư ví, nạp tiền và lịch sử giao dịch ACID.
-- `Simulator.jsx`: Bảng điều khiển giả lập trạm sạc vật lý thời gian thực.
-- `AIAdvisor.jsx`: Trợ lý ảo tư vấn tối ưu vận hành và biểu giá điện.
-
-### API hiện có
-*(Nguồn: `backend/app/api/v1/__init__.py:10-18`)*
-Hệ thống cung cấp 8 nhóm router REST API tại tiền tố `/api/v1`:
-1. `/api/v1/auth`: Đăng ký, đăng nhập JWT, lấy thông tin cá nhân.
-2. `/api/v1/stations`: Quản lý trạm sạc, đo đếm phụ tải trạm.
-3. `/api/v1/chargers`: Quản lý trụ sạc và cổng sạc vật lý.
-4. `/api/v1/tariffs`: Quản lý biểu giá điện TOU 3 khung giờ.
-5. `/api/v1/wallet`: Quản lý ví điện tử, nạp tiền, trừ cước.
-6. `/api/v1/sessions`: Khởi động, dừng phiên sạc, chốt cước ACID.
-7. `/api/v1/simulator`: Điều khiển bộ giả lập và đo đếm Telemetry.
-8. `/api/v1/ai`: Điều phối công suất sạc thông minh và tư vấn vận hành.
-
----
-
-## 6. Cấu trúc thư mục
-
-*(Nguồn: Khảo sát thực tế cây thư mục dự án ngày 29/09/2026)*
-
-```text
-E:\Nền tảng vận hành trạm sạc xe điện\
-├── backend/                           # Dịch vụ máy chủ FastAPI, Models, Services, Tests
-├── frontend/                          # Giao diện người dùng Web React + Vite + Tailwind
-├── docs/                              # Trung tâm tài liệu và tri thức hệ thống chuẩn hóa
-├── phacthaobandau/                    # Thư mục lưu trữ tài liệu phác thảo ban đầu
-├── .github/                           # Biểu mẫu kiểm soát chất lượng kho mã nguồn
-├── .env.example                       # Biến môi trường mẫu cho toàn hệ thống
-└── ev_csms.db                         # Cơ sở dữ liệu SQLite cục bộ
 ```
 
----
-
-## 7. Tài liệu liên quan
-
-- Cổng điều hướng tài liệu toàn hệ thống: [`docs/README.md`](docs/README.md)
-- Hướng dẫn chi tiết phân hệ Backend: [`backend/README.md`](backend/README.md)
-- Bản đồ cấu trúc và ma trận truy vết: [`docs/architecture/PROJECT_STRUCTURE.md`](docs/architecture/PROJECT_STRUCTURE.md)
-- Sổ tay vận hành kỹ thuật: [`docs/devops/OPERATIONS.md`](docs/devops/OPERATIONS.md)
-- Hiến chương và sổ cái kiểm thử: [`docs/qa/STANDARD.md`](docs/qa/STANDARD.md), [`docs/qa/INVENTORY.md`](docs/qa/INVENTORY.md)
+```
