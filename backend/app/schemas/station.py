@@ -54,6 +54,7 @@ class ChargingPointCreate(ChargingPointBase):
 
 
 class ChargingPointUpdate(BaseModel):
+    code: Optional[str] = Field(default=None, min_length=3, max_length=50, description="Mã định danh trụ sạc")
     vendor: Optional[str] = None
     model: Optional[str] = None
     max_power_kw: Optional[float] = Field(default=None, gt=0)
@@ -95,6 +96,7 @@ class ChargingPointResponse(ChargingPointBase):
     # Chỉ số tính toán tại tầng Charger (Charger vs Connectors)
     total_connector_power_kw: float = 0.0
     is_power_sharing: bool = False
+    has_sessions: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

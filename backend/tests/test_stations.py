@@ -300,8 +300,71 @@ def test_unique_constraint_charger_code_and_connector_number(client, db_session,
         json={"code": "UNIQUE-01", "max_power_kw": 50.0},
         headers={"Authorization": f"Bearer {test_users['token_op_a']}"},
     )
-    assert res_dup.status_code == 400
+    assert res_dup.status_code == 409
     assert "đã tồn tại" in res_dup.json()["detail"]
+
+
+def test_update_charger_code_conflict_when_sessions_exist(client, db_session, test_users):
+    """Kiểm tra chặn sửa mã trụ khi đã có phiên sạc -> HTTP 409."""
+    from app.models.session import ChargingSession
+    from app.models.tariff import Tariff
+    st = Station(
+        operator_id=test_users["op_a"].id,
+        name="Trạm Test Phiên Sạc",
+        address="Hà Nội",
+        latitude=21.0,
+        longitude=105.8,
+        total_grid_capacity_kw=100.0,
+    )
+    db_session.add(st)
+    db_session.commit()
+
+    tariff = Tariff(
+        station_id=st.id,
+        name="Biểu giá Test",
+        price_normal=3000,
+        price_peak=4000,
+        price_offpeak=2000,
+        is_active=True,
+    )
+    db_session.add(tariff)
+    db_session.commit()
+
+    cp = ChargingPoint(station_id=st.id, code="CP-SESSION-01", max_power_kw=60.0)
+    db_session.add(cp)
+    db_session.commit()
+
+    conn = Connector(
+        charging_point_id=cp.id,
+        connector_number=1,
+        connector_type="CCS2",
+        max_power_kw=60.0,
+        status="AVAILABLE",
+    )
+    db_session.add(conn)
+    db_session.commit()
+
+    # Thêm 1 phiên sạc cho connector
+    sess = ChargingSession(
+        connector_id=conn.id,
+        user_id=test_users["customer"].id,
+        tariff_id=tariff.id,
+        applied_price_per_kwh=3000.0,
+        status="COMPLETED",
+        total_kwh=10.0,
+        total_amount=30000.0,
+    )
+    db_session.add(sess)
+    db_session.commit()
+
+    # Thử sửa mã trụ CP-SESSION-01 thành CP-SESSION-02 -> 409 Conflict
+    res_update = client.put(
+        f"/api/v1/chargers/{cp.id}",
+        json={"code": "CP-SESSION-02"},
+        headers={"Authorization": f"Bearer {test_users['token_op_a']}"},
+    )
+    assert res_update.status_code == 409
+    assert "Không thể thay đổi mã trụ sạc đã có phiên sạc" in res_update.json()["detail"]
 
 
 def test_idor_charger_level_create_update_delete(client, db_session, test_users):

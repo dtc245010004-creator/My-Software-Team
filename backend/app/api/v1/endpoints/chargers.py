@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.api.deps import get_optional_current_user, require_roles
 from app.core.database import get_db
+from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
 from app.schemas.station import (
@@ -51,10 +52,10 @@ def create_charger_for_station(
     verify_station_ownership(station, current_user)
 
     # Kiểm tra trùng mã code
-    existing_code = db.query(ChargingPoint).filter(ChargingPoint.code == charger_in.code).first()
-    if existing_code:
+    existing_cp = db.query(ChargingPoint).filter(ChargingPoint.code == charger_in.code).first()
+    if existing_cp:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=f"Mã trụ sạc '{charger_in.code}' đã tồn tại trong hệ thống.",
         )
 
@@ -97,11 +98,11 @@ def create_charger_for_station(
     except IntegrityError:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Xung đột dữ liệu: Mã trụ hoặc số thứ tự súng sạc bị trùng lặp.",
         )
 
-    return enrich_charger_response(new_charger)
+    return enrich_charger_response(new_charger, db=db)
 
 
 @router.get(
@@ -123,7 +124,7 @@ def get_charger(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Bạn không có quyền truy cập trụ sạc này.",
             )
-    return enrich_charger_response(charger)
+    return enrich_charger_response(charger, db=db)
 
 
 @router.put(
@@ -145,12 +146,46 @@ def update_charger(
     verify_charger_ownership(charger, current_user)
 
     update_data = charger_in.model_dump(exclude_unset=True)
+    if "code" in update_data and update_data["code"] != charger.code:
+        # Kiểm tra xem trụ đã có phiên sạc nào chưa
+        has_session = (
+            db.query(ChargingSession.id)
+            .join(Connector, ChargingSession.connector_id == Connector.id)
+            .filter(Connector.charging_point_id == charger.id)
+            .first()
+            is not None
+        )
+        if has_session:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Không thể thay đổi mã trụ sạc đã có phiên sạc.",
+            )
+
+        # Kiểm tra mã mới có bị trùng với trụ khác không
+        code_dup = (
+            db.query(ChargingPoint)
+            .filter(ChargingPoint.code == update_data["code"], ChargingPoint.id != charger.id)
+            .first()
+        )
+        if code_dup:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Mã trụ sạc '{update_data['code']}' đã tồn tại.",
+            )
+
     for field, value in update_data.items():
         setattr(charger, field, value)
 
-    db.commit()
-    db.refresh(charger)
-    return enrich_charger_response(charger)
+    try:
+        db.commit()
+        db.refresh(charger)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Xung đột dữ liệu khi cập nhật trụ sạc.",
+        )
+    return enrich_charger_response(charger, db=db)
 
 
 @router.patch(

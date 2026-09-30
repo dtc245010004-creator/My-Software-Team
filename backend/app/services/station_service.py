@@ -92,7 +92,7 @@ def verify_charger_ownership(charger: ChargingPoint, user: User) -> None:
             )
 
 
-def enrich_charger_response(charger: ChargingPoint) -> ChargingPointResponse:
+def enrich_charger_response(charger: ChargingPoint, db: Optional[Session] = None) -> ChargingPointResponse:
     """Tính toán chỉ số công suất cổng và cờ chia sẻ tải (Charger vs Connectors)."""
     connectors_resp = [
         ConnectorResponse.model_validate(c) for c in charger.connectors if c.is_active
@@ -107,6 +107,19 @@ def enrich_charger_response(charger: ChargingPoint) -> ChargingPointResponse:
     resp.connectors = connectors_resp
     resp.total_connector_power_kw = total_connector_power
     resp.is_power_sharing = is_power_sharing
+
+    # Kiểm tra xem trụ đã có phiên sạc nào chưa
+    has_sessions = False
+    if db is not None:
+        from app.models.session import ChargingSession
+        has_sessions = (
+            db.query(ChargingSession.id)
+            .join(Connector, ChargingSession.connector_id == Connector.id)
+            .filter(Connector.charging_point_id == charger.id)
+            .first()
+            is not None
+        )
+    resp.has_sessions = has_sessions
     return resp
 
 
