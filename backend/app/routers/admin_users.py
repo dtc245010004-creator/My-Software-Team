@@ -1,7 +1,6 @@
 ﻿from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -21,78 +20,41 @@ def list_users(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    users = db.query(User).order_by(User.id).all()
+    users = (
+        db.query(User)
+        .order_by(User.id)
+        .all()
+    )
 
-    return [
-        {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "full_name": user.full_name,
-            "role": user.role,
-            "is_active": user.is_active,
-            "is_locked": (
-                user.locked_until is not None
-                and user.locked_until > datetime.now(timezone.utc)
-            ),
-            "failed_login_attempts": user.failed_login_attempts,
-            "locked_until": user.locked_until,
-        }
-        for user in users
-    ]
+    now = datetime.now(timezone.utc)
 
+    result = []
 
-class RoleUpdateRequest(BaseModel):
-    role: str
+    for user in users:
+        locked_until = user.locked_until
 
+        if locked_until is not None and locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
 
-@router.patch("/{user_id}/role")
-@roles("ADMIN")
-def update_user_role(
-    user_id: int,
-    data: RoleUpdateRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    allowed_roles = {
-        "ADMIN",
-        "OPERATOR",
-        "OWNER",
-        "DRIVER",
-        "CUSTOMER",
-    }
-
-    new_role = data.role.upper()
-
-    if new_role not in allowed_roles:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Vai trò không hợp lệ",
+        is_locked = (
+            locked_until is not None
+            and locked_until > now
         )
 
-    user = db.query(User).filter(User.id == user_id).first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy tài khoản",
+        result.append(
+            {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": user.role,
+                "is_active": user.is_active,
+                "is_locked": is_locked,
+                "locked_until": locked_until,
+            }
         )
 
-    if current_user.id == user_id and new_role != "ADMIN":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Không thể tự đổi role ADMIN của chính mình",
-        )
-
-    user.role = new_role
-    db.commit()
-    db.refresh(user)
-
-    return {
-        "message": "Đã cập nhật vai trò",
-        "user_id": user.id,
-        "role": user.role,
-    }
+    return result
 
 
 @router.patch("/{user_id}/disable")
