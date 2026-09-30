@@ -42,7 +42,8 @@ npm run dev
 ```
 - Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
 
-### Cách 2: Khởi chạy môi trường Staging qua Docker Compose
+### Cách 2: Khởi chạy môi trường Staging qua Docker Compose (NHỚ CÀI DOCKER DESKTOP)
+*https://docs.docker.com/desktop/setup/install/windows-install/
 *(Nguồn: `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`)*
 
 ```bash
