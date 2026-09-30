@@ -164,10 +164,18 @@ def rbac_setup(db_session):
         "conn_b1": conn_b1,
         "tariff_global": tariff_global,
         "tariff_a1": tariff_a1,
-        "h_admin": {"Authorization": f"Bearer {create_access_token({'sub': str(admin.id), 'role': admin.role})}"},
-        "h_op_a": {"Authorization": f"Bearer {create_access_token({'sub': str(op_a.id), 'role': op_a.role})}"},
-        "h_op_b": {"Authorization": f"Bearer {create_access_token({'sub': str(op_b.id), 'role': op_b.role})}"},
-        "h_driver": {"Authorization": f"Bearer {create_access_token({'sub': str(driver.id), 'role': driver.role})}"},
+        "h_admin": {
+            "Authorization": f"Bearer {create_access_token({'sub': str(admin.id), 'role': admin.role})}"
+        },
+        "h_op_a": {
+            "Authorization": f"Bearer {create_access_token({'sub': str(op_a.id), 'role': op_a.role})}"
+        },
+        "h_op_b": {
+            "Authorization": f"Bearer {create_access_token({'sub': str(op_b.id), 'role': op_b.role})}"
+        },
+        "h_driver": {
+            "Authorization": f"Bearer {create_access_token({'sub': str(driver.id), 'role': driver.role})}"
+        },
     }
 
 
@@ -203,23 +211,33 @@ def test_station_list_isolation(client, rbac_setup):
 def test_station_detail_cross_access_403(client, rbac_setup):
     """2. Chủ trạm không thể xem chi tiết trạm của chủ khác hoặc trạm unowned (403 Forbidden)."""
     # Chủ A xem trạm của Chủ A -> 200
-    res_ok = client.get(f"/api/v1/stations/{rbac_setup['st_a1'].id}", headers=rbac_setup["h_op_a"])
+    res_ok = client.get(
+        f"/api/v1/stations/{rbac_setup['st_a1'].id}", headers=rbac_setup["h_op_a"]
+    )
     assert res_ok.status_code == 200
     assert res_ok.json()["name"] == "Trạm VinFast A1"
 
     # Chủ A xem trạm của Chủ B -> 403
-    res_forbidden = client.get(f"/api/v1/stations/{rbac_setup['st_b1'].id}", headers=rbac_setup["h_op_a"])
+    res_forbidden = client.get(
+        f"/api/v1/stations/{rbac_setup['st_b1'].id}", headers=rbac_setup["h_op_a"]
+    )
     assert res_forbidden.status_code == 403
     assert "Bạn không có quyền truy cập" in res_forbidden.json()["detail"]
 
     # Chủ A xem trạm chưa có chủ -> 403
-    res_unowned = client.get(f"/api/v1/stations/{rbac_setup['st_unowned'].id}", headers=rbac_setup["h_op_a"])
+    res_unowned = client.get(
+        f"/api/v1/stations/{rbac_setup['st_unowned'].id}", headers=rbac_setup["h_op_a"]
+    )
     assert res_unowned.status_code == 403
 
     # Admin xem trạm bất kỳ -> 200
-    res_admin = client.get(f"/api/v1/stations/{rbac_setup['st_b1'].id}", headers=rbac_setup["h_admin"])
+    res_admin = client.get(
+        f"/api/v1/stations/{rbac_setup['st_b1'].id}", headers=rbac_setup["h_admin"]
+    )
     assert res_admin.status_code == 200
-    res_admin_unowned = client.get(f"/api/v1/stations/{rbac_setup['st_unowned'].id}", headers=rbac_setup["h_admin"])
+    res_admin_unowned = client.get(
+        f"/api/v1/stations/{rbac_setup['st_unowned'].id}", headers=rbac_setup["h_admin"]
+    )
     assert res_admin_unowned.status_code == 200
 
 
@@ -236,7 +254,9 @@ def test_station_create_auto_assignment(client, rbac_setup):
         "status": "ACTIVE",
         "operator_id": rbac_setup["op_b"].id,  # Cố tình truyền ID của Chủ B
     }
-    res_a = client.post("/api/v1/stations", json=payload_a, headers=rbac_setup["h_op_a"])
+    res_a = client.post(
+        "/api/v1/stations", json=payload_a, headers=rbac_setup["h_op_a"]
+    )
     assert res_a.status_code == 201
     assert res_a.json()["operator_id"] == rbac_setup["op_a"].id  # Bị ép về Chủ A
 
@@ -247,7 +267,9 @@ def test_station_create_auto_assignment(client, rbac_setup):
         "total_grid_capacity_kw": 90.0,
         "operator_id": rbac_setup["op_b"].id,
     }
-    res_admin_b = client.post("/api/v1/stations", json=payload_admin_b, headers=rbac_setup["h_admin"])
+    res_admin_b = client.post(
+        "/api/v1/stations", json=payload_admin_b, headers=rbac_setup["h_admin"]
+    )
     assert res_admin_b.status_code == 201
     assert res_admin_b.json()["operator_id"] == rbac_setup["op_b"].id
 
@@ -258,7 +280,9 @@ def test_station_create_auto_assignment(client, rbac_setup):
         "total_grid_capacity_kw": 70.0,
         "operator_id": None,
     }
-    res_admin_none = client.post("/api/v1/stations", json=payload_admin_none, headers=rbac_setup["h_admin"])
+    res_admin_none = client.post(
+        "/api/v1/stations", json=payload_admin_none, headers=rbac_setup["h_admin"]
+    )
     assert res_admin_none.status_code == 201
     assert res_admin_none.json()["operator_id"] is None
 
@@ -267,23 +291,39 @@ def test_station_update_restrictions(client, rbac_setup):
     """4. Chỉ Admin được phép thay đổi operator_id; Chủ trạm đổi operator_id bị 403."""
     # Chủ A cố tình đổi operator_id trạm của mình sang Chủ B -> 403
     payload_hack = {"operator_id": rbac_setup["op_b"].id}
-    res_hack = client.put(f"/api/v1/stations/{rbac_setup['st_a1'].id}", json=payload_hack, headers=rbac_setup["h_op_a"])
+    res_hack = client.put(
+        f"/api/v1/stations/{rbac_setup['st_a1'].id}",
+        json=payload_hack,
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_hack.status_code == 403
     assert "Chỉ Quản trị viên (Admin)" in res_hack.json()["detail"]
 
     # Chủ A sửa tên trạm mình -> 200
     payload_ok = {"name": "Trạm VinFast A1 Đã Đổi Tên"}
-    res_ok = client.put(f"/api/v1/stations/{rbac_setup['st_a1'].id}", json=payload_ok, headers=rbac_setup["h_op_a"])
+    res_ok = client.put(
+        f"/api/v1/stations/{rbac_setup['st_a1'].id}",
+        json=payload_ok,
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_ok.status_code == 200
     assert res_ok.json()["name"] == "Trạm VinFast A1 Đã Đổi Tên"
 
     # Chủ A sửa trạm của Chủ B -> 403
-    res_cross = client.put(f"/api/v1/stations/{rbac_setup['st_b1'].id}", json=payload_ok, headers=rbac_setup["h_op_a"])
+    res_cross = client.put(
+        f"/api/v1/stations/{rbac_setup['st_b1'].id}",
+        json=payload_ok,
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_cross.status_code == 403
 
     # Admin gán chủ cho trạm st_unowned -> 200
     payload_assign = {"operator_id": rbac_setup["op_a"].id}
-    res_assign = client.put(f"/api/v1/stations/{rbac_setup['st_unowned'].id}", json=payload_assign, headers=rbac_setup["h_admin"])
+    res_assign = client.put(
+        f"/api/v1/stations/{rbac_setup['st_unowned'].id}",
+        json=payload_assign,
+        headers=rbac_setup["h_admin"],
+    )
     assert res_assign.status_code == 200
     assert res_assign.json()["operator_id"] == rbac_setup["op_a"].id
 
@@ -297,7 +337,11 @@ def test_charger_management_rbac(client, rbac_setup):
         "model": "Terra 54",
         "max_power_kw": 50.0,
     }
-    res_add_hack = client.post(f"/api/v1/stations/{rbac_setup['st_b1'].id}/chargers", json=payload_charger, headers=rbac_setup["h_op_a"])
+    res_add_hack = client.post(
+        f"/api/v1/stations/{rbac_setup['st_b1'].id}/chargers",
+        json=payload_charger,
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_add_hack.status_code == 403
 
     # Chủ A thêm trụ vào trạm của mình -> 201
@@ -307,15 +351,23 @@ def test_charger_management_rbac(client, rbac_setup):
         "model": "Terra 54",
         "max_power_kw": 60.0,
     }
-    res_add_ok = client.post(f"/api/v1/stations/{rbac_setup['st_a1'].id}/chargers", json=payload_charger_ok, headers=rbac_setup["h_op_a"])
+    res_add_ok = client.post(
+        f"/api/v1/stations/{rbac_setup['st_a1'].id}/chargers",
+        json=payload_charger_ok,
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_add_ok.status_code == 201
 
     # Chủ A xem trụ sạc của Chủ B -> 403
-    res_view_hack = client.get(f"/api/v1/chargers/{rbac_setup['ch_b1'].id}", headers=rbac_setup["h_op_a"])
+    res_view_hack = client.get(
+        f"/api/v1/chargers/{rbac_setup['ch_b1'].id}", headers=rbac_setup["h_op_a"]
+    )
     assert res_view_hack.status_code == 403
 
     # Chủ A xem trụ sạc của mình -> 200
-    res_view_ok = client.get(f"/api/v1/chargers/{rbac_setup['ch_a1'].id}", headers=rbac_setup["h_op_a"])
+    res_view_ok = client.get(
+        f"/api/v1/chargers/{rbac_setup['ch_a1'].id}", headers=rbac_setup["h_op_a"]
+    )
     assert res_view_ok.status_code == 200
 
 
@@ -329,7 +381,9 @@ def test_tariffs_rbac_vulnerability_fix(client, rbac_setup):
         "price_offpeak": 7777.0,
         "station_id": None,
     }
-    res_global = client.post("/api/v1/tariffs", json=payload_global, headers=rbac_setup["h_op_a"])
+    res_global = client.post(
+        "/api/v1/tariffs", json=payload_global, headers=rbac_setup["h_op_a"]
+    )
     assert res_global.status_code == 403
     assert "Chỉ Quản trị viên" in res_global.json()["detail"]
 
@@ -346,11 +400,19 @@ def test_tariffs_rbac_vulnerability_fix(client, rbac_setup):
 
     # Chủ A sửa biểu giá chung -> 403
     payload_update = {"price_peak": 9999.0}
-    res_up_global = client.put(f"/api/v1/tariffs/{rbac_setup['tariff_global'].id}", json=payload_update, headers=rbac_setup["h_op_a"])
+    res_up_global = client.put(
+        f"/api/v1/tariffs/{rbac_setup['tariff_global'].id}",
+        json=payload_update,
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_up_global.status_code == 403
 
     # Chủ A sửa biểu giá của mình -> 200
-    res_up_a1 = client.put(f"/api/v1/tariffs/{rbac_setup['tariff_a1'].id}", json={"price_peak": 5500.0}, headers=rbac_setup["h_op_a"])
+    res_up_a1 = client.put(
+        f"/api/v1/tariffs/{rbac_setup['tariff_a1'].id}",
+        json={"price_peak": 5500.0},
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_up_a1.status_code == 200
     assert float(res_up_a1.json()["price_peak"]) == 5500.0
 
@@ -367,21 +429,33 @@ def test_metrics_live_safe_limit_and_scope(client, rbac_setup):
     assert len(data_a["stations_detail"]) == 2
 
     # Chủ A lọc theo trạm của mình (st_a1) -> grid: 200kW, safe_limit: 190kW
-    res_a1 = client.get(f"/api/v1/stations/metrics/live?station_id={rbac_setup['st_a1'].id}", headers=rbac_setup["h_op_a"])
+    res_a1 = client.get(
+        f"/api/v1/stations/metrics/live?station_id={rbac_setup['st_a1'].id}",
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_a1.status_code == 200
     assert res_a1.json()["safe_limit_kw"] == 190.0
 
     # Chủ A lọc theo trạm của Chủ B -> 403 Forbidden
-    res_a_b = client.get(f"/api/v1/stations/metrics/live?station_id={rbac_setup['st_b1'].id}", headers=rbac_setup["h_op_a"])
+    res_a_b = client.get(
+        f"/api/v1/stations/metrics/live?station_id={rbac_setup['st_b1'].id}",
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_a_b.status_code == 403
     assert "Bạn không có quyền truy cập số liệu" in res_a_b.json()["detail"]
 
     # Load profile cross access -> 403 Forbidden
-    res_lp = client.get(f"/api/v1/stations/metrics/load-profile?station_id={rbac_setup['st_b1'].id}", headers=rbac_setup["h_op_a"])
+    res_lp = client.get(
+        f"/api/v1/stations/metrics/load-profile?station_id={rbac_setup['st_b1'].id}",
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_lp.status_code == 403
 
     # Load profile timeline cross access -> 403 Forbidden
-    res_lpt = client.get(f"/api/v1/stations/metrics/load-profile-timeline?station_id={rbac_setup['st_b1'].id}", headers=rbac_setup["h_op_a"])
+    res_lpt = client.get(
+        f"/api/v1/stations/metrics/load-profile-timeline?station_id={rbac_setup['st_b1'].id}",
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_lpt.status_code == 403
 
 
@@ -420,15 +494,22 @@ def test_sessions_list_and_detail_isolation(client, db_session, rbac_setup):
     assert sess_b.id not in ids_a
 
     # Chủ A cố lọc trạm của Chủ B -> 403
-    res_sess_cross = client.get(f"/api/v1/sessions?station_id={rbac_setup['st_b1'].id}", headers=rbac_setup["h_op_a"])
+    res_sess_cross = client.get(
+        f"/api/v1/sessions?station_id={rbac_setup['st_b1'].id}",
+        headers=rbac_setup["h_op_a"],
+    )
     assert res_sess_cross.status_code == 403
 
     # Chủ A xem chi tiết sess_a -> 200
-    res_det_a = client.get(f"/api/v1/sessions/{sess_a.id}", headers=rbac_setup["h_op_a"])
+    res_det_a = client.get(
+        f"/api/v1/sessions/{sess_a.id}", headers=rbac_setup["h_op_a"]
+    )
     assert res_det_a.status_code == 200
 
     # Chủ A xem chi tiết sess_b -> 403
-    res_det_b = client.get(f"/api/v1/sessions/{sess_b.id}", headers=rbac_setup["h_op_a"])
+    res_det_b = client.get(
+        f"/api/v1/sessions/{sess_b.id}", headers=rbac_setup["h_op_a"]
+    )
     assert res_det_b.status_code == 403
     assert "Bạn không có quyền xem thông tin" in res_det_b.json()["detail"]
 

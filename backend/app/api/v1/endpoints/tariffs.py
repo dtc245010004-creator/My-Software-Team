@@ -125,7 +125,10 @@ def update_tariff(
         else:
             new_st = db.query(Station).filter(Station.id == new_st_id).first()
             if not new_st:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc mới.")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Không tìm thấy trạm sạc mới.",
+                )
             verify_station_ownership(new_st, current_user)
 
     for field, value in update_data.items():

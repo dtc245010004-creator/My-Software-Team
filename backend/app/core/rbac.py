@@ -1,4 +1,4 @@
-﻿from typing import Callable
+from typing import Callable
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -82,10 +82,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Chưa xác thực"},
             )
 
-        user_roles = {
-            role.name
-            for role in getattr(user, "roles", [])
-        }
+        user_roles = {role.name for role in getattr(user, "roles", [])}
 
         if not user_roles.intersection(allowed_roles):
             return JSONResponse(

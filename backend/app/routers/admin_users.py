@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -21,11 +21,7 @@ def list_users(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    users = (
-        db.query(User)
-        .order_by(User.id)
-        .all()
-    )
+    users = db.query(User).order_by(User.id).all()
 
     return [
         {
@@ -44,6 +40,7 @@ def list_users(
         }
         for user in users
     ]
+
 
 class RoleUpdateRequest(BaseModel):
     role: str
@@ -73,11 +70,7 @@ def update_user_role(
             detail="Vai trò không hợp lệ",
         )
 
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
@@ -101,6 +94,7 @@ def update_user_role(
         "role": user.role,
     }
 
+
 @router.patch("/{user_id}/disable")
 @roles("ADMIN")
 def disable_user(
@@ -114,11 +108,7 @@ def disable_user(
             detail="Không thể tự khóa tài khoản admin đang đăng nhập",
         )
 
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
@@ -142,11 +132,7 @@ def enable_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
@@ -176,11 +162,7 @@ def lock_login(
             detail="Không thể tự khóa đăng nhập của chính mình",
         )
 
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
@@ -207,11 +189,7 @@ def unlock_login(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(

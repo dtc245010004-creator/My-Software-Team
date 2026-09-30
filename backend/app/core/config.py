@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     # Ví tiền & Ràng buộc tài chính (ACID)
     MIN_START_BALANCE: int = 50000  # 50,000 VND để bắt đầu sạc
     NEGATIVE_BALANCE_LIMIT: int = -300000  # -300,000 VND hạn mức cho nợ
-    MAX_SAFE_DEBT_LIMIT: int = -500000  # -500,000 VND cho CheckConstraint CSDL (khóa ở -300k, chỉ cho tràn tối đa 200k)
+    MAX_SAFE_DEBT_LIMIT: int = (
+        -500000
+    )  # -500,000 VND cho CheckConstraint CSDL (khóa ở -300k, chỉ cho tràn tối đa 200k)
 
     # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"
