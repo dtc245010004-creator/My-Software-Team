@@ -1,26 +1,11 @@
 version: '3.8'
 
 services:
-<<<<<<< HEAD
   frontend:
-    build: ./frontend
-    container_name: ev_frontend_staging
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:80"
+    container_name: ev_frontend_staging
     restart: always
-=======
-  postgres-db:
-    image: postgres:15-alpine
-    container_name: ev_charging_db
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secretpassword
-      POSTGRES_DB: ev_charging_system
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
->>>>>>> origin/feature/S-01-khung-ung-dung-staging
