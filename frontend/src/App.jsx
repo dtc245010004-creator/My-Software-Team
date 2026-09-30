@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
@@ -11,9 +11,10 @@ import Wallet from './pages/Wallet';
 import Sessions from './pages/Sessions';
 import AIAdvisor from './pages/AIAdvisor';
 import Login from './pages/Login';
+import AdminPanel from './pages/AdminPanel';
 
 function AppLayout() {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -35,6 +36,7 @@ function AppLayout() {
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/ai-advisor" element={<AIAdvisor />} />
+          <Route path="/admin" element={<AdminPanel />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
