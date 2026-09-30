@@ -46,12 +46,22 @@ npm run dev
 *(Nguồn: `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`)*
 
 ```bash
+# Build image Backend và Frontend
+docker compose -f docker-compose.staging.yml build
+
+# Chỉ chạy một lần khi khởi tạo database Docker mới để tạo tài khoản và dữ liệu demo
+docker compose -f docker-compose.staging.yml run --rm --no-deps backend python seed_data.py
+
 # Khởi chạy toàn bộ cụm dịch vụ Backend & Frontend (Nginx reverse proxy)
-docker compose -f docker-compose.staging.yml up -d --build
+docker compose -f docker-compose.staging.yml up -d
 
 # Kiểm tra trạng thái và logs
 docker compose -f docker-compose.staging.yml logs -f
 ```
+
+> [!WARNING]
+> `backend/seed_data.py` xóa và tạo lại toàn bộ bảng trước khi nạp dữ liệu. Chỉ chạy trên database mới/trống; nếu database đã có dữ liệu cần giữ, hãy sao lưu trước. Không chạy lại lệnh seed mỗi lần khởi động dự án.
+
 - Giao diện người dùng Staging: `http://localhost` (cổng 80)
 - API Backend Staging: `http://localhost:8000` (hoặc qua proxy `http://localhost/api/v1`)
 
@@ -59,7 +69,7 @@ docker compose -f docker-compose.staging.yml logs -f
 
 ## 2. Dùng thử hệ thống
 
-### Tài khoản có sẵn (tạo tự động từ `backend/seed_data.py`)
+### Tài khoản demo (có sau khi nạp dữ liệu bằng `backend/seed_data.py`)
 *(Nguồn: `backend/seed_data.py:44-95`)*
 
 | Vai trò (Role) | Tên đăng nhập | Email | Mật khẩu mặc định | Chức năng chính |
@@ -92,7 +102,7 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
 
 ### Dữ liệu demo
 *(Nguồn: `backend/seed_data.py:28-360`)*
-- Script `backend/seed_data.py` tự động tái tạo bảng và nạp:
+- Khi được chạy chủ động, script `backend/seed_data.py` tái tạo bảng và nạp:
   - 3 trạm sạc quy mô lớn tại Hà Nội (Vincom Smart City, Ecopark, Mỹ Đình).
   - 9 trụ sạc vật lý (công suất từ 11kW đến 250kW Ultra-Fast).
   - 18 cổng sạc chuẩn CCS2, Type 2, CHAdeMO.
