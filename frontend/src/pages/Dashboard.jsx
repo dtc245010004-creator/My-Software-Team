@@ -1,33 +1,58 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BatteryCharging, AlertTriangle, Zap, CheckCircle2, Radio, Activity, BarChart3, Sliders } from 'lucide-react';
+import { BatteryCharging, AlertTriangle, Zap, CheckCircle2, Radio, Activity, BarChart3, Sliders, Filter } from 'lucide-react';
 import api from '../services/api';
 import { telemetryWs } from '../services/websocket';
+import { useAuth } from '../context/AuthContext';
 import BusbarLoadIndicator from '../components/BusbarLoadIndicator';
 import MetricBox from '../components/MetricBox';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 export default function Dashboard() {
+  const { user, role } = useAuth();
+  const [accessibleStations, setAccessibleStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState('ALL');
+
   const [totalStations, setTotalStations] = useState(0);
   const [totalChargers, setTotalChargers] = useState(0);
   const [chargingCount, setChargingCount] = useState(0);
   const [availableCount, setAvailableCount] = useState(0);
   const [faultedCount, setFaultedCount] = useState(0);
   const [totalGridKw, setTotalGridKw] = useState(0);
+  const [safeLimitKw, setSafeLimitKw] = useState(0);
   const [activeKw, setActiveKw] = useState(0.0);
   const [chargers, setChargers] = useState([]);
   const [loadProfile, setLoadProfile] = useState([]);
   const [timelineData, setTimelineData] = useState([]);
+  const [stationsDetail, setStationsDetail] = useState([]);
+  const [hasOverloadStation, setHasOverloadStation] = useState(false);
+  const [emptyState, setEmptyState] = useState(false);
+
   const [chartViewMode, setChartViewMode] = useState('EQUALIZER'); // 'EQUALIZER' | 'TOU_2H'
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Nạp toàn bộ dữ liệu Dashboard (Metrics, Load Profile 2h, Timeline 1440m, Chargers)
+  // Nạp danh sách các trạm trong phạm vi phân quyền
+  useEffect(() => {
+    const fetchAccessibleStations = async () => {
+      try {
+        const res = await api.get('/stations');
+        setAccessibleStations(res.data || []);
+      } catch (err) {
+        console.error('Lỗi nạp danh sách trạm:', err);
+      }
+    };
+    fetchAccessibleStations();
+    setSelectedStationId('ALL');
+  }, [user]);
+
+  // Nạp toàn bộ dữ liệu Dashboard (Metrics, Load Profile 2h, Timeline 1440m, Chargers) theo phạm vi trạm
   const fetchDashboardData = useCallback(async () => {
     try {
+      const params = selectedStationId !== 'ALL' ? { station_id: selectedStationId } : {};
       const [liveRes, profileRes, timelineRes] = await Promise.all([
-        api.get('/stations/metrics/live').catch(() => null),
-        api.get('/stations/metrics/load-profile').catch(() => null),
-        api.get('/stations/metrics/load-profile-timeline').catch(() => null),
+        api.get('/stations/metrics/live', { params }).catch(() => null),
+        api.get('/stations/metrics/load-profile', { params }).catch(() => null),
+        api.get('/stations/metrics/load-profile-timeline', { params }).catch(() => null),
       ]);
 
       if (liveRes && liveRes.data) {
@@ -38,8 +63,12 @@ export default function Dashboard() {
         setAvailableCount(d.available_chargers_count || 0);
         setFaultedCount(d.faulted_chargers_count || 0);
         setTotalGridKw(d.total_grid_capacity_kw || 0);
+        setSafeLimitKw(d.safe_limit_kw || 0);
         setActiveKw(d.active_power_kw || 0.0);
         setChargers(d.chargers || []);
+        setStationsDetail(d.stations_detail || []);
+        setHasOverloadStation(!!d.has_overload_station);
+        setEmptyState(!!d.empty_state);
       }
 
       if (profileRes && Array.isArray(profileRes.data)) {
@@ -55,18 +84,22 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedStationId]);
 
   // Chỉ lấy live metrics nhanh để cập nhật nhẹ
   const fetchLiveMetricsOnly = useCallback(async () => {
     try {
-      const res = await api.get('/stations/metrics/live');
+      const params = selectedStationId !== 'ALL' ? { station_id: selectedStationId } : {};
+      const res = await api.get('/stations/metrics/live', { params });
       if (res && res.data) {
         const d = res.data;
         setChargingCount(d.charging_chargers_count || 0);
         setAvailableCount(d.available_chargers_count || 0);
         setFaultedCount(d.faulted_chargers_count || 0);
         setActiveKw(d.active_power_kw || 0.0);
+        setSafeLimitKw(d.safe_limit_kw || 0);
+        setHasOverloadStation(!!d.has_overload_station);
+        setStationsDetail(d.stations_detail || []);
         if (d.chargers) {
           setChargers(d.chargers);
         }
@@ -74,7 +107,7 @@ export default function Dashboard() {
     } catch (e) {
       // Bỏ qua lỗi polling nhẹ
     }
-  }, []);
+  }, [selectedStationId]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -151,7 +184,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Top Technical Headline */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-xl font-bold tracking-tight text-tech-white">Tổng Quan Vận Hành Mạng Lưới Trạm Sạc</h1>
@@ -165,20 +198,122 @@ export default function Dashboard() {
             {lastUpdated && ` (Cập nhật: ${lastUpdated.toLocaleTimeString('vi-VN')})`}
           </p>
         </div>
-        <button
-          onClick={fetchDashboardData}
-          className="text-xs px-3 py-1.5 rounded bg-panel border border-hairline hover:bg-hairline text-steel-gray hover:text-tech-white transition-colors font-mono"
-        >
-          LÀM MỚI DỮ LIỆU
-        </button>
+
+        {/* Scope Selector & Refresh */}
+        <div className="flex items-center space-x-2.5">
+          <div className="flex items-center space-x-2 bg-panel border border-hairline rounded px-2.5 py-1 text-xs font-mono">
+            <Filter className="w-3.5 h-3.5 text-steel-gray" />
+            <span className="text-steel-gray">Phạm vi:</span>
+            <select
+              value={selectedStationId}
+              onChange={(e) => setSelectedStationId(e.target.value)}
+              className="bg-obsidian border border-hairline text-tech-white rounded px-2 py-1 text-xs focus:outline-none focus:border-electric-cyan font-mono"
+            >
+              <option value="ALL">
+                {role === 'ADMIN'
+                  ? `Tất cả trạm (${accessibleStations.length} trạm)`
+                  : `Tất cả trạm của tôi (${accessibleStations.length} trạm)`}
+              </option>
+              {accessibleStations.map((st) => (
+                <option key={st.id} value={st.id}>
+                  [ST-{st.id}] {st.name} ({st.total_grid_capacity_kw || 0} kW)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={fetchDashboardData}
+            className="text-xs px-3 py-1.5 rounded bg-panel border border-hairline hover:bg-hairline text-steel-gray hover:text-tech-white transition-colors font-mono"
+          >
+            LÀM MỚI DỮ LIỆU
+          </button>
+        </div>
       </div>
+
+      {/* Overload Alert Warning */}
+      {hasOverloadStation && (
+        <div className="bg-critical-red/10 border border-critical-red/40 p-3 rounded flex items-center space-x-3 text-critical-red text-xs font-mono animate-pulse">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-critical-red" />
+          <div>
+            <span className="font-bold">[CẢNH BÁO QUÁ TẢI LƯỚI ĐIỆN]</span> Phát hiện trạm sạc đang vượt ngưỡng an toàn 95% công suất lưới! Thuật toán điều phối Smart Charging / Fallback đang tự động can thiệp giảm dòng sạc.
+          </div>
+        </div>
+      )}
+
+      {/* Empty State Banner if no stations owned */}
+      {emptyState && (
+        <div className="bg-panel border border-hairline p-6 rounded text-center space-y-2 font-mono">
+          <Zap className="w-8 h-8 text-steel-gray mx-auto opacity-50" />
+          <h3 className="text-sm font-bold text-tech-white">Bạn chưa sở hữu trạm sạc nào trong hệ thống</h3>
+          <p className="text-xs text-steel-gray max-w-md mx-auto">
+            Hiện tại tài khoản chưa được gán trạm sạc nào. Hãy liên hệ Quản trị viên hệ thống để được gán quyền sở hữu trạm, hoặc chuyển tài khoản demo để kiểm thử.
+          </p>
+        </div>
+      )}
 
       {/* Grid Busbar Main Indicator */}
       <BusbarLoadIndicator
         currentKw={activeKw}
-        limitKw={totalGridKw * 0.95 || 100}
-        label="Tổng Phụ Tải Lưới Toàn Hệ Thống (Total Grid Load vs 95% Safety Limit)"
+        limitKw={safeLimitKw || (totalGridKw * 0.95) || 100}
+        label={
+          selectedStationId === 'ALL'
+            ? `Tổng Phụ Tải Lưới Các Trạm (vs Ngưỡng An Toàn 95% = ${safeLimitKw.toFixed(1)} kW)`
+            : `Phụ Tải Lưới Trạm Đang Chọn (vs Ngưỡng An Toàn 95% = ${safeLimitKw.toFixed(1)} kW)`
+        }
       />
+
+      {/* Stations Detail Breakdown (Chủ có nhiều trạm hoặc Admin) */}
+      {selectedStationId === 'ALL' && stationsDetail.length > 1 && (
+        <div className="bg-panel border border-hairline p-4 rounded-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
+              Phân Phối Phụ Tải Từng Trạm Sạc Trong Phạm Vi ({stationsDetail.length} Trạm)
+            </span>
+            <span className="text-[11px] font-mono text-steel-gray">
+              Ngưỡng an toàn = 95% công suất lưới định mức
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {stationsDetail.map((st) => (
+              <div
+                key={st.station_id}
+                onClick={() => setSelectedStationId(String(st.station_id))}
+                className={`p-3 rounded border font-mono text-xs cursor-pointer transition-colors ${
+                  st.is_over_limit
+                    ? 'bg-critical-red/10 border-critical-red/50 hover:bg-critical-red/20'
+                    : 'bg-obsidian border-hairline hover:border-electric-cyan/40'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-tech-white truncate max-w-[180px]">{st.station_name}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      st.is_over_limit
+                        ? 'bg-critical-red/20 text-critical-red border border-critical-red/40'
+                        : 'bg-grid-green/20 text-grid-green border border-grid-green/40'
+                    }`}
+                  >
+                    {st.is_over_limit ? 'QUÁ TẢI' : 'BÌNH THƯỜNG'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-steel-gray text-[11px]">
+                  <span>Phụ tải live:</span>
+                  <span className={`font-bold tabular-nums ${st.is_over_limit ? 'text-critical-red' : 'text-electric-cyan'}`}>
+                    {st.active_power_kw} kW / {st.safe_limit_kw} kW
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-panel rounded overflow-hidden mt-1.5 border border-hairline">
+                  <div
+                    className={`h-full ${st.is_over_limit ? 'bg-critical-red' : 'bg-electric-cyan'}`}
+                    style={{ width: `${Math.min(100, (st.active_power_kw / (st.safe_limit_kw || 1)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 4 Metric Boxes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

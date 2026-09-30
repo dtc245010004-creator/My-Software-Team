@@ -207,7 +207,7 @@ export default function Simulator() {
     }
   };
 
-  // 4. Điều tiết giới hạn công suất trần từ Admin/CPO
+  // 4. Điều tiết giới hạn công suất trần từ Admin / Chủ trạm
   const handleSetPowerLimit = async (e) => {
     e.preventDefault();
     if (!activeSession || !powerLimitInput) return;
@@ -416,7 +416,7 @@ export default function Simulator() {
 
               {/* Power Limit Override */}
               <form onSubmit={handleSetPowerLimit} className="pt-3 border-t border-hairline space-y-2">
-                <span className="text-steel-gray text-[11px] block">ĐIỀU TIẾT CÔNG SUẤT TRẦN (AI/CPO):</span>
+                <span className="text-steel-gray text-[11px] block">ĐIỀU TIẾT CÔNG SUẤT TRẦN (AI / CHỦ TRẠM):</span>
                 <div className="flex space-x-2">
                   <input
                     type="number"

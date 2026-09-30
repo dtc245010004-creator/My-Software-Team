@@ -114,3 +114,23 @@ def require_roles(allowed_roles: List[str]) -> Callable[[User], User]:
         return current_user
 
     return role_checker
+
+
+def get_optional_current_user(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Dependency lấy user nếu có token hợp lệ, ngược lại trả về None (không raise error)."""
+    if not token:
+        return None
+    try:
+        payload = decode_access_token(token)
+        user_id_str = payload.get("sub")
+        if user_id_str is not None:
+            user = db.query(User).filter(User.id == int(user_id_str)).first()
+            if user and user.is_active:
+                return user
+    except Exception:
+        pass
+    return None
+

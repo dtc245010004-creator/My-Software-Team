@@ -59,11 +59,11 @@ def seed_database():
                 role="ADMIN",
                 is_active=True,
             ),
-            # Đơn vị vận hành CPO
+            # Chủ trạm sạc (Role: OPERATOR)
             User(
                 username="operator",
                 email="operator@evcsms.vn",
-                full_name="Đơn Vị Vận Hành CPO Trung Tâm",
+                full_name="Chủ Trạm Sạc Trung Tâm (Chủ B)",
                 password_hash=get_password_hash("OpPass123"),
                 role="OPERATOR",
                 is_active=True,
@@ -71,7 +71,7 @@ def seed_database():
             User(
                 username="operator_a",
                 email="cpo_vinfast@evcsms.vn",
-                full_name="CPO Mạng Lưới Trạm Sạc VinFast",
+                full_name="Chủ Trạm Sạc VinFast (Chủ A)",
                 password_hash=get_password_hash("OpPass123"),
                 role="OPERATOR",
                 is_active=True,
@@ -168,12 +168,13 @@ def seed_database():
                 db.add(tx)
         db.commit()
 
-        # 4. Tạo Hạ tầng Trạm sạc (3 trạm lớn Hà Nội, Đà Nẵng, TP.HCM)
-        print("[+] Đang tạo hạ tầng 3 trạm sạc chiến lược (Hà Nội, Đà Nẵng, TP.HCM)...")
-        cpo_op = next(u for u in users_to_create if u.username == "operator_a")
+        # 4. Tạo Hạ tầng Trạm sạc (ST-1, ST-2 thuộc Chủ A; ST-3 thuộc Chủ B; ST-4 chưa gán chủ)
+        print("[+] Đang tạo hạ tầng trạm sạc phân quyền (Chủ A, Chủ B, Trạm chưa gán chủ)...")
+        cpo_a = next(u for u in users_to_create if u.username == "operator_a")
+        cpo_b = next(u for u in users_to_create if u.username == "operator")
 
         st_hanoi = Station(
-            operator_id=cpo_op.id,
+            operator_id=cpo_a.id,
             name="Trạm Sạc Vincom Center Metropolis",
             address="29 Liễu Giai, Ba Đình, Hà Nội",
             latitude=21.0313,
@@ -184,7 +185,7 @@ def seed_database():
             is_active=True,
         )
         st_danang = Station(
-            operator_id=cpo_op.id,
+            operator_id=cpo_a.id,
             name="Trạm Sạc Cầu Rồng - Sơn Trà",
             address="Võ Văn Kiệt, P. An Hải Bắc, Sơn Trà, Đà Nẵng",
             latitude=16.0601,
@@ -195,7 +196,7 @@ def seed_database():
             is_active=True,
         )
         st_hcm = Station(
-            operator_id=cpo_op.id,
+            operator_id=cpo_b.id,
             name="Trạm Sạc Landmark 81 - Central Park",
             address="720A Điện Biên Phủ, P. 22, Bình Thạnh, TP.HCM",
             latitude=10.7950,
@@ -205,7 +206,18 @@ def seed_database():
             status="ACTIVE",
             is_active=True,
         )
-        db.add_all([st_hanoi, st_danang, st_hcm])
+        st_unassigned = Station(
+            operator_id=None,
+            name="Trạm Sạc An Bình - Hải Dương",
+            address="Khu công nghiệp An Bình, Nam Sách, Hải Dương",
+            latitude=21.584576,
+            longitude=105.807241,
+            total_grid_capacity_kw=150.0,
+            operating_hours="24/7",
+            status="ACTIVE",
+            is_active=True,
+        )
+        db.add_all([st_hanoi, st_danang, st_hcm, st_unassigned])
         db.commit()
 
         # 5. Tạo Biểu giá TOU (Time-of-Use)

@@ -40,6 +40,8 @@ export default function Stations() {
     num_connectors: 2,
   });
 
+  const [owners, setOwners] = useState([]);
+
   // Form tạo trạm mới (mặc định chưa có ghim, tọa độ null để nhìn toàn Việt Nam)
   const [formData, setFormData] = useState({
     name: '',
@@ -49,6 +51,7 @@ export default function Stations() {
     total_grid_capacity_kw: 150.0,
     operating_hours: '24/7',
     status: 'ACTIVE',
+    operator_id: null,
   });
 
   // Form sửa trạm
@@ -60,11 +63,17 @@ export default function Stations() {
     total_grid_capacity_kw: 150.0,
     operating_hours: '24/7',
     status: 'ACTIVE',
+    operator_id: null,
   });
 
   useEffect(() => {
     fetchStations();
-  }, []);
+    if (role === 'ADMIN') {
+      api.get('/stations/owners')
+        .then((res) => setOwners(res.data || []))
+        .catch((err) => console.error('Lỗi tải danh sách chủ trạm:', err));
+    }
+  }, [role]);
 
   const fetchStations = async () => {
     try {
@@ -90,6 +99,7 @@ export default function Stations() {
       total_grid_capacity_kw: 150.0,
       operating_hours: '24/7',
       status: 'ACTIVE',
+      operator_id: null,
     });
     setStationValidationError(null);
     setShowAddModal(true);
@@ -140,6 +150,7 @@ export default function Stations() {
       total_grid_capacity_kw: st.total_grid_capacity_kw,
       operating_hours: st.operating_hours || '24/7',
       status: st.status || 'ACTIVE',
+      operator_id: st.operator_id || null,
     });
     setStationValidationError(null);
     setShowEditModal(true);
@@ -355,6 +366,15 @@ export default function Stations() {
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-grid-green/20 text-grid-green font-semibold">
                         {st.status}
                       </span>
+                      {role === 'ADMIN' && (
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-semibold ${
+                          st.operator_id
+                            ? 'bg-caution-amber/15 text-caution-amber border-caution-amber/30'
+                            : 'bg-obsidian text-steel-gray border-hairline'
+                        }`}>
+                          {st.operator_id ? `Chủ trạm: ${st.operator_name || `ID #${st.operator_id}`}` : 'Chưa gán chủ'}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center space-x-3 text-xs text-steel-gray mt-1 font-mono">
                       <span className="flex items-center">
@@ -633,6 +653,24 @@ export default function Stations() {
                 </div>
               </div>
 
+              {role === 'ADMIN' && (
+                <div>
+                  <label className="text-steel-gray block mb-1 font-bold">GÁN CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
+                  <select
+                    value={formData.operator_id || ''}
+                    onChange={(e) => setFormData({ ...formData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                  >
+                    <option value="">Chưa gán chủ (Trạm tự do / Admin quản lý)</option>
+                    {owners.map((ow) => (
+                      <option key={ow.id} value={ow.id}>
+                        [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="flex items-center justify-end space-x-2 pt-4 border-t border-hairline">
                 <button
                   type="button"
@@ -752,6 +790,24 @@ export default function Stations() {
                   </select>
                 </div>
               </div>
+
+              {role === 'ADMIN' && (
+                <div>
+                  <label className="text-steel-gray block mb-1 font-bold">GÁN / ĐỔI CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
+                  <select
+                    value={editFormData.operator_id || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                  >
+                    <option value="">Chưa gán chủ (Trạm tự do / Admin quản lý)</option>
+                    {owners.map((ow) => (
+                      <option key={ow.id} value={ow.id}>
+                        [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex items-center justify-end space-x-2 pt-4 border-t border-hairline">
                 <button

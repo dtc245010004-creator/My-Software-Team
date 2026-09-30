@@ -1,24 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { History, Zap, CheckCircle2, AlertOctagon, XCircle, FileText } from 'lucide-react';
+import { History, Zap, CheckCircle2, AlertOctagon, XCircle, FileText, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatVNDateTime } from '../utils/formatTime';
 
 export default function Sessions() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [sessions, setSessions] = useState([]);
+  const [accessibleStations, setAccessibleStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedSession, setSelectedSession] = useState(null);
 
   useEffect(() => {
+    if (role === 'ADMIN' || role === 'OPERATOR') {
+      api.get('/stations')
+        .then((res) => setAccessibleStations(res.data || []))
+        .catch((err) => console.error('Lỗi tải danh sách trạm:', err));
+    } else {
+      setAccessibleStations([]);
+    }
+    setSelectedStationId('ALL');
+  }, [user, role]);
+
+  useEffect(() => {
     fetchSessions();
-  }, [user]);
+  }, [user, role, selectedStationId, statusFilter]);
 
   const fetchSessions = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/sessions/me');
+      let res;
+      if (role === 'ADMIN' || role === 'OPERATOR') {
+        const params = {};
+        if (selectedStationId !== 'ALL') params.station_id = selectedStationId;
+        if (statusFilter !== 'ALL') params.status = statusFilter;
+        res = await api.get('/sessions', { params });
+      } else {
+        res = await api.get('/sessions/me');
+      }
       setSessions(res.data || []);
     } catch (err) {
       console.error('Lỗi tải danh sách phiên sạc:', err);
@@ -34,7 +55,7 @@ export default function Sessions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-tech-white">Nhật Ký Phiên Sạc & Hóa Đơn Điện Tử</h1>
           <p className="text-xs text-steel-gray mt-0.5 font-mono">
@@ -42,21 +63,48 @@ export default function Sessions() {
           </p>
         </div>
 
-        {/* Filter buttons */}
-        <div className="flex items-center bg-panel border border-hairline rounded p-0.5 text-xs font-mono">
-          {['ALL', 'ACTIVE', 'COMPLETED', 'INTERRUPTED'].map((st) => (
-            <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1 rounded transition-colors ${
-                statusFilter === st
-                  ? 'bg-obsidian text-tech-white font-bold border border-hairline'
-                  : 'text-steel-gray hover:text-tech-white'
-              }`}
-            >
-              {st}
-            </button>
-          ))}
+        {/* Filter controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Station Filter for Admin and Station Owner */}
+          {(role === 'ADMIN' || role === 'OPERATOR') && accessibleStations.length > 0 && (
+            <div className="flex items-center space-x-1.5 bg-panel border border-hairline rounded px-2.5 py-1 text-xs font-mono">
+              <Filter className="w-3.5 h-3.5 text-steel-gray" />
+              <span className="text-steel-gray">Trạm:</span>
+              <select
+                value={selectedStationId}
+                onChange={(e) => setSelectedStationId(e.target.value)}
+                className="bg-obsidian border border-hairline text-tech-white rounded px-2 py-0.5 text-xs focus:outline-none focus:border-electric-cyan font-mono"
+              >
+                <option value="ALL">
+                  {role === 'ADMIN'
+                    ? `Tất cả trạm (${accessibleStations.length})`
+                    : `Tất cả trạm của tôi (${accessibleStations.length})`}
+                </option>
+                {accessibleStations.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    [ST-{st.id}] {st.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Status buttons */}
+          <div className="flex items-center bg-panel border border-hairline rounded p-0.5 text-xs font-mono">
+            {['ALL', 'ACTIVE', 'COMPLETED', 'INTERRUPTED'].map((st) => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-3 py-1 rounded transition-colors ${
+                  statusFilter === st
+                    ? 'bg-obsidian text-tech-white font-bold border border-hairline'
+                    : 'text-steel-gray hover:text-tech-white'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
