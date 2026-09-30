@@ -424,10 +424,45 @@ export default function AdminPanel() {
                         <td>{user.full_name || '—'}</td>
                         <td className="email-cell">{user.email || '—'}</td>
                         <td>
-                          <span className={`role-badge role-${String(user.role).toLowerCase()}`}>
-                            {user.role}
-                          </span>
-                        </td>
+  <select
+    className="role-select"
+    value={user.role}
+    disabled={busy}
+    onChange={async (event) => {
+      const nextRole = event.target.value;
+
+      if (nextRole === user.role) return;
+
+      setActionId(user.id);
+      setError('');
+      setMessage('');
+
+      try {
+        await api.patch(`/admin/users/${user.id}/role`, {
+          role: nextRole,
+        });
+
+        setMessage(
+          `Đã đổi vai trò tài khoản ${user.username} thành ${nextRole}.`
+        );
+
+        await loadUsers();
+      } catch (err) {
+        setError(
+          getErrorMessage(err, 'Không thể cập nhật vai trò tài khoản.')
+        );
+      } finally {
+        setActionId(null);
+      }
+    }}
+  >
+    {ROLE_OPTIONS.map((item) => (
+      <option key={item} value={item}>
+        {item}
+      </option>
+    ))}
+  </select>
+</td>
                         <td>
                           {locked ? (
                             <div className="status locked">
