@@ -67,6 +67,9 @@ docker compose -f docker-compose.staging.yml down
 
 # Muốn chỉ dừng container để bật lại nhanh sau đó
 docker compose -f docker-compose.staging.yml stop
+
+# Muốn chạy lại thì
+docker compose -f docker-compose.staging.yml up -d --build
 ```
 
 > [!WARNING]
