@@ -11,6 +11,7 @@
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
 - **Kiểm thử tự động**: **89/89 test cases passed**, 0 lỗi hồi quy (Zero regression). *(Nguồn: Kết quả thực thi `pytest backend/tests`)*
 - **Kiến trúc dữ liệu**: 9 bảng CSDL quan hệ (`users`, `wallets`, `wallet_transactions`, `stations`, `chargers`, `connectors`, `station_power_metrics`, `tariffs`, `charging_sessions`). *(Nguồn: `backend/app/models/`)*
+- **Migration Alembic**: Cây revision hiện có một head duy nhất (`795931a69149`), hợp nhất hai nhánh migration.
 - **Khung Staging & CI/CD**: Hỗ trợ chạy đồng thời qua `docker-compose.staging.yml` và pipeline kiểm thử tự động `.github/workflows/ci-staging.yml`.
 
 ---

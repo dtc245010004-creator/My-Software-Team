@@ -53,6 +53,7 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Backend API**: 8 router modules REST API (34 endpoints) và 1 kênh WebSocket `/ws/telemetry`.
 * **Frontend SPA**: 6 màn hình chức năng tại `frontend/src/pages/`.
 * **Kiểm thử tự động**: 90 ca kiểm thử passed (xác nhận qua `pytest backend/tests` và chạy thực tế).
+* **Migration Alembic**: Cây revision hiện có một head duy nhất `795931a69149`; trạng thái áp dụng trên cơ sở dữ liệu đích chưa được xác minh.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
@@ -70,6 +71,7 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
   * *Hạn mức CSDL*: Thay đổi từ `balance >= -1000000` $\longrightarrow$ `balance >= -500000`.
   * *Xác thực đăng nhập*: Chặn đăng nhập tài khoản nợ với HTTP 403 Forbidden.
   * *Số lượng test case*: Tăng từ **83 lên 84 tests**.
+* **Hợp nhất cây migration Alembic**: Ngày **30/09/2026** (chưa commit), thêm revision merge `795931a69149` để quy hai nhánh `c2d3e4f5a6b7` và `d3a5e8b1c4f2` về một head; sửa revision `f99adeda980d` để tránh thêm lặp `wallets.is_debt_locked` và cấp mặc định `0` cho `charging_sessions.current_soc`.
 
 ---
 
