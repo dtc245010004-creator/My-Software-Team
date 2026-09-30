@@ -63,12 +63,15 @@ npm run dev
 
 - Giao diện Web: `http://localhost:5173` (hoặc địa chỉ Vite hiển thị trong terminal)
 
-### Cách 2: Chạy môi trường Staging bằng Docker Compose
+```bash
+# Build image Backend và Frontend
+docker compose -f docker-compose.staging.yml build
 
-Chạy các lệnh tại thư mục gốc dự án:
+# Chỉ chạy một lần khi khởi tạo database Docker mới để tạo tài khoản và dữ liệu demo
+docker compose -f docker-compose.staging.yml run --rm --no-deps backend python seed_data.py
 
-```powershell
-docker compose -f docker-compose.staging.yml up -d --build
+# Khởi chạy toàn bộ cụm dịch vụ Backend & Frontend (Nginx reverse proxy)
+docker compose -f docker-compose.staging.yml up -d
 
 # Xem trạng thái container
 docker compose -f docker-compose.staging.yml ps
@@ -76,6 +79,12 @@ docker compose -f docker-compose.staging.yml ps
 # Xem log
 docker compose -f docker-compose.staging.yml logs --tail=100
 ```
+
+> [!WARNING]
+> `backend/seed_data.py` xóa và tạo lại toàn bộ bảng trước khi nạp dữ liệu. Chỉ chạy trên database mới/trống; nếu database đã có dữ liệu cần giữ, hãy sao lưu trước. Không chạy lại lệnh seed mỗi lần khởi động dự án.
+
+- Giao diện người dùng Staging: `http://localhost` (cổng 80)
+- API Backend Staging: `http://localhost:8000` (hoặc qua proxy `http://localhost/api/v1`)
 
 - Giao diện Staging: `http://localhost`
 - Swagger UI Backend: `http://localhost:8000/docs`
@@ -89,7 +98,7 @@ docker compose -f docker-compose.staging.yml down
 
 ## 2. Dùng thử hệ thống
 
-### Tài khoản có sẵn (tạo tự động từ `backend/seed_data.py`)
+### Tài khoản demo (có sau khi nạp dữ liệu bằng `backend/seed_data.py`)
 *(Nguồn: `backend/seed_data.py:44-95`)*
 
 | Vai trò (Role) | Tên đăng nhập | Email | Mật khẩu mặc định | Chức năng chính |
@@ -122,7 +131,7 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
 
 ### Dữ liệu demo
 *(Nguồn: `backend/seed_data.py:28-360`)*
-- Script `backend/seed_data.py` tự động tái tạo bảng và nạp:
+- Khi được chạy chủ động, script `backend/seed_data.py` tái tạo bảng và nạp:
   - 3 trạm sạc quy mô lớn tại Hà Nội (Vincom Smart City, Ecopark, Mỹ Đình).
   - 9 trụ sạc vật lý (công suất từ 11kW đến 250kW Ultra-Fast).
   - 18 cổng sạc chuẩn CCS2, Type 2, CHAdeMO.
