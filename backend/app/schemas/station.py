@@ -1,8 +1,8 @@
 from typing import List, Optional
 
-from app.core.datetime_utils import UTCDateTime
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.datetime_utils import UTCDateTime
 
 
 # ==========================================
