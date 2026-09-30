@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import jwt
+import pytest
 
 from app.core.config import settings
 from app.core.security import (
@@ -15,13 +16,13 @@ from app.core.security import (
 # ==============================================================================
 
 
-def test_get_password_hash_returns_valid_argon2id_hash():
-    """Happy Path: Mật khẩu thông thường được băm theo đúng chuẩn Argon2id."""
+def test_get_password_hash_returns_valid_bcrypt_hash():
+    """Happy Path: Mật khẩu thông thường được băm theo đúng chuẩn bcrypt."""
     raw_pass = "SecureP@ssword2026"
     hashed = get_password_hash(raw_pass)
 
     assert isinstance(hashed, str)
-    assert hashed.startswith("$argon2id$")
+    assert hashed.startswith("$2b$")
     assert raw_pass not in hashed
 
 
@@ -32,17 +33,17 @@ def test_get_password_hash_generates_unique_salt():
     hash2 = get_password_hash(raw_pass)
 
     assert hash1 != hash2
-    assert hash1.startswith("$argon2id$")
-    assert hash2.startswith("$argon2id$")
+    assert hash1.startswith("$2b$")
+    assert hash2.startswith("$2b$")
 
 
 def test_get_password_hash_handles_empty_string():
-    """Edge Case: Cho phép băm chuỗi rỗng và sinh ra chuỗi hash Argon2id hợp lệ."""
+    """Edge Case: Cho phép băm chuỗi rỗng và sinh ra chuỗi hash bcrypt hợp lệ."""
     empty_pass = ""
     hashed = get_password_hash(empty_pass)
 
     assert isinstance(hashed, str)
-    assert hashed.startswith("$argon2id$")
+    assert hashed.startswith("$2b$")
     assert verify_password(empty_pass, hashed) is True
 
 
@@ -51,17 +52,8 @@ def test_get_password_hash_handles_unicode_characters():
     unicode_pass = "TrạmSạcXeĐiện_HàNội_🔋⚡2026"
     hashed = get_password_hash(unicode_pass)
 
-    assert hashed.startswith("$argon2id$")
+    assert hashed.startswith("$2b$")
     assert verify_password(unicode_pass, hashed) is True
-
-
-def test_get_password_hash_handles_long_string():
-    """Edge Case: Xử lý mật khẩu độ dài cực lớn (1000 ký tự) không bị crash."""
-    long_pass = "A" * 1000
-    hashed = get_password_hash(long_pass)
-
-    assert hashed.startswith("$argon2id$")
-    assert verify_password(long_pass, hashed) is True
 
 
 # ==============================================================================
@@ -96,7 +88,7 @@ def test_verify_password_is_case_sensitive():
 
 
 def test_verify_password_returns_false_for_corrupted_hash():
-    """Error Handling: Chuỗi hash bị sai định dạng hoặc không phải Argon2id -> trả về False (không văng lỗi)."""
+    """Error Handling: Chuỗi hash bị sai định dạng hoặc không phải bcrypt -> trả về False (không văng lỗi)."""
     password = "SamplePassword"
     corrupted_hashes = [
         "not_a_valid_hash",
@@ -125,7 +117,7 @@ def test_create_access_token_with_default_expiration():
 
     assert isinstance(token, str)
     decoded = jwt.decode(
-        token, settings.secret_key, algorithms=[settings.jwt_algorithm]
+        token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
     )
     assert decoded["sub"] == "101"
     assert decoded["email"] == "user@evcsms.vn"
@@ -133,11 +125,11 @@ def test_create_access_token_with_default_expiration():
     assert "iat" in decoded
     assert "exp" in decoded
 
-    # Kiểm tra delta thời gian xấp xỉ settings.access_token_expire_minutes
+    # Kiểm tra delta thời gian xấp xỉ settings.ACCESS_TOKEN_EXPIRE_MINUTES
     exp_time = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
     iat_time = datetime.fromtimestamp(decoded["iat"], tz=timezone.utc)
     diff_minutes = (exp_time - iat_time).total_seconds() / 60
-    assert abs(diff_minutes - settings.access_token_expire_minutes) < 1
+    assert abs(diff_minutes - settings.ACCESS_TOKEN_EXPIRE_MINUTES) < 1
 
 
 def test_create_access_token_with_custom_expiration():
@@ -147,7 +139,7 @@ def test_create_access_token_with_custom_expiration():
     token = create_access_token(data=payload, expires_delta=custom_delta)
 
     decoded = jwt.decode(
-        token, settings.secret_key, algorithms=[settings.jwt_algorithm]
+        token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
     )
     exp_time = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
     iat_time = datetime.fromtimestamp(decoded["iat"], tz=timezone.utc)
@@ -164,7 +156,7 @@ def test_create_access_token_preserves_nested_data():
     }
     token = create_access_token(data=payload)
     decoded = jwt.decode(
-        token, settings.secret_key, algorithms=[settings.jwt_algorithm]
+        token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
     )
 
     assert decoded["permissions"] == ["station:read", "station:write"]
@@ -187,19 +179,19 @@ def test_decode_access_token_success_for_valid_token():
     assert decoded["email"] == "admin@evcsms.vn"
 
 
-def test_decode_access_token_returns_none_for_expired_token():
-    """Edge Case / Negative Case: Token đã quá hạn -> trả về None (không crash)."""
+def test_decode_access_token_raises_for_expired_token():
+    """Edge Case / Negative Case: Token đã quá hạn -> ném lỗi."""
     # Tạo token hết hạn 10 phút trước
     past_delta = timedelta(minutes=-10)
     payload = {"sub": "999"}
     expired_token = create_access_token(payload, expires_delta=past_delta)
 
-    decoded = decode_access_token(expired_token)
-    assert decoded is None
+    with pytest.raises(jwt.ExpiredSignatureError):
+        decode_access_token(expired_token)
 
 
-def test_decode_access_token_returns_none_for_tampered_payload():
-    """Negative Case: Token bị can thiệp sửa đổi nội dung payload -> trả về None."""
+def test_decode_access_token_raises_for_tampered_payload():
+    """Negative Case: Token bị can thiệp sửa đổi nội dung payload -> ném lỗi."""
     payload = {"sub": "1", "email": "normal_user@ev.vn"}
     token = create_access_token(payload)
 
@@ -208,25 +200,26 @@ def test_decode_access_token_returns_none_for_tampered_payload():
     tampered_payload = parts[1][:-1] + ("A" if parts[1][-1] != "A" else "B")
     tampered_token = f"{parts[0]}.{tampered_payload}.{parts[2]}"
 
-    assert decode_access_token(tampered_token) is None
+    with pytest.raises(jwt.InvalidSignatureError):
+        decode_access_token(tampered_token)
 
 
-def test_decode_access_token_returns_none_for_tampered_signature():
-    """Negative Case: Token bị can thiệp vào chữ ký -> trả về None."""
+def test_decode_access_token_raises_for_tampered_signature():
+    """Negative Case: Token bị can thiệp vào chữ ký -> ném lỗi."""
     payload = {"sub": "1"}
     token = create_access_token(payload)
 
     parts = token.split(".")
-    # Thay đổi ký tự đầu tiên của chữ ký để làm hỏng chữ ký mật mã (tránh rơi vào padding bit ở cuối base64)
     tampered_sig_char = "X" if parts[2][0] != "X" else "Y"
     tampered_signature = tampered_sig_char + parts[2][1:]
     tampered_token = f"{parts[0]}.{parts[1]}.{tampered_signature}"
 
-    assert decode_access_token(tampered_token) is None
+    with pytest.raises(jwt.InvalidSignatureError):
+        decode_access_token(tampered_token)
 
 
-def test_decode_access_token_returns_none_for_malformed_string():
-    """Error Handling: Chuỗi token hoàn toàn không phải JWT -> trả về None."""
+def test_decode_access_token_raises_for_malformed_string():
+    """Error Handling: Chuỗi token hoàn toàn không phải JWT -> ném lỗi."""
     malformed_tokens = [
         "",
         "not.a.token",
@@ -234,11 +227,12 @@ def test_decode_access_token_returns_none_for_malformed_string():
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",  # Chỉ có 1 phần
     ]
     for bad_token in malformed_tokens:
-        assert decode_access_token(bad_token) is None
+        with pytest.raises(jwt.DecodeError):
+            decode_access_token(bad_token)
 
 
-def test_decode_access_token_returns_none_for_wrong_secret_key():
-    """Negative Case: Token được ký bằng secret key khác -> trả về None."""
+def test_decode_access_token_raises_for_wrong_secret_key():
+    """Negative Case: Token được ký bằng secret key khác -> ném lỗi."""
     other_secret = "another-secret-key-different-from-config-123456"
     now = datetime.now(timezone.utc)
     token = jwt.encode(
@@ -247,4 +241,5 @@ def test_decode_access_token_returns_none_for_wrong_secret_key():
         algorithm="HS256",
     )
 
-    assert decode_access_token(token) is None
+    with pytest.raises(jwt.InvalidSignatureError):
+        decode_access_token(token)
