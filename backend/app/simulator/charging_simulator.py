@@ -41,10 +41,30 @@ class ChargingSimulator:
         initial_soc: float | None = None,
         tick_interval: float = 2.0,
         checkpoint_interval: float = 30.0,
+        station_id: int | None = None,
     ):
         self.session_id = session_id
         self.connector_id = connector_id
         self.user_id = user_id
+        self.station_id = station_id
+        if self.station_id is None and self.connector_id:
+            try:
+                from app.models.station import Connector
+
+                with SessionLocal() as db_sess:
+                    c = (
+                        db_sess.query(Connector)
+                        .filter(Connector.id == self.connector_id)
+                        .first()
+                    )
+                    if c and c.charging_point:
+                        self.station_id = c.charging_point.station_id
+            except (SQLAlchemyError, RuntimeError, OSError):
+                logger.debug(
+                    "Không thể tra cứu station_id cho connector #%s",
+                    self.connector_id,
+                    exc_info=True,
+                )
         self.applied_price_per_kwh = Decimal(str(applied_price_per_kwh))
         self.max_power_kw = float(max_power_kw)
         self.battery_capacity_kwh = float(battery_capacity_kwh)
@@ -234,6 +254,7 @@ class ChargingSimulator:
                 await ws_manager.broadcast(
                     {
                         "event": "GRID_TELEMETRY",
+                        "station_id": self.station_id,
                         "active_kw": total_active_kw,
                         "active_chargers_count": len(
                             simulator_manager.active_simulators
@@ -327,6 +348,9 @@ class ChargingSimulator:
                     await ws_manager.broadcast(
                         {
                             "event": "GRID_TELEMETRY",
+                            "station_id": self.station_id,
+                            "session_id": self.session_id,
+                            "connector_id": self.connector_id,
                             "active_kw": remaining_kw,
                             "active_chargers_count": max(
                                 0, len(simulator_manager.active_simulators) - 1
@@ -412,6 +436,7 @@ class SimulatorManager:
         initial_soc: float | None = None,
         tick_interval: float = 2.0,
         checkpoint_interval: float = 30.0,
+        station_id: int | None = None,
     ) -> ChargingSimulator:
         """Tạo mới và khởi động background task mô phỏng cho phiên sạc."""
         if session_id in self.active_simulators:
@@ -427,6 +452,7 @@ class SimulatorManager:
             initial_soc=initial_soc,
             tick_interval=tick_interval,
             checkpoint_interval=checkpoint_interval,
+            station_id=station_id,
         )
         self.active_simulators[session_id] = sim
 

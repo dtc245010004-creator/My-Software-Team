@@ -19,6 +19,7 @@ from app.schemas.ai import (
 )
 from app.services.ai_service import AIService
 from app.services.station_service import (
+    get_accessible_station_ids,
     verify_charger_ownership,
     verify_station_ownership,
 )
@@ -265,34 +266,92 @@ async def ask_ai_advisor(
     - Tự động fallback Heuristic (HTTP 200, is_fallback=True) kèm basic_stats khi mất mạng/hết quota.
     """
     # Trích xuất thống kê vận hành thực tế từ DB
-    total_rev = (
-        db.query(func.coalesce(func.sum(ChargingSession.total_amount), 0))
-        .filter(ChargingSession.status == "COMPLETED")
-        .scalar()
-    )
-    total_sess = db.query(ChargingSession).count()
-    total_chargers = db.query(ChargingPoint).count()
-    charging_chargers = (
-        db.query(ChargingPoint).filter(ChargingPoint.status == "CHARGING").count()
-    )
-    faulted_chargers = (
-        db.query(ChargingPoint)
-        .filter(ChargingPoint.status.in_(["FAULTED", "UNAVAILABLE"]))
-        .count()
-    )
-
-    avg_occupancy = (
-        round((charging_chargers / total_chargers * 100.0), 1)
-        if total_chargers > 0
-        else 0.0
-    )
-
-    basic_stats = {
-        "revenue_7days": float(total_rev),
-        "total_sessions": total_sess,
-        "avg_occupancy": avg_occupancy,
-        "open_maintenance_alerts": faulted_chargers,
-    }
+    if current_user.role == "OPERATOR":
+        accessible_ids = get_accessible_station_ids(current_user, db)
+        if not accessible_ids:
+            basic_stats = {
+                "revenue_7days": 0.0,
+                "total_sessions": 0,
+                "avg_occupancy": 0.0,
+                "open_maintenance_alerts": 0,
+            }
+        else:
+            total_rev = (
+                db.query(func.coalesce(func.sum(ChargingSession.total_amount), 0))
+                .join(ChargingSession.connector)
+                .join(Connector.charging_point)
+                .filter(
+                    ChargingPoint.station_id.in_(accessible_ids),
+                    ChargingSession.status == "COMPLETED",
+                )
+                .scalar()
+            )
+            total_sess = (
+                db.query(ChargingSession)
+                .join(ChargingSession.connector)
+                .join(Connector.charging_point)
+                .filter(ChargingPoint.station_id.in_(accessible_ids))
+                .count()
+            )
+            total_chargers = (
+                db.query(ChargingPoint)
+                .filter(ChargingPoint.station_id.in_(accessible_ids))
+                .count()
+            )
+            charging_chargers = (
+                db.query(ChargingPoint)
+                .filter(
+                    ChargingPoint.station_id.in_(accessible_ids),
+                    ChargingPoint.status == "CHARGING",
+                )
+                .count()
+            )
+            faulted_chargers = (
+                db.query(ChargingPoint)
+                .filter(
+                    ChargingPoint.station_id.in_(accessible_ids),
+                    ChargingPoint.status.in_(["FAULTED", "UNAVAILABLE"]),
+                )
+                .count()
+            )
+            avg_occupancy = (
+                round((charging_chargers / total_chargers * 100.0), 1)
+                if total_chargers > 0
+                else 0.0
+            )
+            basic_stats = {
+                "revenue_7days": float(total_rev),
+                "total_sessions": total_sess,
+                "avg_occupancy": avg_occupancy,
+                "open_maintenance_alerts": faulted_chargers,
+            }
+    else:
+        total_rev = (
+            db.query(func.coalesce(func.sum(ChargingSession.total_amount), 0))
+            .filter(ChargingSession.status == "COMPLETED")
+            .scalar()
+        )
+        total_sess = db.query(ChargingSession).count()
+        total_chargers = db.query(ChargingPoint).count()
+        charging_chargers = (
+            db.query(ChargingPoint).filter(ChargingPoint.status == "CHARGING").count()
+        )
+        faulted_chargers = (
+            db.query(ChargingPoint)
+            .filter(ChargingPoint.status.in_(["FAULTED", "UNAVAILABLE"]))
+            .count()
+        )
+        avg_occupancy = (
+            round((charging_chargers / total_chargers * 100.0), 1)
+            if total_chargers > 0
+            else 0.0
+        )
+        basic_stats = {
+            "revenue_7days": float(total_rev),
+            "total_sessions": total_sess,
+            "avg_occupancy": avg_occupancy,
+            "open_maintenance_alerts": faulted_chargers,
+        }
 
     result = await AIService.ask_advisor(
         question=req.question,

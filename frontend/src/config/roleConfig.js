@@ -28,21 +28,13 @@ export const DEMO_USERS = {
     fullName: 'Quản Trị Viên Hệ Thống',
     description: 'Toàn quyền mạng lưới trạm sạc',
   },
-  OPERATOR_A: {
+  OPERATOR: {
     username: 'operator_a',
     password: 'OpPass123',
     role: 'OPERATOR',
-    label: 'Chủ trạm A',
-    fullName: 'Chủ Trạm VinFast (Trạm ST-1, ST-2)',
-    description: 'Trạm VinFast Hòa Khánh & Trung Tâm',
-  },
-  OPERATOR_B: {
-    username: 'operator',
-    password: 'OpPass123',
-    role: 'OPERATOR',
-    label: 'Chủ trạm B',
-    fullName: 'Chủ Trạm Trung Tâm (Trạm ST-3)',
-    description: 'Trạm Sạc Trung Tâm Đà Nẵng',
+    label: 'Chủ trạm sạc',
+    fullName: 'Chủ Trạm Sạc Mẫu',
+    description: 'Quản lý trạm sạc thuộc quyền sở hữu',
   },
   CUSTOMER: {
     username: 'driver_user',

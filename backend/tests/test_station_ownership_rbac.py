@@ -242,8 +242,8 @@ def test_station_detail_cross_access_403(client, rbac_setup):
 
 
 def test_station_create_auto_assignment(client, rbac_setup):
-    """3. Chủ trạm tạo trạm sạc tự động gán operator_id = current_user.id; Admin có thể chỉ định hoặc để None."""
-    # Chủ A tạo trạm (kể cả có truyền operator_id khác)
+    """3. Chủ trạm không được tạo trạm (403); Admin có toàn quyền tạo và chỉ định operator_id hoặc để None."""
+    # Chủ A tạo trạm -> 403 Forbidden
     payload_a = {
         "name": "Trạm Mới Của Chủ A",
         "address": "111 Hải Phòng, Đà Nẵng",
@@ -257,8 +257,7 @@ def test_station_create_auto_assignment(client, rbac_setup):
     res_a = client.post(
         "/api/v1/stations", json=payload_a, headers=rbac_setup["h_op_a"]
     )
-    assert res_a.status_code == 201
-    assert res_a.json()["operator_id"] == rbac_setup["op_a"].id  # Bị ép về Chủ A
+    assert res_a.status_code == 403
 
     # Admin tạo trạm chỉ định cho Chủ B
     payload_admin_b = {
@@ -519,3 +518,99 @@ def test_sessions_list_and_detail_isolation(client, db_session, rbac_setup):
     admin_ids = [s["id"] for s in res_admin_sess.json()]
     assert sess_a.id in admin_ids
     assert sess_b.id in admin_ids
+
+
+def test_operator_forbidden_from_modifying_grid_capacity(client, rbac_setup):
+    """9. Chủ trạm bị cấm sửa total_grid_capacity_kw (HTTP 403); chỉ được sửa operating_hours."""
+    st_id = rbac_setup["st_a1"].id
+    # Cố tình sửa công suất lưới -> 403
+    payload_hack_capacity = {"total_grid_capacity_kw": 999.0}
+    res_hack = client.put(
+        f"/api/v1/stations/{st_id}",
+        json=payload_hack_capacity,
+        headers=rbac_setup["h_op_a"],
+    )
+    assert res_hack.status_code == 403
+    assert "total_grid_capacity_kw" in res_hack.json()["detail"]
+
+    # Sửa operating_hours hợp lệ -> 200
+    payload_ok_hours = {"operating_hours": "06:00 - 22:00"}
+    res_ok = client.put(
+        f"/api/v1/stations/{st_id}",
+        json=payload_ok_hours,
+        headers=rbac_setup["h_op_a"],
+    )
+    assert res_ok.status_code == 200
+    assert res_ok.json()["operating_hours"] == "06:00 - 22:00"
+
+
+def test_session_response_enriched_fields_and_summary_endpoint(
+    client, rbac_setup, db_session
+):
+    """10. SessionResponse có station_id, station_name, charger_code; GET /sessions/summary phân quyền đúng."""
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from app.models.session import ChargingSession
+
+    sess = ChargingSession(
+        user_id=rbac_setup["driver"].id,
+        connector_id=rbac_setup["conn_a1"].id,
+        tariff_id=rbac_setup["tariff_a1"].id,
+        applied_price_per_kwh=Decimal("3500.00"),
+        meter_start_kwh=Decimal("10.00"),
+        meter_stop_kwh=Decimal("30.00"),
+        total_kwh=Decimal("20.00"),
+        total_amount=Decimal("70000.00"),
+        status="COMPLETED",
+        start_time=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(sess)
+    db_session.commit()
+    db_session.refresh(sess)
+
+    # 1. Kiểm tra trường làm giàu trong danh sách phiên
+    res_list = client.get("/api/v1/sessions", headers=rbac_setup["h_op_a"])
+    assert res_list.status_code == 200
+    item = next((s for s in res_list.json() if s["id"] == sess.id), None)
+    assert item is not None
+    assert item["station_id"] == rbac_setup["st_a1"].id
+    assert item["station_name"] == rbac_setup["st_a1"].name
+    assert item["charger_code"] == rbac_setup["ch_a1"].code
+
+    # 2. Kiểm tra summary nhóm theo trạm cho Operator A
+    res_sum_op = client.get(
+        "/api/v1/sessions/summary?group_by=station", headers=rbac_setup["h_op_a"]
+    )
+    assert res_sum_op.status_code == 200
+    data_op = res_sum_op.json()
+    assert "kpi" in data_op
+    assert data_op["kpi"]["total_sessions"] >= 1
+    assert data_op["kpi"]["total_kwh"] >= 20.0
+    assert len(data_op["items"]) >= 1
+
+    # 3. Kiểm tra summary nhóm theo ngày cho Admin
+    res_sum_admin = client.get(
+        "/api/v1/sessions/summary?group_by=date", headers=rbac_setup["h_admin"]
+    )
+    assert res_sum_admin.status_code == 200
+    data_admin = res_sum_admin.json()
+    assert data_admin["group_by"] == "date"
+    assert data_admin["kpi"]["total_sessions"] >= 1
+
+
+def test_ai_ask_basic_stats_scoped_to_operator(client, rbac_setup):
+    """11. AI /ai/ask phân lập số liệu thống kê cơ bản theo trạm sở hữu của Chủ trạm."""
+    res = client.post(
+        "/api/v1/ai/ask",
+        json={"question": "Tổng quan hiệu suất vận hành hôm nay thế nào?"},
+        headers=rbac_setup["h_op_a"],
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "answer" in data
+    assert "basic_stats" in data
+    assert "revenue_7days" in data["basic_stats"]
+    assert "total_sessions" in data["basic_stats"]
+    assert "avg_occupancy" in data["basic_stats"]

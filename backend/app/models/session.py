@@ -90,5 +90,27 @@ class ChargingSession(Base):
     connector = relationship("Connector")
     tariff = relationship("Tariff")
 
+    @property
+    def station_id(self) -> int | None:
+        if self.connector and self.connector.charging_point:
+            return self.connector.charging_point.station_id
+        return None
+
+    @property
+    def station_name(self) -> str | None:
+        if (
+            self.connector
+            and self.connector.charging_point
+            and self.connector.charging_point.station
+        ):
+            return self.connector.charging_point.station.name
+        return None
+
+    @property
+    def charger_code(self) -> str | None:
+        if self.connector and self.connector.charging_point:
+            return self.connector.charging_point.code
+        return None
+
     def __repr__(self) -> str:
         return f"<ChargingSession(id={self.id}, user_id={self.user_id}, status='{self.status}', kwh={self.total_kwh}, amount={self.total_amount})>"

@@ -89,7 +89,11 @@ export default function Simulator() {
       const res = await api.get('/stations');
       const stData = res.data || [];
       setStations(stData);
-      if (stData.length > 0) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const queryStationId = searchParams.get('station_id');
+      if (queryStationId && stData.some((st) => String(st.id) === String(queryStationId))) {
+        setSelectedStationId(String(queryStationId));
+      } else if (stData.length > 0) {
         setSelectedStationId(String(stData[0].id));
       }
     } catch (err) {
