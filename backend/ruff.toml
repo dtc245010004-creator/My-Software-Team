@@ -1,0 +1,3 @@
+[lint.isort]`nknown-first-party = ["app"]
+[lint.isort]
+known-first-party = ["app"]
