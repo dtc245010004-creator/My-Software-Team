@@ -78,6 +78,35 @@ docker compose -f docker-compose.staging.yml up -d --build
 - Giao diện người dùng Staging: `http://localhost` (cổng 80)
 - API Backend Staging: `http://localhost:8000` (hoặc qua proxy `http://localhost/api/v1`)
 
+### Cách 3: Khởi chạy Backend và Frontend cùng lúc bằng Python (Local Dev)
+
+Cách này chạy trực tiếp trên máy, không cần Docker Desktop. Yêu cầu Python 3.12+ và Node.js/npm; mở PowerShell tại thư mục gốc dự án. Cài dependencies một lần:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+npm --prefix frontend install
+```
+
+Nếu cần tài khoản demo, nạp dữ liệu một lần vào database local. Lệnh này xóa và tạo lại database; hãy sao lưu `backend\ev_csms.db` trước khi chạy nếu file đã có dữ liệu:
+
+```powershell
+Push-Location backend
+..\.venv\Scripts\python.exe seed_data.py
+Pop-Location
+```
+
+Khởi chạy cả Backend và Frontend trong cùng terminal:
+
+```powershell
+.\.venv\Scripts\python.exe run.py
+```
+
+- Frontend: `http://localhost:5173`
+- Backend Swagger UI: `http://localhost:8000/docs`
+- Nhấn `Ctrl+C` để dừng cả hai dịch vụ.
+- `run.py` không tự cài dependencies hoặc nạp lại dữ liệu demo.
+
 ---
 
 ## 2. Dùng thử hệ thống

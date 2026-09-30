@@ -15,9 +15,12 @@
 * **Cây migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo các bảng lõi trước `03906fa596ea`; cây hiện quy về một head `f2c9a6d81b40`, nối merge revision `795931a69149` với migration `e4b6f9a2c1d3`.
 * **Số lượng kiểm thử tự động**: Đạt **89 ca kiểm thử** tự động được xác thực thực tế (toàn bộ 89/89 PASS khi chạy `pytest`).
 * **Khung triển khai Staging & CI/CD**: Đóng gói container hóa qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và quy trình kiểm thử tự động `.github/workflows/ci-staging.yml`.
+* **Bộ chạy Local Dev**: `run.py` khởi chạy Backend FastAPI và Frontend Vite đồng thời trong một terminal; `Ctrl+C` dừng cả hai.
 * **Cơ cấu tổ chức tài liệu**: Phân tách thành 6 phân khu chuyên trách trong `docs/` (`architecture/`, `devops/`, `planning/`, `qa/`, `design/`, `research/`) gồm 24 file chuẩn mực.
 
 ### 0.2. Đã thay đổi
+* **Bộ chạy Local Dev ở thư mục gốc (30/09/2026 - chưa commit)**:
+  * Thêm `run.py` để mở Uvicorn và Vite cùng lúc, kiểm tra dependencies cần thiết, và dừng cả hai tiến trình khi nhấn `Ctrl+C`.
 * **Hợp nhất cây migration Alembic (30/09/2026, commit `d7acaf4`)**:
   * Thêm revision merge `795931a69149` để hợp nhất hai head `c2d3e4f5a6b7` và `d3a5e8b1c4f2`.
   * Sửa revision `f99adeda980d`: bỏ thao tác thêm lặp cột `wallets.is_debt_locked` và đặt mặc định `0` cho `charging_sessions.current_soc` khi nâng cấp dữ liệu hiện có.
@@ -143,6 +146,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   └── vite.config.js                 # Cấu hình máy chủ Vite & Reverse Proxy
 ├── phacthaobandau/                    # Kho lưu trữ các tài liệu phác thảo cũ
 ├── docker-compose.staging.yml         # Điều phối cụm dịch vụ Staging Backend & Frontend
+├── run.py                             # Khởi chạy Backend và Frontend cho Local Dev
 ├── CONTRIBUTING.md                    # Quy ước làm việc nhóm, Git flow & PR checklist
 ├── nentangtramsac_bandaydu.md         # Bảng tính chuẩn hóa yêu cầu và tiến độ Scrum
 ├── README.md                          # Cổng đón tiếp chung & Hướng dẫn khởi động nhanh
