@@ -116,9 +116,7 @@ def test_create_access_token_with_default_expiration():
     token = create_access_token(data=payload)
 
     assert isinstance(token, str)
-    decoded = jwt.decode(
-        token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-    )
+    decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     assert decoded["sub"] == "101"
     assert decoded["email"] == "user@evcsms.vn"
     assert decoded["role"] == "cpo"
@@ -138,9 +136,7 @@ def test_create_access_token_with_custom_expiration():
     payload = {"sub": "202"}
     token = create_access_token(data=payload, expires_delta=custom_delta)
 
-    decoded = jwt.decode(
-        token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-    )
+    decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     exp_time = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc)
     iat_time = datetime.fromtimestamp(decoded["iat"], tz=timezone.utc)
     diff_minutes = (exp_time - iat_time).total_seconds() / 60
@@ -155,9 +151,7 @@ def test_create_access_token_preserves_nested_data():
         "metadata": {"tenant_id": "cpo_hn_01"},
     }
     token = create_access_token(data=payload)
-    decoded = jwt.decode(
-        token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-    )
+    decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
     assert decoded["permissions"] == ["station:read", "station:write"]
     assert decoded["metadata"]["tenant_id"] == "cpo_hn_01"

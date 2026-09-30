@@ -114,7 +114,9 @@ def login(
     """
     user = (
         db.query(User)
-        .filter((User.username == login_in.username) | (User.email == login_in.username))
+        .filter(
+            (User.username == login_in.username) | (User.email == login_in.username)
+        )
         .first()
     )
 
@@ -125,7 +127,10 @@ def login(
         locked_until_utc = ensure_utc(user.locked_until)
         if locked_until_utc and now < locked_until_utc:
             remaining_seconds = (locked_until_utc - now).total_seconds()
-            remaining_minutes = max(1, int(remaining_seconds // 60) + (1 if remaining_seconds % 60 > 0 else 0))
+            remaining_minutes = max(
+                1,
+                int(remaining_seconds // 60) + (1 if remaining_seconds % 60 > 0 else 0),
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Tài khoản bị tạm khóa do nhập sai mật khẩu quá {settings.MAX_FAILED_LOGIN_ATTEMPTS} lần. Vui lòng thử lại sau {remaining_minutes} phút.",
@@ -141,7 +146,9 @@ def login(
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
-                user.locked_until = now + timedelta(minutes=settings.LOCKOUT_DURATION_MINUTES)
+                user.locked_until = now + timedelta(
+                    minutes=settings.LOCKOUT_DURATION_MINUTES
+                )
                 db.commit()
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -149,7 +156,9 @@ def login(
                 )
             else:
                 db.commit()
-                remaining = settings.MAX_FAILED_LOGIN_ATTEMPTS - user.failed_login_attempts
+                remaining = (
+                    settings.MAX_FAILED_LOGIN_ATTEMPTS - user.failed_login_attempts
+                )
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail=f"Tên đăng nhập hoặc mật khẩu không chính xác. Còn lại {remaining} lần thử.",
@@ -182,9 +191,7 @@ def login(
         db.commit()
 
     # Cấp access token nhúng sub (user.id) và role
-    access_token = create_access_token(
-        data={"sub": str(user.id), "role": user.role}
-    )
+    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
 
     wallet_balance = float(user.wallet.balance) if user.wallet else 0.0
     user_response = UserResponse(
@@ -234,4 +241,6 @@ def get_me(
 )
 def test_admin_access(current_user: User = Depends(get_current_user)):
     """Endpoint bảo vệ kiểm thử phân quyền RBAC cho ADMIN."""
-    return {"message": f"Xin chào Quản trị viên {current_user.username}. Truy cập hợp lệ!"}
+    return {
+        "message": f"Xin chào Quản trị viên {current_user.username}. Truy cập hợp lệ!"
+    }

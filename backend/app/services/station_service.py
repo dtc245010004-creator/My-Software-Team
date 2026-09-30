@@ -98,7 +98,11 @@ def verify_station_ownership(station: Station, user: User) -> None:
 def verify_charger_ownership(charger: ChargingPoint, user: User) -> None:
     """Kiểm tra quyền sở hữu trụ sạc thông qua trạm cha (IDOR Guard cấp Charger)."""
     if user.role != "ADMIN":
-        if not charger.station or charger.station.operator_id is None or charger.station.operator_id != user.id:
+        if (
+            not charger.station
+            or charger.station.operator_id is None
+            or charger.station.operator_id != user.id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Bạn không có quyền thao tác trên trụ sạc này.",

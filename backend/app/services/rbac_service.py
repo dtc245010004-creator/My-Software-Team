@@ -1,6 +1,6 @@
-from app.models.auth import Role, UserRole
 from sqlalchemy.orm import Session
 
+from app.models.auth import Role, UserRole
 from app.models.user import User
 
 ROLE_NAMES = {

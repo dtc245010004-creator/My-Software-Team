@@ -29,7 +29,11 @@ router = APIRouter(prefix="/sessions", tags=["Phiên sạc xe điện (Charging 
 )
 def list_sessions(
     station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
-    status_filter: Optional[str] = Query(None, alias="status", description="Lọc theo trạng thái phiên: ACTIVE, COMPLETED, INTERRUPTED"),
+    status_filter: Optional[str] = Query(
+        None,
+        alias="status",
+        description="Lọc theo trạng thái phiên: ACTIVE, COMPLETED, INTERRUPTED",
+    ),
     current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
@@ -42,7 +46,11 @@ def list_sessions(
     if current_user.role == "ADMIN":
         query = db.query(ChargingSession)
         if station_id:
-            query = query.join(ChargingSession.connector).join(Connector.charging_point).filter(ChargingPoint.station_id == station_id)
+            query = (
+                query.join(ChargingSession.connector)
+                .join(Connector.charging_point)
+                .filter(ChargingPoint.station_id == station_id)
+            )
         if status_filter and status_filter.upper() != "ALL":
             query = query.filter(ChargingSession.status == status_filter.upper())
         return query.order_by(ChargingSession.id.desc()).all()
@@ -171,8 +179,14 @@ def get_session_detail(
 
     if current_user.role == "OPERATOR":
         connector = session.connector
-        station = connector.charging_point.station if connector and connector.charging_point else None
-        if (station and station.operator_id == current_user.id) or session.user_id == current_user.id:
+        station = (
+            connector.charging_point.station
+            if connector and connector.charging_point
+            else None
+        )
+        if (
+            station and station.operator_id == current_user.id
+        ) or session.user_id == current_user.id:
             return session
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
