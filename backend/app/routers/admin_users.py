@@ -19,6 +19,17 @@ class RoleUpdate(BaseModel):
     role: str
 
 
+# Các tài khoản mặc định được bảo vệ
+PROTECTED_DEFAULT_USERS = {
+    "admin",
+}
+
+
+def is_protected_default_user(user: User) -> bool:
+    username = (user.username or "").strip().lower()
+    return username in PROTECTED_DEFAULT_USERS
+
+
 @router.get("")
 @roles("ADMIN")
 def list_users(
@@ -70,13 +81,6 @@ def update_user_role(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Không cho ADMIN đang đăng nhập tự thay đổi vai trò của mình
-    if current_user.id == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Không thể thay đổi vai trò của chính tài khoản ADMIN đang đăng nhập.",
-        )
-
     allowed_roles = {
         "ADMIN",
         "OPERATOR",
@@ -105,6 +109,20 @@ def update_user_role(
             detail="Không tìm thấy tài khoản.",
         )
 
+    # Không cho thay đổi vai trò tài khoản mặc định
+    if is_protected_default_user(user):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể thay đổi vai trò của tài khoản mặc định.",
+        )
+
+    # Không cho ADMIN tự thay đổi vai trò của chính mình
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể thay đổi vai trò của chính tài khoản đang đăng nhập.",
+        )
+
     user.role = next_role
 
     db.commit()
@@ -124,12 +142,6 @@ def disable_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if current_user.id == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Không thể tự khóa tài khoản admin đang đăng nhập.",
-        )
-
     user = (
         db.query(User)
         .filter(User.id == user_id)
@@ -140,6 +152,20 @@ def disable_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy tài khoản.",
+        )
+
+    # Không cho khóa tài khoản mặc định
+    if is_protected_default_user(user):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể khóa tài khoản mặc định.",
+        )
+
+    # Không cho tự khóa chính mình
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể tự khóa tài khoản đang đăng nhập.",
         )
 
     user.is_active = False
@@ -188,12 +214,6 @@ def lock_login(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if current_user.id == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Không thể tự khóa đăng nhập của chính mình.",
-        )
-
     user = (
         db.query(User)
         .filter(User.id == user_id)
@@ -204,6 +224,20 @@ def lock_login(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy tài khoản.",
+        )
+
+    # Không cho khóa đăng nhập tài khoản mặc định
+    if is_protected_default_user(user):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể khóa đăng nhập của tài khoản mặc định.",
+        )
+
+    # Không cho tự khóa đăng nhập của chính mình
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể tự khóa đăng nhập của chính mình.",
         )
 
     now = datetime.now(timezone.utc)
