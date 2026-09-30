@@ -115,7 +115,7 @@ Hệ thống tích hợp Google Gemini API kết hợp cùng Thuật toán Heuri
 ```text
 ┌────────────────────────────────────────────────────────┐
 │                   FRONTEND WEB APP                     │
-│  React 18 + Vite + Tailwind CSS + Recharts + WebSocket │
+│  React 19 + Vite + Tailwind CSS + Recharts + WebSocket │
 │  - Driver Portal: Tìm trạm, ví tiền, phiên sạc realtime│
 │  - CPO Dashboard: Quản lý trạm/trụ, biểu giá, bảo trì  │
 │  - Simulator UI: Công cụ giả lập trụ sạc và xe sạc     │

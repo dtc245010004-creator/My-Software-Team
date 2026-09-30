@@ -10,6 +10,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
 
 
@@ -31,9 +32,13 @@ class Tariff(Base):
         index=True,
     )  # NULL = Biểu giá mặc định toàn hệ thống
     name = Column(String(100), nullable=False)
-    price_normal = Column(Numeric(10, 2), nullable=False)  # Giá giờ bình thường (VNĐ/kWh)
+    price_normal = Column(
+        Numeric(10, 2), nullable=False
+    )  # Giá giờ bình thường (VNĐ/kWh)
     price_peak = Column(Numeric(10, 2), nullable=False)  # Giá giờ cao điểm (VNĐ/kWh)
-    price_offpeak = Column(Numeric(10, 2), nullable=False)  # Giá giờ thấp điểm (VNĐ/kWh)
+    price_offpeak = Column(
+        Numeric(10, 2), nullable=False
+    )  # Giá giờ thấp điểm (VNĐ/kWh)
 
     # Khung giờ cao điểm 1 (sáng) & 2 (chiều tối)
     peak_start = Column(String(5), default="09:30", nullable=False)

@@ -1,9 +1,13 @@
-from typing import Any, Dict, List
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_current_user_or_driver_guest, require_roles
+from app.api.deps import (
+    get_current_user_or_driver_guest,
+    require_roles,
+)
 from app.core.database import get_db
 from app.models.session import ChargingSession
 from app.models.user import User
@@ -17,21 +21,31 @@ class TriggerEventRequest(BaseModel):
 
 
 class SetPowerLimitRequest(BaseModel):
-    power_limit_kw: float = Field(..., gt=0, description="Giới hạn công suất sạc mới (kW)")
+    power_limit_kw: float = Field(
+        ..., gt=0, description="Giới hạn công suất sạc mới (kW)"
+    )
 
 
-def verify_session_management_permission(db: Session, session_id: int, user: User) -> ChargingSession:
+def verify_session_management_permission(
+    db: Session, session_id: int, user: User
+) -> ChargingSession:
     """Kiểm tra quyền quản lý phần cứng giả lập: Chỉ Admin hoặc Operator sở hữu trạm mới được can thiệp."""
     session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc."
+        )
 
     if user.role == "ADMIN":
         return session
 
     if user.role == "OPERATOR":
         connector = session.connector
-        station = connector.charging_point.station if connector and connector.charging_point else None
+        station = (
+            connector.charging_point.station
+            if connector and connector.charging_point
+            else None
+        )
         if station and station.operator_id == user.id:
             return session
 
@@ -43,7 +57,7 @@ def verify_session_management_permission(db: Session, session_id: int, user: Use
 
 @router.get(
     "/sessions",
-    response_model=List[Dict[str, Any]],
+    response_model=list[dict[str, Any]],
     summary="Xem danh sách các phiên sạc đang chạy mô phỏng trong RAM (Chỉ Admin / CPO)",
 )
 def list_active_simulators(
@@ -60,7 +74,11 @@ def list_active_simulators(
     results = []
 
     for sim in sims:
-        session = db.query(ChargingSession).filter(ChargingSession.id == sim.session_id).first()
+        session = (
+            db.query(ChargingSession)
+            .filter(ChargingSession.id == sim.session_id)
+            .first()
+        )
         if not session:
             continue
 
@@ -68,7 +86,11 @@ def list_active_simulators(
             results.append(sim.to_telemetry_dict())
         elif current_user.role == "OPERATOR":
             connector = session.connector
-            station = connector.charging_point.station if connector and connector.charging_point else None
+            station = (
+                connector.charging_point.station
+                if connector and connector.charging_point
+                else None
+            )
             if station and station.operator_id == current_user.id:
                 results.append(sim.to_telemetry_dict())
 
@@ -77,7 +99,7 @@ def list_active_simulators(
 
 @router.get(
     "/sessions/{session_id}",
-    response_model=Dict[str, Any],
+    response_model=dict[str, Any],
     summary="Xem thông số Telemetry tức thời của một phiên sạc từ RAM",
 )
 def get_session_telemetry(
@@ -92,7 +114,9 @@ def get_session_telemetry(
     """
     session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc."
+        )
 
     # Kiểm tra quyền xem
     if current_user.role == "CUSTOMER" and session.user_id != current_user.id:
@@ -102,7 +126,11 @@ def get_session_telemetry(
         )
     elif current_user.role == "OPERATOR":
         connector = session.connector
-        station = connector.charging_point.station if connector and connector.charging_point else None
+        station = (
+            connector.charging_point.station
+            if connector and connector.charging_point
+            else None
+        )
         if not station or station.operator_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

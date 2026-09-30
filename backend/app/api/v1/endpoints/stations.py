@@ -1,9 +1,11 @@
-from datetime import datetime, timedelta, timezone
 import math
+from datetime import timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from app.api.deps import get_current_user, get_optional_current_user, require_roles
+
+from app.api.deps import get_optional_current_user, require_roles
 from app.core.database import get_db
 from app.core.datetime_utils import get_vn_now, to_vn_time
 from app.models.session import ChargingSession
@@ -20,9 +22,8 @@ from app.services.station_service import (
     atomic_soft_delete_station,
     calculate_haversine_distance,
     enrich_station_response,
-    verify_station_ownership,
     get_accessible_station_ids,
-    assert_station_accessible,
+    verify_station_ownership,
 )
 from app.simulator.charging_simulator import simulator_manager
 
@@ -39,7 +40,11 @@ def list_station_owners(
     db: Session = Depends(get_db),
 ):
     """Admin lấy danh sách tài khoản Chủ trạm sạc (Role: OPERATOR) để gán cho trạm."""
-    owners = db.query(User).filter(User.role == "OPERATOR", User.is_active == True).all()
+    owners = (
+        db.query(User)
+        .filter(User.role == "OPERATOR", User.is_active.is_(True))
+        .all()
+    )
     return [
         {
             "id": u.id,
@@ -73,7 +78,7 @@ def list_stations(
     - Quản trị viên (ADMIN): Thấy toàn bộ trạm trong hệ thống (kể cả trạm chưa gán chủ).
     - Khách / Tài xế (CUSTOMER): Thấy toàn bộ trạm active công khai để tìm kiếm và cắm sạc.
     """
-    query = db.query(Station).filter(Station.is_active == True)
+    query = db.query(Station).filter(Station.is_active)
 
     # Phân quyền: Chủ trạm chỉ thấy các trạm do mình sở hữu
     if current_user and current_user.role == "OPERATOR":
@@ -88,8 +93,8 @@ def list_stations(
             .join(ChargingPoint.connectors)
             .filter(
                 Connector.connector_type == connector_type.upper(),
-                Connector.is_active == True,
-                ChargingPoint.is_active == True,
+                Connector.is_active,
+                ChargingPoint.is_active,
             )
             .distinct()
         )
@@ -141,7 +146,15 @@ def get_live_dashboard_metrics(
     - Nếu truyền station_id: Kiểm tra quyền sở hữu, ngoài phạm vi -> 403 Forbidden.
     - Hạn mức: An toàn 95% công suất thiết kế, kèm chi tiết từng trạm.
     """
-    accessible_ids = get_accessible_station_ids(current_user, db) if current_user else [s.id for s in db.query(Station.id).filter(Station.is_active == True).all()]
+    if current_user and current_user.role == "OPERATOR":
+        accessible_ids = get_accessible_station_ids(current_user, db)
+    else:
+        accessible_ids = [
+            station_id
+            for (station_id,) in db.query(Station.id)
+            .filter(Station.is_active.is_(True))
+            .all()
+        ]
 
     if station_id is not None:
         if current_user and station_id not in accessible_ids:
@@ -153,8 +166,23 @@ def get_live_dashboard_metrics(
     else:
         target_station_ids = accessible_ids
 
-    stations = db.query(Station).filter(Station.id.in_(target_station_ids), Station.is_active == True).all() if target_station_ids else []
-    chargers = db.query(ChargingPoint).filter(ChargingPoint.station_id.in_(target_station_ids), ChargingPoint.is_active == True).all() if target_station_ids else []
+    stations = (
+        db.query(Station)
+        .filter(Station.id.in_(target_station_ids), Station.is_active)
+        .all()
+        if target_station_ids
+        else []
+    )
+    chargers = (
+        db.query(ChargingPoint)
+        .filter(
+            ChargingPoint.station_id.in_(target_station_ids),
+            ChargingPoint.is_active,
+        )
+        .all()
+        if target_station_ids
+        else []
+    )
     charger_ids_set = {c.id for c in chargers}
 
     # Map connector_id -> charger_id

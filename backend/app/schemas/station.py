@@ -1,6 +1,8 @@
-from datetime import datetime
 from typing import List, Optional
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.datetime_utils import UTCDateTime
 
 
 # ==========================================
@@ -22,10 +24,6 @@ class ConnectorBase(BaseModel):
 
 class ConnectorCreate(ConnectorBase):
     pass
-
-
-from app.core.datetime_utils import UTCDateTime
-
 
 class ConnectorResponse(ConnectorBase):
     id: int

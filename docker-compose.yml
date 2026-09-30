@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: ev_csms_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+    networks:
+      - ev_net
+
+  backend:
+    build:
+      context: ./backend
+    container_name: ev_csms_backend
+    environment:
+      - DATABASE_URL=sqlite:////app/data/ev_csms.db
+      - BACKEND_CORS_ORIGINS=["http://localhost", "http://localhost:5173", "http://127.0.0.1:5173"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - sqlite_data:/app/data
+    restart: unless-stopped
+    networks:
+      - ev_net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: ev_csms_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - ev_net
+
+volumes:
+  postgres_data:
+  sqlite_data:
+
+networks:
+  ev_net:
+    driver: bridge

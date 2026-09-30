@@ -1,7 +1,9 @@
-from typing import List, Optional
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_optional_current_user, require_roles
 from app.core.database import get_db
 from app.models.station import ChargingPoint, Connector, Station
@@ -46,12 +48,16 @@ def create_charger_for_station(
     """
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
+        )
 
     verify_station_ownership(station, current_user)
 
     # Kiểm tra trùng mã code
-    existing_code = db.query(ChargingPoint).filter(ChargingPoint.code == charger_in.code).first()
+    existing_code = (
+        db.query(ChargingPoint).filter(ChargingPoint.code == charger_in.code).first()
+    )
     if existing_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -116,7 +122,9 @@ def get_charger(
 ):
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
+        )
     if current_user and current_user.role == "OPERATOR":
         if not charger.station or charger.station.operator_id != current_user.id:
             raise HTTPException(
@@ -140,7 +148,9 @@ def update_charger(
     """Cập nhật thông tin cấu hình trụ sạc: Chỉ Owner trạm cha hoặc Admin mới có quyền."""
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
+        )
 
     verify_charger_ownership(charger, current_user)
 
@@ -171,7 +181,9 @@ async def update_charger_status(
     """
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
+        )
 
     verify_charger_ownership(charger, current_user)
 
@@ -202,7 +214,9 @@ def delete_charger(
     """Xóa mềm trụ sạc: Gán is_active = False cascade cho các súng sạc trong 1 Transaction."""
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
+        )
 
     verify_charger_ownership(charger, current_user)
     atomic_soft_delete_charger(db, charger)
@@ -222,7 +236,9 @@ def reactivate_charger(
     """Phục hồi hoạt động trụ sạc và các súng sạc con."""
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
+        )
 
     verify_charger_ownership(charger, current_user)
     atomic_reactivate_charger(db, charger)
@@ -244,7 +260,9 @@ def add_connector(
     """Thêm cổng sạc vào trụ: Kiểm tra trùng lặp connector_number."""
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
+        )
 
     verify_charger_ownership(charger, current_user)
 

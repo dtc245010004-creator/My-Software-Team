@@ -10,6 +10,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
 
 
@@ -19,13 +20,14 @@ class ChargingSession(Base):
     __tablename__ = "charging_sessions"
     __table_args__ = (
         CheckConstraint("total_kwh >= 0", name="ck_session_total_kwh_non_negative"),
-        CheckConstraint("total_amount >= 0", name="ck_session_total_amount_non_negative"),
+        CheckConstraint(
+            "total_amount >= 0", name="ck_session_total_amount_non_negative"
+        ),
         CheckConstraint(
             "status IN ('ACTIVE', 'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED')",
             name="ck_session_status_valid",
         ),
     )
-
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(
@@ -70,9 +72,12 @@ class ChargingSession(Base):
     last_checkpoint_at = Column(DateTime(timezone=True), nullable=True)
 
     # Trạng thái riêng biệt của phiên sạc
-    status = Column(String(20), default="ACTIVE", nullable=False)  # ACTIVE, COMPLETED, FAILED, CANCELLED, INTERRUPTED
-    stop_reason = Column(String(100), nullable=True)  # USER_STOPPED, EMERGENCY, BATTERY_FULL, DEBT_LIMIT_REACHED...
-
+    status = Column(
+        String(20), default="ACTIVE", nullable=False
+    )  # ACTIVE, COMPLETED, FAILED, CANCELLED, INTERRUPTED
+    stop_reason = Column(
+        String(100), nullable=True
+    )  # USER_STOPPED, EMERGENCY, BATTERY_FULL, DEBT_LIMIT_REACHED...
 
     created_at = Column(
         DateTime(timezone=True),

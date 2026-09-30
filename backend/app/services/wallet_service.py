@@ -1,7 +1,8 @@
 from decimal import Decimal
-from typing import Optional, Tuple
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+
 from app.core.config import settings
 from app.models.wallet import Wallet, WalletTransaction
 
@@ -21,7 +22,7 @@ def topup_wallet(
     db: Session,
     user_id: int,
     amount: Decimal,
-    note: Optional[str] = None,
+    note: str | None = None,
 ) -> Wallet:
     """
     Nạp tiền vào ví điện tử:
@@ -30,10 +31,7 @@ def topup_wallet(
     - Tạo bản ghi WalletTransaction loại TOPUP.
     """
     wallet = (
-        db.query(Wallet)
-        .filter(Wallet.user_id == user_id)
-        .with_for_update()
-        .first()
+        db.query(Wallet).filter(Wallet.user_id == user_id).with_for_update().first()
     )
     if not wallet:
         # Tự động khởi tạo ví 0 VND nếu tài khoản chưa có ví (chống tài khoản mồ côi ví)
@@ -63,7 +61,7 @@ def deduct_charging_fee(
     user_id: int,
     session_id: int,
     amount: Decimal,
-) -> Tuple[Wallet, WalletTransaction, bool]:
+) -> tuple[Wallet, WalletTransaction, bool]:
     """
     Quyết toán trừ tiền phiên sạc (ACID Transaction):
     - Khóa dòng bi quan (with_for_update).
@@ -75,10 +73,7 @@ def deduct_charging_fee(
     - Lưu bản ghi WalletTransaction loại CHARGE_FEE.
     """
     wallet = (
-        db.query(Wallet)
-        .filter(Wallet.user_id == user_id)
-        .with_for_update()
-        .first()
+        db.query(Wallet).filter(Wallet.user_id == user_id).with_for_update().first()
     )
     if not wallet:
         raise HTTPException(

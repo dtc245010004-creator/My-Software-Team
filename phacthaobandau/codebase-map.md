@@ -1,15 +1,11 @@
-# Bản đồ mã nguồn (Codebase Map)
+# Codebase Map
 
-> **File này bắt buộc cập nhật mỗi khi thêm, xóa hoặc đổi vai trò một file.**
-> Xem `GEMINI.md §9` — trigger "thêm/xóa/đổi vai trò file bất kỳ" → cập nhật ngay lập tức.
+> File này bắt buộc cập nhật khi thêm / xóa / đổi vai trò file. Xem `GEMINI.md §9`.
+> **Cập nhật lần cuối:** 2026-09-24 (phiên cuối: fix input mất chữ + thêm `/auth/register` + trang `/register`, dọn scripts rác).
 
 **Cập nhật lần cuối:** 2026-09-26
 
----
-
-## Hiện có
-
-### Gốc dự án
+### Đã có
 
 | File | Vai trò |
 | --- | --- |
@@ -152,7 +148,7 @@
 | `backend/tests/test_sessions.py` | Bộ 5 test cases kiểm thử vòng đời phiên sạc: 409 Conflict cổng độc quyền, 402 chặn nợ, Idempotency |
 | `backend/tests/test_driver_unauthenticated.py` | Bộ 4 test cases kiểm thử luồng Tài xế không cần đăng nhập: xem ví, nạp tiền QR ghi tên, cấu hình dung lượng pin & mức pin ban đầu, sạc và ngắt sạc |
 
----
+### Chưa có — sẽ tạo theo Buoc-10
 
 ## Chưa có — Sẽ tạo theo từng bước
 

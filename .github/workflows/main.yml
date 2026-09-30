@@ -1,0 +1,95 @@
+name: EV Charging Staging Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  frontend-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: npm run build
+
+  backend-ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: ev_charging_system
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d ev_charging_system"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@127.0.0.1:5432/ev_charging_system
+      JWT_SECRET: ci-test-secret-not-for-prod
+      SESSION_COOKIE_NAME: ev_csms_session
+      SESSION_COOKIE_SECURE: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint with Ruff
+        working-directory: backend
+        run: ruff check .
+
+      - name: Wait for Postgres ready
+        run: |
+          for i in {1..30}; do
+            if pg_isready -h 127.0.0.1 -p 5432 -U admin -d ev_charging_system; then
+              echo "Postgres ready"; exit 0
+            fi
+            echo "Waiting for Postgres... ($i)"
+            sleep 2
+          done
+          echo "Postgres not ready"; exit 1
+
+      - name: Run Database Migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg2://admin:admin@127.0.0.1:5432/ev_charging_system
+        run: alembic upgrade head
+
+      - name: Run Tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg2://admin:admin@127.0.0.1:5432/ev_charging_system
+        run: pytest tests -v

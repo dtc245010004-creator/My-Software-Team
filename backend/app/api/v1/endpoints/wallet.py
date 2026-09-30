@@ -1,7 +1,8 @@
 from decimal import Decimal
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_current_user_or_driver_guest
 from app.core.database import get_db
 from app.models.user import User
@@ -21,14 +22,12 @@ def get_my_wallet(
     current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
-    wallet = (
-        db.query(Wallet)
-        .filter(Wallet.user_id == current_user.id)
-        .first()
-    )
+    wallet = db.query(Wallet).filter(Wallet.user_id == current_user.id).first()
     if not wallet:
         # Tự động khởi tạo ví điện tử 0 VND nếu người dùng chưa có (Self-healing)
-        wallet = Wallet(user_id=current_user.id, balance=Decimal("0.00"), is_debt_locked=False)
+        wallet = Wallet(
+            user_id=current_user.id, balance=Decimal("0.00"), is_debt_locked=False
+        )
         db.add(wallet)
         db.commit()
         db.refresh(wallet)
@@ -37,7 +36,7 @@ def get_my_wallet(
 
 @router.get(
     "/transactions",
-    response_model=List[WalletTransactionResponse],
+    response_model=list[WalletTransactionResponse],
     summary="Xem danh sách lịch sử biến động số dư ví của tôi",
 )
 def get_my_wallet_transactions(
@@ -80,7 +79,10 @@ def topup_my_wallet(
         db.commit()
         db.refresh(current_user)
 
-    note_text = topup_in.note or f"Nạp tiền ví chuyển khoản QR ({current_user.full_name or 'Tài xế'})"
+    note_text = (
+        topup_in.note
+        or f"Nạp tiền ví chuyển khoản QR ({current_user.full_name or 'Tài xế'})"
+    )
 
     wallet = topup_wallet(
         db=db,

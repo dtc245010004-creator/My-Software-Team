@@ -1,7 +1,9 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.session import ChargingSession
@@ -16,10 +18,15 @@ from app.schemas.ai import (
     SmartChargingResponse,
 )
 from app.services.ai_service import AIService
-from app.services.station_service import verify_charger_ownership, verify_station_ownership
+from app.services.station_service import (
+    verify_charger_ownership,
+    verify_station_ownership,
+)
 from app.simulator.charging_simulator import simulator_manager
 
-router = APIRouter(prefix="/ai", tags=["Trợ lý AI & Điều phối tải thông minh (AI CSMS)"])
+router = APIRouter(
+    prefix="/ai", tags=["Trợ lý AI & Điều phối tải thông minh (AI CSMS)"]
+)
 
 
 @router.post(
@@ -40,7 +47,9 @@ async def smart_charging_load_balancing(
     """
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
+        )
 
     verify_station_ownership(station, current_user)
 
@@ -56,13 +65,15 @@ async def smart_charging_load_balancing(
         .all()
     )
 
-    active_requests: List[Dict[str, Any]] = []
+    active_requests: list[dict[str, Any]] = []
     for sess in active_sessions:
         conn = sess.connector
         charger = conn.charging_point if conn else None
         sim = simulator_manager.get_simulator(sess.id)
 
-        current_soc = sim.soc if sim else (sess.current_soc if sess.current_soc > 0 else 25.0)
+        current_soc = (
+            sim.soc if sim else (sess.current_soc if sess.current_soc > 0 else 25.0)
+        )
         power_req = conn.max_power_kw if conn else 30.0
 
         active_requests.append(
@@ -104,18 +115,23 @@ async def predictive_maintenance(
     """
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
+        )
 
     verify_charger_ownership(charger, current_user)
 
     # Thu thập telemetry history từ simulator hoặc các phiên gần đây
-    telemetry_history: List[Dict[str, Any]] = []
+    telemetry_history: list[dict[str, Any]] = []
 
     # Kiểm tra telemetry tức thời từ simulator nếu có connector đang sạc
     for conn in charger.connectors:
         active_sess = (
             db.query(ChargingSession)
-            .filter(ChargingSession.connector_id == conn.id, ChargingSession.status == "ACTIVE")
+            .filter(
+                ChargingSession.connector_id == conn.id,
+                ChargingSession.status == "ACTIVE",
+            )
             .first()
         )
         if active_sess:
@@ -159,8 +175,12 @@ async def predictive_maintenance(
 )
 async def dynamic_pricing_advice(
     station_id: int,
-    peak_occupancy: Optional[float] = Query(None, ge=0.0, le=100.0, description="Mock tỷ lệ lấp đầy cao điểm (%)"),
-    offpeak_occupancy: Optional[float] = Query(None, ge=0.0, le=100.0, description="Mock tỷ lệ lấp đầy thấp điểm (%)"),
+    peak_occupancy: float | None = Query(
+        None, ge=0.0, le=100.0, description="Mock tỷ lệ lấp đầy cao điểm (%)"
+    ),
+    offpeak_occupancy: float | None = Query(
+        None, ge=0.0, le=100.0, description="Mock tỷ lệ lấp đầy thấp điểm (%)"
+    ),
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
@@ -172,20 +192,22 @@ async def dynamic_pricing_advice(
     """
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
+        )
 
     verify_station_ownership(station, current_user)
 
     # 1. Tìm biểu giá áp dụng
     tariff = (
         db.query(Tariff)
-        .filter(Tariff.station_id == station.id, Tariff.is_active == True)
+        .filter(Tariff.station_id == station.id, Tariff.is_active.is_(True))
         .first()
     )
     if not tariff:
         tariff = (
             db.query(Tariff)
-            .filter(Tariff.station_id.is_(None), Tariff.is_active == True)
+            .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
             .first()
         )
 
@@ -250,10 +272,20 @@ async def ask_ai_advisor(
     )
     total_sess = db.query(ChargingSession).count()
     total_chargers = db.query(ChargingPoint).count()
-    charging_chargers = db.query(ChargingPoint).filter(ChargingPoint.status == "CHARGING").count()
-    faulted_chargers = db.query(ChargingPoint).filter(ChargingPoint.status.in_(["FAULTED", "UNAVAILABLE"])).count()
+    charging_chargers = (
+        db.query(ChargingPoint).filter(ChargingPoint.status == "CHARGING").count()
+    )
+    faulted_chargers = (
+        db.query(ChargingPoint)
+        .filter(ChargingPoint.status.in_(["FAULTED", "UNAVAILABLE"]))
+        .count()
+    )
 
-    avg_occupancy = round((charging_chargers / total_chargers * 100.0), 1) if total_chargers > 0 else 0.0
+    avg_occupancy = (
+        round((charging_chargers / total_chargers * 100.0), 1)
+        if total_chargers > 0
+        else 0.0
+    )
 
     basic_stats = {
         "revenue_7days": float(total_rev),

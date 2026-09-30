@@ -2,8 +2,8 @@
 
 ## Nền tảng vận hành trạm sạc xe điện tích hợp AI (EV CSMS)
 
-> **Vai trò của file này:** Bức tranh toàn cảnh — la bàn định hướng cho toàn bộ dự án và liên kết sang từng bước thực thi chi tiết.
-> Xem `GEMINI.md §9` để hiểu quy ước nguồn sự thật và khi nào cập nhật file này.
+> Vai trò: Bức tranh toàn cảnh — la bàn định hướng. Xem `GEMINI.md §9` quy ước nguồn sự thật.
+> **Cập nhật lần cuối:** 2026-09-24.
 
 ---
 
@@ -11,17 +11,15 @@
 
 ```text
 docs/plans/TIEN-DO.md          ← Trạng thái thực tế (tick ✅ ở đây là chính thức)
-     ↑ đồng bộ
-MASTER-ROADMAP.md   ← Bức tranh toàn cảnh + điều hướng (file này)
-     ↓ link sang
-Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
+MASTER-ROADMAP.md               ← Bức tranh toàn cảnh + điều hướng (file này)
+Buoc-NN.md                      ← Spec thực thi chi tiết cho từng bước
 ```
 
-**Khi hai file mâu thuẫn:** TIEN-DO.md thắng về trạng thái; Buoc-NN.md thắng về cách làm.
+Khi hai file mâu thuẫn: TIEN-DO.md thắng về trạng thái; Buoc-NN.md thắng về cách làm.
 
 ---
 
-## Trạng thái tổng quan
+## Trạng thái 8 phân hệ (Concurrent Workstreams)
 
 | Giai đoạn | Mô tả | Mốc SDLC | Tiến độ |
 | :---: | --- | :---: | :---: |
@@ -34,11 +32,20 @@ Buoc-NN.md          ← Spec thực thi chi tiết cho từng bước
 | **6** | Xây dựng Frontend Web (React + Tailwind) | KT3 | ✅ Hoàn thành |
 | **7** | Kiểm thử, Seed Data & Đóng gói Cuối kỳ | Cuối kỳ | ✅ Hoàn thành |
 
-> **Quy ước trạng thái ô:** ⬜ Chưa bắt đầu · 🔄 Đang thực hiện · ✅ Hoàn thành · ⚠️ Cần xem xét
+| Phân hệ | Tên | Mốc | Phụ trách | Trạng thái | Tiến độ | Thực tế & Xung đột với `sodo.md` |
+|:---:|---|:---:|:---:|:---:|:---:|---|
+| **Phần 0** | Đặc tả & Kiến trúc | KT1 | Lead Architect | 🔄 | 90% | Đã xong tài liệu nền tảng. Còn thiếu `docs/SDLC/KT1/01_SRS_and_UseCases.md`. |
+| **Phần I** | Hạ tầng Docker & CI/CD | Toàn dự án | Study332 + Hiếu + KimiCoNY | ⚠️ | 60% | Đã có PostgreSQL container, Dockerfile Backend, CI GitHub Actions (`backend-ci` + `frontend-ci`). Xung đột tên DB `ev_csms_db` cần đồng bộ. |
+| **Phần II** | Backend Core, CSDL & Kênh Realtime | KT2 | KimiCoNY (BE1) | 🔄 | 60% (KT2) / 85% (T-01) | Khung FastAPI + Alembic + Ruff + pytest OK. Cần CORSMiddleware, sửa `env.py` crash khi thiếu `.env`, Router `/api/v1`, `core/websocket.py`. |
+| **Phần III** | Frontend & Layout CPO | KT3 | Hiếu + Study332 | 🔄 | 65% (KT3) / 100% (Jira Login/WS) | **2026-09-24: Form Đăng nhập + Auth Flow + WebSocket Heartbeat + Reconnect ✅** (theo Jira). Vite Proxy `/api` + `/ws` đã cấu hình. Còn thiếu: Recharts, các trang nghiệp vụ (Stations/Wallet/Sessions/AI). |
+| **Phần IV** | Quản trị Trạm, Trụ, Cổng & Biểu giá TOU | KT2 | BE2 + FE2 | ⬜ | 0% | Chờ Bước 02 hoàn thiện ERD. |
+| **Phần V** | Ví ACID, Phiên sạc & Simulator | KT2/KT3 | BE3 + FE3 | 🔄 | 10% | Có `ChargePoint`/`Connector` models (T-10). Chờ `Wallet`/`Session`/`Tariff` models và Simulator Backend. |
+| **Phần VI** | AI: Smart Charging & Predictive Maintenance | KT3 | BE3 + FE2 | ⬜ | 0% | Kiến trúc 2 vòng lặp theo `sodo.md`. |
+| **Phần VII** | Test toàn diện, Seed Data & Đóng gói | Cuối kỳ | Cả 6 | ⬜ | 0% | Có `test_placeholder.py` mồi pytest. |
 
 ---
 
-## Chi tiết từng giai đoạn
+## Chi tiết Phần III — Frontend
 
 ---
 

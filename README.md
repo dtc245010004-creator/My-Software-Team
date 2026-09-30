@@ -10,7 +10,8 @@
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
 - **Kiểm thử tự động**: **89/89 test cases passed**, 0 lỗi hồi quy (Zero regression). *(Nguồn: Kết quả thực thi `pytest backend/tests`)*
-- **Kiến trúc dữ liệu**: 9 bảng CSDL quan hệ (`users`, `wallets`, `wallet_transactions`, `stations`, `chargers`, `connectors`, `station_power_metrics`, `tariffs`, `charging_sessions`). *(Nguồn: `backend/app/models/`)*
+- **Kiến trúc dữ liệu**: 9 bảng CSDL quan hệ (`users`, `wallets`, `wallet_transactions`, `stations`, `charging_points`, `connectors`, `station_power_metrics`, `tariffs`, `charging_sessions`). *(Nguồn: `backend/app/models/`)*
+- **Migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo bảng lõi; cây revision hiện quy về một head (`f2c9a6d81b40`).
 - **Khung Staging & CI/CD**: Hỗ trợ chạy đồng thời qua `docker-compose.staging.yml` và pipeline kiểm thử tự động `.github/workflows/ci-staging.yml`.
 
 ---

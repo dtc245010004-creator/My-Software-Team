@@ -1,7 +1,8 @@
 import re
-from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from app.core.datetime_utils import UTCDateTime
 
 
 class UserRegister(BaseModel):
@@ -24,7 +25,7 @@ class UserRegister(BaseModel):
         description="Mật khẩu (tối thiểu 8 ký tự, tối đa 72 bytes, gồm cả chữ và số)",
         examples=["Password123"],
     )
-    full_name: Optional[str] = Field(
+    full_name: str | None = Field(
         default=None,
         max_length=100,
         description="Họ và tên đầy đủ",
@@ -64,16 +65,13 @@ class UserLogin(BaseModel):
     password: str = Field(..., description="Mật khẩu")
 
 
-from app.core.datetime_utils import UTCDateTime
-
-
 class UserResponse(BaseModel):
     """Schema trả về thông tin người dùng (TUYỆT ĐỐI KHÔNG chứa password hay password_hash)."""
 
     id: int
     username: str
     email: str
-    full_name: Optional[str] = None
+    full_name: str | None = None
     role: str
     is_active: bool
     created_at: UTCDateTime

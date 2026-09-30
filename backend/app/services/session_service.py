@@ -1,13 +1,14 @@
+import logging
 from datetime import datetime, time, timezone
 from decimal import Decimal
-import logging
-from typing import Optional
+
 from fastapi import HTTPException, status
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+
 from app.core.config import settings
 from app.core.datetime_utils import to_vn_time
-from app.core.websocket import ws_manager
 from app.models.session import ChargingSession
 from app.models.station import Connector
 from app.models.tariff import Tariff
@@ -16,7 +17,6 @@ from app.models.wallet import Wallet
 from app.services.wallet_service import deduct_charging_fee
 
 logger = logging.getLogger("ev_csms.session_service")
-
 
 
 def parse_time_str(time_str: str) -> time:
@@ -57,12 +57,12 @@ def determine_tou_rate(tariff: Tariff, check_time: time) -> Decimal:
     return tariff.price_normal
 
 
-def get_or_create_default_tariff(db: Session, station_id: Optional[int] = None) -> Tariff:
+def get_or_create_default_tariff(db: Session, station_id: int | None = None) -> Tariff:
     """Lấy biểu giá áp dụng riêng cho trạm hoặc biểu giá mặc định hệ thống."""
     if station_id:
         tariff = (
             db.query(Tariff)
-            .filter(Tariff.station_id == station_id, Tariff.is_active == True)
+            .filter(Tariff.station_id == station_id, Tariff.is_active.is_(True))
             .first()
         )
         if tariff:
@@ -71,7 +71,7 @@ def get_or_create_default_tariff(db: Session, station_id: Optional[int] = None) 
     # Lấy biểu giá mặc định hệ thống
     default_tariff = (
         db.query(Tariff)
-        .filter(Tariff.station_id == None, Tariff.is_active == True)
+        .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
         .first()
     )
     if not default_tariff:
@@ -93,24 +93,23 @@ def get_or_create_default_tariff(db: Session, station_id: Optional[int] = None) 
             db.add(default_tariff)
             db.commit()
             db.refresh(default_tariff)
-        except Exception:
+        except SQLAlchemyError:
             db.rollback()
             default_tariff = (
                 db.query(Tariff)
-                .filter(Tariff.station_id == None, Tariff.is_active == True)
+                .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
                 .first()
             )
 
     return default_tariff
 
 
-
 def start_charging_session(
     db: Session,
     user: User,
     connector_id: int,
-    battery_capacity_kwh: Optional[float] = 60.0,
-    initial_soc: Optional[float] = None,
+    battery_capacity_kwh: float | None = 60.0,
+    initial_soc: float | None = None,
 ) -> ChargingSession:
     """
     Bắt đầu phiên sạc xe điện:
@@ -124,9 +123,12 @@ def start_charging_session(
     # 1. Kiểm tra ví người dùng
     wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
     if not wallet:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy ví tiền người dùng.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy ví tiền người dùng.",
+        )
 
-    if wallet.balance < Decimal("0"):
+    if wallet.balance < Decimal(0):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail=f"Tài khoản đang có số dư âm ({wallet.balance:,.0f} VNĐ). Vui lòng nạp tiền để tiếp tục sạc.",
@@ -171,7 +173,11 @@ def start_charging_session(
             text("UPDATE charging_points SET status = 'CHARGING' WHERE id = :cpid;"),
             {"cpid": connector.charging_point_id},
         )
-    station_id = connector.charging_point.station_id if connector and connector.charging_point else None
+    station_id = (
+        connector.charging_point.station_id
+        if connector and connector.charging_point
+        else None
+    )
     tariff = get_or_create_default_tariff(db, station_id=station_id)
 
     # 5. Chốt đơn giá điện TOU tại thời điểm bắt đầu phiên sạc theo giờ Việt Nam
@@ -201,6 +207,7 @@ def start_charging_session(
     # 7. Khởi động bộ giả lập phần cứng (Charging Simulator) trong RAM
     try:
         from app.simulator.charging_simulator import simulator_manager
+
         power = connector.max_power_kw if connector and connector.max_power_kw else 60.0
         simulator_manager.start_simulation(
             session_id=new_session.id,
@@ -211,8 +218,10 @@ def start_charging_session(
             battery_capacity_kwh=battery_capacity_kwh or 60.0,
             initial_soc=initial_soc,
         )
-    except Exception as sim_err:
-        logger.warning(f"Không thể khởi động simulator cho session #{new_session.id}: {sim_err}")
+    except RuntimeError:
+        logger.exception(
+            "Không thể khởi động simulator cho session #%s", new_session.id
+        )
 
     return new_session
 
@@ -221,7 +230,7 @@ def stop_charging_session(
     db: Session,
     user: User,
     session_id: int,
-    meter_stop_kwh: Optional[Decimal] = None,
+    meter_stop_kwh: Decimal | None = None,
     stop_reason: str = "USER_STOPPED",
 ) -> ChargingSession:
     """
@@ -234,7 +243,9 @@ def stop_charging_session(
     """
     session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc."
+        )
 
     # 1. Chống IDOR
     if user.role != "ADMIN" and session.user_id != user.id:
@@ -251,12 +262,15 @@ def stop_charging_session(
     if meter_stop_kwh is None:
         try:
             from app.simulator.charging_simulator import simulator_manager
+
             sim = simulator_manager.get_simulator(session_id)
             if sim:
                 meter_stop_kwh = sim.current_energy_kwh
             else:
-                meter_stop_kwh = session.total_kwh if session.total_kwh else Decimal("0.00")
-        except Exception:
+                meter_stop_kwh = (
+                    session.total_kwh if session.total_kwh else Decimal("0.00")
+                )
+        except (ImportError, RuntimeError, AttributeError):
             meter_stop_kwh = session.total_kwh if session.total_kwh else Decimal("0.00")
 
     if meter_stop_kwh < session.meter_start_kwh:
@@ -293,7 +307,9 @@ def stop_charging_session(
         )
 
         # Đồng bộ trạng thái trụ sạc cha về AVAILABLE nếu không còn cổng nào khác đang CHARGING
-        connector = db.query(Connector).filter(Connector.id == session.connector_id).first()
+        connector = (
+            db.query(Connector).filter(Connector.id == session.connector_id).first()
+        )
         if connector and connector.charging_point_id:
             other_active = (
                 db.query(Connector)
@@ -301,13 +317,15 @@ def stop_charging_session(
                     Connector.charging_point_id == connector.charging_point_id,
                     Connector.status == "CHARGING",
                     Connector.id != session.connector_id,
-                    Connector.is_active == True,
+                    Connector.is_active.is_(True),
                 )
                 .count()
             )
             if other_active == 0:
                 db.execute(
-                    text("UPDATE charging_points SET status = 'AVAILABLE' WHERE id = :cpid AND status = 'CHARGING';"),
+                    text(
+                        "UPDATE charging_points SET status = 'AVAILABLE' WHERE id = :cpid AND status = 'CHARGING';"
+                    ),
                     {"cpid": connector.charging_point_id},
                 )
 
@@ -316,19 +334,20 @@ def stop_charging_session(
     except HTTPException:
         db.rollback()
         raise
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi giao dịch khi quyết toán phiên sạc: {str(e)}",
-        )
+            detail=f"Lỗi giao dịch khi quyết toán phiên sạc: {exc!s}",
+        ) from exc
 
     # 7. Dọn dẹp background simulator task
     try:
         from app.simulator.charging_simulator import simulator_manager
+
         simulator_manager.stop_simulation(session.id)
-    except Exception as sim_stop_err:
-        logger.warning(f"Lỗi khi dừng simulator task cho session #{session.id}: {sim_stop_err}")
+    except RuntimeError:
+        logger.exception("Lỗi khi dừng simulator task cho session #%s", session.id)
 
     return session
 
@@ -342,7 +361,9 @@ def reconcile_interrupted_sessions(db: Session) -> int:
     - Giải phóng cổng sạc về AVAILABLE để không bị treo vĩnh viễn.
     - Đồng bộ trạng thái trụ sạc về AVAILABLE.
     """
-    active_sessions = db.query(ChargingSession).filter(ChargingSession.status == "ACTIVE").all()
+    active_sessions = (
+        db.query(ChargingSession).filter(ChargingSession.status == "ACTIVE").all()
+    )
     if not active_sessions:
         return 0
 
@@ -368,27 +389,33 @@ def reconcile_interrupted_sessions(db: Session) -> int:
                 text("UPDATE connectors SET status = 'AVAILABLE' WHERE id = :cid;"),
                 {"cid": session.connector_id},
             )
-            connector = db.query(Connector).filter(Connector.id == session.connector_id).first()
+            connector = (
+                db.query(Connector).filter(Connector.id == session.connector_id).first()
+            )
             if connector and connector.charging_point_id:
                 other_active = (
                     db.query(Connector)
                     .filter(
                         Connector.charging_point_id == connector.charging_point_id,
                         Connector.status == "CHARGING",
-                        Connector.is_active == True,
+                        Connector.is_active.is_(True),
                     )
                     .count()
                 )
                 if other_active == 0:
                     db.execute(
-                        text("UPDATE charging_points SET status = 'AVAILABLE' WHERE id = :cpid AND status = 'CHARGING';"),
+                        text(
+                            "UPDATE charging_points SET status = 'AVAILABLE' WHERE id = :cpid AND status = 'CHARGING';"
+                        ),
                         {"cpid": connector.charging_point_id},
                     )
             count += 1
-        except Exception as e:
-            logger.error(f"Lỗi khi reconcile session #{session.id}: {e}")
+        except (SQLAlchemyError, HTTPException):
+            db.rollback()
+            logger.exception("Lỗi khi reconcile session #%s", session.id)
 
     db.commit()
-    logger.info(f"Đã phục hồi và giải phóng {count} phiên sạc bị gián đoạn do server crash.")
+    logger.info(
+        f"Đã phục hồi và giải phóng {count} phiên sạc bị gián đoạn do server crash."
+    )
     return count
-

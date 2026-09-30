@@ -1,8 +1,10 @@
 import logging
 from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_current_user, require_roles
 from app.core.config import settings
 from app.core.database import get_db
@@ -76,9 +78,9 @@ def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Xung đột dữ liệu: Tên đăng nhập hoặc email đã tồn tại.",
         )
-    except Exception as e:
+    except Exception:
         db.rollback()
-        logger.error(f"Lỗi hệ thống khi tạo tài khoản & ví: {e}")
+        logger.exception("Lỗi hệ thống khi tạo tài khoản & ví:")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Lỗi hệ thống khi khởi tạo tài khoản và ví điện tử.",

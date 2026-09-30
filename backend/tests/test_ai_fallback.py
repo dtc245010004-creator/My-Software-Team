@@ -1,10 +1,9 @@
-import asyncio
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from app.core.security import create_access_token, get_password_hash
-from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
@@ -226,6 +225,7 @@ class TestHeuristicEngine:
 
 # --- FIXTURES DÀNH CHO INTEGRATION TESTS ---
 
+
 @pytest.fixture
 def ai_test_data(db_session):
     """Thiết lập môi trường dữ liệu: Users, Station, Charger, Connectors, Tariff."""
@@ -328,7 +328,9 @@ def ai_test_data(db_session):
         "token_admin": create_access_token({"sub": str(admin.id), "role": admin.role}),
         "token_op_a": create_access_token({"sub": str(op_a.id), "role": op_a.role}),
         "token_op_b": create_access_token({"sub": str(op_b.id), "role": op_b.role}),
-        "token_customer": create_access_token({"sub": str(customer.id), "role": customer.role}),
+        "token_customer": create_access_token(
+            {"sub": str(customer.id), "role": customer.role}
+        ),
     }
 
 
@@ -346,7 +348,9 @@ class TestAIEndpointsAndRBAC:
         assert res1.status_code == 403
 
         # 2. Predictive Maintenance
-        res2 = client.post(f"/api/v1/ai/predictive-maintenance/{cp_id}", headers=headers)
+        res2 = client.post(
+            f"/api/v1/ai/predictive-maintenance/{cp_id}", headers=headers
+        )
         assert res2.status_code == 403
 
         # 3. Dynamic Pricing Advice
@@ -354,7 +358,9 @@ class TestAIEndpointsAndRBAC:
         assert res3.status_code == 403
 
         # 4. Ask Advisor
-        res4 = client.post("/api/v1/ai/ask", json={"question": "Chào AI"}, headers=headers)
+        res4 = client.post(
+            "/api/v1/ai/ask", json={"question": "Chào AI"}, headers=headers
+        )
         assert res4.status_code == 403
 
     def test_operator_idor_forbidden(self, client, ai_test_data):
@@ -368,7 +374,9 @@ class TestAIEndpointsAndRBAC:
         assert res1.status_code == 403
 
         # Operator B gọi bảo trì trụ sạc của trạm A
-        res2 = client.post(f"/api/v1/ai/predictive-maintenance/{cp_id}", headers=headers_b)
+        res2 = client.post(
+            f"/api/v1/ai/predictive-maintenance/{cp_id}", headers=headers_b
+        )
         assert res2.status_code == 403
 
         # Operator B gọi tư vấn giá trạm A
@@ -393,7 +401,9 @@ class TestAIEndpointsAndRBAC:
         headers_a = {"Authorization": f"Bearer {ai_test_data['token_op_a']}"}
         cp_id = ai_test_data["charger_a"].id
 
-        res = client.post(f"/api/v1/ai/predictive-maintenance/{cp_id}", headers=headers_a)
+        res = client.post(
+            f"/api/v1/ai/predictive-maintenance/{cp_id}", headers=headers_a
+        )
         assert res.status_code == 200
         data = res.json()
         assert data["charger_id"] == cp_id
@@ -443,10 +453,14 @@ class TestAIEndpointsAndRBAC:
         st_id = ai_test_data["station_a"].id
         cp_id = ai_test_data["charger_a"].id
 
-        res_sc = client.post(f"/api/v1/ai/smart-charging/{st_id}", headers=headers_admin)
+        res_sc = client.post(
+            f"/api/v1/ai/smart-charging/{st_id}", headers=headers_admin
+        )
         assert res_sc.status_code == 200
 
-        res_pm = client.post(f"/api/v1/ai/predictive-maintenance/{cp_id}", headers=headers_admin)
+        res_pm = client.post(
+            f"/api/v1/ai/predictive-maintenance/{cp_id}", headers=headers_admin
+        )
         assert res_pm.status_code == 200
 
 
@@ -459,12 +473,18 @@ class TestGeminiMockAndGracefulDegradation:
         from app.services.ai_service import AIService
 
         mock_response = MagicMock()
-        mock_response.text = '{"recommendations": ["Gemini AI: Khuyến nghị phân bổ tải tối ưu 100%"]}'
+        mock_response.text = (
+            '{"recommendations": ["Gemini AI: Khuyến nghị phân bổ tải tối ưu 100%"]}'
+        )
 
-        with patch("app.services.ai_service.settings.GEMINI_API_KEY", "valid_mock_key"), \
-             patch("app.services.ai_service.HAS_GENAI", True), \
-             patch("google.generativeai.GenerativeModel.generate_content", return_value=mock_response):
-
+        with (
+            patch("app.services.ai_service.settings.GEMINI_API_KEY", "valid_mock_key"),
+            patch("app.services.ai_service.HAS_GENAI", True),
+            patch(
+                "google.generativeai.GenerativeModel.generate_content",
+                return_value=mock_response,
+            ),
+        ):
             res = await AIService.get_smart_charging(
                 station_id=ai_test_data["station_a"].id,
                 grid_capacity_kw=80.0,
@@ -478,14 +498,20 @@ class TestGeminiMockAndGracefulDegradation:
             assert "Gemini AI" in res.recommendations[0]
 
     @pytest.mark.anyio
-    async def test_gemini_timeout_or_error_graceful_fallback(self, client, ai_test_data):
+    async def test_gemini_timeout_or_error_graceful_fallback(
+        self, client, ai_test_data
+    ):
         """Khi Gemini AI gặp lỗi (Exception, Timeout, 429) -> Tự động Fallback Heuristic, không ném 500."""
         from app.services.ai_service import AIService
 
-        with patch("app.services.ai_service.settings.GEMINI_API_KEY", "valid_mock_key"), \
-             patch("app.services.ai_service.HAS_GENAI", True), \
-             patch("google.generativeai.GenerativeModel.generate_content", side_effect=RuntimeError("Gemini Quota Exceeded")):
-
+        with (
+            patch("app.services.ai_service.settings.GEMINI_API_KEY", "valid_mock_key"),
+            patch("app.services.ai_service.HAS_GENAI", True),
+            patch(
+                "google.generativeai.GenerativeModel.generate_content",
+                side_effect=RuntimeError("Gemini Quota Exceeded"),
+            ),
+        ):
             # Gọi smart charging
             res_sc = await AIService.get_smart_charging(
                 station_id=ai_test_data["station_a"].id,
@@ -515,7 +541,9 @@ class TestGeminiMockAndGracefulDegradation:
             assert res_ask.is_fallback is True
 
     @pytest.mark.anyio
-    async def test_scheduler_calculate_and_broadcast_integration(self, db_session, ai_test_data):
+    async def test_scheduler_calculate_and_broadcast_integration(
+        self, db_session, ai_test_data
+    ):
         """Kiểm thử hàm lõi calculate_and_broadcast_smart_charging chạy an toàn."""
         st_id = ai_test_data["station_a"].id
         res = await calculate_and_broadcast_smart_charging(

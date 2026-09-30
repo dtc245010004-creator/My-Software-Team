@@ -1,14 +1,16 @@
 import logging
-from typing import Dict, Any
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+
 from app.core.database import SessionLocal
+from app.core.websocket import ws_manager
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.services.ai_service import AIService, latest_smart_charging_cache
 from app.simulator.charging_simulator import simulator_manager
-from app.core.websocket import ws_manager
 
 logger = logging.getLogger("ev_csms.scheduler")
 
@@ -16,7 +18,7 @@ scheduler = AsyncIOScheduler()
 
 # Bộ nhớ lưu năng lượng lũy kế của từng trạm tại lần tick trước (phục vụ tính delta kWh * 60)
 # {station_id: cumulative_energy_kwh}
-_last_station_cumulative_energy: Dict[int, float] = {}
+_last_station_cumulative_energy: dict[int, float] = {}
 
 
 def get_station_cumulative_energy(db: Session, station_id: int) -> float:
@@ -42,10 +44,13 @@ def get_station_cumulative_energy(db: Session, station_id: int) -> float:
     if active_sims:
         conn_ids = [s.connector_id for s in active_sims]
         st_conn_ids = set(
-            cid for (cid,) in (
+            cid
+            for (cid,) in (
                 db.query(Connector.id)
                 .join(ChargingPoint, Connector.charging_point_id == ChargingPoint.id)
-                .filter(ChargingPoint.station_id == station_id, Connector.id.in_(conn_ids))
+                .filter(
+                    ChargingPoint.station_id == station_id, Connector.id.in_(conn_ids)
+                )
                 .all()
             )
         )
@@ -62,7 +67,6 @@ def reset_cumulative_energy_cache():
     _last_station_cumulative_energy.clear()
 
 
-
 async def calculate_and_broadcast_smart_charging(
     station_id: int,
     db: Session,
@@ -74,7 +78,11 @@ async def calculate_and_broadcast_smart_charging(
     2. Periodic background job (Slow Loop / Gemini AI)
     3. On-demand API
     """
-    station = db.query(Station).filter(Station.id == station_id, Station.is_active == True).first()
+    station = (
+        db.query(Station)
+        .filter(Station.id == station_id, Station.is_active.is_(True))
+        .first()
+    )
     if not station:
         return None
 
@@ -120,6 +128,7 @@ async def calculate_and_broadcast_smart_charging(
         )
     else:
         from app.services.fallback_service import FallbackService
+
         res = FallbackService.calculate_load_balancing_heuristic(
             station_id=station.id,
             grid_capacity_kw=station.total_grid_capacity_kw,
@@ -136,15 +145,17 @@ async def calculate_and_broadcast_smart_charging(
                 "data": res.model_dump(),
             }
         )
-    except Exception as e:
-        logger.warning(f"Lỗi phát sóng Smart Charging qua WebSocket: {e}")
+    except (OSError, RuntimeError):
+        logger.exception("Lỗi phát sóng Smart Charging qua WebSocket")
 
     return res
 
 
 async def periodic_smart_charging_job():
     """Tác vụ chạy định kỳ mỗi 3-5 phút: Phân tích xu hướng tải toàn bộ trạm sạc đang hoạt động."""
-    logger.debug("Bắt đầu chu kỳ định kỳ phân tích điều phối tải lưới điện (Slow Loop)...")
+    logger.debug(
+        "Bắt đầu chu kỳ định kỳ phân tích điều phối tải lưới điện (Slow Loop)..."
+    )
     db: Session = SessionLocal()
     try:
         # Tìm các trạm đang có phiên sạc ACTIVE
@@ -153,7 +164,7 @@ async def periodic_smart_charging_job():
             .join(ChargingPoint, ChargingPoint.station_id == Station.id)
             .join(Connector, Connector.charging_point_id == ChargingPoint.id)
             .join(ChargingSession, ChargingSession.connector_id == Connector.id)
-            .filter(ChargingSession.status == "ACTIVE", Station.is_active == True)
+            .filter(ChargingSession.status == "ACTIVE", Station.is_active.is_(True))
             .distinct()
             .all()
         )
@@ -161,11 +172,11 @@ async def periodic_smart_charging_job():
         for (st_id,) in stations_with_active_sessions:
             try:
                 await calculate_and_broadcast_smart_charging(st_id, db, use_gemini=True)
-            except Exception as e:
-                logger.error(f"Lỗi phân tích định kỳ trạm #{st_id}: {e}")
+            except (SQLAlchemyError, RuntimeError, ValueError):
+                logger.exception("Lỗi phân tích định kỳ trạm #%s", st_id)
 
-    except Exception as exc:
-        logger.error(f"Lỗi thực thi periodic_smart_charging_job: {exc}")
+    except SQLAlchemyError:
+        logger.exception("Lỗi thực thi periodic_smart_charging_job")
     finally:
         db.close()
 
@@ -180,6 +191,7 @@ async def record_station_power_metrics_minute_job(db: Session = None):
     - Xử lý lần đầu chạy / restart server: delta = 0, power_kw = 0.0, lưu mốc lũy kế mới.
     """
     from datetime import datetime, timezone
+
     from app.models.station import StationPowerMetric
 
     now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
@@ -188,13 +200,16 @@ async def record_station_power_metrics_minute_job(db: Session = None):
         db = SessionLocal()
         should_close = True
     try:
-        stations = db.query(Station).filter(Station.is_active == True).all()
+        stations = db.query(Station).filter(Station.is_active.is_(True)).all()
         if not stations:
             return
 
         # 1. Truy vấn tổng năng lượng của các phiên sạc ĐÃ KẾT THÚC theo từng trạm
         completed_rows = (
-            db.query(ChargingPoint.station_id, func.coalesce(func.sum(ChargingSession.total_kwh), 0.0))
+            db.query(
+                ChargingPoint.station_id,
+                func.coalesce(func.sum(ChargingSession.total_kwh), 0.0),
+            )
             .join(Connector, ChargingSession.connector_id == Connector.id)
             .join(ChargingPoint, Connector.charging_point_id == ChargingPoint.id)
             .filter(ChargingSession.status != "ACTIVE")
@@ -228,7 +243,11 @@ async def record_station_power_metrics_minute_job(db: Session = None):
         # 3. Tính công suất trung bình P_avg = ΔkWh * 60 cho TẤT CẢ các trạm
         for st in stations:
             st_id = st.id
-            current_cum = round(completed_energy_map.get(st_id, 0.0) + active_energy_map.get(st_id, 0.0), 4)
+            current_cum = round(
+                completed_energy_map.get(st_id, 0.0)
+                + active_energy_map.get(st_id, 0.0),
+                4,
+            )
             active_count = len(station_chargers_map.get(st_id, set()))
 
             if st_id not in _last_station_cumulative_energy:
@@ -266,9 +285,9 @@ async def record_station_power_metrics_minute_job(db: Session = None):
                 db.add(metric)
 
         db.commit()
-    except Exception as exc:
+    except SQLAlchemyError:
         db.rollback()
-        logger.error(f"Lỗi ghi nhận định kỳ station_power_metrics: {exc}")
+        logger.exception("Lỗi ghi nhận định kỳ station_power_metrics")
     finally:
         if should_close:
             db.close()
@@ -294,7 +313,9 @@ def start_scheduler():
             replace_existing=True,
         )
         scheduler.start()
-        logger.info("Đã khởi động APScheduler cho các tác vụ định kỳ (Smart Charging 3p & Power Metrics 1p).")
+        logger.info(
+            "Đã khởi động APScheduler cho các tác vụ định kỳ (Smart Charging 3p & Power Metrics 1p)."
+        )
 
 
 def stop_scheduler():

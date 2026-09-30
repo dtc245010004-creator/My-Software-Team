@@ -1,14 +1,20 @@
-from typing import Callable, List, Optional
+import logging
+from collections.abc import Callable
 from decimal import Decimal
+from typing import Optional
+
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-import jwt
 from sqlalchemy.orm import Session
+
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.models.wallet import Wallet
+
+logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login",
@@ -22,7 +28,7 @@ oauth2_scheme_optional = OAuth2PasswordBearer(
 
 
 def get_current_user_or_driver_guest(
-    token: Optional[str] = Depends(oauth2_scheme_optional),
+    token: str | None = Depends(oauth2_scheme_optional),
     db: Session = Depends(get_db),
 ) -> User:
     """
@@ -39,13 +45,19 @@ def get_current_user_or_driver_guest(
                 user = db.query(User).filter(User.id == int(user_id_str)).first()
                 if user and user.is_active:
                     return user
-        except Exception:
-            pass
+        except (jwt.PyJWTError, TypeError, ValueError) as exc:
+            logger.debug(
+                "Token tài xế không hợp lệ; tiếp tục với tài khoản khách: %s", exc
+            )
 
     # Role Tài xế không cần đăng nhập: tìm hoặc tự tạo tài khoản tài xế mặc định
     guest_user = db.query(User).filter(User.username == "customer_user").first()
     if not guest_user:
-        guest_user = db.query(User).filter(User.role == "CUSTOMER", User.is_active == True).first()
+        guest_user = (
+            db.query(User)
+            .filter(User.role == "CUSTOMER", User.is_active.is_(True))
+            .first()
+        )
     if not guest_user:
         guest_user = User(
             username="customer_user",
@@ -62,7 +74,9 @@ def get_current_user_or_driver_guest(
     # Đảm bảo tài khoản tài xế khách luôn có ví điện tử
     wallet = db.query(Wallet).filter(Wallet.user_id == guest_user.id).first()
     if not wallet:
-        wallet = Wallet(user_id=guest_user.id, balance=Decimal("0.00"), is_debt_locked=False)
+        wallet = Wallet(
+            user_id=guest_user.id, balance=Decimal("0.00"), is_debt_locked=False
+        )
         db.add(wallet)
         db.commit()
         db.refresh(guest_user)
@@ -102,7 +116,7 @@ def get_current_user(
     return user
 
 
-def require_roles(allowed_roles: List[str]) -> Callable[[User], User]:
+def require_roles(allowed_roles: list[str]) -> Callable[[User], User]:
     """Dependency kiểm tra phân quyền RBAC dựa trên vai trò thực tế của người dùng trong CSDL."""
 
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
@@ -130,7 +144,6 @@ def get_optional_current_user(
             user = db.query(User).filter(User.id == int(user_id_str)).first()
             if user and user.is_active:
                 return user
-    except Exception:
-        pass
+    except (jwt.PyJWTError, TypeError, ValueError) as exc:
+        logger.debug("Token tùy chọn không hợp lệ; xem như chưa đăng nhập: %s", exc)
     return None
-

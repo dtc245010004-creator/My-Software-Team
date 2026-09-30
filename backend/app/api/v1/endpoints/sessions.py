@@ -1,6 +1,8 @@
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_current_user_or_driver_guest
 from app.core.database import get_db
 from app.models.session import ChargingSession
@@ -132,7 +134,7 @@ def stop_session_endpoint(
 
 @router.get(
     "/me",
-    response_model=List[SessionResponse],
+    response_model=list[SessionResponse],
     summary="Xem lịch sử các phiên sạc của tôi (Hỗ trợ tài xế không cần đăng nhập)",
 )
 def get_my_sessions(
@@ -160,7 +162,9 @@ def get_session_detail(
 ):
     session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc."
+        )
 
     if current_user.role == "ADMIN":
         return session

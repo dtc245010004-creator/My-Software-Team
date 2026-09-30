@@ -1,9 +1,10 @@
 import pytest
-from app.models.user import User
-from app.models.station import Station, ChargingPoint, Connector
-from app.models.tariff import Tariff
-from app.models.session import ChargingSession
+
 from app.core.security import create_access_token, get_password_hash
+from app.models.session import ChargingSession
+from app.models.station import ChargingPoint, Connector, Station
+from app.models.tariff import Tariff
+from app.models.user import User
 
 
 @pytest.fixture

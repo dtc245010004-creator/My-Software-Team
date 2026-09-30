@@ -1,10 +1,11 @@
 import asyncio
-from datetime import datetime, timezone
-from decimal import Decimal
 import logging
 import random
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -37,7 +38,7 @@ class ChargingSimulator:
         applied_price_per_kwh: Decimal,
         max_power_kw: float,
         battery_capacity_kwh: float = 60.0,
-        initial_soc: Optional[float] = None,
+        initial_soc: float | None = None,
         tick_interval: float = 2.0,
         checkpoint_interval: float = 30.0,
     ):
@@ -62,7 +63,7 @@ class ChargingSimulator:
         self.temp_c = 30.0
 
         # Cờ can thiệp điều khiển từ Admin/CPO
-        self.power_limit_override_kw: Optional[float] = None
+        self.power_limit_override_kw: float | None = None
         self.overheat_triggered: bool = False
 
         # Vòng lặp thời gian
@@ -70,9 +71,9 @@ class ChargingSimulator:
         self.checkpoint_interval = checkpoint_interval
         self.time_since_last_checkpoint = 0.0
         self.is_running = False
-        self.task: Optional[Any] = None
+        self.task: Any | None = None
 
-    def compute_physics(self, dt_seconds: float) -> Optional[str]:
+    def compute_physics(self, dt_seconds: float) -> str | None:
         """
         Tính toán bước chuyển vật lý và kiểm tra ngưỡng an toàn:
         Trả về stop_reason nếu kích hoạt điều kiện ngắt sạc tự động, ngược lại trả về None.
@@ -132,7 +133,7 @@ class ChargingSimulator:
         cost = float(self.current_energy_kwh) * float(self.applied_price_per_kwh)
         return int(round(cost, 0))
 
-    def to_telemetry_dict(self) -> Dict[str, Any]:
+    def to_telemetry_dict(self) -> dict[str, Any]:
         """Tạo gói tin JSON telemetry chuẩn hóa."""
         return {
             "event": "TELEMETRY",
@@ -152,7 +153,11 @@ class ChargingSimulator:
     def checkpoint_db(self, db: Session) -> None:
         """Ghi snapshot năng lượng và SoC vào CSDL (bảo vệ chống server crash)."""
         try:
-            session = db.query(ChargingSession).filter(ChargingSession.id == self.session_id).first()
+            session = (
+                db.query(ChargingSession)
+                .filter(ChargingSession.id == self.session_id)
+                .first()
+            )
             if session and session.status == "ACTIVE":
                 session.total_kwh = self.current_energy_kwh
                 session.current_soc = self.soc
@@ -161,9 +166,9 @@ class ChargingSimulator:
                 logger.debug(
                     f"Checkpoint Session #{self.session_id}: {self.current_energy_kwh} kWh, SoC: {self.soc}%"
                 )
-        except Exception as e:
+        except SQLAlchemyError:
             db.rollback()
-            logger.error(f"Lỗi khi checkpoint Session #{self.session_id}: {e}")
+            logger.exception("Lỗi khi checkpoint Session #%s", self.session_id)
 
     def check_debt_limit(self, db: Session) -> bool:
         """
@@ -182,11 +187,13 @@ class ChargingSimulator:
                         f"Session #{self.session_id}: Dự kiến số dư {projected_balance} VNĐ chạm hạn mức nợ {limit} VNĐ!"
                     )
                     return True
-        except Exception as e:
-            logger.error(f"Lỗi kiểm tra hạn mức ví: {e}")
+        except SQLAlchemyError:
+            logger.exception("Lỗi kiểm tra hạn mức ví cho Session #%s", self.session_id)
         return False
 
-    async def step(self, dt_seconds: float, db: Optional[Session] = None) -> Dict[str, Any]:
+    async def step(
+        self, dt_seconds: float, db: Session | None = None
+    ) -> dict[str, Any]:
         """
         Thực hiện một bước mô phỏng:
         - Tính toán vật lý.
@@ -218,42 +225,66 @@ class ChargingSimulator:
 
             # Phát telemetry tổng phụ tải lưới tức thời cho toàn bộ Dashboard
             try:
-                total_active_kw = round(sum(s.power_kw for s in simulator_manager.active_simulators.values()), 1)
-                await ws_manager.broadcast({
-                    "event": "GRID_TELEMETRY",
-                    "active_kw": total_active_kw,
-                    "active_chargers_count": len(simulator_manager.active_simulators),
-                    "session_id": self.session_id,
-                    "connector_id": self.connector_id,
-                    "power_kw": round(self.power_kw, 2),
-                })
-            except Exception:
-                pass
+                total_active_kw = round(
+                    sum(
+                        s.power_kw for s in simulator_manager.active_simulators.values()
+                    ),
+                    1,
+                )
+                await ws_manager.broadcast(
+                    {
+                        "event": "GRID_TELEMETRY",
+                        "active_kw": total_active_kw,
+                        "active_chargers_count": len(
+                            simulator_manager.active_simulators
+                        ),
+                        "session_id": self.session_id,
+                        "connector_id": self.connector_id,
+                        "power_kw": round(self.power_kw, 2),
+                    }
+                )
+            except (OSError, RuntimeError):
+                logger.warning(
+                    "Không thể phát GRID_TELEMETRY cho Session #%s",
+                    self.session_id,
+                    exc_info=True,
+                )
 
             # Kích hoạt Fast Loop Load Balancing (Event-driven Heuristic) khi SoC đổi >= 5%
             if abs(self.soc - self.last_load_balance_soc) >= 5.0:
                 self.last_load_balance_soc = self.soc
                 try:
                     from app.models.station import Connector
-                    from app.services.scheduler_service import calculate_and_broadcast_smart_charging
-                    conn = db.query(Connector).filter(Connector.id == self.connector_id).first()
+                    from app.services.scheduler_service import (
+                        calculate_and_broadcast_smart_charging,
+                    )
+
+                    conn = (
+                        db.query(Connector)
+                        .filter(Connector.id == self.connector_id)
+                        .first()
+                    )
                     if conn and conn.charging_point and conn.charging_point.station_id:
                         await calculate_and_broadcast_smart_charging(
                             station_id=conn.charging_point.station_id,
                             db=db,
                             use_gemini=False,
                         )
-                except Exception as exc:
-                    logger.debug(f"Event-driven load balancing non-blocking notice: {exc}")
+                except (SQLAlchemyError, RuntimeError, ValueError) as exc:
+                    logger.debug(
+                        f"Event-driven load balancing non-blocking notice: {exc}"
+                    )
 
             # Xử lý tự động ngắt sạc nếu có stop_reason
             if stop_reason is not None:
-                logger.info(f"Tự động ngắt sạc Session #{self.session_id}: Lý do = {stop_reason}")
+                logger.info(
+                    f"Tự động ngắt sạc Session #{self.session_id}: Lý do = {stop_reason}"
+                )
                 self.is_running = False
 
                 # Gọi hàm dừng phiên sạc chuẩn
-                from app.services.session_service import stop_charging_session
                 from app.models.user import User
+                from app.services.session_service import stop_charging_session
 
                 user = db.query(User).filter(User.id == self.user_id).first()
                 if user:
@@ -277,20 +308,37 @@ class ChargingSimulator:
                 }
                 await ws_manager.broadcast_to_session(self.session_id, stopped_event)
                 try:
-                    remaining_kw = round(sum(s.power_kw for sid, s in simulator_manager.active_simulators.items() if sid != self.session_id), 1)
-                    await ws_manager.broadcast({
-                        "event": "SESSION_STOPPED",
-                        "session_id": self.session_id,
-                        "connector_id": self.connector_id,
-                        "stop_reason": stop_reason,
-                    })
-                    await ws_manager.broadcast({
-                        "event": "GRID_TELEMETRY",
-                        "active_kw": remaining_kw,
-                        "active_chargers_count": max(0, len(simulator_manager.active_simulators) - 1),
-                    })
-                except Exception:
-                    pass
+                    remaining_kw = round(
+                        sum(
+                            s.power_kw
+                            for sid, s in simulator_manager.active_simulators.items()
+                            if sid != self.session_id
+                        ),
+                        1,
+                    )
+                    await ws_manager.broadcast(
+                        {
+                            "event": "SESSION_STOPPED",
+                            "session_id": self.session_id,
+                            "connector_id": self.connector_id,
+                            "stop_reason": stop_reason,
+                        }
+                    )
+                    await ws_manager.broadcast(
+                        {
+                            "event": "GRID_TELEMETRY",
+                            "active_kw": remaining_kw,
+                            "active_chargers_count": max(
+                                0, len(simulator_manager.active_simulators) - 1
+                            ),
+                        }
+                    )
+                except (OSError, RuntimeError):
+                    logger.warning(
+                        "Không thể phát sự kiện dừng cho Session #%s",
+                        self.session_id,
+                        exc_info=True,
+                    )
 
             return telemetry_data
         finally:
@@ -299,7 +347,9 @@ class ChargingSimulator:
 
     async def run_loop(self) -> None:
         """Vòng lặp chạy ngầm trong asyncio task với bảo vệ ngoại lệ (Task Crash Guard)."""
-        logger.info(f"Khởi động vòng lặp Simulator cho Session #{self.session_id} (tick={self.tick_interval}s)")
+        logger.info(
+            f"Khởi động vòng lặp Simulator cho Session #{self.session_id} (tick={self.tick_interval}s)"
+        )
         self.is_running = True
         try:
             while self.is_running:
@@ -309,13 +359,16 @@ class ChargingSimulator:
                 await self.step(self.tick_interval)
         except asyncio.CancelledError:
             logger.info(f"Simulator Session #{self.session_id} bị hủy (Cancelled).")
-        except Exception as e:
-            logger.critical(f"Lỗi nghiêm trọng trong background loop Session #{self.session_id}: {e}", exc_info=True)
+        except Exception as e:  # noqa: BLE001 - task crash guard must always reconcile state
+            logger.critical(
+                f"Lỗi nghiêm trọng trong background loop Session #{self.session_id}: {e}",
+                exc_info=True,
+            )
             # Dọn dẹp an toàn khi task crash
             try:
                 db = SessionLocal()
-                from app.services.session_service import stop_charging_session
                 from app.models.user import User
+                from app.services.session_service import stop_charging_session
 
                 user = db.query(User).filter(User.id == self.user_id).first()
                 if user:
@@ -327,8 +380,10 @@ class ChargingSimulator:
                         stop_reason="SIMULATOR_TASK_ERROR",
                     )
                 db.close()
-            except Exception as cleanup_err:
-                logger.error(f"Không thể dọn dẹp sau crash Simulator #{self.session_id}: {cleanup_err}")
+            except (SQLAlchemyError, RuntimeError):
+                logger.exception(
+                    "Không thể dọn dẹp sau crash Simulator #%s", self.session_id
+                )
         finally:
             self.is_running = False
             simulator_manager.remove_simulator(self.session_id)
@@ -338,8 +393,8 @@ class SimulatorManager:
     """Quản lý các instance ChargingSimulator đang hoạt động trong bộ nhớ RAM."""
 
     def __init__(self):
-        self.active_simulators: Dict[int, ChargingSimulator] = {}
-        self.main_loop: Optional[asyncio.AbstractEventLoop] = None
+        self.active_simulators: dict[int, ChargingSimulator] = {}
+        self.main_loop: asyncio.AbstractEventLoop | None = None
 
     def set_main_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Đăng ký main asyncio event loop từ FastAPI Lifespan."""
@@ -354,7 +409,7 @@ class SimulatorManager:
         applied_price_per_kwh: Decimal,
         max_power_kw: float,
         battery_capacity_kwh: float = 60.0,
-        initial_soc: Optional[float] = None,
+        initial_soc: float | None = None,
         tick_interval: float = 2.0,
         checkpoint_interval: float = 30.0,
     ) -> ChargingSimulator:
@@ -391,7 +446,9 @@ class SimulatorManager:
                 if current_loop is target_loop:
                     sim.task = target_loop.create_task(sim.run_loop())
                 else:
-                    sim.task = asyncio.run_coroutine_threadsafe(sim.run_loop(), target_loop)
+                    sim.task = asyncio.run_coroutine_threadsafe(
+                        sim.run_loop(), target_loop
+                    )
             except RuntimeError:
                 # Đang gọi từ worker thread (ThreadPoolExecutor của sync FastAPI endpoint)
                 sim.task = asyncio.run_coroutine_threadsafe(sim.run_loop(), target_loop)
@@ -399,8 +456,10 @@ class SimulatorManager:
             try:
                 loop = asyncio.get_event_loop()
                 sim.task = loop.create_task(sim.run_loop())
-            except Exception as e:
-                logger.error(f"Không thể khởi động simulator loop cho Session #{session_id}: {e}")
+            except RuntimeError:
+                logger.exception(
+                    "Không thể khởi động simulator loop cho Session #%s", session_id
+                )
 
         logger.info(f"Đã đăng ký và chạy simulator cho Session #{session_id}")
         return sim
@@ -414,11 +473,15 @@ class SimulatorManager:
                 try:
                     if hasattr(sim.task, "done") and not sim.task.done():
                         sim.task.cancel()
-                except Exception as cancel_err:
-                    logger.debug(f"Hủy simulator task Session #{session_id}: {cancel_err}")
+                except RuntimeError:
+                    logger.debug(
+                        "Hủy simulator task Session #%s thất bại",
+                        session_id,
+                        exc_info=True,
+                    )
             logger.info(f"Đã hủy simulator cho Session #{session_id}")
 
-    def get_simulator(self, session_id: int) -> Optional[ChargingSimulator]:
+    def get_simulator(self, session_id: int) -> ChargingSimulator | None:
         """Lấy instance simulator trong RAM."""
         return self.active_simulators.get(session_id)
 
@@ -445,7 +508,9 @@ class SimulatorManager:
             return False
 
         sim.power_limit_override_kw = power_limit_kw
-        logger.info(f"Session #{session_id}: Cập nhật công suất trần mới = {power_limit_kw} kW")
+        logger.info(
+            f"Session #{session_id}: Cập nhật công suất trần mới = {power_limit_kw} kW"
+        )
         return True
 
 
