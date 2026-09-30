@@ -61,6 +61,12 @@ docker compose -f docker-compose.staging.yml up -d
 
 # Kiểm tra trạng thái và logs
 docker compose -f docker-compose.staging.yml logs -f
+
+# Để tắt dự án và dọn container/network nhưng giữ database, chạy
+docker compose -f docker-compose.staging.yml down
+
+# Muốn chỉ dừng container để bật lại nhanh sau đó
+docker compose -f docker-compose.staging.yml stop
 ```
 
 > [!WARNING]
