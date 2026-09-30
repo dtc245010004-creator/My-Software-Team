@@ -63,7 +63,7 @@ docker compose -f docker-compose.staging.yml up -d
 docker compose -f docker-compose.staging.yml logs -f
 ```
 
-> [!WARNING]
+> [!Chứ ý]
 > `backend/seed_data.py` xóa và tạo lại toàn bộ bảng trước khi nạp dữ liệu. Chỉ chạy trên database mới/trống; nếu database đã có dữ liệu cần giữ, hãy sao lưu trước. Không chạy lại lệnh seed mỗi lần khởi động dự án.
 
 - Giao diện người dùng Staging: `http://localhost` (cổng 80)
