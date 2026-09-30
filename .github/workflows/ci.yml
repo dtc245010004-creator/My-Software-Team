@@ -3,7 +3,7 @@ name: CSMS CI and staging
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, quocdung]
 
 permissions:
   contents: read
