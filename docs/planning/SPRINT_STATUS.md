@@ -53,7 +53,7 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Backend API**: 8 router modules REST API (34 endpoints) và 1 kênh WebSocket `/ws/telemetry`.
 * **Frontend SPA**: 6 màn hình chức năng tại `frontend/src/pages/`.
 * **Kiểm thử tự động**: 90 ca kiểm thử passed (xác nhận qua `pytest backend/tests` và chạy thực tế).
-* **Migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo bảng lõi; cây revision hiện có một head duy nhất `795931a69149`. Trạng thái áp dụng trên cơ sở dữ liệu đích chưa được xác minh.
+* **Migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo bảng lõi; cây revision hiện có một head duy nhất `f2c9a6d81b40`. Trạng thái áp dụng trên cơ sở dữ liệu đích chưa được xác minh.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
@@ -72,7 +72,8 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
   * *Xác thực đăng nhập*: Chặn đăng nhập tài khoản nợ với HTTP 403 Forbidden.
   * *Số lượng test case*: Tăng từ **83 lên 84 tests**.
 * **Hợp nhất cây migration Alembic**: Ngày **30/09/2026**, commit `d7acaf4`, thêm revision merge `795931a69149` để quy hai nhánh `c2d3e4f5a6b7` và `d3a5e8b1c4f2` về một head; sửa revision `f99adeda980d` để tránh thêm lặp `wallets.is_debt_locked` và cấp mặc định `0` cho `charging_sessions.current_soc`.
-* **Khôi phục migration nền PostgreSQL**: Ngày **30/09/2026** (chưa commit), khôi phục revision `a1b2c3d4e5f6` tạo các bảng lõi và nối `03906fa596ea` làm revision kế tiếp để tránh lỗi thiếu bảng `stations`.
+* **Khôi phục migration nền PostgreSQL**: Ngày **30/09/2026**, commit `d8c8ff6`, khôi phục revision `a1b2c3d4e5f6` tạo các bảng lõi và nối `03906fa596ea` làm revision kế tiếp để tránh lỗi thiếu bảng `stations`.
+* **Gộp các head Alembic còn lại**: Ngày **30/09/2026**, commit `3cdb675`, thêm revision merge `f2c9a6d81b40` nối `795931a69149` và `e4b6f9a2c1d3`; không thay đổi schema.
 
 ---
 
