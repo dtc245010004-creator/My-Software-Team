@@ -16,34 +16,52 @@
 
 ---
 
-## 1. Chạy dự án (môi trường phát triển & staging)
+## 1. Chạy dự án (Windows PowerShell)
 
-### Cách 1: Khởi chạy môi trường phát triển cục bộ (Local Dev)
+Yêu cầu: Python 3.12 trở lên, Node.js/npm; Docker Desktop nếu chạy Staging.
+
+### Cách 1: Chạy môi trường phát triển cục bộ
+
+Mở **hai cửa sổ PowerShell riêng**: một cho Backend, một cho Frontend.
 
 #### Bước 1: Khởi động Backend (FastAPI)
-*(Nguồn: `backend/requirements.txt`, `backend/app/main.py:20`)*
 
-```bash
+Tại thư mục gốc của dự án:
+
+```powershell
 cd backend
-pip install -r requirements.txt
-python seed_data.py                # Khởi tạo CSDL SQLite và nạp dữ liệu mẫu
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
-- API Swagger UI: `http://localhost:8000/docs`
-- Kiểm tra sức khỏe hệ thống: `http://localhost:8000/api/v1/health`
+
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+- Kiểm tra sức khỏe: `http://localhost:8000/api/v1/health`
+
+Ứng dụng tự tạo các bảng khi khởi động. Nếu muốn tạo dữ liệu mẫu, chạy `seed_data.py` riêng. **Lệnh này xóa dữ liệu hiện có trên cơ sở dữ liệu đang cấu hình.** Chỉ chạy với cơ sở dữ liệu demo; với SQLite mặc định, sao lưu file trước:
+
+```powershell
+cd backend
+if (Test-Path -LiteralPath ".\ev_csms.db") {
+    $backup = "ev_csms.db.$(Get-Date -Format 'yyyyMMdd-HHmmss').bak"
+    Copy-Item -LiteralPath ".\ev_csms.db" -Destination $backup
+}
+python seed_data.py
+```
 
 #### Bước 2: Khởi động Frontend (React + Vite)
-*(Nguồn: `frontend/package.json:6-9`)*
 
-```bash
+Trong cửa sổ PowerShell thứ hai, tại thư mục gốc dự án:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
-- Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
 
-### Cách 2: Khởi chạy môi trường Staging qua Docker Compose
-*(Nguồn: `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`)*
+- Giao diện Web: `http://localhost:5173` (hoặc địa chỉ Vite hiển thị trong terminal)
 
 ```bash
 # Build image Backend và Frontend
@@ -55,8 +73,11 @@ docker compose -f docker-compose.staging.yml run --rm --no-deps backend python s
 # Khởi chạy toàn bộ cụm dịch vụ Backend & Frontend (Nginx reverse proxy)
 docker compose -f docker-compose.staging.yml up -d
 
-# Kiểm tra trạng thái và logs
-docker compose -f docker-compose.staging.yml logs -f
+# Xem trạng thái container
+docker compose -f docker-compose.staging.yml ps
+
+# Xem log
+docker compose -f docker-compose.staging.yml logs --tail=100
 ```
 
 > [!WARNING]
@@ -65,7 +86,15 @@ docker compose -f docker-compose.staging.yml logs -f
 - Giao diện người dùng Staging: `http://localhost` (cổng 80)
 - API Backend Staging: `http://localhost:8000` (hoặc qua proxy `http://localhost/api/v1`)
 
----
+- Giao diện Staging: `http://localhost`
+- Swagger UI Backend: `http://localhost:8000/docs`
+- API qua Nginx proxy: `http://localhost/api/v1`
+
+Dừng các container:
+
+```powershell
+docker compose -f docker-compose.staging.yml down
+```
 
 ## 2. Dùng thử hệ thống
 
