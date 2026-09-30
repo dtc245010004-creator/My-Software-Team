@@ -109,7 +109,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-  Cây migration hiện quy về một head (`795931a69149`). Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
+  Revision nền `a1b2c3d4e5f6` tạo các bảng lõi; cây migration hiện quy về một head (`795931a69149`). Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
 
 ---
 

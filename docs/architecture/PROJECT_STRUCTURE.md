@@ -12,15 +12,17 @@
 * **Hạn mức ví điện tử & Bảo mật xác thực**:
   * Tầng cơ sở dữ liệu: `backend/app/models/wallet.py` dòng 11 có ràng buộc cứng `CheckConstraint("balance >= -500000", name="check_min_balance")`. Bảng `users` trang bị 2 cột `failed_login_attempts` và `locked_until`.
   * Tầng ứng dụng: `backend/app/core/config.py` quy định `NEGATIVE_BALANCE_LIMIT = -300000` (ngưỡng khóa nợ), `MAX_SAFE_DEBT_LIMIT = -500000` (chặn thấu chi tối đa), `MAX_FAILED_LOGIN_ATTEMPTS = 5` và `LOCKOUT_DURATION_MINUTES = 15` (khóa tạm 15 phút khi sai mật khẩu 5 lần).
-* **Cây migration Alembic**: Một head duy nhất là `795931a69149`, hợp nhất hai nhánh revision `c2d3e4f5a6b7` và `d3a5e8b1c4f2`.
+* **Cây migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo các bảng lõi trước `03906fa596ea`; cây hiện quy về một head `795931a69149`, hợp nhất hai nhánh revision `c2d3e4f5a6b7` và `d3a5e8b1c4f2`.
 * **Số lượng kiểm thử tự động**: Đạt **89 ca kiểm thử** tự động được xác thực thực tế (toàn bộ 89/89 PASS khi chạy `pytest`).
 * **Khung triển khai Staging & CI/CD**: Đóng gói container hóa qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và quy trình kiểm thử tự động `.github/workflows/ci-staging.yml`.
 * **Cơ cấu tổ chức tài liệu**: Phân tách thành 6 phân khu chuyên trách trong `docs/` (`architecture/`, `devops/`, `planning/`, `qa/`, `design/`, `research/`) gồm 24 file chuẩn mực.
 
 ### 0.2. Đã thay đổi
-* **Hợp nhất cây migration Alembic (30/09/2026 - chưa commit)**:
+* **Hợp nhất cây migration Alembic (30/09/2026, commit `d7acaf4`)**:
   * Thêm revision merge `795931a69149` để hợp nhất hai head `c2d3e4f5a6b7` và `d3a5e8b1c4f2`.
   * Sửa revision `f99adeda980d`: bỏ thao tác thêm lặp cột `wallets.is_debt_locked` và đặt mặc định `0` cho `charging_sessions.current_soc` khi nâng cấp dữ liệu hiện có.
+* **Khôi phục migration nền PostgreSQL (30/09/2026 - chưa commit)**:
+  * Khôi phục revision `a1b2c3d4e5f6` để tạo các bảng lõi; nối `03906fa596ea` làm revision kế tiếp để các khóa ngoại như `tariffs.station_id` có bảng đích.
   * Thay đổi mới nhất: 30/09/2026 (chưa commit).
 * **Khung ứng dụng Staging và Khóa tạm mật khẩu (30/09/2026 - chưa commit)**:
   * Ngày thay đổi: **30/09/2026** (chưa commit).
