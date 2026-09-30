@@ -45,6 +45,7 @@ npm run dev
 ### Cách 2: Khởi chạy môi trường Staging qua Docker Compose (NHỚ CÀI DOCKER DESKTOP)
 https://docs.docker.com/desktop/setup/install/windows-install/
 *(Nguồn: `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`)*
+*Nhớ là chạy trên terminal/powershell ở thư mục project
 
 ```bash
 # Build image Backend và Frontend
