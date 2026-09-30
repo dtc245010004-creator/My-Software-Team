@@ -30,7 +30,9 @@ Căn cứ vào kết quả chạy kiểm thử tự động thực tế ngày **
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
-| **Xác thực & Bảo mật (Auth & RBAC)** | `backend/tests/test_auth.py` | 12 | 100% PASS | Đăng ký, đăng nhập JWT, hash mật khẩu, chặn khóa nợ, phân quyền RBAC |
+| Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
+| :--- | :--- | :---: | :---: | :--- |
+| **Xác thực & Bảo mật (Auth & RBAC)** | `backend/tests/test_auth.py` | 18 | 100% PASS | Đăng ký, đăng nhập JWT, hash bcrypt, chặn khóa nợ, khóa tạm 15 phút sau 5 lần sai, phân quyền RBAC |
 | **Khách vãng lai (Guest Driver)** | `backend/tests/test_driver_unauthenticated.py` | 4 | 100% PASS | Sạc không cần đăng nhập, nạp tiền tự do, cấu hình pin tùy chỉnh |
 | **Vòng đời phiên sạc (Session Lifecycle)** | `backend/tests/test_sessions.py` | 5 | 100% PASS | Bắt đầu sạc, giải phóng đầu nối, kiểm tra idempotent stop |
 | **Giao dịch & Tiền tệ ACID** | `backend/tests/test_sessions_acid.py` | 8 | 100% PASS | Trừ tiền nguyên tử, biểu giá TOU, khóa độc quyền đầu nối, chặn nợ |
@@ -39,15 +41,15 @@ Căn cứ vào kết quả chạy kiểm thử tự động thực tế ngày **
 | **Mô phỏng sạc (Simulator & Telemetry)** | `backend/tests/test_simulator.py` | 10 | 100% PASS | Đường cong CC/CV, ngắt khi đầy/quá nhiệt/nợ, phục hồi crash |
 | **Trí tuệ nhân tạo (AI Fallback & Scheduler)** | `backend/tests/test_ai_fallback.py` | 18 | 100% PASS | Heuristic fallback, phân tích nhiệt độ, biểu giá động, lập lịch định kỳ |
 | **Kiểm tra sức khỏe dịch vụ** | `backend/tests/test_health.py` | 1 | 100% PASS | Endpoint `/health`, kết nối CSDL |
-| **TỔNG CỘNG** | **9 Test Suites** | **84** | **100% PASS** | **Độ phủ toàn diện các chức năng đã triển khai của Giai đoạn 1** |
+| **TỔNG CỘNG** | **9 Test Suites** | **89** | **100% PASS** | **Độ phủ toàn diện các chức năng đã triển khai của Giai đoạn 1** |
 
 ---
 
 ## 4. Test Case Inventory
 
-Bảng danh mục chi tiết 84 ca kiểm thử đang hoạt động:
+Bảng danh mục chi tiết 89 ca kiểm thử đang hoạt động:
 
-### 4.1. Suite: `test_auth.py` (12 tests)
+### 4.1. Suite: `test_auth.py` (18 tests)
 1. `test_register_success_creates_wallet_atomically`: Đăng ký tài khoản thành công đồng thời tạo ví tiền nguyên tử.
 2. `test_register_atomicity_rollback_on_wallet_failure`: Rollback đăng ký nếu khởi tạo ví thất bại.
 3. `test_register_duplicate_username`: Chặn đăng ký trùng username.
@@ -59,7 +61,13 @@ Bảng danh mục chi tiết 84 ca kiểm thử đang hoạt động:
 9. `test_register_rejects_client_supplied_role`: Chặn client tự gửi role nâng cao (luôn gán CUSTOMER).
 10. `test_login_wrong_credentials`: Báo lỗi HTTP 401 khi sai mật khẩu.
 11. `test_login_success_and_get_me`: Đăng nhập cấp mã token JWT và lấy thông tin `/auth/me`.
-12. `test_login_debt_locked_shows_error`: Chặn đăng nhập tài khoản nợ kèm thông báo `"tài khoản bị khóa vì - quá 300k"`.
+12. `test_rbac_forbidden_for_insufficient_role`: Phân quyền RBAC chặn quyền truy cập endpoint Admin đối với Customer.
+13. `test_login_debt_locked_shows_error`: Chặn đăng nhập tài khoản nợ kèm thông báo `"tài khoản bị khóa vì - quá 300k"`.
+14. `test_login_wrong_password_increments_attempts_and_shows_remaining`: Đăng nhập sai mật khẩu tăng số lần sai và hiển thị số lần thử còn lại.
+15. `test_login_lockout_after_max_failed_attempts`: Đăng nhập sai liên tiếp 5 lần kích hoạt khóa tạm 15 phút (HTTP 403 Forbidden).
+16. `test_login_blocked_during_lockout_without_checking_password`: Trong thời gian bị khóa, mọi yêu cầu đăng nhập (kể cả mật khẩu đúng) đều bị chặn ngay lập tức.
+17. `test_login_auto_unlock_after_lockout_duration`: Tự động mở khóa và reset biến đếm khi đã hết thời gian khóa tạm và đăng nhập đúng.
+18. `test_login_success_resets_failed_attempts_counter`: Nhập sai dưới ngưỡng rồi đăng nhập đúng thì reset số lần đếm thất bại về 0.
 
 ### 4.2. Suite: `test_driver_unauthenticated.py` (4 tests)
 13. `test_driver_wallet_me_without_login`: Khách sạc lấy thông tin ví tự động tạo theo session.
@@ -185,13 +193,13 @@ Các thành phần hiện tại chưa thể kiểm thử tự động do thiếu
 
 ### 8.2. Danh mục ứng viên kiểm thử theo thành phần dùng chung
 
-Khi sửa các file cấu hình nền tảng (`app/core/config.py`, `app/core/database.py`), toàn bộ **84 test cases** thuộc cả 9 suites đều là ứng viên bắt buộc phải chạy lại.
+Khi sửa các file cấu hình nền tảng (`app/core/config.py`, `app/core/database.py`), toàn bộ **89 test cases** thuộc cả 9 suites đều là ứng viên bắt buộc phải chạy lại.
 
 ---
 
 ## 9. Inventory Verification Metadata
 
-* **Ngày kiểm chứng**: 29/09/2026.
-* **Môi trường thực thi**: Python 3.14.0a3, pytest 8.x, SQLite 3.
-* **Tổng số ca kiểm thử**: 84 passed.
+* **Ngày kiểm chứng**: 30/09/2026.
+* **Môi trường thực thi**: Python 3.14 / pytest 8.x, SQLite 3.
+* **Tổng số ca kiểm thử**: 89 passed (100% pass).
 * **Người xác thực**: AI Assistant phối hợp cùng Tech Lead dự án.

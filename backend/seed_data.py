@@ -51,6 +51,14 @@ def seed_database():
                 role="ADMIN",
                 is_active=True,
             ),
+            User(
+                username="admin2",
+                email="admin2@evcsms.vn",
+                full_name="Quản Trị Viên Dự Phòng",
+                password_hash=get_password_hash("AdminPass123"),
+                role="ADMIN",
+                is_active=True,
+            ),
             # Đơn vị vận hành CPO
             User(
                 username="operator",
@@ -115,7 +123,7 @@ def seed_database():
         print("[+] Đang tạo ví tiền điện tử và nạp số dư ban đầu cho toàn bộ người dùng...")
         wallets_map = {}
         for u in users_to_create:
-            if u.username == "admin":
+            if u.username in ("admin", "admin2"):
                 init_balance = Decimal("5000000.00")
                 is_locked = False
             elif u.username in ("operator", "operator_a"):

@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 giờ
     BCRYPT_ROUNDS: int = 12
 
+    # Khóa tạm khi đăng nhập sai nhiều lần (Brute-Force Protection)
+    MAX_FAILED_LOGIN_ATTEMPTS: int = 5  # Số lần đăng nhập sai tối đa trước khi khóa
+    LOCKOUT_DURATION_MINUTES: int = 15  # Thời gian khóa tạm thời (phút)
+
     # Ví tiền & Ràng buộc tài chính (ACID)
     MIN_START_BALANCE: int = 50000  # 50,000 VND để bắt đầu sạc
     NEGATIVE_BALANCE_LIMIT: int = -300000  # -300,000 VND hạn mức cho nợ

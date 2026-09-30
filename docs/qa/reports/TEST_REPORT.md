@@ -8,29 +8,29 @@
 
 ## Overall Summary
 
-Đợt thực thi kiểm thử toàn diện được thực hiện vào ngày **29/09/2026** trên môi trường cục bộ (Local Development).
-* **Backend**: Toàn bộ **84/84 test cases** kiểm thử tự động đã **PASS 100%** (0 Failed, 0 Skipped).
-* **Frontend**: Lệnh biên dịch sản phẩm `npm run build` hoàn thành thành công trong 7.50 giây, không phát sinh lỗi cú pháp hay gãy liên kết module.
-* **Độ ổn định hệ thống**: Toàn bộ các cơ chế an toàn ACID (giao dịch trừ tiền ví, khóa tài khoản khi nợ vượt -300.000 VND, giới hạn chống tràn CSDL `balance >= -500000`, khôi phục phiên sạc mồ côi sau sự cố sập nguồn) đều hoạt động chính xác theo đặc tả.
+Đợt thực thi kiểm thử toàn diện được thực hiện vào ngày **30/09/2026** trên môi trường cục bộ (Local Development) và cấu hình Staging:
+* **Backend**: Toàn bộ **89/89 test cases** kiểm thử tự động đã **PASS 100%** (0 Failed, 0 Skipped).
+* **Frontend**: Lệnh biên dịch sản phẩm `npm --prefix frontend run build` hoàn thành thành công trong 12.40 giây, không phát sinh lỗi cú pháp hay gãy liên kết module.
+* **Độ ổn định hệ thống**: Toàn bộ các cơ chế an toàn ACID (giao dịch trừ tiền ví, khóa tài khoản khi nợ vượt -300.000 VND, giới hạn chống tràn CSDL `balance >= -500000`, khôi phục phiên sạc mồ côi sau sự cố sập nguồn, khóa tạm 15 phút sau 5 lần đăng nhập sai) đều hoạt động chính xác theo đặc tả.
 
 ---
 
 ## Test Statistics
 
-Căn cứ theo nhật ký thực thi thực tế của `pytest` (Task log: `task-348` ngày 29/09/2026):
+Căn cứ theo nhật ký thực thi thực tế của `pytest` (chạy ngày 30/09/2026):
 
 | Chỉ số kiểm thử | Giá trị đo lường | Tỷ lệ (%) | Ghi chú kỹ thuật |
 | :--- | :---: | :---: | :--- |
-| **Tổng số ca kiểm thử (Total Tests)** | **84** | **100%** | Bao gồm Unit, Integration, ACID và Mocking |
-| **Số ca kiểm thử đạt (Passed)** | **84** | **100%** | Tất cả assertions đều thỏa mãn |
+| **Tổng số ca kiểm thử (Total Tests)** | **89** | **100%** | Bao gồm Unit, Integration, ACID, Brute-Force Lockout và Mocking |
+| **Số ca kiểm thử đạt (Passed)** | **89** | **100%** | Tất cả assertions đều thỏa mãn |
 | **Số ca kiểm thử thất bại (Failed)** | **0** | **0%** | Không có lỗi logic hoặc assertion fail |
 | **Số ca kiểm thử bị chặn (Blocked / Error)** | **0** | **0%** | Không có lỗi sập môi trường |
 | **Số ca kiểm thử bỏ qua (Skipped)** | **0** | **0%** | 100% bộ test được thực thi đầy đủ |
-| **Thời gian thực thi (Execution Time)** | **47.32s** | — | Môi trường Python 3.14 / SQLite |
+| **Thời gian thực thi (Execution Time)** | **168.53s** | — | Môi trường Python 3.14 / SQLite |
 
 ### Phân bổ theo từng Module kiểm thử:
 1. `tests/test_ai_fallback.py`: **18/18 passed** (Heuristic fallback, AI RBAC, Gemini mock, Scheduler).
-2. `tests/test_auth.py`: **12/12 passed** (Đăng ký, Đăng nhập JWT, Phân quyền RBAC, Chặn đăng nhập khóa nợ).
+2. `tests/test_auth.py`: **18/18 passed** (Đăng ký, Đăng nhập JWT, Phân quyền RBAC, Chặn khóa nợ, Đếm số lần sai và Khóa tạm 15 phút sau 5 lần sai).
 3. `tests/test_driver_unauthenticated.py`: **4/4 passed** (Khách vãng lai sạc không cần login, nạp tiền tự do).
 4. `tests/test_health.py`: **1/1 passed** (Kiểm tra kết nối CSDL và dịch vụ qua `/health`).
 5. `tests/test_sessions.py`: **5/5 passed** (Vòng đời phiên sạc, xung đột đầu nối, idempotent stop).

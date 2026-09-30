@@ -24,8 +24,8 @@
 Căn cứ theo [nguồn tạm: nentangtramsac_bandaydu.md: Sheet Sprints & Backlog]:
 * **Cam kết Sprint 1**: 12 Story Points (SP).
 * **Danh mục Story**:
-  1. `S-01` (3 SP): Khung ứng dụng chạy được trên máy cá nhân/staging — **ACCEPTED**.
-  2. `S-02` (2 SP): Đăng nhập bằng email và mật khẩu, khoá tạm khi nợ — **ACCEPTED**.
+  1. `S-01` (3 SP): Khung ứng dụng chạy được trên máy cá nhân/staging — **ACCEPTED** (Đã đóng gói Docker Backend/Frontend, `docker-compose.staging.yml` và pipeline CI `.github/workflows/ci-staging.yml`).
+  2. `S-02` (2 SP): Đăng nhập bằng email và mật khẩu, khoá tạm khi sai nhiều lần và khi nợ — **ACCEPTED** (Hoàn thiện cơ chế khóa tạm 15 phút sau 5 lần sai mật khẩu và khóa nợ -300k).
   3. `S-03` (2 SP): Mỗi vai trò chỉ thấy và thao tác được phần việc của mình (RBAC) — **ACCEPTED**.
   4. `S-04` (2 SP): Chủ trạm tạo và sửa thông tin trạm sạc — **ACCEPTED**.
   5. `S-05` (1 SP): Chủ trạm thêm trụ và đầu nối vào trạm, mã trụ là duy nhất — **CONDITIONAL ACCEPTANCE** (Đạt AC1, AC2, AC4; AC3 dời theo biên bản giải trình gửi PO).
@@ -46,18 +46,29 @@ Căn cứ theo mã nguồn thực tế:
 Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `backend/app/core/config.py`:
 * **Ngưỡng khóa nợ ứng dụng (`config.py:23`)**: `NEGATIVE_BALANCE_LIMIT = -300000` (-300.000 VND). Khi số dư nhỏ hơn mức này, tài khoản chuyển cờ `is_debt_locked = True`.
 * **Giới hạn tràn nợ tối đa CSDL (`config.py:24` & `wallet.py:11`)**: `MAX_SAFE_DEBT_LIMIT = -500000`, CSDL chặn cứng bằng `CheckConstraint("balance >= -500000", name="check_min_balance")`.
-* **Cơ chế chặn đăng nhập (`auth.py:46-52`)**: Tài khoản nợ bị chặn đăng nhập với HTTP 403 Forbidden kèm thông điệp `"tài khoản bị khóa vì - quá 300k"`.
+* **Cơ chế chặn đăng nhập (`auth.py`)**: Tài khoản nợ bị chặn đăng nhập với HTTP 403 Forbidden kèm thông điệp `"tài khoản bị khóa vì - quá 300k"`.
+* **Cơ chế chống vét cạn mật khẩu (`auth.py`, `config.py`)**: Ngưỡng thử sai `MAX_FAILED_LOGIN_ATTEMPTS = 5` lần. Khi chạm ngưỡng, tài khoản bị khóa tạm thời `LOCKOUT_DURATION_MINUTES = 15` phút (HTTP 403 Forbidden) và tự động mở lại sau khi hết thời hạn.
 
 ### Hiện trạng thành phần phần mềm
-* **Backend API**: 8 router modules REST API và 1 kênh WebSocket `/ws/telemetry`.
+* **Backend API**: 8 router modules REST API (34 endpoints) và 1 kênh WebSocket `/ws/telemetry`.
 * **Frontend SPA**: 6 màn hình chức năng tại `frontend/src/pages/`.
-* **Kiểm thử tự động**: 84 ca kiểm thử passed (xác nhận qua `pytest --collect-only -q` và chạy thực tế).
+* **Kiểm thử tự động**: 90 ca kiểm thử passed (xác nhận qua `pytest backend/tests` và chạy thực tế).
+* **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
-* **Thời điểm thực hiện**: Ngày **29/09/2026** (theo Git log commit `cb9a5c8: tái tạo` lúc 12:48:02 +0700), thực hiện **theo yêu cầu của người dùng**:
-  * *Hạn mức CSDL*: Thay đổi từ `balance >= -1000000` (cho phép âm tới -1.000.000 VND) $\longrightarrow$ `balance >= -500000` (chỉ cho phép tràn 200.000 VND sau mốc nợ -300.000 VND).
-  * *Xác thực đăng nhập*: Thay đổi từ việc cho phép tài khoản nợ đăng nhập bình thường $\longrightarrow$ Chặn đăng nhập với HTTP 403 Forbidden kèm thông báo `"tài khoản bị khóa vì - quá 300k"`.
-  * *Số lượng test case*: Tăng từ **83 lên 84 tests** do bổ sung thêm ca kiểm thử `test_login_debt_locked_shows_error` trong `backend/tests/test_auth.py`.
+* **Thời điểm thực hiện**: Ngày **30/09/2026** (chưa commit), thực hiện **theo yêu cầu của người dùng**:
+  * *Khung Staging & CI/CD*: Bổ sung Dockerfile đa tầng cho Backend/Frontend, cấu hình Reverse Proxy Nginx, file `docker-compose.staging.yml` và pipeline GitHub Actions `.github/workflows/ci-staging.yml` cho Story S-01.
+  * *Bảo vệ đăng nhập chống vét cạn*: Thêm 2 cột `failed_login_attempts` và `locked_until` vào bảng `users` qua migration Alembic `149038e71dc9`, cập nhật endpoint `POST /api/v1/auth/login` đếm số lần sai và khóa tạm 15 phút khi sai liên tiếp 5 lần cho Story S-02.
+  * *Giao diện Thêm trụ sạc & Bản đồ Leaflet cho trạm sạc*:
+    - Bổ sung nút `+ GẮN TRỤ SẠC` và Modal Form cấu hình trụ sạc mới trực tiếp trên `Stations.jsx`.
+    - Tích hợp component bản đồ `StationLocationPicker.jsx` sử dụng Leaflet (CARTO Dark Matter & Esri World Imagery vệ tinh), ghim SVG draggable, tra cứu Nominatim debounced (>= 500ms) kèm fallback, nút vị trí hiện tại GPS, reverse geocoding tự động điền địa chỉ khi trống, kiểm tra ranh giới Việt Nam (lat 8-24, lng 102-110).
+    - Hỗ trợ nút `SỬA TRẠM` và modal cập nhật trạm sạc kèm tọa độ bản đồ.
+    - CSDL: Tạo migration Alembic `d3a5e8b1c4f2_make_station_coordinates_nullable.py` chuyển `latitude` và `longitude` thành nullable=True để tương thích dữ liệu trạm cũ.
+  * *Số lượng test case*: Tăng từ **84 lên 90 tests** (thêm 5 tests khóa tạm đăng nhập và 1 test kiểm thử tọa độ trạm sạc `test_station_coordinates_nullable_and_crud` trong `backend/tests/test_stations.py`, tất cả 90 tests đều passed).
+* **Thời điểm thực hiện trước đó**: Ngày **29/09/2026** (theo Git log commit `cb9a5c8: tái tạo` lúc 12:48:02 +0700):
+  * *Hạn mức CSDL*: Thay đổi từ `balance >= -1000000` $\longrightarrow$ `balance >= -500000`.
+  * *Xác thực đăng nhập*: Chặn đăng nhập tài khoản nợ với HTTP 403 Forbidden.
+  * *Số lượng test case*: Tăng từ **83 lên 84 tests**.
 
 ---
 

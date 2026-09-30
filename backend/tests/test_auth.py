@@ -297,3 +297,135 @@ def test_login_debt_locked_shows_error(client, db_session):
     assert res.status_code == 403
     assert res.json()["detail"] == "tài khoản bị khóa vì - quá 300k"
 
+
+def test_login_wrong_password_increments_attempts_and_shows_remaining(client, db_session):
+    """14. Đăng nhập sai mật khẩu -> Tăng failed_login_attempts và hiển thị số lần thử còn lại."""
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_1", "email": "lockout1@test.com", "password": "Password123"},
+    )
+
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_1", "password": "WrongPassword1"},
+    )
+    assert res.status_code == 401
+    assert "Còn lại 4 lần thử" in res.json()["detail"]
+
+    user = db_session.query(User).filter(User.username == "lockout_user_1").first()
+    assert user.failed_login_attempts == 1
+    assert user.locked_until is None
+
+
+def test_login_lockout_after_max_failed_attempts(client, db_session):
+    """15. Đăng nhập sai 5 lần liên tiếp -> Khóa tạm tài khoản 15 phút (HTTP 403)."""
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_2", "email": "lockout2@test.com", "password": "Password123"},
+    )
+
+    # Thử sai 4 lần đầu
+    for i in range(1, 5):
+        res = client.post(
+            "/api/v1/auth/login",
+            json={"username": "lockout_user_2", "password": f"WrongPassword{i}"},
+        )
+        assert res.status_code == 401
+        assert f"Còn lại {5 - i} lần thử" in res.json()["detail"]
+
+    # Thử sai lần thứ 5 -> Khóa tạm
+    res_5th = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_2", "password": "WrongPassword5"},
+    )
+    assert res_5th.status_code == 403
+    assert "Tài khoản bị tạm khóa 15 phút do nhập sai mật khẩu quá 5 lần" in res_5th.json()["detail"]
+
+    user = db_session.query(User).filter(User.username == "lockout_user_2").first()
+    assert user.failed_login_attempts == 5
+    assert user.locked_until is not None
+
+
+def test_login_blocked_during_lockout_without_checking_password(client, db_session):
+    """16. Trong thời gian bị khóa, kể cả nhập đúng mật khẩu vẫn bị chặn với HTTP 403."""
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_3", "email": "lockout3@test.com", "password": "Password123"},
+    )
+
+    # Sai 5 lần để bị khóa
+    for _ in range(5):
+        client.post(
+            "/api/v1/auth/login",
+            json={"username": "lockout_user_3", "password": "WrongPassword"},
+        )
+
+    # Thử đăng nhập lại với mật khẩu ĐÚNG trong lúc đang bị khóa
+    res_correct = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_3", "password": "Password123"},
+    )
+    assert res_correct.status_code == 403
+    assert "Tài khoản bị tạm khóa do nhập sai mật khẩu quá 5 lần" in res_correct.json()["detail"]
+
+
+def test_login_auto_unlock_after_lockout_duration(client, db_session):
+    """17. Sau khi hết thời gian khóa tạm (locked_until trong quá khứ) -> Tự động mở khóa khi đăng nhập đúng."""
+    from datetime import timedelta
+    from app.core.datetime_utils import get_utc_now
+
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_4", "email": "lockout4@test.com", "password": "Password123"},
+    )
+
+    # Giả lập tài khoản bị khóa trong quá khứ (đã hết hạn khóa 2 phút trước)
+    user = db_session.query(User).filter(User.username == "lockout_user_4").first()
+    user.failed_login_attempts = 5
+    user.locked_until = get_utc_now() - timedelta(minutes=2)
+    db_session.commit()
+
+    # Đăng nhập với mật khẩu đúng
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_4", "password": "Password123"},
+    )
+    assert res.status_code == 200
+    assert "access_token" in res.json()
+
+    # Kiểm tra DB: Đã reset về 0 và xóa locked_until
+    db_session.refresh(user)
+    assert user.failed_login_attempts == 0
+    assert user.locked_until is None
+
+
+def test_login_success_resets_failed_attempts_counter(client, db_session):
+    """18. Nhập sai 2 lần rồi nhập đúng -> Reset failed_login_attempts về 0."""
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_5", "email": "lockout5@test.com", "password": "Password123"},
+    )
+
+    # Sai 2 lần
+    client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_5", "password": "WrongPassword"},
+    )
+    client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_5", "password": "WrongPassword"},
+    )
+
+    user = db_session.query(User).filter(User.username == "lockout_user_5").first()
+    assert user.failed_login_attempts == 2
+
+    # Đăng nhập đúng
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_5", "password": "Password123"},
+    )
+    assert res.status_code == 200
+
+    db_session.refresh(user)
+    assert user.failed_login_attempts == 0
+

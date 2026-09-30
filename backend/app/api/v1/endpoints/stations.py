@@ -79,12 +79,13 @@ def list_stations(
         stations = query.all()
         results: List[StationDistanceResponse] = []
         for st in stations:
-            dist = calculate_haversine_distance(user_lat, user_lon, st.latitude, st.longitude)
-            if radius_km is None or dist <= radius_km:
-                enriched = enrich_station_response(st)
-                dist_item = StationDistanceResponse.model_validate(enriched)
-                dist_item.distance_km = dist
-                results.append(dist_item)
+            if st.latitude is not None and st.longitude is not None:
+                dist = calculate_haversine_distance(user_lat, user_lon, st.latitude, st.longitude)
+                if radius_km is None or dist <= radius_km:
+                    enriched = enrich_station_response(st)
+                    dist_item = StationDistanceResponse.model_validate(enriched)
+                    dist_item.distance_km = dist
+                    results.append(dist_item)
 
         # Sắp xếp theo khoảng cách tăng dần và áp dụng phân trang
         results.sort(key=lambda x: x.distance_km if x.distance_km is not None else 999999.0)

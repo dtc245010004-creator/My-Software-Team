@@ -639,4 +639,63 @@ async def test_cumulative_energy_captures_short_session_under_60s(client, db_ses
     assert non_zero_points[0]["powerKw"] == 30.0
 
 
+def test_station_coordinates_nullable_and_crud(client, db_session, test_users):
+    """Kiểm tra tạo, sửa tọa độ GPS bản đồ và hỗ trợ trạm cũ có tọa độ null."""
+    token_op = test_users["token_op_a"]
+    headers = {"Authorization": f"Bearer {token_op}"}
+
+    # 1. Tạo trạm mới có tọa độ GPS hợp lệ từ bản đồ
+    payload = {
+        "name": "Trạm Sạc Hải Dương Central",
+        "address": "Phường An Bình, TP. Hải Dương, Hải Dương",
+        "latitude": 20.9373,
+        "longitude": 106.3146,
+        "total_grid_capacity_kw": 200.0,
+        "operating_hours": "24/7",
+        "status": "ACTIVE",
+    }
+    res = client.post("/api/v1/stations", json=payload, headers=headers)
+    assert res.status_code == 201
+    data = res.json()
+    station_id = data["id"]
+    assert data["latitude"] == 20.9373
+    assert data["longitude"] == 106.3146
+
+    # 2. Cập nhật vị trí GPS qua bản đồ (PUT)
+    update_payload = {
+        "latitude": 20.9410,
+        "longitude": 106.3200,
+    }
+    res_update = client.put(f"/api/v1/stations/{station_id}", json=update_payload, headers=headers)
+    assert res_update.status_code == 200
+    updated_data = res_update.json()
+    assert updated_data["latitude"] == 20.9410
+    assert updated_data["longitude"] == 106.3200
+
+    # 3. Trạm cũ có tọa độ null trong CSDL vẫn đọc và trả về hợp lệ (không crash)
+    legacy_station = Station(
+        operator_id=test_users["op_a"].id,
+        name="Trạm Cũ Chưa Có Tọa Độ",
+        address="123 Phố Cổ, Hà Nội",
+        latitude=None,
+        longitude=None,
+        total_grid_capacity_kw=100.0,
+        operating_hours="24/7",
+        status="ACTIVE",
+    )
+    db_session.add(legacy_station)
+    db_session.commit()
+
+    res_legacy = client.get(f"/api/v1/stations/{legacy_station.id}")
+    assert res_legacy.status_code == 200
+    legacy_data = res_legacy.json()
+    assert legacy_data["latitude"] is None
+    assert legacy_data["longitude"] is None
+
+    # 4. Tìm kiếm khoảng cách GPS không bị crash bởi trạm null
+    res_distance = client.get("/api/v1/stations?user_lat=21.0&user_lon=105.8&radius_km=50")
+    assert res_distance.status_code == 200
+
+
+
 

@@ -105,8 +105,8 @@ class ChargingPointResponse(ChargingPointBase):
 class StationBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=150, description="Tên trạm sạc")
     address: str = Field(..., min_length=5, max_length=255, description="Địa chỉ vật lý chi tiết")
-    latitude: float = Field(..., ge=-90.0, le=90.0, description="Vĩ độ GPS")
-    longitude: float = Field(..., ge=-180.0, le=180.0, description="Kinh độ GPS")
+    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Vĩ độ GPS")
+    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Kinh độ GPS")
     total_grid_capacity_kw: float = Field(..., gt=0, description="Công suất nguồn trạm (kW)")
     operating_hours: str = Field(default="24/7", max_length=50)
     status: str = Field(default="ACTIVE", description="Trạng thái vận hành: ACTIVE hoặc MAINTENANCE")

@@ -5,18 +5,21 @@
 
 ---
 
-## Trạng thái nhanh (29/09/2026)
+## Trạng thái nhanh
 
-- **Backend**: Python 3.14+ / FastAPI 1.0.0, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py:11-27`)*
-- **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json:12-20`)*
-- **Kiểm thử tự động**: **84/84 test cases passed**, thời gian chạy 92.75s, 0 lỗi hồi quy (Zero regression). *(Nguồn: Kết quả thực thi `pytest backend/tests` ngày 29/09/2026)*
-- **Kiến trúc dữ liệu**: 9 bảng CSDL quan hệ (`users`, `wallets`, `wallet_transactions`, `stations`, `charging_points`, `connectors`, `station_power_metrics`, `tariffs`, `charging_sessions`). *(Nguồn: `backend/app/models/`)*
+- **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
+- **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
+- **Kiểm thử tự động**: **89/89 test cases passed**, 0 lỗi hồi quy (Zero regression). *(Nguồn: Kết quả thực thi `pytest backend/tests`)*
+- **Kiến trúc dữ liệu**: 9 bảng CSDL quan hệ (`users`, `wallets`, `wallet_transactions`, `stations`, `chargers`, `connectors`, `station_power_metrics`, `tariffs`, `charging_sessions`). *(Nguồn: `backend/app/models/`)*
+- **Khung Staging & CI/CD**: Hỗ trợ chạy đồng thời qua `docker-compose.staging.yml` và pipeline kiểm thử tự động `.github/workflows/ci-staging.yml`.
 
 ---
 
-## 1. Chạy dự án (môi trường phát triển)
+## 1. Chạy dự án (môi trường phát triển & staging)
 
-### Bước 1: Khởi động Backend (FastAPI)
+### Cách 1: Khởi chạy môi trường phát triển cục bộ (Local Dev)
+
+#### Bước 1: Khởi động Backend (FastAPI)
 *(Nguồn: `backend/requirements.txt`, `backend/app/main.py:20`)*
 
 ```bash
@@ -28,7 +31,7 @@ uvicorn app.main:app --reload --port 8000
 - API Swagger UI: `http://localhost:8000/docs`
 - Kiểm tra sức khỏe hệ thống: `http://localhost:8000/api/v1/health`
 
-### Bước 2: Khởi động Frontend (React + Vite)
+#### Bước 2: Khởi động Frontend (React + Vite)
 *(Nguồn: `frontend/package.json:6-9`)*
 
 ```bash
@@ -37,6 +40,19 @@ npm install
 npm run dev
 ```
 - Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
+
+### Cách 2: Khởi chạy môi trường Staging qua Docker Compose
+*(Nguồn: `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`)*
+
+```bash
+# Khởi chạy toàn bộ cụm dịch vụ Backend & Frontend (Nginx reverse proxy)
+docker compose -f docker-compose.staging.yml up -d --build
+
+# Kiểm tra trạng thái và logs
+docker compose -f docker-compose.staging.yml logs -f
+```
+- Giao diện người dùng Staging: `http://localhost` (cổng 80)
+- API Backend Staging: `http://localhost:8000` (hoặc qua proxy `http://localhost/api/v1`)
 
 ---
 
@@ -48,6 +64,7 @@ npm run dev
 | Vai trò (Role) | Tên đăng nhập | Email | Mật khẩu mặc định | Chức năng chính |
 | :--- | :--- | :--- | :--- | :--- |
 | **Quản trị viên (ADMIN)** | `admin` | `admin@evcsms.vn` | `AdminPass123` | Quản trị toàn hệ thống, cấu hình tham số, giám sát tải busbar |
+| **Quản trị viên dự phòng (ADMIN)** | `admin2` | `admin2@evcsms.vn` | `AdminPass123` | Quản trị viên dự phòng hệ thống |
 | **Chủ trạm (OPERATOR)** | `operator` | `operator@evcsms.vn` | `OpPass123` | Quản lý trạm sạc, trụ sạc, cổng sạc, xem telemetry, AI Advisor |
 | **Chủ trạm VinFast** | `operator_a` | `cpo_vinfast@evcsms.vn` | `OpPass123` | Quản trị mạng lưới trạm sạc khu vực |
 | **Tài xế chuẩn (CUSTOMER)** | `customer_user` | `driver1@gmail.com` | `CusPass123` | Xem ví điện tử, nạp tiền, theo dõi phiên sạc trực tiếp |

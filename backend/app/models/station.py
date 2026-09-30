@@ -32,8 +32,8 @@ class Station(Base):
     )
     name = Column(String(150), nullable=False)
     address = Column(String(255), nullable=False)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     total_grid_capacity_kw = Column(Float, nullable=False)
     operating_hours = Column(String(50), default="24/7", nullable=False)
     status = Column(String(20), default="ACTIVE", nullable=False)  # ACTIVE, MAINTENANCE

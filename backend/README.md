@@ -46,6 +46,12 @@ uvicorn app.main:app --reload --port 8000
    - Khi phiên sạc kết thúc và thực hiện trừ tiền cước qua `deduct_charging_fee()`, nếu số dư ví sau khi trừ rơi xuống dưới ngưỡng cho phép `NEGATIVE_BALANCE_LIMIT = -300000` VND, hệ thống tự động đánh dấu cờ `is_debt_locked = True`.
    - **Kiểm soát tràn 200k**: CSDL SQLite áp dụng `CheckConstraint("balance >= -500000")` (`MAX_SAFE_DEBT_LIMIT = -500000`), bảo đảm sau ngưỡng khóa nợ 300k, hệ thống chỉ cho phép phiên sạc xả điện tràn tối đa thêm 200,000 VND trước khi chặn cứng CSDL.
    - Khi tài khoản bị khóa nợ (`is_debt_locked == True`), người dùng bị chặn toàn bộ quyền đăng nhập và cắm sạc mới. Tài khoản chỉ được mở khóa khi nạp tiền đưa số dư về $\ge 0$ VND (qua cổng nạp tiền QR không cần đăng nhập).
+3. **Cơ chế Khóa tạm khi sai mật khẩu nhiều lần (Brute-Force Protection)**:
+   - Theo dõi số lần nhập sai qua trường `failed_login_attempts` trong bảng `users`.
+   - Mỗi lần nhập sai mật khẩu, hệ thống tăng biến đếm và phản hồi HTTP 401 Unauthorized kèm số lần thử còn lại (`MAX_FAILED_LOGIN_ATTEMPTS = 5`).
+   - Khi nhập sai liên tiếp 5 lần, hệ thống gán mốc thời gian `locked_until = now + 15 phút` (`LOCKOUT_DURATION_MINUTES = 15`) và trả về `HTTP 403 Forbidden`.
+   - Trong suốt thời gian bị khóa tạm, mọi yêu cầu đăng nhập của tài khoản đều bị chặn ngay lập tức tại tầng đầu tiên (tiết kiệm chi phí băm bcrypt).
+   - Khi hết thời gian khóa tạm thời, tài khoản tự động được giải tỏa và reset số lần đếm thất bại về `0` khi đăng nhập thành công.
 
 ---
 

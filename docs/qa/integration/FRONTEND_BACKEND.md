@@ -104,18 +104,50 @@ Tài liệu này xác nhận tính toàn vẹn và mức độ tương thích gi
 
 ---
 
+## TC-FB-12: Khóa tạm tài khoản khi đăng nhập sai mật khẩu nhiều lần
+* **Luồng tích hợp**: Client nhập sai mật khẩu $\longrightarrow$ `POST /api/v1/auth/login`.
+* **Xác thực Client**:
+  * Nhập sai 1-4 lần: Server phản hồi HTTP 401 Unauthorized kèm thông báo `"Còn lại X lần thử"`, giao diện `Login.jsx` hiển thị cảnh báo đỏ tương ứng.
+  * Nhập sai lần thứ 5: Server kích hoạt `locked_until = now + 15 phút` và trả về HTTP 403 Forbidden. Giao diện `Login.jsx` hiển thị rõ thông điệp tài khoản bị khóa tạm 15 phút.
+  * Trong thời gian bị khóa, mọi lần đăng nhập tiếp theo đều bị chặn ngay với HTTP 403 Forbidden.
+* **Kết quả**: **PASS** (Đồng bộ với schema `User` và endpoint `auth.py`, chưa commit).
+
+---
+
+## TC-FB-13: Thêm trụ sạc vật lý trực tiếp từ màn hình Stations.jsx
+* **Luồng tích hợp**: Admin/Operator mở rộng chi tiết trạm $\longrightarrow$ Bấm nút `+ GẮN TRỤ SẠC` $\longrightarrow$ Mở Modal cấu hình $\longrightarrow$ `POST /api/v1/stations/{station_id}/chargers`.
+* **Xác thực Client**:
+  * Nhập mã trụ, hãng, model, công suất, số súng sạc và chuẩn cổng.
+  * Bấm lưu: Gửi request lên backend thành công (HTTP 201), modal tự đóng và danh sách trụ trong trạm tự động nạp lại không cần refresh trang.
+  * Nếu mã trụ trùng: Bắt lỗi HTTP 400 và hiển thị banner cảnh báo đỏ trong modal.
+* **Kết quả**: **PASS** (chưa commit).
+
+---
+
+## TC-FB-14: Chọn vị trí trạm sạc bằng bản đồ Leaflet CARTO Dark / Esri Vệ tinh
+* **Luồng tích hợp**: Admin/Operator bấm `+ THÊM TRẠM SẠC` hoặc icon `SỬA TRẠM` $\longrightarrow$ Giao diện bản đồ `StationLocationPicker.jsx` hiển thị.
+* **Xác thực Client**:
+  * Bước 1: Mở form thấy bản đồ CARTO Dark Matter toàn cảnh Việt Nam (zoom 5), hỗ trợ chuyển đổi lớp ảnh vệ tinh Esri World Imagery.
+  * Bước 2: Chọn tỉnh/thành (63 tỉnh từ `provinces.json`) hoặc nhập địa chỉ $\longrightarrow$ bản đồ tự động bay tới vị trí tương ứng (flyTo) theo phân cấp zoom (9, 12, 14, 17) qua debounced geocoding (>= 500ms).
+  * Bước 3: Chấm ghim hoặc kéo ghim trên bản đồ $\longrightarrow$ Ghim SVG neon-cyan cập nhật tọa độ chính xác (6 chữ số thập phân). Hỗ trợ nút định vị GPS hiện tại (`navigator.geolocation`) và reverse geocode tự động điền địa chỉ khi ô trống.
+  * Bước 4: Chặn lưu nếu chưa có ghim hoặc tọa độ ngoài lãnh thổ Việt Nam (lat 8-24, lng 102-110). Khi có ghim, lưu thành công vào CSDL (HTTP 201 cho tạo mới, HTTP 200 cho cập nhật).
+  * Bước 5: Mở sửa trạm đã có tọa độ $\longrightarrow$ ghim hiển thị đúng vị trí zoom 16; trạm cũ chưa có tọa độ $\longrightarrow$ tự động geocode từ địa chỉ cũ.
+* **Kết quả**: **PASS** (chưa commit).
+
+---
+
 ## Current Summary
 
 ### Đánh giá mức độ tích hợp Frontend ↔ Backend
-* **Mức độ tương thích**: **95%** (Đạt chuẩn hoạt động trơn tru cho Giai đoạn 1).
-* Toàn bộ 11 ca kiểm thử tích hợp (TC-FB-01 đến TC-FB-11) đều hoạt động ổn định và chính xác trên môi trường tích hợp cục bộ.
+* **Mức độ tương thích**: Hoạt động trơn tru trên môi trường tích hợp cục bộ.
+* Toàn bộ 14 ca kiểm thử tích hợp (TC-FB-01 đến TC-FB-14) đều được xác minh đồng bộ.
 * Luồng dữ liệu hai chiều giữa REST API và WebSocket Telemetry được xử lý bất đồng bộ nhịp nhàng, đảm bảo trải nghiệm người dùng liền mạch.
 
 ---
 
 ## Current Defects
 
-* **0 lỗi phát hiện trong 11 luồng tích hợp cốt lõi**.
+* **0 lỗi phát hiện trong 14 luồng tích hợp cốt lõi**.
 * Các vấn đề nhỏ về giao diện (như căn chỉnh lề trên màn hình điện thoại siêu nhỏ) đã được đưa vào danh mục theo dõi của giai đoạn UI polish.
 
 ---

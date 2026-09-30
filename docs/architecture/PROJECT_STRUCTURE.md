@@ -9,13 +9,19 @@
 ## 0. Tiến trình cấu trúc (Theo khung 4 phần: Hiện trạng / Đã thay đổi / Sắp thay đổi / Cần thay đổi)
 
 ### 0.1. Hiện trạng
-* **Hạn mức ví điện tử**:
-  * Tầng cơ sở dữ liệu: `backend/app/models/wallet.py` dòng 11 có ràng buộc cứng `CheckConstraint("balance >= -500000", name="check_min_balance")`.
-  * Tầng ứng dụng: `backend/app/core/config.py` dòng 23–24 quy định `NEGATIVE_BALANCE_LIMIT = -300000` (ngưỡng khóa nợ tài khoản) và `MAX_SAFE_DEBT_LIMIT = -500000` (ngưỡng chặn thấu chi tối đa).
-* **Số lượng kiểm thử tự động**: Đạt **84 ca kiểm thử** tự động được xác thực thực tế (toàn bộ 84/84 PASS khi chạy `pytest`).
+* **Hạn mức ví điện tử & Bảo mật xác thực**:
+  * Tầng cơ sở dữ liệu: `backend/app/models/wallet.py` dòng 11 có ràng buộc cứng `CheckConstraint("balance >= -500000", name="check_min_balance")`. Bảng `users` trang bị 2 cột `failed_login_attempts` và `locked_until`.
+  * Tầng ứng dụng: `backend/app/core/config.py` quy định `NEGATIVE_BALANCE_LIMIT = -300000` (ngưỡng khóa nợ), `MAX_SAFE_DEBT_LIMIT = -500000` (chặn thấu chi tối đa), `MAX_FAILED_LOGIN_ATTEMPTS = 5` và `LOCKOUT_DURATION_MINUTES = 15` (khóa tạm 15 phút khi sai mật khẩu 5 lần).
+* **Số lượng kiểm thử tự động**: Đạt **89 ca kiểm thử** tự động được xác thực thực tế (toàn bộ 89/89 PASS khi chạy `pytest`).
+* **Khung triển khai Staging & CI/CD**: Đóng gói container hóa qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và quy trình kiểm thử tự động `.github/workflows/ci-staging.yml`.
 * **Cơ cấu tổ chức tài liệu**: Phân tách thành 6 phân khu chuyên trách trong `docs/` (`architecture/`, `devops/`, `planning/`, `qa/`, `design/`, `research/`) gồm 24 file chuẩn mực.
 
 ### 0.2. Đã thay đổi
+* **Khung ứng dụng Staging và Khóa tạm mật khẩu (30/09/2026 - chưa commit)**:
+  * Ngày thay đổi: **30/09/2026** (chưa commit).
+  * Khung Staging & CI/CD: Đóng gói Docker đa tầng cho Backend/Frontend, thiết lập Nginx reverse proxy, file `docker-compose.staging.yml` và pipeline kiểm thử tự động `.github/workflows/ci-staging.yml` (hoàn thiện Story S-01).
+  * Chống vét cạn mật khẩu: Bổ sung cột `failed_login_attempts` và `locked_until` vào bảng `users` qua migration Alembic `149038e71dc9`, cập nhật endpoint `auth.py` tự động khóa tạm 15 phút khi sai liên tiếp 5 lần (hoàn thiện Story S-02).
+  * Số ca kiểm thử tự động (84 → 89 test cases): Bổ sung 5 ca kiểm thử mới trong `backend/tests/test_auth.py` xác thực việc đếm số lần sai, khóa tạm và tự động mở khóa.
 * **Hạn mức ví điện tử (giá trị cũ → giá trị mới)**:
   * Ngày thay đổi: **29/09/2026** (ghi nhận từ Git log qua commit `cb9a5c8: tái tạo`).
   * Nội dung thay đổi: Giảm trần thấu chi DB từ `-1.000.000` VND xuống `-500.000` VND (`CheckConstraint("balance >= -500000")`), và thiết lập ngưỡng khóa nợ `-300.000` VND tại tầng ứng dụng (`config.py`).
@@ -67,7 +73,9 @@ Cây thư mục vật lý thực tế trên ổ đĩa tại thời điểm kiể
 
 ```text
 E:\Nền tảng vận hành trạm sạc xe điện\
-├── .github/                           # Biểu mẫu kiểm định chất lượng Pull Request
+├── .github/                           # Biểu mẫu PR & Quy trình CI/CD
+│   ├── workflows/                     # GitHub Actions CI & Staging Validation
+│   │   └── ci-staging.yml
 │   └── pull_request_template.md
 ├── backend/                           # Phân hệ Dịch vụ Máy chủ (FastAPI)
 │   ├── alembic/                       # Kịch bản di chuyển cơ sở dữ liệu
@@ -80,12 +88,14 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   │   ├── services/                  # Xử lý nghiệp vụ lõi (Ví ACID, Tính cước TOU...)
 │   │   ├── simulator/                 # Bộ mô phỏng sạc nội bộ CC/CV
 │   │   └── main.py                    # Điểm khởi động ứng dụng FastAPI & WebSocket
+│   ├── .dockerignore                  # Danh sách loại trừ đóng gói Docker backend
+│   ├── Dockerfile                     # Đóng gói container hóa FastAPI (Python 3.12)
 │   ├── ev_csms.db                     # Cơ sở dữ liệu SQLite chính
 │   ├── pytest.ini                     # Cấu hình thực thi kiểm thử tự động
 │   ├── README.md                      # Hướng dẫn kỹ thuật phân hệ Backend
 │   ├── requirements.txt               # Danh mục thư viện Python phụ thuộc
 │   ├── seed_data.py                   # Script nạp dữ liệu mẫu cho demo
-│   └── tests/                         # Bộ kiểm thử tự động 84 test cases
+│   └── tests/                         # Bộ kiểm thử tự động 90 test cases
 ├── docs/                              # TRUNG TÂM TRI THỨC VÀ TÀI LIỆU DỰ ÁN
 │   ├── README.md                      # Cổng điều hướng toàn hệ thống & FAQ Tester
 │   ├── architecture/                  # Phân khu Kiến trúc & Bản đồ hệ thống
@@ -111,11 +121,19 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │       ├── K-01-ocpp-simulator.md
 │       └── S-05-AC3-ghi-nhan-cho-PO.md
 ├── frontend/                          # Phân hệ Giao diện Người dùng (React Vite)
-│   ├── src/                           # Mã nguồn client SPA (pages, components, context)
-│   ├── package.json                   # Cấu hình gói và thư viện Node.js
+│   ├── src/                           # Mã nguồn client SPA (pages, components, context, data, services)
+│   │   ├── components/                # Thành phần UI (StationLocationPicker, MetricBox...)
+│   │   ├── data/                      # Dữ liệu tĩnh (provinces.json 63 tỉnh thành)
+│   │   ├── services/                  # Dịch vụ API & Geocoding OpenStreetMap
+│   │   └── pages/                     # Màn hình giao diện SPA (Stations, Dashboard...)
+│   ├── .dockerignore                  # Danh sách loại trừ đóng gói Docker frontend
+│   ├── Dockerfile                     # Đóng gói container hóa đa tầng (Node build -> Nginx)
+│   ├── nginx.conf                     # Cấu hình máy chủ Web Nginx phục vụ tĩnh & reverse proxy
+│   ├── package.json                   # Cấu hình gói và thư viện Node.js (Leaflet, React)
 │   ├── tailwind.config.js             # Cấu hình bảng màu và design tokens
 │   └── vite.config.js                 # Cấu hình máy chủ Vite & Reverse Proxy
 ├── phacthaobandau/                    # Kho lưu trữ các tài liệu phác thảo cũ
+├── docker-compose.staging.yml         # Điều phối cụm dịch vụ Staging Backend & Frontend
 ├── CONTRIBUTING.md                    # Quy ước làm việc nhóm, Git flow & PR checklist
 ├── nentangtramsac_bandaydu.md         # Bảng tính chuẩn hóa yêu cầu và tiến độ Scrum
 ├── README.md                          # Cổng đón tiếp chung & Hướng dẫn khởi động nhanh

@@ -139,16 +139,31 @@ npm run build
 
 ---
 
-## 9. Staging (Render)
+## 9. Staging (Docker & CI/CD)
 
-* **Quyết định đối với `render.yaml`**: **Không cần, trừ khi bạn định deploy lên Render**.
-* **Lý do**: Chỉ có ý nghĩa với riêng nền tảng đám mây Render.com. Dự án hiện chưa có kế hoạch bắt buộc triển khai lên Render, hiện chỉ vận hành trên môi trường phát triển cục bộ (Local Development).
+* **Cấu hình Staging Container**:
+  * Dự án cung cấp file cấu hình điều phối cụm dịch vụ Staging tại `docker-compose.staging.yml`.
+  * Đóng gói Backend qua `backend/Dockerfile` (Python 3.12 / FastAPI / Uvicorn).
+  * Đóng gói Frontend qua `frontend/Dockerfile` (Node 20 build -> Nginx Alpine reverse proxy).
+  * Đường dẫn kiểm thử tự động CI/CD: `.github/workflows/ci-staging.yml` (chạy `pytest backend/tests` và `npm run build` trên GitHub Actions).
+* **Lệnh khởi chạy môi trường Staging**:
+  ```bash
+  # Build và khởi chạy ngầm toàn bộ dịch vụ staging
+  docker compose -f docker-compose.staging.yml up -d --build
+
+  # Kiểm tra nhật ký hoạt động
+  docker compose -f docker-compose.staging.yml logs -f
+
+  # Dừng và dọn dẹp cụm staging
+  docker compose -f docker-compose.staging.yml down
+  ```
+* **Lưu ý đám mây**: Đối với nền tảng Render.com, chỉ tạo file `render.yaml` khi có yêu cầu chỉ định triển khai lên hạ tầng này.
 
 ---
 
 ## 10. Biến môi trường
 
-Căn cứ theo `backend/app/core/config.py:11-50` và file mẫu `backend/.env.example`:
+Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example`:
 
 | Tên biến | Kiểu dữ liệu | Giá trị mặc định trong mã | Ý nghĩa & Mục đích |
 | :--- | :--- | :--- | :--- |
@@ -158,6 +173,8 @@ Căn cứ theo `backend/app/core/config.py:11-50` và file mẫu `backend/.env.e
 | `DATABASE_URL` | String | `sqlite:///./ev_csms.db` | Chuỗi kết nối CSDL (hỗ trợ SQLite / PostgreSQL) |
 | `SECRET_KEY` | String | *(Khóa dev mặc định)* | Khóa bí mật dùng để ký và giải mã JWT token |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Integer | `1440` (24 giờ) | Thời gian hiệu lực của phiên đăng nhập |
+| `MAX_FAILED_LOGIN_ATTEMPTS` | Integer | `5` | Số lần đăng nhập sai tối đa trước khi khóa tạm thời |
+| `LOCKOUT_DURATION_MINUTES` | Integer | `15` | Thời gian khóa tạm thời tài khoản tính theo phút |
 | `NEGATIVE_BALANCE_LIMIT` | Integer | `-300000` | Ngưỡng số dư ví kích hoạt khóa tài khoản (-300.000 VND) |
 | `MAX_SAFE_DEBT_LIMIT` | Integer | `-500000` | Hạn mức CSDL CheckConstraint chặn cứng chống tràn (-500.000 VND) |
 | `BACKEND_CORS_ORIGINS` | JSON List | `["http://localhost:5173", ...]` | Danh sách origin trình duyệt được phép gọi API |
