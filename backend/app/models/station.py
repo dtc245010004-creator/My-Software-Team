@@ -1,4 +1,4 @@
-from sqlalchemy import (
+﻿from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
@@ -16,7 +16,7 @@ from app.core.database import Base
 
 
 class Station(Base):
-    """Mô hình Trạm sạc xe điện (Quản lý nguồn điện lưới và tập hợp các trụ sạc)."""
+    """MÃ´ hÃ¬nh Tráº¡m sáº¡c xe Ä‘iá»‡n (Quáº£n lÃ½ nguá»“n Ä‘iá»‡n lÆ°á»›i vÃ  táº­p há»£p cÃ¡c trá»¥ sáº¡c)."""
 
     __tablename__ = "stations"
     __table_args__ = (
@@ -53,7 +53,7 @@ class Station(Base):
         nullable=False,
     )
 
-    # Quan hệ
+    # Quan há»‡
     operator = relationship("User", foreign_keys=[operator_id])
     charging_points = relationship(
         "ChargingPoint",
@@ -67,7 +67,7 @@ class Station(Base):
 
 
 class ChargingPoint(Base):
-    """Mô hình Trụ sạc (EVSE - Electric Vehicle Supply Equipment)."""
+    """MÃ´ hÃ¬nh Trá»¥ sáº¡c (EVSE - Electric Vehicle Supply Equipment)."""
 
     __tablename__ = "charging_points"
     __table_args__ = (
@@ -87,7 +87,7 @@ class ChargingPoint(Base):
     )
     code = Column(
         String(50), unique=True, index=True, nullable=False
-    )  # EVSE ID toàn hệ thống
+    )  # EVSE ID toÃ n há»‡ thá»‘ng
     vendor = Column(String(100), nullable=False, default="VinFast/ABB")
     model = Column(String(100), nullable=True)
     max_power_kw = Column(Float, nullable=False)
@@ -99,7 +99,7 @@ class ChargingPoint(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    # Quan hệ
+    # Quan há»‡
     station = relationship("Station", back_populates="charging_points")
     connectors = relationship(
         "Connector",
@@ -115,7 +115,7 @@ class ChargingPoint(Base):
 
 
 class Connector(Base):
-    """Mô hình Cổng / Súng sạc vật lý (CCS2, Type 2, CHAdeMO)."""
+    """MÃ´ hÃ¬nh Cá»•ng / SÃºng sáº¡c váº­t lÃ½ (CCS2, Type 2, CHAdeMO)."""
 
     __tablename__ = "connectors"
     __table_args__ = (
@@ -141,16 +141,17 @@ class Connector(Base):
         nullable=False,
         index=True,
     )
-    connector_number = Column(Integer, nullable=False)  # Súng số 1, số 2...
+    connector_number = Column(Integer, nullable=False)  # SÃºng sá»‘ 1, sá»‘ 2...
     connector_type = Column(String(20), nullable=False)  # CCS2, TYPE_2, CHADEMO
     max_power_kw = Column(Float, nullable=False)
     status = Column(String(20), default="AVAILABLE", nullable=False)
+    ocpp_status = Column(String, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    # Quan hệ
+    # Quan há»‡
     charging_point = relationship("ChargingPoint", back_populates="connectors")
 
     def __repr__(self) -> str:
@@ -158,7 +159,7 @@ class Connector(Base):
 
 
 class StationPowerMetric(Base):
-    """Bảng lưu trữ lịch sử đo đếm công suất phụ tải trạm sạc theo từng phút (Equalizer 24h)."""
+    """Báº£ng lÆ°u trá»¯ lá»‹ch sá»­ Ä‘o Ä‘áº¿m cÃ´ng suáº¥t phá»¥ táº£i tráº¡m sáº¡c theo tá»«ng phÃºt (Equalizer 24h)."""
 
     __tablename__ = "station_power_metrics"
     __table_args__ = (
@@ -183,3 +184,19 @@ class StationPowerMetric(Base):
 
     def __repr__(self) -> str:
         return f"<StationPowerMetric(station_id={self.station_id}, time={self.timestamp}, kw={self.power_kw})>"
+
+
+
+
+
+
+
+
+class ConnectorError(Base):
+    __tablename__ = "connector_errors"
+    __table_args__ = {"extend_existing": True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    connector_id = Column(Integer, nullable=False)
+    error_code = Column(String, nullable=False)
+    vendor_error_code = Column(String, nullable=True)
