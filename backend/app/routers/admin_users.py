@@ -9,7 +9,6 @@ from app.core.database import get_db
 from app.core.rbac import roles
 from app.models.user import User
 
-
 router = APIRouter(
     prefix="/admin/users",
     tags=["Admin - Users"],
