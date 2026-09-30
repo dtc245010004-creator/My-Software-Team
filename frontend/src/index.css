@@ -33,3 +33,35 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
 }
+
+/* Lớp CSS làm tối bản đồ OpenStreetMap (Dark Mode Tile Inversion) */
+.map-tiles-dark,
+.leaflet-tile-pane .map-tiles-dark {
+  filter: invert(100%) hue-rotate(180deg) brightness(0.95) contrast(0.9) !important;
+}
+
+/* Tùy chỉnh Popup Leaflet nền tối Obsidian */
+.leaflet-popup-content-wrapper {
+  background-color: #0F172A !important;
+  color: #F1F5F9 !important;
+  border: 1px solid #334155 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content {
+  margin: 12px 14px !important;
+  line-height: 1.4 !important;
+}
+.leaflet-popup-tip {
+  background-color: #0F172A !important;
+  border: 1px solid #334155 !important;
+}
+.leaflet-popup-close-button {
+  color: #94A3B8 !important;
+  padding: 6px !important;
+}
+.leaflet-popup-close-button:hover {
+  color: #F1F5F9 !important;
+}
+

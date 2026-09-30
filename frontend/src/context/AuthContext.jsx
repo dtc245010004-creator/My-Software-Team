@@ -69,6 +69,8 @@ export const AuthProvider = ({ children }) => {
         await login('admin', 'AdminPass123');
       } else if (role === 'OPERATOR') {
         await login('operator_a', 'OpPass123');
+      } else if (role === 'DEBT') {
+        await login('driver_debt', 'DriverPass123');
       } else {
         // Role Tài xế không cần đăng nhập: chuyển trực tiếp sang chế độ tài xế tự do
         logout();

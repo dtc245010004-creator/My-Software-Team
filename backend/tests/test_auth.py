@@ -1,6 +1,8 @@
+import pytest
 from unittest.mock import patch
-
 from app.models.user import User
+from app.models.wallet import Wallet
+from app.core.security import get_password_hash
 
 
 def test_register_success_creates_wallet_atomically(client, db_session):
@@ -36,16 +38,10 @@ def test_register_atomicity_rollback_on_wallet_failure(client, db_session):
     }
 
     # Giả lập lỗi ném ra khi khởi tạo Wallet
-    with patch(
-        "app.api.v1.endpoints.auth.Wallet",
-        side_effect=RuntimeError("Mô phỏng lỗi CSDL khi tạo Ví"),
-    ):
+    with patch("app.api.v1.endpoints.auth.Wallet", side_effect=RuntimeError("Mô phỏng lỗi CSDL khi tạo Ví")):
         response = client.post("/api/v1/auth/register", json=payload)
         assert response.status_code == 500
-        assert (
-            "Lỗi hệ thống khi khởi tạo tài khoản và ví điện tử"
-            in response.json()["detail"]
-        )
+        assert "Lỗi hệ thống khi khởi tạo tài khoản và ví điện tử" in response.json()["detail"]
 
     # Khẳng định không có User rác nào tồn tại trong DB
     user = db_session.query(User).filter(User.username == "crash_test_user").first()
@@ -123,11 +119,7 @@ def test_register_password_lacks_digits_or_letters(client):
     # Thiếu số
     res1 = client.post(
         "/api/v1/auth/register",
-        json={
-            "username": "no_digit_user",
-            "email": "d1@test.com",
-            "password": "OnlyLettersPass",
-        },
+        json={"username": "no_digit_user", "email": "d1@test.com", "password": "OnlyLettersPass"},
     )
     assert res1.status_code == 422
     assert "phải chứa ít nhất một chữ số" in res1.text
@@ -135,11 +127,7 @@ def test_register_password_lacks_digits_or_letters(client):
     # Thiếu chữ cái
     res2 = client.post(
         "/api/v1/auth/register",
-        json={
-            "username": "no_letter_user",
-            "email": "l1@test.com",
-            "password": "1234567890",
-        },
+        json={"username": "no_letter_user", "email": "l1@test.com", "password": "1234567890"},
     )
     assert res2.status_code == 422
     assert "phải chứa ít nhất một chữ cái" in res2.text
@@ -195,11 +183,7 @@ def test_login_wrong_credentials(client):
     # Đăng ký tài khoản mẫu
     client.post(
         "/api/v1/auth/register",
-        json={
-            "username": "login_victim",
-            "email": "victim@test.com",
-            "password": "Password123",
-        },
+        json={"username": "login_victim", "email": "victim@test.com", "password": "Password123"},
     )
 
     # Thử sai mật khẩu
@@ -222,11 +206,7 @@ def test_login_success_and_get_me(client):
     """11. Đăng nhập đúng nhận Token -> Dùng token gọi /me lấy thông tin và số dư ví."""
     client.post(
         "/api/v1/auth/register",
-        json={
-            "username": "valid_user",
-            "email": "valid@test.com",
-            "password": "Password123",
-        },
+        json={"username": "valid_user", "email": "valid@test.com", "password": "Password123"},
     )
 
     # Đăng nhập bằng email hoặc username
@@ -248,9 +228,7 @@ def test_login_success_and_get_me(client):
     assert me_data["wallet_balance"] == 0.0
 
     # Gọi /me với token giả mạo -> 401
-    res_invalid = client.get(
-        "/api/v1/auth/me", headers={"Authorization": "Bearer fake.token.here"}
-    )
+    res_invalid = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer fake.token.here"})
     assert res_invalid.status_code == 401
 
 
@@ -259,11 +237,7 @@ def test_rbac_forbidden_for_insufficient_role(client, db_session):
     # 1. Đăng ký tài khoản thường (CUSTOMER)
     client.post(
         "/api/v1/auth/register",
-        json={
-            "username": "standard_driver",
-            "email": "driver_rbac@test.com",
-            "password": "Password123",
-        },
+        json={"username": "standard_driver", "email": "driver_rbac@test.com", "password": "Password123"},
     )
     res_login = client.post(
         "/api/v1/auth/login",
@@ -290,6 +264,168 @@ def test_rbac_forbidden_for_insufficient_role(client, db_session):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert res_admin_updated.status_code == 200
-    assert (
-        "Xin chào Quản trị viên standard_driver" in res_admin_updated.json()["message"]
+    assert "Xin chào Quản trị viên standard_driver" in res_admin_updated.json()["message"]
+
+
+def test_login_debt_locked_shows_error(client, db_session):
+    """13. Tài khoản bị khóa nợ (is_debt_locked = True) -> Chặn đăng nhập với thông báo rõ ràng."""
+    from decimal import Decimal
+    # Tạo user và ví bị khóa nợ do âm quá 300k
+    u = User(
+        username="debt_locked_user",
+        email="debt_locked@test.com",
+        password_hash=get_password_hash("Password123"),
+        role="CUSTOMER",
+        is_active=True,
     )
+    db_session.add(u)
+    db_session.flush()
+
+    w = Wallet(
+        user_id=u.id,
+        balance=Decimal("-350000.00"),
+        is_debt_locked=True,
+    )
+    db_session.add(w)
+    db_session.commit()
+
+    # Thử đăng nhập
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "debt_locked_user", "password": "Password123"},
+    )
+    assert res.status_code == 403
+    assert res.json()["detail"] == "tài khoản bị khóa vì - quá 300k"
+
+
+def test_login_wrong_password_increments_attempts_and_shows_remaining(client, db_session):
+    """14. Đăng nhập sai mật khẩu -> Tăng failed_login_attempts và hiển thị số lần thử còn lại."""
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_1", "email": "lockout1@test.com", "password": "Password123"},
+    )
+
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_1", "password": "WrongPassword1"},
+    )
+    assert res.status_code == 401
+    assert "Còn lại 4 lần thử" in res.json()["detail"]
+
+    user = db_session.query(User).filter(User.username == "lockout_user_1").first()
+    assert user.failed_login_attempts == 1
+    assert user.locked_until is None
+
+
+def test_login_lockout_after_max_failed_attempts(client, db_session):
+    """15. Đăng nhập sai 5 lần liên tiếp -> Khóa tạm tài khoản 15 phút (HTTP 403)."""
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_2", "email": "lockout2@test.com", "password": "Password123"},
+    )
+
+    # Thử sai 4 lần đầu
+    for i in range(1, 5):
+        res = client.post(
+            "/api/v1/auth/login",
+            json={"username": "lockout_user_2", "password": f"WrongPassword{i}"},
+        )
+        assert res.status_code == 401
+        assert f"Còn lại {5 - i} lần thử" in res.json()["detail"]
+
+    # Thử sai lần thứ 5 -> Khóa tạm
+    res_5th = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_2", "password": "WrongPassword5"},
+    )
+    assert res_5th.status_code == 403
+    assert "Tài khoản bị tạm khóa 15 phút do nhập sai mật khẩu quá 5 lần" in res_5th.json()["detail"]
+
+    user = db_session.query(User).filter(User.username == "lockout_user_2").first()
+    assert user.failed_login_attempts == 5
+    assert user.locked_until is not None
+
+
+def test_login_blocked_during_lockout_without_checking_password(client, db_session):
+    """16. Trong thời gian bị khóa, kể cả nhập đúng mật khẩu vẫn bị chặn với HTTP 403."""
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_3", "email": "lockout3@test.com", "password": "Password123"},
+    )
+
+    # Sai 5 lần để bị khóa
+    for _ in range(5):
+        client.post(
+            "/api/v1/auth/login",
+            json={"username": "lockout_user_3", "password": "WrongPassword"},
+        )
+
+    # Thử đăng nhập lại với mật khẩu ĐÚNG trong lúc đang bị khóa
+    res_correct = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_3", "password": "Password123"},
+    )
+    assert res_correct.status_code == 403
+    assert "Tài khoản bị tạm khóa do nhập sai mật khẩu quá 5 lần" in res_correct.json()["detail"]
+
+
+def test_login_auto_unlock_after_lockout_duration(client, db_session):
+    """17. Sau khi hết thời gian khóa tạm (locked_until trong quá khứ) -> Tự động mở khóa khi đăng nhập đúng."""
+    from datetime import timedelta
+    from app.core.datetime_utils import get_utc_now
+
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_4", "email": "lockout4@test.com", "password": "Password123"},
+    )
+
+    # Giả lập tài khoản bị khóa trong quá khứ (đã hết hạn khóa 2 phút trước)
+    user = db_session.query(User).filter(User.username == "lockout_user_4").first()
+    user.failed_login_attempts = 5
+    user.locked_until = get_utc_now() - timedelta(minutes=2)
+    db_session.commit()
+
+    # Đăng nhập với mật khẩu đúng
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_4", "password": "Password123"},
+    )
+    assert res.status_code == 200
+    assert "access_token" in res.json()
+
+    # Kiểm tra DB: Đã reset về 0 và xóa locked_until
+    db_session.refresh(user)
+    assert user.failed_login_attempts == 0
+    assert user.locked_until is None
+
+
+def test_login_success_resets_failed_attempts_counter(client, db_session):
+    """18. Nhập sai 2 lần rồi nhập đúng -> Reset failed_login_attempts về 0."""
+    client.post(
+        "/api/v1/auth/register",
+        json={"username": "lockout_user_5", "email": "lockout5@test.com", "password": "Password123"},
+    )
+
+    # Sai 2 lần
+    client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_5", "password": "WrongPassword"},
+    )
+    client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_5", "password": "WrongPassword"},
+    )
+
+    user = db_session.query(User).filter(User.username == "lockout_user_5").first()
+    assert user.failed_login_attempts == 2
+
+    # Đăng nhập đúng
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "lockout_user_5", "password": "Password123"},
+    )
+    assert res.status_code == 200
+
+    db_session.refresh(user)
+    assert user.failed_login_attempts == 0
+

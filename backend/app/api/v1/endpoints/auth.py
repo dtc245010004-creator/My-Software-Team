@@ -1,11 +1,12 @@
 import logging
-
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
 from app.api.deps import get_current_user, require_roles
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.datetime_utils import ensure_utc, get_utc_now
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models.user import User
 from app.models.wallet import Wallet
@@ -75,9 +76,9 @@ def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Xung đột dữ liệu: Tên đăng nhập hoặc email đã tồn tại.",
         )
-    except SQLAlchemyError:
+    except Exception as e:
         db.rollback()
-        logger.exception("Lỗi hệ thống khi tạo tài khoản và ví")
+        logger.error(f"Lỗi hệ thống khi tạo tài khoản & ví: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Lỗi hệ thống khi khởi tạo tài khoản và ví điện tử.",
@@ -111,27 +112,77 @@ def login(
     """
     user = (
         db.query(User)
-        .filter(
-            (User.username == login_in.username) | (User.email == login_in.username)
-        )
+        .filter((User.username == login_in.username) | (User.email == login_in.username))
         .first()
     )
 
-    if not user or not verify_password(login_in.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Tên đăng nhập hoặc mật khẩu không chính xác.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    now = get_utc_now()
 
+    # 1. Kiểm tra tài khoản có đang bị khóa tạm thời do nhập sai mật khẩu nhiều lần không
+    if user and user.locked_until:
+        locked_until_utc = ensure_utc(user.locked_until)
+        if locked_until_utc and now < locked_until_utc:
+            remaining_seconds = (locked_until_utc - now).total_seconds()
+            remaining_minutes = max(1, int(remaining_seconds // 60) + (1 if remaining_seconds % 60 > 0 else 0))
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Tài khoản bị tạm khóa do nhập sai mật khẩu quá {settings.MAX_FAILED_LOGIN_ATTEMPTS} lần. Vui lòng thử lại sau {remaining_minutes} phút.",
+            )
+        else:
+            # Đã hết thời hạn khóa -> tự động mở khóa
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            db.commit()
+
+    # 2. Kiểm tra xác thực thông tin đăng nhập và tính toán số lần thử
+    if not user or not verify_password(login_in.password, user.password_hash):
+        if user:
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
+                user.locked_until = now + timedelta(minutes=settings.LOCKOUT_DURATION_MINUTES)
+                db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Tài khoản bị tạm khóa {settings.LOCKOUT_DURATION_MINUTES} phút do nhập sai mật khẩu quá {settings.MAX_FAILED_LOGIN_ATTEMPTS} lần.",
+                )
+            else:
+                db.commit()
+                remaining = settings.MAX_FAILED_LOGIN_ATTEMPTS - user.failed_login_attempts
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"Tên đăng nhập hoặc mật khẩu không chính xác. Còn lại {remaining} lần thử.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Tên đăng nhập hoặc mật khẩu không chính xác.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    # 3. Kiểm tra trạng thái hoạt động và nợ vượt hạn mức
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tài khoản người dùng đã bị vô hiệu hóa.",
         )
 
+    if user.wallet and user.wallet.is_debt_locked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="tài khoản bị khóa vì - quá 300k",
+        )
+
+    # 4. Đăng nhập thành công -> Reset số lần đếm sai và gỡ cờ khóa tạm
+    if user.failed_login_attempts > 0 or user.locked_until is not None:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        db.commit()
+
     # Cấp access token nhúng sub (user.id) và role
-    access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role}
+    )
 
     wallet_balance = float(user.wallet.balance) if user.wallet else 0.0
     user_response = UserResponse(
@@ -181,6 +232,4 @@ def get_me(
 )
 def test_admin_access(current_user: User = Depends(get_current_user)):
     """Endpoint bảo vệ kiểm thử phân quyền RBAC cho ADMIN."""
-    return {
-        "message": f"Xin chào Quản trị viên {current_user.username}. Truy cập hợp lệ!"
-    }
+    return {"message": f"Xin chào Quản trị viên {current_user.username}. Truy cập hợp lệ!"}

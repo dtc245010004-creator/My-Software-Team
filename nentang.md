@@ -145,11 +145,6 @@ Hệ thống tích hợp Google Gemini API kết hợp cùng Thuật toán Heuri
 
 Dự án vừa là một sản phẩm web hoàn chỉnh, trực quan, vừa được cấu trúc tài liệu hóa bài bản phục vụ đánh giá tiến độ bài tập cá nhân:
 
-- **KT1 (Đặc tả & Thiết kế)**: Đặc tả yêu cầu, mô hình dữ liệu (ERD), thiết kế API Contracts và giao diện mẫu wireframe.
-- **KT2 (Hiện thực hóa Core Backend & Simulator)**: Hoàn thành API quản lý trạm, ví tiền Mock Top-up, phiên sạc, module giả lập telemetry qua WebSocket với bảo toàn giao dịch ACID.
-- **KT3 (Tích hợp AI & Hoàn thiện Frontend)**: Hoàn thành giao diện Web React (Dashboard CPO + Driver Portal + Simulator UI), tích hợp AI Smart Charging & Predictive Maintenance kèm Fallback Heuristic.
-- **Final (Kiểm thử trọng tâm, Tối ưu & Đóng gói)**: Viết bộ 3–5 unit test trọng tâm cho nghiệp vụ Ví tiền ACID (chặn hoàn toàn số dư âm), nạp seed data mẫu, hoàn thiện kịch bản demo bảo vệ.
-
 ---
 
 ## 7. Phân kỳ Kế hoạch: Phạm vi Giai đoạn 1 (Hiện tại) vs Hạng mục hoãn sang Giai đoạn 2

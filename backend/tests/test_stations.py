@@ -1,8 +1,7 @@
 import pytest
-
-from app.core.security import create_access_token, get_password_hash
-from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
+from app.models.station import Station, ChargingPoint, Connector
+from app.core.security import create_access_token, get_password_hash
 
 
 @pytest.fixture
@@ -47,9 +46,7 @@ def test_users(db_session):
         "token_admin": create_access_token({"sub": str(admin.id), "role": admin.role}),
         "token_op_a": create_access_token({"sub": str(op_a.id), "role": op_a.role}),
         "token_op_b": create_access_token({"sub": str(op_b.id), "role": op_b.role}),
-        "token_customer": create_access_token(
-            {"sub": str(customer.id), "role": customer.role}
-        ),
+        "token_customer": create_access_token({"sub": str(customer.id), "role": customer.role}),
     }
 
 
@@ -59,8 +56,8 @@ def test_public_list_stations_and_pagination(client, db_session, test_users):
     for i in range(5):
         st = Station(
             operator_id=op.id,
-            name=f"Trạm Sạc Số {i + 1}",
-            address=f"Số {i + 1} Đường ABC",
+            name=f"Trạm Sạc Số {i+1}",
+            address=f"Số {i+1} Đường ABC",
             latitude=21.0 + i * 0.01,
             longitude=105.8 + i * 0.01,
             total_grid_capacity_kw=100.0,
@@ -264,12 +261,8 @@ def test_oversubscription_calculation(client, db_session, test_users):
     db_session.commit()
 
     # Thêm 2 trụ 60kW -> Tổng 120kW
-    cp1 = ChargingPoint(
-        station_id=st.id, code="CG-CP01", max_power_kw=60.0, vendor="ABB"
-    )
-    cp2 = ChargingPoint(
-        station_id=st.id, code="CG-CP02", max_power_kw=60.0, vendor="ABB"
-    )
+    cp1 = ChargingPoint(station_id=st.id, code="CG-CP01", max_power_kw=60.0, vendor="ABB")
+    cp2 = ChargingPoint(station_id=st.id, code="CG-CP02", max_power_kw=60.0, vendor="ABB")
     db_session.add_all([cp1, cp2])
     db_session.commit()
 
@@ -281,9 +274,7 @@ def test_oversubscription_calculation(client, db_session, test_users):
     assert data["is_oversubscribed"] is True
 
 
-def test_unique_constraint_charger_code_and_connector_number(
-    client, db_session, test_users
-):
+def test_unique_constraint_charger_code_and_connector_number(client, db_session, test_users):
     """9. Ràng buộc duy nhất: Trùng mã code trụ sạc hoặc trùng số súng -> HTTP 400."""
     st = Station(
         operator_id=test_users["op_a"].id,
@@ -367,9 +358,7 @@ def test_idor_patch_charger_status(client, db_session, test_users):
     db_session.add(st)
     db_session.commit()
 
-    cp = ChargingPoint(
-        station_id=st.id, code="STATUS-CP01", max_power_kw=60.0, status="AVAILABLE"
-    )
+    cp = ChargingPoint(station_id=st.id, code="STATUS-CP01", max_power_kw=60.0, status="AVAILABLE")
     db_session.add(cp)
     db_session.commit()
 
@@ -406,19 +395,11 @@ def test_atomic_soft_delete_and_reactivate_station(client, db_session, test_user
     db_session.add(st)
     db_session.commit()
 
-    cp = ChargingPoint(
-        station_id=st.id, code="VD-CP01", max_power_kw=60.0, is_active=True
-    )
+    cp = ChargingPoint(station_id=st.id, code="VD-CP01", max_power_kw=60.0, is_active=True)
     db_session.add(cp)
     db_session.commit()
 
-    conn = Connector(
-        charging_point_id=cp.id,
-        connector_number=1,
-        connector_type="CCS2",
-        max_power_kw=60.0,
-        is_active=True,
-    )
+    conn = Connector(charging_point_id=cp.id, connector_number=1, connector_type="CCS2", max_power_kw=60.0, is_active=True)
     db_session.add(conn)
     db_session.commit()
 
@@ -542,19 +523,16 @@ def test_get_grid_load_profile_timeline(client, db_session):
 
 
 @pytest.mark.anyio
-async def test_cumulative_energy_captures_short_session_under_60s(
-    client, db_session, test_users
-):
+async def test_cumulative_energy_captures_short_session_under_60s(client, db_session, test_users):
     """16. Kiểm tra cơ chế lũy kế năng lượng bảo toàn 100% điện năng, bắt trọn các phiên sạc ngắn < 60s."""
-    from datetime import datetime, timezone
-
-    from app.models.session import ChargingSession
-    from app.models.station import StationPowerMetric
-    from app.models.tariff import Tariff
     from app.services.scheduler_service import (
         record_station_power_metrics_minute_job,
         reset_cumulative_energy_cache,
     )
+    from app.models.station import StationPowerMetric
+    from app.models.session import ChargingSession
+    from app.models.tariff import Tariff
+    from datetime import datetime, timezone
 
     # 1. Chuẩn bị dữ liệu: Tạo trạm và trụ sạc 60 kW
     op = test_users["op_a"]
@@ -650,16 +628,74 @@ async def test_cumulative_energy_captures_short_session_under_60s(
         .first()
     )
     assert metric_after is not None
-    assert (
-        metric_after.power_kw == 30.0
-    )  # Khớp chính xác 30.0 kW, KHÔNG bị lọt/ghi 0.0 sai!
+    assert metric_after.power_kw == 30.0  # Khớp chính xác 30.0 kW, KHÔNG bị lọt/ghi 0.0 sai!
 
     # 6. Gọi endpoint load-profile-timeline để xác nhận API trả về đúng số kW thật
-    res = client.get(
-        f"/api/v1/stations/metrics/load-profile-timeline?station_id={st.id}"
-    )
+    res = client.get(f"/api/v1/stations/metrics/load-profile-timeline?station_id={st.id}")
     assert res.status_code == 200
     timeline = res.json()
     non_zero_points = [p for p in timeline if p["powerKw"] > 0]
     assert len(non_zero_points) >= 1
     assert non_zero_points[0]["powerKw"] == 30.0
+
+
+def test_station_coordinates_nullable_and_crud(client, db_session, test_users):
+    """Kiểm tra tạo, sửa tọa độ GPS bản đồ và hỗ trợ trạm cũ có tọa độ null."""
+    token_op = test_users["token_op_a"]
+    headers = {"Authorization": f"Bearer {token_op}"}
+
+    # 1. Tạo trạm mới có tọa độ GPS hợp lệ từ bản đồ
+    payload = {
+        "name": "Trạm Sạc Hải Dương Central",
+        "address": "Phường An Bình, TP. Hải Dương, Hải Dương",
+        "latitude": 20.9373,
+        "longitude": 106.3146,
+        "total_grid_capacity_kw": 200.0,
+        "operating_hours": "24/7",
+        "status": "ACTIVE",
+    }
+    res = client.post("/api/v1/stations", json=payload, headers=headers)
+    assert res.status_code == 201
+    data = res.json()
+    station_id = data["id"]
+    assert data["latitude"] == 20.9373
+    assert data["longitude"] == 106.3146
+
+    # 2. Cập nhật vị trí GPS qua bản đồ (PUT)
+    update_payload = {
+        "latitude": 20.9410,
+        "longitude": 106.3200,
+    }
+    res_update = client.put(f"/api/v1/stations/{station_id}", json=update_payload, headers=headers)
+    assert res_update.status_code == 200
+    updated_data = res_update.json()
+    assert updated_data["latitude"] == 20.9410
+    assert updated_data["longitude"] == 106.3200
+
+    # 3. Trạm cũ có tọa độ null trong CSDL vẫn đọc và trả về hợp lệ (không crash)
+    legacy_station = Station(
+        operator_id=test_users["op_a"].id,
+        name="Trạm Cũ Chưa Có Tọa Độ",
+        address="123 Phố Cổ, Hà Nội",
+        latitude=None,
+        longitude=None,
+        total_grid_capacity_kw=100.0,
+        operating_hours="24/7",
+        status="ACTIVE",
+    )
+    db_session.add(legacy_station)
+    db_session.commit()
+
+    res_legacy = client.get(f"/api/v1/stations/{legacy_station.id}")
+    assert res_legacy.status_code == 200
+    legacy_data = res_legacy.json()
+    assert legacy_data["latitude"] is None
+    assert legacy_data["longitude"] is None
+
+    # 4. Tìm kiếm khoảng cách GPS không bị crash bởi trạm null
+    res_distance = client.get("/api/v1/stations?user_lat=21.0&user_lon=105.8&radius_km=50")
+    assert res_distance.status_code == 200
+
+
+
+

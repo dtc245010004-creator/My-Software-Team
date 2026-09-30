@@ -1,11 +1,9 @@
+from datetime import datetime, timedelta, timezone
 import math
-from datetime import timedelta, timezone
-from typing import Any
-
+from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-
-from app.api.deps import require_roles
+from app.api.deps import get_current_user, require_roles
 from app.core.database import get_db
 from app.core.datetime_utils import get_vn_now, to_vn_time
 from app.models.session import ChargingSession
@@ -31,27 +29,17 @@ router = APIRouter(prefix="/stations", tags=["Quản lý Trạm sạc (Stations)
 
 @router.get(
     "",
-    response_model=list[StationDistanceResponse | StationResponse],
+    response_model=List[Union[StationDistanceResponse, StationResponse]],
     summary="Tìm kiếm, lọc danh sách trạm sạc (Hỗ trợ định vị Haversine & Phân trang)",
 )
 def list_stations(
     skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
     limit: int = Query(50, ge=1, le=100, description="Số lượng bản ghi tối đa"),
-    status_filter: str | None = Query(
-        None, alias="status", description="Lọc theo status: ACTIVE, MAINTENANCE"
-    ),
-    connector_type: str | None = Query(
-        None, description="Lọc theo chuẩn sạc: CCS2, TYPE_2, CHADEMO"
-    ),
-    user_lat: float | None = Query(
-        None, ge=-90.0, le=90.0, description="Vĩ độ người dùng để tính khoảng cách"
-    ),
-    user_lon: float | None = Query(
-        None, ge=-180.0, le=180.0, description="Kinh độ người dùng để tính khoảng cách"
-    ),
-    radius_km: float | None = Query(
-        None, gt=0, description="Bán kính tìm kiếm xung quanh (km)"
-    ),
+    status_filter: Optional[str] = Query(None, alias="status", description="Lọc theo status: ACTIVE, MAINTENANCE"),
+    connector_type: Optional[str] = Query(None, description="Lọc theo chuẩn sạc: CCS2, TYPE_2, CHADEMO"),
+    user_lat: Optional[float] = Query(None, ge=-90.0, le=90.0, description="Vĩ độ người dùng để tính khoảng cách"),
+    user_lon: Optional[float] = Query(None, ge=-180.0, le=180.0, description="Kinh độ người dùng để tính khoảng cách"),
+    radius_km: Optional[float] = Query(None, gt=0, description="Bán kính tìm kiếm xung quanh (km)"),
     db: Session = Depends(get_db),
 ):
     """
@@ -60,7 +48,7 @@ def list_stations(
     - Hỗ trợ lọc Bounding Box nhanh tại CSDL kết hợp tính khoảng cách Haversine chuẩn xác.
     - Hỗ trợ phân trang chuẩn qua skip & limit.
     """
-    query = db.query(Station).filter(Station.is_active.is_(True))
+    query = db.query(Station).filter(Station.is_active == True)
 
     if status_filter:
         query = query.filter(Station.status == status_filter.upper())
@@ -71,8 +59,8 @@ def list_stations(
             .join(ChargingPoint.connectors)
             .filter(
                 Connector.connector_type == connector_type.upper(),
-                Connector.is_active.is_(True),
-                ChargingPoint.is_active.is_(True),
+                Connector.is_active == True,
+                ChargingPoint.is_active == True,
             )
             .distinct()
         )
@@ -89,21 +77,18 @@ def list_stations(
             )
 
         stations = query.all()
-        results: list[StationDistanceResponse] = []
+        results: List[StationDistanceResponse] = []
         for st in stations:
-            dist = calculate_haversine_distance(
-                user_lat, user_lon, st.latitude, st.longitude
-            )
-            if radius_km is None or dist <= radius_km:
-                enriched = enrich_station_response(st)
-                dist_item = StationDistanceResponse.model_validate(enriched)
-                dist_item.distance_km = dist
-                results.append(dist_item)
+            if st.latitude is not None and st.longitude is not None:
+                dist = calculate_haversine_distance(user_lat, user_lon, st.latitude, st.longitude)
+                if radius_km is None or dist <= radius_km:
+                    enriched = enrich_station_response(st)
+                    dist_item = StationDistanceResponse.model_validate(enriched)
+                    dist_item.distance_km = dist
+                    results.append(dist_item)
 
         # Sắp xếp theo khoảng cách tăng dần và áp dụng phân trang
-        results.sort(
-            key=lambda x: x.distance_km if x.distance_km is not None else 999999.0
-        )
+        results.sort(key=lambda x: x.distance_km if x.distance_km is not None else 999999.0)
         return results[skip : skip + limit]
 
     # Không truyền GPS -> Phân trang thông thường
@@ -113,7 +98,7 @@ def list_stations(
 
 @router.get(
     "/metrics/live",
-    response_model=dict[str, Any],
+    response_model=Dict[str, Any],
     summary="Lấy số liệu vận hành mạng lưới thời gian thực (Live Dashboard Metrics)",
 )
 def get_live_dashboard_metrics(db: Session = Depends(get_db)):
@@ -124,8 +109,8 @@ def get_live_dashboard_metrics(db: Session = Depends(get_db)):
     - Công suất tiêu thụ tức thời thực tế (kW) lấy trực tiếp từ các phiên sạc đang chạy.
     - Số trụ sẵn sàng (AVAILABLE) và số trụ cảnh báo lỗi/bảo trì.
     """
-    stations = db.query(Station).filter(Station.is_active.is_(True)).all()
-    chargers = db.query(ChargingPoint).filter(ChargingPoint.is_active.is_(True)).all()
+    stations = db.query(Station).filter(Station.is_active == True).all()
+    chargers = db.query(ChargingPoint).filter(ChargingPoint.is_active == True).all()
 
     # Tra cứu simulator đang chạy thực tế trong RAM
     active_sims = list(simulator_manager.active_simulators.values())
@@ -139,9 +124,7 @@ def get_live_dashboard_metrics(db: Session = Depends(get_db)):
             charging_charger_ids.add(conn.charging_point_id)
 
     # Kiểm tra bổ sung nếu có session ACTIVE trong DB
-    db_active_sessions = (
-        db.query(ChargingSession).filter(ChargingSession.status == "ACTIVE").all()
-    )
+    db_active_sessions = db.query(ChargingSession).filter(ChargingSession.status == "ACTIVE").all()
     for sess in db_active_sessions:
         conn = db.query(Connector).filter(Connector.id == sess.connector_id).first()
         if conn and conn.charging_point_id:
@@ -157,17 +140,15 @@ def get_live_dashboard_metrics(db: Session = Depends(get_db)):
     chargers_status = []
     for c in chargers:
         st_status = "CHARGING" if c.id in charging_charger_ids else c.status
-        chargers_status.append(
-            {
-                "id": c.id,
-                "station_id": c.station_id,
-                "code": c.code,
-                "vendor": c.vendor,
-                "model": c.model,
-                "max_power_kw": c.max_power_kw,
-                "status": st_status,
-            }
-        )
+        chargers_status.append({
+            "id": c.id,
+            "station_id": c.station_id,
+            "code": c.code,
+            "vendor": c.vendor,
+            "model": c.model,
+            "max_power_kw": c.max_power_kw,
+            "status": st_status,
+        })
 
     return {
         "total_stations": len(stations),
@@ -184,11 +165,11 @@ def get_live_dashboard_metrics(db: Session = Depends(get_db)):
 
 @router.get(
     "/metrics/load-profile",
-    response_model=list[dict[str, Any]],
+    response_model=List[Dict[str, Any]],
     summary="Đo đếm đồ thị phụ tải lưới 24 giờ thực tế từ phiên sạc và công suất live",
 )
 def get_grid_load_profile(
-    station_id: int | None = Query(None, description="Lọc theo trạm cụ thể"),
+    station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
     db: Session = Depends(get_db),
 ):
     """
@@ -203,15 +184,9 @@ def get_grid_load_profile(
     # Lấy các phiên sạc thực tế phát sinh trong ngày hôm nay (từ 00:00 hôm nay theo giờ VN)
     today_start_vn = vn_now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_start_utc = today_start_vn.astimezone(timezone.utc).replace(tzinfo=None)
-    query = db.query(ChargingSession).filter(
-        ChargingSession.start_time >= today_start_utc
-    )
+    query = db.query(ChargingSession).filter(ChargingSession.start_time >= today_start_utc)
     if station_id:
-        query = (
-            query.join(ChargingSession.connector)
-            .join(Connector.charging_point)
-            .filter(ChargingPoint.station_id == station_id)
-        )
+        query = query.join(ChargingSession.connector).join(Connector.charging_point).filter(ChargingPoint.station_id == station_id)
     recent_sessions = query.all()
 
     # Khung giờ 12 mốc (cách nhau 2 tiếng: 00:00, 02:00, ..., 22:00)
@@ -231,9 +206,7 @@ def get_grid_load_profile(
     ]
 
     # Tính tổng công suất tức thời hiện tại từ simulator
-    live_sim_power = sum(
-        s.power_kw for s in simulator_manager.active_simulators.values()
-    )
+    live_sim_power = sum(s.power_kw for s in simulator_manager.active_simulators.values())
 
     load_profile = []
     for slot_label, start_h, end_h in time_slots:
@@ -259,25 +232,23 @@ def get_grid_load_profile(
         else:
             price_slot = "NORMAL"
 
-        load_profile.append(
-            {
-                "time": slot_label,
-                "loadKw": est_kw,
-                "priceSlot": price_slot,
-                "isLive": is_current_slot,
-            }
-        )
+        load_profile.append({
+            "time": slot_label,
+            "loadKw": est_kw,
+            "priceSlot": price_slot,
+            "isLive": is_current_slot,
+        })
 
     return load_profile
 
 
 @router.get(
     "/metrics/load-profile-timeline",
-    response_model=list[dict[str, Any]],
+    response_model=List[Dict[str, Any]],
     summary="Đo đếm phụ tải lưới chi tiết 1440 phút (24 Giờ Equalizer)",
 )
 def get_grid_load_profile_timeline(
-    station_id: int | None = Query(None, description="Lọc theo trạm cụ thể"),
+    station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
     db: Session = Depends(get_db),
 ):
     """
@@ -308,13 +279,11 @@ def get_grid_load_profile_timeline(
     db_metrics = query.all()
 
     # Gom nhóm theo mốc phút theo giờ Việt Nam: timestamp_str -> power_kw
-    recorded_power_map: dict[str, float] = {}
+    recorded_power_map: Dict[str, float] = {}
     for m in db_metrics:
         m_vn = to_vn_time(m.timestamp)
         t_key = m_vn.strftime("%H:%M")
-        recorded_power_map[t_key] = round(
-            recorded_power_map.get(t_key, 0.0) + float(m.power_kw), 2
-        )
+        recorded_power_map[t_key] = round(recorded_power_map.get(t_key, 0.0) + float(m.power_kw), 2)
 
     # 2. Lấy công suất live từ RAM Simulator cho phút hiện tại
     active_sims = list(simulator_manager.active_simulators.values())
@@ -323,69 +292,56 @@ def get_grid_load_profile_timeline(
         if station_id:
             conn_ids = [s.connector_id for s in active_sims]
             st_conn_ids = set(
-                cid
-                for (cid,) in db.query(Connector.id)
+                cid for (cid,) in db.query(Connector.id)
                 .join(ChargingPoint, Connector.charging_point_id == ChargingPoint.id)
-                .filter(
-                    ChargingPoint.station_id == station_id, Connector.id.in_(conn_ids)
-                )
+                .filter(ChargingPoint.station_id == station_id, Connector.id.in_(conn_ids))
                 .all()
             )
-            live_power_now = sum(
-                s.power_kw for s in active_sims if s.connector_id in st_conn_ids
-            )
+            live_power_now = sum(s.power_kw for s in active_sims if s.connector_id in st_conn_ids)
         else:
             live_power_now = sum(s.power_kw for s in active_sims)
     live_power_now = round(live_power_now, 2)
 
     # 3. Tạo đủ 1440 điểm (từ 00:00 đến 23:59 theo giờ VN)
-    timeline: list[dict[str, Any]] = []
+    timeline: List[Dict[str, Any]] = []
     for minute_idx in range(1440):
         slot_time = vn_today_start + timedelta(minutes=minute_idx)
         time_str = slot_time.strftime("%H:%M")
 
         if slot_time > vn_current_minute_floor:
             # Tương lai: Chưa tới
-            timeline.append(
-                {
-                    "time": time_str,
-                    "powerKw": 0.0,
-                    "isPlaceholder": True,
-                    "noData": False,
-                }
-            )
+            timeline.append({
+                "time": time_str,
+                "powerKw": 0.0,
+                "isPlaceholder": True,
+                "noData": False,
+            })
         elif slot_time == vn_current_minute_floor:
             # Phút hiện tại: lấy max giữa live power từ RAM và giá trị đã lưu
             current_kw = max(live_power_now, recorded_power_map.get(time_str, 0.0))
-            timeline.append(
-                {
-                    "time": time_str,
-                    "powerKw": current_kw,
-                    "isPlaceholder": False,
-                    "noData": False,
-                }
-            )
+            timeline.append({
+                "time": time_str,
+                "powerKw": current_kw,
+                "isPlaceholder": False,
+                "noData": False,
+            })
         else:
             # Quá khứ: Đã qua
             if time_str in recorded_power_map:
-                timeline.append(
-                    {
-                        "time": time_str,
-                        "powerKw": recorded_power_map[time_str],
-                        "isPlaceholder": False,
-                        "noData": False,
-                    }
-                )
+                timeline.append({
+                    "time": time_str,
+                    "powerKw": recorded_power_map[time_str],
+                    "isPlaceholder": False,
+                    "noData": False,
+                })
             else:
                 # Quá khứ chưa từng ghi log (tính năng mới triển khai)
-                timeline.append(
-                    {
-                        "time": time_str,
-                        "powerKw": 0.0,
-                        "isPlaceholder": True,
-                        "noData": True,
-                    }
-                )
+                timeline.append({
+                    "time": time_str,
+                    "powerKw": 0.0,
+                    "isPlaceholder": True,
+                    "noData": True,
+                })
 
     return timeline
 
@@ -398,9 +354,7 @@ def get_grid_load_profile_timeline(
 def get_station(station_id: int, db: Session = Depends(get_db)):
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
     return enrich_station_response(station)
 
 
@@ -451,9 +405,7 @@ def update_station(
     """Cập nhật trạm sạc: Kiểm tra quyền sở hữu (Owner hoặc Admin)."""
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
 
     verify_station_ownership(station, current_user)
 
@@ -482,15 +434,11 @@ def delete_station(
     """
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
 
     verify_station_ownership(station, current_user)
     atomic_soft_delete_station(db, station)
-    return {
-        "message": f"Đã xóa mềm trạm sạc '{station.name}' và toàn bộ thiết bị liên kết thành công."
-    }
+    return {"message": f"Đã xóa mềm trạm sạc '{station.name}' và toàn bộ thiết bị liên kết thành công."}
 
 
 @router.post(
@@ -510,9 +458,7 @@ def reactivate_station(
     """
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
 
     verify_station_ownership(station, current_user)
     atomic_reactivate_station(db, station)

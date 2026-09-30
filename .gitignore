@@ -50,6 +50,7 @@ frontend/.env.*.local
 *.db-journal
 *.db-wal
 *.db-shm
+*.bak
 ev_csms.db
 
 # --- Frontend (Node / React / Vite) ---
