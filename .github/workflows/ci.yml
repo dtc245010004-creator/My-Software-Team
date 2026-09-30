@@ -148,4 +148,5 @@ jobs:
           ssh "${ssh_opts[@]}" "$STAGING_USER@$STAGING_HOST" "bash '$STAGING_PATH/deploy-staging.sh' '$STAGING_PATH' '$IMAGE_BASE' '$IMAGE_TAG'"
       - name: Explain that staging secrets are not configured
         if: env.STAGING_HOST == '' || env.STAGING_USER == '' || env.STAGING_PATH == '' || env.STAGING_SSH_KEY == '' || env.STAGING_KNOWN_HOSTS == '' || env.STAGING_REGISTRY_USER == '' || env.STAGING_REGISTRY_TOKEN == ''
-        run: echo "Staging deploy skipped: configure the documented STAGING_* repository secrets to enable it."
+        run: |
+    echo 'Staging deploy skipped: configure the documented STAGING_* repository secrets to enable it.'
