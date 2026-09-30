@@ -23,6 +23,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
+# Dummy password hash dùng cùng thuật toán bcrypt và cost factor để cân bằng timing attack
+DUMMY_PASSWORD_HASH = get_password_hash("dummy_safety_password_for_timing")
+
+
 def create_access_token(
     data: Dict[str, Any],
     expires_delta: Optional[timedelta] = None,

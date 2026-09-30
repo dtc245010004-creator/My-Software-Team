@@ -35,3 +35,23 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}', role='{self.role}')>"
+
+
+class LoginAttempt(Base):
+    """Bảng lưu số lần đăng nhập thất bại và thời gian khóa tạm theo email chuẩn hóa."""
+
+    __tablename__ = "login_attempts"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    failed_count = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    def __repr__(self) -> str:
+        return f"<LoginAttempt(email='{self.email}', failed_count={self.failed_count}, locked_until='{self.locked_until}')>"

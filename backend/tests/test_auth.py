@@ -179,27 +179,31 @@ def test_register_rejects_client_supplied_role(client, db_session):
 
 
 def test_login_wrong_credentials(client):
-    """10. Đăng nhập sai tài khoản hoặc sai mật khẩu -> HTTP 401 Unauthorized."""
+    """10. Đăng nhập sai thông tin: email có/không tồn tại trả CÙNG mã 401 và CÙNG nội dung."""
     # Đăng ký tài khoản mẫu
     client.post(
         "/api/v1/auth/register",
         json={"username": "login_victim", "email": "victim@test.com", "password": "Password123"},
     )
 
-    # Thử sai mật khẩu
+    # Thử sai mật khẩu trên tài khoản có thật
     res_wrong_pw = client.post(
         "/api/v1/auth/login",
-        json={"username": "login_victim", "password": "WrongPassword999"},
+        json={"username": "victim@test.com", "password": "WrongPassword999"},
     )
     assert res_wrong_pw.status_code == 401
-    assert "không chính xác" in res_wrong_pw.json()["detail"]
+    assert res_wrong_pw.json()["detail"] == "Email hoặc mật khẩu không đúng"
+    assert "Còn lại" not in res_wrong_pw.json()["detail"]
 
     # Thử tài khoản không tồn tại
     res_wrong_user = client.post(
         "/api/v1/auth/login",
-        json={"username": "non_existent_user", "password": "Password123"},
+        json={"username": "non_existent@test.com", "password": "Password123"},
     )
     assert res_wrong_user.status_code == 401
+    assert res_wrong_user.json()["detail"] == "Email hoặc mật khẩu không đúng"
+    # Hai phản hồi giống hệt nhau
+    assert res_wrong_pw.json() == res_wrong_user.json()
 
 
 def test_login_success_and_get_me(client):
@@ -298,8 +302,9 @@ def test_login_debt_locked_shows_error(client, db_session):
     assert res.json()["detail"] == "tài khoản bị khóa vì - quá 300k"
 
 
-def test_login_wrong_password_increments_attempts_and_shows_remaining(client, db_session):
-    """14. Đăng nhập sai mật khẩu -> Tăng failed_login_attempts và hiển thị số lần thử còn lại."""
+def test_login_wrong_password_increments_attempts_without_leaking(client, db_session):
+    """14. Đăng nhập sai mật khẩu -> Tăng failed_count trong login_attempts nhưng không tiết lộ số lần thử."""
+    from app.models.user import LoginAttempt
     client.post(
         "/api/v1/auth/register",
         json={"username": "lockout_user_1", "email": "lockout1@test.com", "password": "Password123"},
@@ -307,125 +312,138 @@ def test_login_wrong_password_increments_attempts_and_shows_remaining(client, db
 
     res = client.post(
         "/api/v1/auth/login",
-        json={"username": "lockout_user_1", "password": "WrongPassword1"},
+        json={"username": "lockout1@test.com", "password": "WrongPassword1"},
     )
     assert res.status_code == 401
-    assert "Còn lại 4 lần thử" in res.json()["detail"]
+    assert res.json()["detail"] == "Email hoặc mật khẩu không đúng"
 
-    user = db_session.query(User).filter(User.username == "lockout_user_1").first()
-    assert user.failed_login_attempts == 1
-    assert user.locked_until is None
+    attempt = db_session.query(LoginAttempt).filter(LoginAttempt.email == "lockout1@test.com").first()
+    assert attempt is not None
+    assert attempt.failed_count == 1
+    assert attempt.locked_until is None
 
 
-def test_login_lockout_after_max_failed_attempts(client, db_session):
-    """15. Đăng nhập sai 5 lần liên tiếp -> Khóa tạm tài khoản 15 phút (HTTP 403)."""
+def test_login_lockout_at_6th_attempt_for_existent_and_non_existent_emails(client, db_session):
+    """15. Nhập sai 5 lần, lần thứ 6 bị khóa 15 phút (HTTP 429) cho cả email có và không tồn tại."""
     client.post(
         "/api/v1/auth/register",
         json={"username": "lockout_user_2", "email": "lockout2@test.com", "password": "Password123"},
     )
 
-    # Thử sai 4 lần đầu
-    for i in range(1, 5):
+    # 1. Với email có tồn tại: sai 5 lần đầu nhận 401
+    for i in range(1, 6):
         res = client.post(
             "/api/v1/auth/login",
-            json={"username": "lockout_user_2", "password": f"WrongPassword{i}"},
+            json={"username": "lockout2@test.com", "password": f"WrongPassword{i}"},
         )
         assert res.status_code == 401
-        assert f"Còn lại {5 - i} lần thử" in res.json()["detail"]
+        assert res.json()["detail"] == "Email hoặc mật khẩu không đúng"
 
-    # Thử sai lần thứ 5 -> Khóa tạm
-    res_5th = client.post(
+    # Lần thứ 6 -> Bị khóa 15 phút, trả 429
+    res_6th = client.post(
         "/api/v1/auth/login",
-        json={"username": "lockout_user_2", "password": "WrongPassword5"},
+        json={"username": "lockout2@test.com", "password": "WrongPassword6"},
     )
-    assert res_5th.status_code == 403
-    assert "Tài khoản bị tạm khóa 15 phút do nhập sai mật khẩu quá 5 lần" in res_5th.json()["detail"]
+    assert res_6th.status_code == 429
+    assert "Retry-After" in res_6th.headers
+    assert res_6th.json()["retry_after_seconds"] > 0
+    assert "Tài khoản bị tạm khóa 15 phút do nhập sai quá 5 lần" in res_6th.json()["detail"]
 
-    user = db_session.query(User).filter(User.username == "lockout_user_2").first()
-    assert user.failed_login_attempts == 5
-    assert user.locked_until is not None
+    # 2. Với email KHÔNG tồn tại: sai 5 lần đầu nhận 401
+    for i in range(1, 6):
+        res = client.post(
+            "/api/v1/auth/login",
+            json={"username": "ghost_user@test.com", "password": f"WrongPassword{i}"},
+        )
+        assert res.status_code == 401
+        assert res.json()["detail"] == "Email hoặc mật khẩu không đúng"
+
+    # Lần thứ 6 với email không tồn tại -> CŨNG bị khóa 429 cùng nội dung và headers
+    res_ghost_6th = client.post(
+        "/api/v1/auth/login",
+        json={"username": "ghost_user@test.com", "password": "WrongPassword6"},
+    )
+    assert res_ghost_6th.status_code == 429
+    assert "Retry-After" in res_ghost_6th.headers
+    assert res_ghost_6th.json()["retry_after_seconds"] > 0
+    assert "Tài khoản bị tạm khóa 15 phút do nhập sai quá 5 lần" in res_ghost_6th.json()["detail"]
 
 
-def test_login_blocked_during_lockout_without_checking_password(client, db_session):
-    """16. Trong thời gian bị khóa, kể cả nhập đúng mật khẩu vẫn bị chặn với HTTP 403."""
+def test_login_blocked_during_lockout_even_with_correct_password(client, db_session):
+    """16. Trong thời gian bị khóa, kể cả nhập đúng mật khẩu vẫn bị chặn với HTTP 429."""
     client.post(
         "/api/v1/auth/register",
         json={"username": "lockout_user_3", "email": "lockout3@test.com", "password": "Password123"},
     )
 
-    # Sai 5 lần để bị khóa
+    # Nhập sai 5 lần đầu
     for _ in range(5):
         client.post(
             "/api/v1/auth/login",
-            json={"username": "lockout_user_3", "password": "WrongPassword"},
+            json={"username": "lockout3@test.com", "password": "WrongPassword"},
         )
 
-    # Thử đăng nhập lại với mật khẩu ĐÚNG trong lúc đang bị khóa
-    res_correct = client.post(
+    # Lần 6 thử đăng nhập lại với mật khẩu ĐÚNG -> Vẫn bị khóa 429!
+    res_correct_6th = client.post(
         "/api/v1/auth/login",
-        json={"username": "lockout_user_3", "password": "Password123"},
+        json={"username": "lockout3@test.com", "password": "Password123"},
     )
-    assert res_correct.status_code == 403
-    assert "Tài khoản bị tạm khóa do nhập sai mật khẩu quá 5 lần" in res_correct.json()["detail"]
+    assert res_correct_6th.status_code == 429
+    assert "Retry-After" in res_correct_6th.headers
+    assert "Tài khoản bị tạm khóa 15 phút" in res_correct_6th.json()["detail"]
 
 
 def test_login_auto_unlock_after_lockout_duration(client, db_session):
-    """17. Sau khi hết thời gian khóa tạm (locked_until trong quá khứ) -> Tự động mở khóa khi đăng nhập đúng."""
+    """17. Sau khi hết thời gian khóa tạm -> Tự động mở khóa khi đăng nhập đúng."""
     from datetime import timedelta
     from app.core.datetime_utils import get_utc_now
+    from app.models.user import LoginAttempt
 
     client.post(
         "/api/v1/auth/register",
         json={"username": "lockout_user_4", "email": "lockout4@test.com", "password": "Password123"},
     )
 
-    # Giả lập tài khoản bị khóa trong quá khứ (đã hết hạn khóa 2 phút trước)
-    user = db_session.query(User).filter(User.username == "lockout_user_4").first()
-    user.failed_login_attempts = 5
-    user.locked_until = get_utc_now() - timedelta(minutes=2)
+    # Giả lập bản ghi login_attempts bị khóa trong quá khứ (đã hết hạn khóa 2 phút trước)
+    attempt = LoginAttempt(
+        email="lockout4@test.com",
+        failed_count=5,
+        locked_until=get_utc_now() - timedelta(minutes=2),
+    )
+    db_session.add(attempt)
     db_session.commit()
 
     # Đăng nhập với mật khẩu đúng
     res = client.post(
         "/api/v1/auth/login",
-        json={"username": "lockout_user_4", "password": "Password123"},
+        json={"username": "lockout4@test.com", "password": "Password123"},
     )
     assert res.status_code == 200
     assert "access_token" in res.json()
 
     # Kiểm tra DB: Đã reset về 0 và xóa locked_until
-    db_session.refresh(user)
-    assert user.failed_login_attempts == 0
-    assert user.locked_until is None
+    db_session.refresh(attempt)
+    assert attempt.failed_count == 0
+    assert attempt.locked_until is None
 
 
-def test_login_success_resets_failed_attempts_counter(client, db_session):
-    """18. Nhập sai 2 lần rồi nhập đúng -> Reset failed_login_attempts về 0."""
-    client.post(
-        "/api/v1/auth/register",
-        json={"username": "lockout_user_5", "email": "lockout5@test.com", "password": "Password123"},
-    )
+def test_login_parallel_requests_does_not_overshoot(client):
+    """18. Kiểm tra gửi yêu cầu đăng nhập song song: không bị race condition."""
+    from concurrent.futures import ThreadPoolExecutor
 
-    # Sai 2 lần
-    client.post(
-        "/api/v1/auth/login",
-        json={"username": "lockout_user_5", "password": "WrongPassword"},
-    )
-    client.post(
-        "/api/v1/auth/login",
-        json={"username": "lockout_user_5", "password": "WrongPassword"},
-    )
+    def send_failed_login(i):
+        return client.post(
+            "/api/v1/auth/login",
+            json={"username": "parallel_user@test.com", "password": f"WrongPass{i}"},
+        ).status_code
 
-    user = db_session.query(User).filter(User.username == "lockout_user_5").first()
-    assert user.failed_login_attempts == 2
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        status_codes = list(executor.map(send_failed_login, range(10)))
 
-    # Đăng nhập đúng
-    res = client.post(
-        "/api/v1/auth/login",
-        json={"username": "lockout_user_5", "password": "Password123"},
-    )
-    assert res.status_code == 200
+    # Chỉ có mã 401 hoặc 429, không có 500 lỗi hệ thống
+    for code in status_codes:
+        assert code in (401, 429)
+    # Phải có ít nhất một yêu cầu nhận 429 vì đã vượt ngưỡng 5 lần
+    assert 429 in status_codes
 
-    db_session.refresh(user)
-    assert user.failed_login_attempts == 0
 

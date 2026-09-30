@@ -31,8 +31,12 @@ export default function Login() {
         alert('Đăng ký tài khoản thành công! Vui lòng đăng nhập.');
         setIsRegisterMode(false);
       } else {
-        await login(username, password);
-        navigate('/');
+        const loggedInUser = await login(username, password);
+        if (loggedInUser?.role === 'CUSTOMER') {
+          navigate('/wallet');
+        } else {
+          navigate('/');
+        }
       }
     } catch (err) {
       setError(err.response?.data?.detail || 'Thao tác thất bại. Vui lòng kiểm tra lại thông tin.');
@@ -44,8 +48,12 @@ export default function Login() {
   const handleQuickDemo = async (role) => {
     try {
       setLoading(true);
-      await quickSwitch(role);
-      navigate('/');
+      const loggedInUser = await quickSwitch(role);
+      if (loggedInUser?.role === 'CUSTOMER') {
+        navigate('/wallet');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError('Tài khoản demo chưa khởi tạo. Vui lòng đăng nhập bằng form bên dưới.');
     } finally {
