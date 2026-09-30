@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Callable
 from decimal import Decimal
+from typing import Optional
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -127,3 +128,22 @@ def require_roles(allowed_roles: list[str]) -> Callable[[User], User]:
         return current_user
 
     return role_checker
+
+
+def get_optional_current_user(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Dependency lấy user nếu có token hợp lệ, ngược lại trả về None (không raise error)."""
+    if not token:
+        return None
+    try:
+        payload = decode_access_token(token)
+        user_id_str = payload.get("sub")
+        if user_id_str is not None:
+            user = db.query(User).filter(User.id == int(user_id_str)).first()
+            if user and user.is_active:
+                return user
+    except (jwt.PyJWTError, TypeError, ValueError) as exc:
+        logger.debug("Token tùy chọn không hợp lệ; xem như chưa đăng nhập: %s", exc)
+    return None

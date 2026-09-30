@@ -1,4 +1,13 @@
+# ruff: noqa: E402
+
 import os
+import sys
+from pathlib import Path
+
+# Đảm bảo thư mục backend luôn nằm trong sys.path khi chạy từ bất kỳ thư mục nào (bao gồm CI runner)
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 import pytest
 from fastapi.testclient import TestClient

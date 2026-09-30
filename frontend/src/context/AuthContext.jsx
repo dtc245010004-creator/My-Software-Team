@@ -63,13 +63,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Nút 1-click chuyển nhanh vai trò cho buổi bảo vệ đồ án / demo
-  const quickSwitch = async (role) => {
+  const quickSwitch = async (roleKey) => {
     try {
-      if (role === 'ADMIN') {
+      if (roleKey === 'ADMIN') {
         await login('admin', 'AdminPass123');
-      } else if (role === 'OPERATOR') {
+      } else if (roleKey === 'OPERATOR_A' || roleKey === 'OPERATOR') {
         await login('operator_a', 'OpPass123');
-      } else if (role === 'DEBT') {
+      } else if (roleKey === 'OPERATOR_B') {
+        await login('operator', 'OpPass123');
+      } else if (roleKey === 'DEBT') {
         await login('driver_debt', 'DriverPass123');
       } else {
         // Role Tài xế không cần đăng nhập: chuyển trực tiếp sang chế độ tài xế tự do
@@ -80,6 +82,16 @@ export const AuthProvider = ({ children }) => {
       throw err;
     }
   };
+
+  // Xác định tài khoản demo hiện tại
+  let currentDemoKey = 'CUSTOMER';
+  if (user?.role === 'ADMIN') {
+    currentDemoKey = 'ADMIN';
+  } else if (user?.role === 'OPERATOR') {
+    currentDemoKey = user.username === 'operator' ? 'OPERATOR_B' : 'OPERATOR_A';
+  } else if (user?.username === 'driver_debt') {
+    currentDemoKey = 'DEBT';
+  }
 
   // Nếu chưa đăng nhập, mặc định hoạt động dưới vai trò CUSTOMER (Tài xế sạc không cần đăng nhập)
   const effectiveRole = user?.role || 'CUSTOMER';
@@ -105,6 +117,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         quickSwitch,
+        currentDemoKey,
       }}
     >
       {children}

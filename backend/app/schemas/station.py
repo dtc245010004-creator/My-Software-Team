@@ -119,7 +119,7 @@ class StationBase(BaseModel):
 
 
 class StationCreate(StationBase):
-    pass
+    operator_id: Optional[int] = Field(default=None, description="ID Chủ trạm sạc (chỉ Admin được gán)")
 
 
 class StationUpdate(BaseModel):
@@ -130,6 +130,7 @@ class StationUpdate(BaseModel):
     total_grid_capacity_kw: Optional[float] = Field(default=None, gt=0)
     operating_hours: Optional[str] = None
     status: Optional[str] = None
+    operator_id: Optional[int] = Field(default=None, description="ID Chủ trạm sạc (chỉ Admin được gán/đổi)")
 
     @field_validator("status")
     @classmethod
@@ -144,7 +145,7 @@ class StationUpdate(BaseModel):
 
 class StationResponse(StationBase):
     id: int
-    operator_id: int
+    operator_id: Optional[int] = None
     is_active: bool
     created_at: UTCDateTime
     updated_at: UTCDateTime

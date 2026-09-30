@@ -68,27 +68,36 @@ export default function Login() {
         {/* 1-Click Fast Login for Demo */}
         <div className="bg-obsidian border border-hairline p-3 rounded space-y-2 text-xs">
           <span className="text-steel-gray font-bold block text-[11px]">ĐĂNG NHẬP NHANH BẢO VỆ ĐỒ ÁN (DEMO 1-CLICK):</span>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-5 gap-1.5">
             <button
               type="button"
               onClick={() => handleQuickDemo('ADMIN')}
               className="py-1.5 px-1 bg-critical-red/20 text-critical-red border border-critical-red/40 hover:bg-critical-red/30 rounded font-bold text-center transition-colors text-[10px]"
             >
-              Quản trị viên
+              Admin
             </button>
             <button
               type="button"
-              onClick={() => handleQuickDemo('OPERATOR')}
+              onClick={() => handleQuickDemo('OPERATOR_A')}
               className="py-1.5 px-1 bg-caution-amber/20 text-caution-amber border border-caution-amber/40 hover:bg-caution-amber/30 rounded font-bold text-center transition-colors text-[10px]"
+              title="Chủ trạm A (VinFast - ST1, ST2)"
             >
-              Vận hành CPO
+              Chủ A
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickDemo('OPERATOR_B')}
+              className="py-1.5 px-1 bg-caution-amber/20 text-caution-amber border border-caution-amber/40 hover:bg-caution-amber/30 rounded font-bold text-center transition-colors text-[10px]"
+              title="Chủ trạm B (Trung Tâm - ST3)"
+            >
+              Chủ B
             </button>
             <button
               type="button"
               onClick={() => handleQuickDemo('CUSTOMER')}
               className="py-1.5 px-1 bg-grid-green/20 text-grid-green border border-grid-green/40 hover:bg-grid-green/30 rounded font-bold text-center transition-colors text-[10px]"
             >
-              Tài xế sạc
+              Tài xế
             </button>
             <button
               type="button"
@@ -96,7 +105,7 @@ export default function Login() {
               className="py-1.5 px-1 bg-critical-red/30 text-critical-red border border-critical-red/60 hover:bg-critical-red/40 rounded font-bold text-center transition-colors text-[10px]"
               title="Mô phỏng tài khoản nợ -330.000đ bị khóa"
             >
-              Tài xế nợ (-300k)
+              Tài xế nợ
             </button>
           </div>
         </div>

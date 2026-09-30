@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import get_optional_current_user, require_roles
 from app.core.database import get_db
 from app.core.datetime_utils import get_vn_now, to_vn_time
 from app.models.session import ChargingSession
@@ -22,11 +22,38 @@ from app.services.station_service import (
     atomic_soft_delete_station,
     calculate_haversine_distance,
     enrich_station_response,
+    get_accessible_station_ids,
     verify_station_ownership,
 )
 from app.simulator.charging_simulator import simulator_manager
 
 router = APIRouter(prefix="/stations", tags=["Quản lý Trạm sạc (Stations)"])
+
+
+@router.get(
+    "/owners",
+    response_model=List[Dict[str, Any]],
+    summary="Lấy danh sách các chủ trạm sạc (Dành riêng cho Quản trị viên)",
+)
+def list_station_owners(
+    current_user: User = Depends(require_roles(["ADMIN"])),
+    db: Session = Depends(get_db),
+):
+    """Admin lấy danh sách tài khoản Chủ trạm sạc (Role: OPERATOR) để gán cho trạm."""
+    owners = (
+        db.query(User)
+        .filter(User.role == "OPERATOR", User.is_active.is_(True))
+        .all()
+    )
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "full_name": u.full_name or u.username,
+            "email": u.email,
+        }
+        for u in owners
+    ]
 
 
 @router.get(
@@ -42,15 +69,20 @@ def list_stations(
     user_lat: Optional[float] = Query(None, ge=-90.0, le=90.0, description="Vĩ độ người dùng để tính khoảng cách"),
     user_lon: Optional[float] = Query(None, ge=-180.0, le=180.0, description="Kinh độ người dùng để tính khoảng cách"),
     radius_km: Optional[float] = Query(None, gt=0, description="Bán kính tìm kiếm xung quanh (km)"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    API tìm kiếm công khai dành cho cả khách vãng lai và tài xế:
-    - Mặc định chỉ lấy trạm đang hoạt động logic (is_active == True).
-    - Hỗ trợ lọc Bounding Box nhanh tại CSDL kết hợp tính khoảng cách Haversine chuẩn xác.
-    - Hỗ trợ phân trang chuẩn qua skip & limit.
+    API tìm kiếm danh sách trạm sạc:
+    - Chủ trạm (OPERATOR): Chỉ thấy các trạm do chính mình sở hữu (operator_id == current_user.id).
+    - Quản trị viên (ADMIN): Thấy toàn bộ trạm trong hệ thống (kể cả trạm chưa gán chủ).
+    - Khách / Tài xế (CUSTOMER): Thấy toàn bộ trạm active công khai để tìm kiếm và cắm sạc.
     """
     query = db.query(Station).filter(Station.is_active)
+
+    # Phân quyền: Chủ trạm chỉ thấy các trạm do mình sở hữu
+    if current_user and current_user.role == "OPERATOR":
+        query = query.filter(Station.operator_id == current_user.id)
 
     if status_filter:
         query = query.filter(Station.status == status_filter.upper())
@@ -103,42 +135,105 @@ def list_stations(
     response_model=Dict[str, Any],
     summary="Lấy số liệu vận hành mạng lưới thời gian thực (Live Dashboard Metrics)",
 )
-def get_live_dashboard_metrics(db: Session = Depends(get_db)):
+def get_live_dashboard_metrics(
+    station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Truy xuất số liệu vận hành thời gian thực từ bộ nhớ RAM (Simulator) và CSDL:
-    - Tổng số trạm, tổng số trụ, tổng công suất lưới.
-    - Số trụ sạc đang cấp nguồn (CHARGING) thực tế.
-    - Công suất tiêu thụ tức thời thực tế (kW) lấy trực tiếp từ các phiên sạc đang chạy.
-    - Số trụ sẵn sàng (AVAILABLE) và số trụ cảnh báo lỗi/bảo trì.
+    - Nếu Chủ trạm (OPERATOR): Chỉ tính toán trên các trạm do mình sở hữu.
+    - Nếu truyền station_id: Kiểm tra quyền sở hữu, ngoài phạm vi -> 403 Forbidden.
+    - Hạn mức: An toàn 95% công suất thiết kế, kèm chi tiết từng trạm.
     """
-    stations = db.query(Station).filter(Station.is_active).all()
-    chargers = db.query(ChargingPoint).filter(ChargingPoint.is_active).all()
+    if current_user and current_user.role == "OPERATOR":
+        accessible_ids = get_accessible_station_ids(current_user, db)
+    else:
+        accessible_ids = [
+            station_id
+            for (station_id,) in db.query(Station.id)
+            .filter(Station.is_active.is_(True))
+            .all()
+        ]
 
-    # Tra cứu simulator đang chạy thực tế trong RAM
+    if station_id is not None:
+        if current_user and station_id not in accessible_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền truy cập số liệu trạm sạc này.",
+            )
+        target_station_ids = [station_id]
+    else:
+        target_station_ids = accessible_ids
+
+    stations = (
+        db.query(Station)
+        .filter(Station.id.in_(target_station_ids), Station.is_active)
+        .all()
+        if target_station_ids
+        else []
+    )
+    chargers = (
+        db.query(ChargingPoint)
+        .filter(
+            ChargingPoint.station_id.in_(target_station_ids),
+            ChargingPoint.is_active,
+        )
+        .all()
+        if target_station_ids
+        else []
+    )
+    charger_ids_set = {c.id for c in chargers}
+
+    # Map connector_id -> charger_id
+    connectors = db.query(Connector.id, Connector.charging_point_id).filter(Connector.charging_point_id.in_(charger_ids_set)).all() if charger_ids_set else []
+    conn_to_charger = {c[0]: c[1] for c in connectors}
+
+    # Lọc simulators chỉ thuộc target chargers
     active_sims = list(simulator_manager.active_simulators.values())
-    live_power_kw = round(sum(s.power_kw for s in active_sims), 1)
+    filtered_active_sims = [s for s in active_sims if s.connector_id in conn_to_charger]
+    live_power_kw = round(sum(s.power_kw for s in filtered_active_sims), 1)
 
-    # Tập hợp các ID trụ sạc đang thực sự có phiên sạc chạy
     charging_charger_ids = set()
-    for s in active_sims:
-        conn = db.query(Connector).filter(Connector.id == s.connector_id).first()
-        if conn and conn.charging_point_id:
-            charging_charger_ids.add(conn.charging_point_id)
+    for s in filtered_active_sims:
+        ch_id = conn_to_charger.get(s.connector_id)
+        if ch_id:
+            charging_charger_ids.add(ch_id)
 
-    # Kiểm tra bổ sung nếu có session ACTIVE trong DB
     db_active_sessions = db.query(ChargingSession).filter(ChargingSession.status == "ACTIVE").all()
     for sess in db_active_sessions:
-        conn = db.query(Connector).filter(Connector.id == sess.connector_id).first()
-        if conn and conn.charging_point_id:
-            charging_charger_ids.add(conn.charging_point_id)
+        if sess.connector_id in conn_to_charger:
+            ch_id = conn_to_charger[sess.connector_id]
+            charging_charger_ids.add(ch_id)
 
     total_chargers = len(chargers)
     charging_count = len(charging_charger_ids)
     faulted_count = len([c for c in chargers if c.status in ("FAULTED", "UNAVAILABLE")])
     available_count = max(0, total_chargers - charging_count - faulted_count)
     total_grid_kw = round(sum(st.total_grid_capacity_kw or 0.0 for st in stations), 1)
+    safe_limit_kw = round(sum((st.total_grid_capacity_kw or 0.0) * 0.95 for st in stations), 1)
 
-    # Danh sách chi tiết trạng thái từng trụ cho Live Bay Status
+    # Thống kê chi tiết theo từng trạm
+    stations_detail = []
+    has_overload_station = False
+    for st in stations:
+        st_ch_ids = {c.id for c in chargers if c.station_id == st.id}
+        st_sims = [s for s in filtered_active_sims if conn_to_charger.get(s.connector_id) in st_ch_ids]
+        st_power = round(sum(s.power_kw for s in st_sims), 1)
+        st_limit = round((st.total_grid_capacity_kw or 0.0) * 0.95, 1)
+        is_over = st_power > st_limit
+        if is_over:
+            has_overload_station = True
+        stations_detail.append({
+            "station_id": st.id,
+            "station_name": st.name,
+            "grid_capacity_kw": st.total_grid_capacity_kw,
+            "safe_limit_kw": st_limit,
+            "active_power_kw": st_power,
+            "is_over_limit": is_over,
+            "chargers_count": len(st_ch_ids),
+        })
+
     chargers_status = []
     for c in chargers:
         st_status = "CHARGING" if c.id in charging_charger_ids else c.status
@@ -159,9 +254,13 @@ def get_live_dashboard_metrics(db: Session = Depends(get_db)):
         "available_chargers_count": available_count,
         "faulted_chargers_count": faulted_count,
         "total_grid_capacity_kw": total_grid_kw,
+        "safe_limit_kw": safe_limit_kw,
         "active_power_kw": live_power_kw,
-        "active_sessions_count": len(active_sims),
+        "active_sessions_count": len(filtered_active_sims),
         "chargers": chargers_status,
+        "stations_detail": stations_detail,
+        "has_overload_station": has_overload_station,
+        "empty_state": len(stations) == 0,
     }
 
 
@@ -172,6 +271,7 @@ def get_live_dashboard_metrics(db: Session = Depends(get_db)):
 )
 def get_grid_load_profile(
     station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -179,17 +279,26 @@ def get_grid_load_profile(
     - Gom nhóm các phiên sạc trong ngày hôm nay (hoặc 24h gần nhất).
     - Tích hợp công suất tức thời của các phiên sạc đang chạy trong RAM vào khung giờ hiện tại.
     - Gắn nhãn TOU linh hoạt (PEAK, NORMAL, OFFPEAK).
+    - Phân quyền: Chủ trạm chỉ được xem số liệu các trạm của mình (chặn 403 nếu chọn trạm khác).
     """
     vn_now = get_vn_now()
     current_hour = vn_now.hour
 
-    # Lấy các phiên sạc thực tế phát sinh trong ngày hôm nay (từ 00:00 hôm nay theo giờ VN)
-    today_start_vn = vn_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_start_utc = today_start_vn.astimezone(timezone.utc).replace(tzinfo=None)
-    query = db.query(ChargingSession).filter(ChargingSession.start_time >= today_start_utc)
-    if station_id:
-        query = query.join(ChargingSession.connector).join(Connector.charging_point).filter(ChargingPoint.station_id == station_id)
-    recent_sessions = query.all()
+    # Phân quyền phạm vi trạm
+    target_station_ids: Optional[List[int]] = None
+    if current_user and current_user.role == "OPERATOR":
+        accessible_ids = get_accessible_station_ids(current_user, db)
+        if station_id is not None:
+            if station_id not in accessible_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền truy cập số liệu trạm sạc này.",
+                )
+            target_station_ids = [station_id]
+        else:
+            target_station_ids = accessible_ids
+    elif station_id is not None:
+        target_station_ids = [station_id]
 
     # Khung giờ 12 mốc (cách nhau 2 tiếng: 00:00, 02:00, ..., 22:00)
     time_slots = [
@@ -207,8 +316,39 @@ def get_grid_load_profile(
         ("22:00", 22, 24),
     ]
 
-    # Tính tổng công suất tức thời hiện tại từ simulator
-    live_sim_power = sum(s.power_kw for s in simulator_manager.active_simulators.values())
+    # Nếu phạm vi trạm trống (Chủ trạm chưa có trạm nào) -> trả về biểu đồ rỗng
+    if target_station_ids is not None and len(target_station_ids) == 0:
+        return [
+            {
+                "time": slot_label,
+                "loadKw": 0.0,
+                "priceSlot": "PEAK" if ((start_h >= 10 and end_h <= 12) or (start_h >= 18 and end_h <= 20)) else ("OFFPEAK" if (start_h >= 22 or end_h <= 4) else "NORMAL"),
+                "isLive": start_h <= current_hour < end_h,
+            }
+            for slot_label, start_h, end_h in time_slots
+        ]
+
+    # Lấy các phiên sạc thực tế phát sinh trong ngày hôm nay (từ 00:00 hôm nay theo giờ VN)
+    today_start_vn = vn_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_utc = today_start_vn.astimezone(timezone.utc).replace(tzinfo=None)
+    query = db.query(ChargingSession).filter(ChargingSession.start_time >= today_start_utc)
+    if target_station_ids is not None:
+        query = query.join(ChargingSession.connector).join(Connector.charging_point).filter(ChargingPoint.station_id.in_(target_station_ids))
+    recent_sessions = query.all()
+
+    # Tính tổng công suất tức thời hiện tại từ simulator thuộc phạm vi
+    active_sims = list(simulator_manager.active_simulators.values())
+    if target_station_ids is not None:
+        conn_ids = [s.connector_id for s in active_sims]
+        allowed_conn_ids = set(
+            cid for (cid,) in db.query(Connector.id)
+            .join(ChargingPoint, Connector.charging_point_id == ChargingPoint.id)
+            .filter(ChargingPoint.station_id.in_(target_station_ids), Connector.id.in_(conn_ids))
+            .all()
+        )
+        live_sim_power = sum(s.power_kw for s in active_sims if s.connector_id in allowed_conn_ids)
+    else:
+        live_sim_power = sum(s.power_kw for s in active_sims)
 
     load_profile = []
     for slot_label, start_h, end_h in time_slots:
@@ -251,6 +391,7 @@ def get_grid_load_profile(
 )
 def get_grid_load_profile_timeline(
     station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -260,6 +401,7 @@ def get_grid_load_profile_timeline(
     - Phút tương lai (sau thời điểm hiện tại): isPlaceholder = True, noData = False, powerKw = 0.0
     - Phút quá khứ đã có log trong DB (hoặc phút hiện tại có live power): isPlaceholder = False, noData = False, powerKw = value
     - Phút quá khứ chưa có dữ liệu trong DB (trước thời điểm ghi log): isPlaceholder = True, noData = True, powerKw = 0.0
+    - Phân quyền: Chủ trạm chỉ được xem số liệu các trạm của mình (chặn 403 nếu chọn trạm khác).
     """
     from app.models.station import StationPowerMetric
 
@@ -270,13 +412,41 @@ def get_grid_load_profile_timeline(
     today_start_utc = vn_today_start.astimezone(timezone.utc).replace(tzinfo=None)
     now_utc = vn_now.astimezone(timezone.utc).replace(tzinfo=None)
 
+    # Phân quyền phạm vi trạm
+    target_station_ids: Optional[List[int]] = None
+    if current_user and current_user.role == "OPERATOR":
+        accessible_ids = get_accessible_station_ids(current_user, db)
+        if station_id is not None:
+            if station_id not in accessible_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền truy cập số liệu trạm sạc này.",
+                )
+            target_station_ids = [station_id]
+        else:
+            target_station_ids = accessible_ids
+    elif station_id is not None:
+        target_station_ids = [station_id]
+
+    # Nếu phạm vi trạm trống (Chủ trạm chưa có trạm nào) -> trả về placeholder rỗng
+    if target_station_ids is not None and len(target_station_ids) == 0:
+        return [
+            {
+                "time": (vn_today_start + timedelta(minutes=i)).strftime("%H:%M"),
+                "powerKw": 0.0,
+                "isPlaceholder": True,
+                "noData": (vn_today_start + timedelta(minutes=i)) < vn_current_minute_floor,
+            }
+            for i in range(1440)
+        ]
+
     # 1. Truy vấn toàn bộ log của ngày hôm nay từ CSDL (tính theo ngày Việt Nam)
     query = db.query(StationPowerMetric).filter(
         StationPowerMetric.timestamp >= today_start_utc,
         StationPowerMetric.timestamp <= now_utc,
     )
-    if station_id:
-        query = query.filter(StationPowerMetric.station_id == station_id)
+    if target_station_ids is not None:
+        query = query.filter(StationPowerMetric.station_id.in_(target_station_ids))
 
     db_metrics = query.all()
 
@@ -291,15 +461,15 @@ def get_grid_load_profile_timeline(
     active_sims = list(simulator_manager.active_simulators.values())
     live_power_now = 0.0
     if active_sims:
-        if station_id:
+        if target_station_ids is not None:
             conn_ids = [s.connector_id for s in active_sims]
-            st_conn_ids = set(
+            allowed_conn_ids = set(
                 cid for (cid,) in db.query(Connector.id)
                 .join(ChargingPoint, Connector.charging_point_id == ChargingPoint.id)
-                .filter(ChargingPoint.station_id == station_id, Connector.id.in_(conn_ids))
+                .filter(ChargingPoint.station_id.in_(target_station_ids), Connector.id.in_(conn_ids))
                 .all()
             )
-            live_power_now = sum(s.power_kw for s in active_sims if s.connector_id in st_conn_ids)
+            live_power_now = sum(s.power_kw for s in active_sims if s.connector_id in allowed_conn_ids)
         else:
             live_power_now = sum(s.power_kw for s in active_sims)
     live_power_now = round(live_power_now, 2)
@@ -353,10 +523,20 @@ def get_grid_load_profile_timeline(
     response_model=StationResponse,
     summary="Xem thông tin chi tiết trạm sạc cùng các trụ và cổng sạc",
 )
-def get_station(station_id: int, db: Session = Depends(get_db)):
+def get_station(
+    station_id: int,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
+    if current_user and current_user.role == "OPERATOR":
+        if station.operator_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền truy cập trạm sạc này.",
+            )
     return enrich_station_response(station)
 
 
@@ -374,10 +554,13 @@ def create_station(
     """
     Tạo trạm sạc mới:
     - Bắt buộc vai trò ADMIN hoặc OPERATOR.
-    - Tự động gắn operator_id = current_user.id.
+    - Nếu là OPERATOR: Tự động gắn operator_id = current_user.id.
+    - Nếu là ADMIN: Cho phép gán operator_id theo station_in (hoặc None nếu để trạm tự do).
     """
+    assigned_operator_id = station_in.operator_id if current_user.role == "ADMIN" else current_user.id
+
     new_station = Station(
-        operator_id=current_user.id,
+        operator_id=assigned_operator_id,
         name=station_in.name,
         address=station_in.address,
         latitude=station_in.latitude,
@@ -404,7 +587,7 @@ def update_station(
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
-    """Cập nhật trạm sạc: Kiểm tra quyền sở hữu (Owner hoặc Admin)."""
+    """Cập nhật trạm sạc: Kiểm tra quyền sở hữu (Owner hoặc Admin). Chỉ Admin được đổi chủ trạm."""
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc.")
@@ -412,6 +595,16 @@ def update_station(
     verify_station_ownership(station, current_user)
 
     update_data = station_in.model_dump(exclude_unset=True)
+
+    # Chặn thay đổi chủ trạm nếu không phải ADMIN
+    if "operator_id" in update_data and current_user.role != "ADMIN":
+        if update_data["operator_id"] != station.operator_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ Quản trị viên (Admin) mới có quyền gán hoặc thay đổi Chủ trạm.",
+            )
+        update_data.pop("operator_id")
+
     for field, value in update_data.items():
         setattr(station, field, value)
 

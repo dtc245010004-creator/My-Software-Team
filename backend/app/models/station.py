@@ -31,8 +31,8 @@ class Station(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     operator_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     name = Column(String(150), nullable=False)

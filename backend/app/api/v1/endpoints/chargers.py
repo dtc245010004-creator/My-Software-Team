@@ -1,8 +1,10 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import get_optional_current_user, require_roles
 from app.core.database import get_db
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
@@ -113,12 +115,22 @@ def create_charger_for_station(
     response_model=ChargingPointResponse,
     summary="Xem chi tiết trụ sạc và các cổng sạc trực thuộc",
 )
-def get_charger(charger_id: int, db: Session = Depends(get_db)):
+def get_charger(
+    charger_id: int,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
     charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
     if not charger:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
         )
+    if current_user and current_user.role == "OPERATOR":
+        if not charger.station or charger.station.operator_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền truy cập trụ sạc này.",
+            )
     return enrich_charger_response(charger)
 
 

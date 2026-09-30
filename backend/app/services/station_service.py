@@ -1,4 +1,5 @@
 import math
+from typing import List
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
@@ -31,22 +32,77 @@ def calculate_haversine_distance(
     return round(R * c, 2)
 
 
+def get_accessible_station_ids(user: User, db: Session) -> List[int]:
+    """
+    Trả về danh sách ID các trạm sạc mà user có quyền truy cập / quản lý / xem báo cáo:
+    - ADMIN: Toàn bộ trạm sạc active (kể cả trạm chưa gán chủ operator_id=None).
+    - OPERATOR (Chủ trạm): Chỉ các trạm active có operator_id == user.id.
+    - CUSTOMER (Tài xế) hoặc khác: Trả về danh sách rỗng.
+    """
+    if user.role == "ADMIN":
+        stations = db.query(Station.id).filter(Station.is_active.is_(True)).all()
+        return [s[0] for s in stations]
+    elif user.role == "OPERATOR":
+        stations = (
+            db.query(Station.id)
+            .filter(Station.is_active.is_(True), Station.operator_id == user.id)
+            .all()
+        )
+        return [s[0] for s in stations]
+    return []
+
+
+def assert_station_accessible(station_id: int, user: User, db: Session) -> Station:
+    """
+    Kiểm tra quyền truy cập trên một trạm cụ thể:
+    - Nếu không tìm thấy trạm -> 404 NOT FOUND.
+    - Nếu user là OPERATOR và station.operator_id != user.id -> 403 FORBIDDEN.
+    - Nếu user là CUSTOMER -> 403 FORBIDDEN.
+    - Hợp lệ -> Trả về đối tượng Station.
+    """
+    station = (
+        db.query(Station)
+        .filter(Station.id == station_id, Station.is_active.is_(True))
+        .first()
+    )
+    if not station:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy trạm sạc.",
+        )
+    if user.role == "ADMIN":
+        return station
+    if user.role == "OPERATOR":
+        if station.operator_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền thao tác trên trạm sạc này.",
+            )
+        return station
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Quyền hạn không đủ để truy cập trạm sạc này.",
+    )
+
+
 def verify_station_ownership(station: Station, user: User) -> None:
     """Kiểm tra quyền sở hữu trạm (IDOR Guard): Admin có toàn quyền, Operator chỉ sở hữu trạm của mình."""
-    if user.role != "ADMIN" and station.operator_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Bạn không có quyền thao tác trên trạm sạc này.",
-        )
+    if user.role != "ADMIN":
+        if station.operator_id is None or station.operator_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền thao tác trên trạm sạc này.",
+            )
 
 
 def verify_charger_ownership(charger: ChargingPoint, user: User) -> None:
     """Kiểm tra quyền sở hữu trụ sạc thông qua trạm cha (IDOR Guard cấp Charger)."""
-    if user.role != "ADMIN" and charger.station.operator_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Bạn không có quyền thao tác trên trụ sạc này.",
-        )
+    if user.role != "ADMIN":
+        if not charger.station or charger.station.operator_id is None or charger.station.operator_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền thao tác trên trụ sạc này.",
+            )
 
 
 def enrich_charger_response(charger: ChargingPoint) -> ChargingPointResponse:

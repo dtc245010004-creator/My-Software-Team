@@ -604,7 +604,7 @@ export default function AIAdvisor() {
                 }`}
               >
                 <div className="flex items-center justify-between mb-1 text-[10px] text-steel-gray">
-                  <span>{msg.role === 'user' ? 'BẠN (CPO)' : 'TRỢ LÝ AI CSMS'}</span>
+                  <span>{msg.role === 'user' ? 'BẠN (CHỦ TRẠM)' : 'TRỢ LÝ AI CSMS'}</span>
                   {msg.source && (
                     <span className="font-bold text-electric-cyan">[{msg.source}]</span>
                   )}

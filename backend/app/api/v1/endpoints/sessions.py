@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_or_driver_guest
 from app.core.database import get_db
 from app.models.session import ChargingSession
+from app.models.station import ChargingPoint, Connector
 from app.models.user import User
 from app.schemas.session import (
     SessionResponse,
@@ -14,8 +17,66 @@ from app.services.session_service import (
     start_charging_session,
     stop_charging_session,
 )
+from app.services.station_service import get_accessible_station_ids
 
 router = APIRouter(prefix="/sessions", tags=["Phiên sạc xe điện (Charging Sessions)"])
+
+
+@router.get(
+    "",
+    response_model=List[SessionResponse],
+    summary="Danh sách các phiên sạc (Phân quyền theo Trạm sạc cho Chủ trạm / Toàn quyền cho Admin)",
+)
+def list_sessions(
+    station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Lọc theo trạng thái phiên: ACTIVE, COMPLETED, INTERRUPTED"),
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    Tra cứu danh sách phiên sạc theo phân quyền:
+    - Quản trị viên (ADMIN): Xem toàn bộ hệ thống, có thể lọc theo station_id.
+    - Chủ trạm (OPERATOR): Chỉ xem các phiên thuộc các trạm mình sở hữu. Nếu cố lọc station_id ngoài phạm vi -> 403 Forbidden.
+    - Khách / Tài xế (CUSTOMER): Chỉ xem các phiên sạc của chính mình.
+    """
+    if current_user.role == "ADMIN":
+        query = db.query(ChargingSession)
+        if station_id:
+            query = query.join(ChargingSession.connector).join(Connector.charging_point).filter(ChargingPoint.station_id == station_id)
+        if status_filter and status_filter.upper() != "ALL":
+            query = query.filter(ChargingSession.status == status_filter.upper())
+        return query.order_by(ChargingSession.id.desc()).all()
+
+    if current_user.role == "OPERATOR":
+        accessible_ids = get_accessible_station_ids(current_user, db)
+        if station_id is not None:
+            if station_id not in accessible_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền xem phiên sạc của trạm sạc này.",
+                )
+            target_ids = [station_id]
+        else:
+            target_ids = accessible_ids
+
+        if not target_ids:
+            return []
+
+        query = (
+            db.query(ChargingSession)
+            .join(ChargingSession.connector)
+            .join(Connector.charging_point)
+            .filter(ChargingPoint.station_id.in_(target_ids))
+        )
+        if status_filter and status_filter.upper() != "ALL":
+            query = query.filter(ChargingSession.status == status_filter.upper())
+        return query.order_by(ChargingSession.id.desc()).all()
+
+    # CUSTOMER / GUEST
+    query = db.query(ChargingSession).filter(ChargingSession.user_id == current_user.id)
+    if status_filter and status_filter.upper() != "ALL":
+        query = query.filter(ChargingSession.status == status_filter.upper())
+    return query.order_by(ChargingSession.id.desc()).all()
 
 
 @router.post(
@@ -105,7 +166,20 @@ def get_session_detail(
             status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc."
         )
 
-    if current_user.role != "ADMIN" and session.user_id != current_user.id:
+    if current_user.role == "ADMIN":
+        return session
+
+    if current_user.role == "OPERATOR":
+        connector = session.connector
+        station = connector.charging_point.station if connector and connector.charging_point else None
+        if (station and station.operator_id == current_user.id) or session.user_id == current_user.id:
+            return session
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền xem thông tin phiên sạc này.",
+        )
+
+    if session.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bạn không có quyền xem thông tin phiên sạc của người khác.",

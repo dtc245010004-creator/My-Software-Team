@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Zap, Shield, User, LogOut, Radio, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { telemetryWs } from '../services/websocket';
+import { getRoleLabel } from '../config/roleConfig';
 
 export default function Header() {
-  const { user, rawUser, role, isGuest, logout, quickSwitch } = useAuth();
+  const { user, rawUser, role, isGuest, logout, quickSwitch, currentDemoKey } = useAuth();
   const [wsOnline, setWsOnline] = useState(false);
   const [switching, setSwitching] = useState(false);
 
@@ -61,8 +62,9 @@ export default function Header() {
           <button
             onClick={() => handleRoleChange('ADMIN')}
             disabled={switching}
-            className={`px-2.5 py-1 rounded transition-colors ${
-              role === 'ADMIN'
+            title="Quản trị viên toàn hệ thống"
+            className={`px-2 py-1 rounded transition-colors ${
+              currentDemoKey === 'ADMIN'
                 ? 'bg-critical-red/20 text-critical-red border border-critical-red/40 font-bold'
                 : 'text-steel-gray hover:text-tech-white'
             }`}
@@ -70,21 +72,35 @@ export default function Header() {
             Admin
           </button>
           <button
-            onClick={() => handleRoleChange('OPERATOR')}
+            onClick={() => handleRoleChange('OPERATOR_A')}
             disabled={switching}
-            className={`px-2.5 py-1 rounded transition-colors ${
-              role === 'OPERATOR'
+            title="Chủ trạm A: Sở hữu trạm ST-1, ST-2"
+            className={`px-2 py-1 rounded transition-colors ${
+              currentDemoKey === 'OPERATOR_A'
                 ? 'bg-caution-amber/20 text-caution-amber border border-caution-amber/40 font-bold'
                 : 'text-steel-gray hover:text-tech-white'
             }`}
           >
-            CPO
+            Chủ A (ST1,2)
+          </button>
+          <button
+            onClick={() => handleRoleChange('OPERATOR_B')}
+            disabled={switching}
+            title="Chủ trạm B: Sở hữu trạm ST-3"
+            className={`px-2 py-1 rounded transition-colors ${
+              currentDemoKey === 'OPERATOR_B'
+                ? 'bg-caution-amber/20 text-caution-amber border border-caution-amber/40 font-bold'
+                : 'text-steel-gray hover:text-tech-white'
+            }`}
+          >
+            Chủ B (ST3)
           </button>
           <button
             onClick={() => handleRoleChange('CUSTOMER')}
             disabled={switching}
-            className={`px-2.5 py-1 rounded transition-colors ${
-              role === 'CUSTOMER'
+            title="Tài xế khách hàng"
+            className={`px-2 py-1 rounded transition-colors ${
+              currentDemoKey === 'CUSTOMER'
                 ? 'bg-grid-green/20 text-grid-green border border-grid-green/40 font-bold'
                 : 'text-steel-gray hover:text-tech-white'
             }`}
@@ -98,7 +114,7 @@ export default function Header() {
           <div className="flex items-center space-x-3 pl-2 border-l border-hairline">
             <div className="text-right">
               <p className="text-xs font-medium text-tech-white">{rawUser.full_name || rawUser.username}</p>
-              <p className="text-[10px] text-steel-gray font-mono uppercase">{rawUser.role}</p>
+              <p className="text-[10px] text-caution-amber font-mono uppercase">{getRoleLabel(rawUser.role)}</p>
             </div>
             <button
               onClick={logout}
@@ -118,7 +134,7 @@ export default function Header() {
               href="/login"
               className="text-xs px-2.5 py-1 rounded bg-obsidian border border-hairline text-steel-gray hover:text-tech-white hover:bg-hairline font-mono transition-colors"
             >
-              Đăng nhập CPO/Admin
+              Đăng nhập Chủ trạm / Admin
             </a>
           </div>
         )}
