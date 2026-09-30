@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
@@ -38,7 +38,7 @@ function normalizeUser(user) {
 }
 
 function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString('vi-VN');
@@ -54,7 +54,6 @@ function getErrorMessage(error, fallback) {
 
 export default function AdminPanel() {
   const { role, rawUser, logout } = useAuth();
-  const navigate = useNavigate();
 
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState('');
@@ -81,17 +80,16 @@ export default function AdminPanel() {
     setError('');
     try {
       const response = await api.get('/admin/users');
-      const data = response.data;
-      const payload = Array.isArray(data)
-        ? data
-        : data.users ?? data.items ?? data.data ?? [];
+      const payload = Array.isArray(response.data)
+        ? response.data
+        : response.data.users ?? [];
       setUsers(payload.map(normalizeUser));
     } catch (err) {
       setUsers([]);
       setError(
         getErrorMessage(
           err,
-          'Không tải được danh sách tài khoản. Hãy kiểm tra API /admin/users.'
+          'KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch tÃ i khoáº£n. HÃ£y kiá»ƒm tra API /admin/users.'
         )
       );
     } finally {
@@ -144,17 +142,12 @@ export default function AdminPanel() {
     setError('');
     setMessage('');
 
-    const endpointByAction = {
-      lock: `/admin/users/${id}/lock-login`,
-      unlock: `/admin/users/${id}/unlock-login`,
-    };
-
     try {
-      await api.patch(endpointByAction[action]);
+      await api.post(`/admin/users/${id}/${action}`);
       setMessage(successText);
       await loadUsers();
     } catch (err) {
-      setError(getErrorMessage(err, `Không thể thực hiện thao tác ${action}.`));
+      setError(getErrorMessage(err, `KhÃ´ng thá»ƒ thá»±c hiá»‡n thao tÃ¡c ${action}.`));
     } finally {
       setActionId(null);
     }
@@ -167,8 +160,7 @@ export default function AdminPanel() {
     setMessage('');
 
     try {
-      const { role: _role, ...registerData } = newUser;
-      await api.post('/auth/register', registerData);
+      await api.post('/admin/users', newUser);
       setShowCreate(false);
       setNewUser({
         username: '',
@@ -177,10 +169,26 @@ export default function AdminPanel() {
         password: '',
         role: 'CUSTOMER',
       });
-      setMessage('Đã tạo tài khoản thành công.');
+      setMessage('ÄÃ£ táº¡o tÃ i khoáº£n thÃ nh cÃ´ng.');
       await loadUsers();
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tạo tài khoản.'));
+      setError(getErrorMessage(err, 'KhÃ´ng thá»ƒ táº¡o tÃ i khoáº£n.'));
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleRoleChange = async (id, nextRole) => {
+    setActionId(id);
+    setError('');
+    setMessage('');
+
+    try {
+      await api.patch(`/admin/users/${id}/role`, { role: nextRole });
+      setMessage('ÄÃ£ cáº­p nháº­t vai trÃ². Vai trÃ² má»›i Ã¡p dá»¥ng tá»« API tiáº¿p theo.');
+      await loadUsers();
+    } catch (err) {
+      setError(getErrorMessage(err, 'KhÃ´ng thá»ƒ cáº­p nháº­t vai trÃ².'));
     } finally {
       setActionId(null);
     }
@@ -211,63 +219,37 @@ export default function AdminPanel() {
         </div>
 
         <nav className="admin-nav">
-          <div className="admin-nav-label">ĐIỀU HÀNH</div>
+          <div className="admin-nav-label">ÄIá»€U HÃ€NH</div>
 
-          <button
-            type="button"
-            className="admin-nav-item"
-            onClick={() => navigate('/')}
-          >
+          <div className="admin-nav-item">
             <Activity size={18} />
-            <span>Bảng điều khiển</span>
-          </button>
+            <span>Báº£ng Ä‘iá»u khiá»ƒn</span>
+          </div>
 
-          <button
-            type="button"
-            className="admin-nav-item active"
-            onClick={() => navigate('/admin')}
-          >
+          <div className="admin-nav-item active">
             <Users size={18} />
-            <span>Quản lý tài khoản</span>
-          </button>
+            <span>Quáº£n lÃ½ tÃ i khoáº£n</span>
+          </div>
 
-          <button
-            type="button"
-            className="admin-nav-item"
-            onClick={() => navigate('/admin')}
-            title="Phân quyền người dùng sẽ được mở trong module quản trị"
-          >
+          <div className="admin-nav-item">
             <ShieldCheck size={18} />
-            <span>Phân quyền</span>
-          </button>
+            <span>PhÃ¢n quyá»n</span>
+          </div>
 
-          <button
-            type="button"
-            className="admin-nav-item"
-            onClick={() => navigate('/stations')}
-          >
+          <div className="admin-nav-item">
             <Zap size={18} />
-            <span>Trạm sạc</span>
-          </button>
+            <span>Tráº¡m sáº¡c</span>
+          </div>
 
-          <button
-            type="button"
-            className="admin-nav-item"
-            onClick={() => navigate('/sessions')}
-          >
+          <div className="admin-nav-item">
             <UserCog size={18} />
-            <span>Phiên sạc</span>
-          </button>
+            <span>PhiÃªn sáº¡c</span>
+          </div>
 
-          <button
-            type="button"
-            className="admin-nav-item"
-            onClick={() => navigate('/admin')}
-            title="Cấu hình hệ thống sẽ được mở trong module quản trị"
-          >
+          <div className="admin-nav-item">
             <Settings size={18} />
-            <span>Cấu hình hệ thống</span>
-          </button>
+            <span>Cáº¥u hÃ¬nh há»‡ thá»‘ng</span>
+          </div>
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -281,7 +263,7 @@ export default function AdminPanel() {
 
           <button className="admin-logout" onClick={logout}>
             <LogOut size={16} />
-            Đăng xuất
+            ÄÄƒng xuáº¥t
           </button>
         </div>
       </aside>
@@ -290,8 +272,8 @@ export default function AdminPanel() {
         <header className="admin-topbar">
           <div>
             <div className="admin-kicker">SYSTEM / ACCOUNTS</div>
-            <h1>QUẢN LÝ TÀI KHOẢN</h1>
-            <p>Quản lý tài khoản, trạng thái khóa và vai trò người dùng.</p>
+            <h1>QUáº¢N LÃ TÃ€I KHOáº¢N</h1>
+            <p>Quáº£n lÃ½ tÃ i khoáº£n, tráº¡ng thÃ¡i khÃ³a vÃ  vai trÃ² ngÆ°á»i dÃ¹ng.</p>
           </div>
 
           <button
@@ -301,13 +283,13 @@ export default function AdminPanel() {
             disabled={loading}
           >
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
-            Tải lại
+            Táº£i láº¡i
           </button>
         </header>
 
         <section className="admin-stat-grid">
           <div className="admin-stat-card">
-            <span>TỔNG TÀI KHOẢN</span>
+            <span>Tá»”NG TÃ€I KHOáº¢N</span>
             <strong>{users.length}</strong>
           </div>
           <div className="admin-stat-card">
@@ -329,7 +311,7 @@ export default function AdminPanel() {
                 setQuery(event.target.value);
                 setPage(1);
               }}
-              placeholder="Tìm ID, username, email, tên..."
+              placeholder="TÃ¬m ID, username, email, tÃªn..."
             />
           </div>
 
@@ -340,7 +322,7 @@ export default function AdminPanel() {
               setPage(1);
             }}
           >
-            <option value="ALL">Tất cả vai trò</option>
+            <option value="ALL">Táº¥t cáº£ vai trÃ²</option>
             {ROLE_OPTIONS.map((item) => (
               <option key={item} value={item}>
                 {item}
@@ -355,18 +337,14 @@ export default function AdminPanel() {
               setPage(1);
             }}
           >
-            <option value="ALL">Tất cả trạng thái</option>
+            <option value="ALL">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
             <option value="ACTIVE">Active</option>
             <option value="LOCKED">Locked</option>
           </select>
 
-          <button
-            className="admin-create"
-            onClick={() => setShowCreate(true)}
-            title="Tài khoản mới sẽ được tạo qua API đăng ký hiện có"
-          >
+          <button className="admin-create" onClick={() => setShowCreate(true)}>
             <Plus size={17} />
-            Tạo tài khoản
+            Táº¡o tÃ i khoáº£n
           </button>
         </section>
 
@@ -385,26 +363,26 @@ export default function AdminPanel() {
                 <tr>
                   <th>HEAD</th>
                   <th>ID</th>
-                  <th>TÀI KHOẢN</th>
-                  <th>TÊN NGƯỜI DÙNG</th>
+                  <th>TÃ€I KHOáº¢N</th>
+                  <th>TÃŠN NGÆ¯á»œI DÃ™NG</th>
                   <th>EMAIL</th>
-                  <th>VAI TRÒ</th>
-                  <th>TRẠNG THÁI</th>
-                  <th>NGÀY TẠO</th>
-                  <th>THAO TÁC</th>
+                  <th>VAI TRÃ’</th>
+                  <th>TRáº NG THÃI</th>
+                  <th>NGÃ€Y Táº O</th>
+                  <th>THAO TÃC</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
                     <td colSpan="9" className="admin-empty">
-                      Đang tải dữ liệu...
+                      Äang táº£i dá»¯ liá»‡u...
                     </td>
                   </tr>
                 ) : visibleUsers.length === 0 ? (
                   <tr>
                     <td colSpan="9" className="admin-empty">
-                      Không tìm thấy tài khoản phù hợp.
+                      KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n phÃ¹ há»£p.
                     </td>
                   </tr>
                 ) : (
@@ -421,12 +399,28 @@ export default function AdminPanel() {
                         <td>
                           <strong className="account-name">{user.username}</strong>
                         </td>
-                        <td>{user.full_name || '—'}</td>
-                        <td className="email-cell">{user.email || '—'}</td>
+                        <td>{user.full_name || 'â€”'}</td>
+                        <td className="email-cell">{user.email || 'â€”'}</td>
                         <td>
-                          <span className={`role-badge role-${String(user.role).toLowerCase()}`}>
-                            {user.role}
-                          </span>
+                          <select
+                            className="role-select"
+                            value={ROLE_OPTIONS.includes(user.role) ? user.role : 'CUSTOMER'}
+                            onChange={(event) =>
+                              handleRoleChange(user.id, event.target.value)
+                            }
+                            disabled={busy || user.username === rawUser?.username}
+                            title={
+                              user.username === rawUser?.username
+                                ? 'KhÃ´ng cho tá»± Ä‘á»•i role cá»§a tÃ i khoáº£n ADMIN hiá»‡n táº¡i'
+                                : 'Äá»•i vai trÃ²'
+                            }
+                          >
+                            {ROLE_OPTIONS.map((item) => (
+                              <option key={item} value={item}>
+                                {item}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         <td>
                           {locked ? (
@@ -434,7 +428,7 @@ export default function AdminPanel() {
                               <span className="status-dot" />
                               LOCKED
                               {user.locked_until && (
-                                <small>đến {formatDate(user.locked_until)}</small>
+                                <small>Ä‘áº¿n {formatDate(user.locked_until)}</small>
                               )}
                             </div>
                           ) : (
@@ -455,12 +449,12 @@ export default function AdminPanel() {
                                   doUserAction(
                                     user.id,
                                     'unlock',
-                                    `Đã mở khóa tài khoản ${user.username}.`
+                                    `ÄÃ£ má»Ÿ khÃ³a tÃ i khoáº£n ${user.username}.`
                                   )
                                 }
                               >
                                 <Unlock size={15} />
-                                Mở
+                                Má»Ÿ
                               </button>
                             ) : (
                               <button
@@ -470,12 +464,12 @@ export default function AdminPanel() {
                                   doUserAction(
                                     user.id,
                                     'lock',
-                                    `Đã khóa tài khoản ${user.username} và yêu cầu vô hiệu hóa session đang mở.`
+                                    `ÄÃ£ khÃ³a tÃ i khoáº£n ${user.username} vÃ  yÃªu cáº§u vÃ´ hiá»‡u hÃ³a session Ä‘ang má»Ÿ.`
                                   )
                                 }
                               >
                                 <Lock size={15} />
-                                Khóa
+                                KhÃ³a
                               </button>
                             )}
                           </div>
@@ -490,7 +484,7 @@ export default function AdminPanel() {
 
           <footer className="admin-pagination">
             <span>
-              Hiển thị {visibleUsers.length} / {filteredUsers.length} tài khoản
+              Hiá»ƒn thá»‹ {visibleUsers.length} / {filteredUsers.length} tÃ i khoáº£n
             </span>
 
             <div className="pagination-controls">
@@ -518,7 +512,8 @@ export default function AdminPanel() {
         <div className="admin-note">
           <Lock size={15} />
           <span>
-            Nút Khóa/Mở dùng endpoint lock-login/unlock-login hiện có của backend.             API đổi role quản trị chưa được expose trong backend hiện tại.
+            KhÃ³a thá»§ cÃ´ng nÃªn Ä‘á»“ng thá»i vÃ´ hiá»‡u hÃ³a session hiá»‡n táº¡i cá»§a tÃ i khoáº£n.
+            TÃ i khoáº£n bá»‹ khÃ³a sáº½ khÃ´ng Ä‘Äƒng nháº­p Ä‘Æ°á»£c cho tá»›i khi ADMIN má»Ÿ khÃ³a.
           </span>
         </div>
       </main>
@@ -533,14 +528,14 @@ export default function AdminPanel() {
             <div className="admin-modal-header">
               <div>
                 <div className="admin-kicker">ACCOUNT / NEW</div>
-                <h2>TẠO TÀI KHOẢN</h2>
+                <h2>Táº O TÃ€I KHOáº¢N</h2>
               </div>
               <button
                 type="button"
                 className="modal-close"
                 onClick={() => setShowCreate(false)}
               >
-                ×
+                Ã—
               </button>
             </div>
 
@@ -574,7 +569,7 @@ export default function AdminPanel() {
             </label>
 
             <label>
-              Họ và tên
+              Há» vÃ  tÃªn
               <input
                 required
                 value={newUser.full_name}
@@ -588,7 +583,7 @@ export default function AdminPanel() {
             </label>
 
             <label>
-              Mật khẩu
+              Máº­t kháº©u
               <input
                 type="password"
                 required
@@ -603,10 +598,24 @@ export default function AdminPanel() {
               />
             </label>
 
-            <div className="admin-form-note">
-              Tài khoản tạo từ API đăng ký hiện tại sẽ nhận vai trò mặc định của backend.
-              Endpoint quản trị đổi role chưa có trong backend hiện tại.
-            </div>
+            <label>
+              Vai trÃ²
+              <select
+                value={newUser.role}
+                onChange={(event) =>
+                  setNewUser((current) => ({
+                    ...current,
+                    role: event.target.value,
+                  }))
+                }
+              >
+                {ROLE_OPTIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             <div className="admin-modal-actions">
               <button
@@ -614,7 +623,7 @@ export default function AdminPanel() {
                 className="secondary-button"
                 onClick={() => setShowCreate(false)}
               >
-                Hủy
+                Há»§y
               </button>
               <button
                 className="admin-create"
@@ -622,7 +631,7 @@ export default function AdminPanel() {
                 disabled={actionId === 'create'}
               >
                 <Plus size={17} />
-                {actionId === 'create' ? 'Đang tạo...' : 'Tạo tài khoản'}
+                {actionId === 'create' ? 'Äang táº¡o...' : 'Táº¡o tÃ i khoáº£n'}
               </button>
             </div>
           </form>
@@ -631,3 +640,4 @@ export default function AdminPanel() {
     </div>
   );
 }
+
