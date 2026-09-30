@@ -124,10 +124,10 @@ Tài liệu này xác nhận tính toàn vẹn và mức độ tương thích gi
 
 ---
 
-## TC-FB-14: Chọn vị trí trạm sạc bằng bản đồ Leaflet CARTO Dark / Esri Vệ tinh
+## TC-FB-14: Chọn vị trí trạm sạc bằng bản đồ Leaflet OpenStreetMap Dark / Esri Vệ tinh
 * **Luồng tích hợp**: Admin/Operator bấm `+ THÊM TRẠM SẠC` hoặc icon `SỬA TRẠM` $\longrightarrow$ Giao diện bản đồ `StationLocationPicker.jsx` hiển thị.
 * **Xác thực Client**:
-  * Bước 1: Mở form thấy bản đồ CARTO Dark Matter toàn cảnh Việt Nam (zoom 5), hỗ trợ chuyển đổi lớp ảnh vệ tinh Esri World Imagery.
+  * Bước 1: Mở form thấy bản đồ OpenStreetMap Dark (áp bộ lọc CSS đảo màu nền tối, không phụ thuộc API key) toàn cảnh Việt Nam (zoom 5), hỗ trợ chuyển đổi lớp ảnh vệ tinh Esri World Imagery (không áp filter). Cấu hình tập trung tại `mapConfig.js`.
   * Bước 2: Chọn tỉnh/thành (63 tỉnh từ `provinces.json`) hoặc nhập địa chỉ $\longrightarrow$ bản đồ tự động bay tới vị trí tương ứng (flyTo) theo phân cấp zoom (9, 12, 14, 17) qua debounced geocoding (>= 500ms).
   * Bước 3: Chấm ghim hoặc kéo ghim trên bản đồ $\longrightarrow$ Ghim SVG neon-cyan cập nhật tọa độ chính xác (6 chữ số thập phân). Hỗ trợ nút định vị GPS hiện tại (`navigator.geolocation`) và reverse geocode tự động điền địa chỉ khi ô trống.
   * Bước 4: Chặn lưu nếu chưa có ghim hoặc tọa độ ngoài lãnh thổ Việt Nam (lat 8-24, lng 102-110). Khi có ghim, lưu thành công vào CSDL (HTTP 201 cho tạo mới, HTTP 200 cho cập nhật).
@@ -136,18 +136,31 @@ Tài liệu này xác nhận tính toàn vẹn và mức độ tương thích gi
 
 ---
 
+## TC-FB-15: Chế độ xem Bản đồ toàn cảnh mạng lưới trạm sạc (Stations Map View)
+* **Luồng tích hợp**: Người dùng truy cập trang "Hạ Tầng Trạm Sạc" $\longrightarrow$ bấm chuyển đổi sang chế độ `[BẢN ĐỒ]` hoặc truy cập URL có `?view=map`.
+* **Xác thực Client**:
+  * Bước 1: Bộ chuyển đổi chế độ xem `[DANH SÁCH] | [BẢN ĐỒ]` hiển thị rõ ràng ở đầu trang, ghi nhớ trạng thái phiên làm việc qua query param `?view=map`.
+  * Bước 2: Bản đồ Leaflet phủ trọn chiều ngang nội dung (cao 600px), tự động `fitBounds` bao trọn tất cả các trạm có tọa độ (maxZoom 15); nếu không có trạm nào có tọa độ thì hiển thị toàn cảnh Việt Nam (zoom 5) kèm cảnh báo.
+  * Bước 3: Marker hiển thị bằng SVG icon tùy biến phân màu sắc chuẩn xác theo trạng thái vận hành: Xanh lá (`ACTIVE`), Vàng cam (`MAINTENANCE`), Xám (`INACTIVE/OFFLINE`). Có viền vàng cảnh báo cho các trạm có tọa độ nghi ngờ ngoài lãnh thổ hoặc tọa độ mặc định cũ.
+  * Bước 4: Nhấp vào marker mở Dark Popup hiển thị tên trạm, mã `ST-x`, badge trạng thái, địa chỉ, giờ hoạt động, công suất lưới kW, GPS, số lượng trụ sạc kèm trạng thái ("x trụ / y đang rảnh"), nút "Xem chi tiết" (chuyển sang Danh sách và mở rộng trạm) và link "Chỉ đường" (mở Google Maps tab mới).
+  * Bước 5: Trong chế độ Danh sách, mỗi card trạm có nút icon Bản đồ; bấm vào sẽ chuyển sang Bản đồ, `flyTo` (zoom 16) và tự động mở popup của trạm đó.
+  * Bước 6: Thanh chú giải (Legend) ở góc dưới trái hiển thị thống kê tổng số trạm và trạng thái mà không che dòng attribution bản quyền. Hỗ trợ nút "Xem tất cả" để fitBounds lại và nút chuyển đổi giữa lớp Bản đồ tối OSM và Ảnh vệ tinh Esri.
+* **Kết quả**: **PASS** (chưa commit).
+
+---
+
 ## Current Summary
 
 ### Đánh giá mức độ tích hợp Frontend ↔ Backend
 * **Mức độ tương thích**: Hoạt động trơn tru trên môi trường tích hợp cục bộ.
-* Toàn bộ 14 ca kiểm thử tích hợp (TC-FB-01 đến TC-FB-14) đều được xác minh đồng bộ.
+* Toàn bộ 15 ca kiểm thử tích hợp (TC-FB-01 đến TC-FB-15) đều được xác minh đồng bộ.
 * Luồng dữ liệu hai chiều giữa REST API và WebSocket Telemetry được xử lý bất đồng bộ nhịp nhàng, đảm bảo trải nghiệm người dùng liền mạch.
 
 ---
 
 ## Current Defects
 
-* **0 lỗi phát hiện trong 14 luồng tích hợp cốt lõi**.
+* **0 lỗi phát hiện trong 15 luồng tích hợp cốt lõi**.
 * Các vấn đề nhỏ về giao diện (như căn chỉnh lề trên màn hình điện thoại siêu nhỏ) đã được đưa vào danh mục theo dõi của giai đoạn UI polish.
 
 ---

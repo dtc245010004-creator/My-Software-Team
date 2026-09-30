@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { MapPin, Navigation, Layers, Search, AlertCircle, CheckCircle2, Crosshair } from 'lucide-react';
 import provincesData from '../data/provinces.json';
 import { geocode, reverseGeocode } from '../services/geocoding';
+import { MAP_CONFIG } from '../config/mapConfig';
 
 // Custom SVG Pin Icon cho trạm sạc điện
 const customPinIcon = L.divIcon({
@@ -46,7 +47,7 @@ export default function StationLocationPicker({
   const [lng, setLng] = useState(initialLng != null ? parseFloat(initialLng) : null);
   const [hasPin, setHasPin] = useState(initialLat != null && initialLng != null);
 
-  // Lớp bản đồ: 'dark' (CARTO Dark Matter) | 'satellite' (Esri World Imagery)
+  // Lớp bản đồ: 'dark' (OpenStreetMap tối) | 'satellite' (Esri World Imagery)
   const [layerMode, setLayerMode] = useState('dark');
 
   // Các trường địa chỉ phân cấp
@@ -79,8 +80,8 @@ export default function StationLocationPicker({
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
-      const defaultCenter = (lat != null && lng != null) ? [lat, lng] : [16.0, 106.0];
-      const defaultZoom = (lat != null && lng != null) ? 16 : 5;
+      const defaultCenter = (lat != null && lng != null) ? [lat, lng] : MAP_CONFIG.defaultCenter;
+      const defaultZoom = (lat != null && lng != null) ? 16 : MAP_CONFIG.defaultZoom;
 
       const map = L.map(mapContainerRef.current, {
         center: defaultCenter,
@@ -90,21 +91,22 @@ export default function StationLocationPicker({
         touchZoom: true,
       });
 
-      // CARTO Dark Matter (Mặc định)
-      const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>, &copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19,
+      // Lớp bản đồ tối: OpenStreetMap kết hợp CSS filter .map-tiles-dark
+      const darkLayer = L.tileLayer(MAP_CONFIG.dark.url, {
+        attribution: MAP_CONFIG.dark.attribution,
+        maxZoom: MAP_CONFIG.dark.maxZoom,
+        className: MAP_CONFIG.dark.className,
       });
 
-      // Esri World Imagery (Ảnh vệ tinh)
-      const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-        maxZoom: 19,
+      // Lớp ảnh vệ tinh: Esri World Imagery (không filter tối)
+      const esriSatellite = L.tileLayer(MAP_CONFIG.satellite.url, {
+        attribution: MAP_CONFIG.satellite.attribution,
+        maxZoom: MAP_CONFIG.satellite.maxZoom,
+        className: MAP_CONFIG.satellite.className,
       });
 
-      cartoDark.addTo(map);
-      baseLayersRef.current = { dark: cartoDark, satellite: esriSatellite };
+      darkLayer.addTo(map);
+      baseLayersRef.current = { dark: darkLayer, satellite: esriSatellite };
       mapInstanceRef.current = map;
 
       // Nếu đã có tọa độ ban đầu -> cắm ghim ngay

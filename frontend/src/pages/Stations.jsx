@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Zap, Cpu, MapPin, ChevronRight, ChevronDown, CheckCircle, AlertCircle, X, Edit2 } from 'lucide-react';
+import { Plus, Zap, Cpu, MapPin, ChevronRight, ChevronDown, CheckCircle, AlertCircle, X, Edit2, Map as MapIcon, List as ListIcon } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import StationLocationPicker from '../components/StationLocationPicker';
+import StationsMapView from '../components/StationsMapView';
 
 export default function Stations() {
   const { role } = useAuth();
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedStationId, setExpandedStationId] = useState(null);
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('view') === 'map' ? 'map' : 'list';
+    } catch (e) {
+      return 'list';
+    }
+  });
+  const [focusStationId, setFocusStationId] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingStation, setEditingStation] = useState(null);
@@ -164,6 +174,33 @@ export default function Stations() {
     }
   };
 
+  const handleToggleViewMode = (mode) => {
+    setViewMode(mode);
+    setFocusStationId(null);
+    try {
+      const url = new URL(window.location);
+      if (mode === 'map') {
+        url.searchParams.set('view', 'map');
+      } else {
+        url.searchParams.delete('view');
+      }
+      window.history.replaceState({}, '', url);
+    } catch (e) {
+      console.warn('Không thể cập nhật URL:', e);
+    }
+  };
+
+  const handleViewStationOnMap = (st) => {
+    setFocusStationId(st.id);
+    if (viewMode === 'map') return;
+    setTimeout(() => {
+      const el = document.getElementById('stations-overview-map');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+  };
+
   const handleOpenAddCharger = (station) => {
     setSelectedStationForCharger(station);
     setChargerError(null);
@@ -224,32 +261,82 @@ export default function Stations() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-tech-white">Hạ Tầng Trạm Sạc & Điểm Cấp Nguồn</h1>
           <p className="text-xs text-steel-gray mt-0.5 font-mono">
             QUẢN LÝ MÁY BIẾN ÁP, CÔNG SUẤT ĐỊNH MỨC & CÁC CỔNG SẠC VẬT LÝ
           </p>
         </div>
-        {(role === 'ADMIN' || role === 'OPERATOR') && (
-          <button
-            onClick={handleOpenAddStation}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white text-xs font-semibold transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>THÊM TRẠM SẠC</span>
-          </button>
-        )}
+        <div className="flex items-center space-x-2">
+          {/* Bộ chuyển đổi chế độ xem: DANH SÁCH | BẢN ĐỒ */}
+          <div className="flex items-center bg-obsidian border border-hairline rounded p-0.5 text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => handleToggleViewMode('list')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-panel text-tech-white font-bold shadow-sm'
+                  : 'text-steel-gray hover:text-tech-white'
+              }`}
+            >
+              <ListIcon className="w-3.5 h-3.5" />
+              <span>DANH SÁCH</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleViewMode('map')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors ${
+                viewMode === 'map'
+                  ? 'bg-panel text-electric-cyan font-bold shadow-sm'
+                  : 'text-steel-gray hover:text-tech-white'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>BẢN ĐỒ</span>
+            </button>
+          </div>
+
+          {(role === 'ADMIN' || role === 'OPERATOR') && (
+            <button
+              onClick={handleOpenAddStation}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white text-xs font-semibold transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>THÊM TRẠM SẠC</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Station List */}
-      <div className="space-y-4">
+      {/* Station List or Map View */}
+      {viewMode === 'map' ? (
+        <StationsMapView
+          stations={stations}
+          focusStationId={focusStationId}
+          onSelectStationDetail={(st) => {
+            setExpandedStationId(st.id);
+            handleToggleViewMode('list');
+            setTimeout(() => {
+              const el = document.getElementById(`station-card-${st.id}`);
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }}
+          onEditStation={handleOpenEditStation}
+        />
+      ) : (
+        <div className="space-y-6">
+          <div className="space-y-4">
         {stations.map((st) => {
           const isExpanded = expandedStationId === st.id;
           const chargers = st.charging_points || [];
 
           return (
-            <div key={st.id} className="bg-panel border border-hairline rounded-sm overflow-hidden">
+            <div
+              key={st.id}
+              id={`station-card-${st.id}`}
+              className="bg-panel border border-hairline rounded-sm overflow-hidden scroll-mt-24"
+            >
               {/* Station Header Bar */}
               <div
                 onClick={() => setExpandedStationId(isExpanded ? null : st.id)}
@@ -295,6 +382,25 @@ export default function Stations() {
                       {st.total_grid_capacity_kw} kW
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    title={st.latitude != null && st.longitude != null ? "Xem vị trí trạm trên bản đồ" : "Trạm chưa có tọa độ, bấm để định vị"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (st.latitude != null && st.longitude != null) {
+                        handleViewStationOnMap(st);
+                      } else {
+                        handleOpenEditStation(st);
+                      }
+                    }}
+                    className={`p-1.5 rounded border border-hairline transition-colors ${
+                      st.latitude != null && st.longitude != null
+                        ? 'hover:bg-obsidian text-steel-gray hover:text-electric-cyan'
+                        : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                    }`}
+                  >
+                    <MapIcon className="w-4 h-4" />
+                  </button>
                   {(role === 'ADMIN' || role === 'OPERATOR') && (
                     <button
                       type="button"
@@ -396,7 +502,37 @@ export default function Stations() {
             </div>
           );
         })}
-      </div>
+          </div>
+
+          {/* Bản đồ tổng quát mạng lưới trạm sạc */}
+          <div id="stations-overview-map" className="pt-6 border-t border-hairline space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-tech-white uppercase font-mono flex items-center space-x-2">
+                  <MapIcon className="w-4 h-4 text-electric-cyan" />
+                  <span>BẢN ĐỒ TỔNG QUÁT MẠNG LƯỚI TRẠM SẠC</span>
+                </h2>
+                <p className="text-xs text-steel-gray font-mono mt-0.5">
+                  VỊ TRÍ GPS VÀ TRẠNG THÁI HOẠT ĐỘNG THỜI GIAN THỰC CỦA TOÀN BỘ {stations.length} TRẠM SẠC
+                </p>
+              </div>
+            </div>
+
+            <StationsMapView
+              stations={stations}
+              focusStationId={focusStationId}
+              onSelectStationDetail={(st) => {
+                setExpandedStationId(st.id);
+                setTimeout(() => {
+                  const el = document.getElementById(`station-card-${st.id}`);
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 50);
+              }}
+              onEditStation={handleOpenEditStation}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Modal Add Station */}
       {showAddModal && (

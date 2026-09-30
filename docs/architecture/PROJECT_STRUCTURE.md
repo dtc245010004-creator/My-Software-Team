@@ -121,8 +121,9 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │       ├── K-01-ocpp-simulator.md
 │       └── S-05-AC3-ghi-nhan-cho-PO.md
 ├── frontend/                          # Phân hệ Giao diện Người dùng (React Vite)
-│   ├── src/                           # Mã nguồn client SPA (pages, components, context, data, services)
-│   │   ├── components/                # Thành phần UI (StationLocationPicker, MetricBox...)
+│   ├── src/                           # Mã nguồn client SPA (pages, components, config, context, data, services)
+│   │   ├── components/                # Thành phần UI (StationsMapView, StationLocationPicker, MetricBox...)
+│   │   ├── config/                    # Cấu hình bản đồ tập trung (mapConfig.js: OSM Dark & Esri)
 │   │   ├── data/                      # Dữ liệu tĩnh (provinces.json 63 tỉnh thành)
 │   │   ├── services/                  # Dịch vụ API & Geocoding OpenStreetMap
 │   │   └── pages/                     # Màn hình giao diện SPA (Stations, Dashboard...)

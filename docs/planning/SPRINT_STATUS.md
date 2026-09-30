@@ -61,9 +61,10 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
   * *Bảo vệ đăng nhập chống vét cạn*: Thêm 2 cột `failed_login_attempts` và `locked_until` vào bảng `users` qua migration Alembic `149038e71dc9`, cập nhật endpoint `POST /api/v1/auth/login` đếm số lần sai và khóa tạm 15 phút khi sai liên tiếp 5 lần cho Story S-02.
   * *Giao diện Thêm trụ sạc & Bản đồ Leaflet cho trạm sạc*:
     - Bổ sung nút `+ GẮN TRỤ SẠC` và Modal Form cấu hình trụ sạc mới trực tiếp trên `Stations.jsx`.
-    - Tích hợp component bản đồ `StationLocationPicker.jsx` sử dụng Leaflet (CARTO Dark Matter & Esri World Imagery vệ tinh), ghim SVG draggable, tra cứu Nominatim debounced (>= 500ms) kèm fallback, nút vị trí hiện tại GPS, reverse geocoding tự động điền địa chỉ khi trống, kiểm tra ranh giới Việt Nam (lat 8-24, lng 102-110).
+    - Tích hợp component bản đồ `StationLocationPicker.jsx` sử dụng Leaflet (OpenStreetMap Dark qua CSS Invert Filter & Esri World Imagery vệ tinh, cấu hình tập trung tại `mapConfig.js`), ghim SVG draggable, tra cứu Nominatim debounced (>= 500ms) kèm fallback, nút vị trí hiện tại GPS, reverse geocoding tự động điền địa chỉ khi trống, kiểm tra ranh giới Việt Nam (lat 8-24, lng 102-110).
     - Hỗ trợ nút `SỬA TRẠM` và modal cập nhật trạm sạc kèm tọa độ bản đồ.
     - CSDL: Tạo migration Alembic `d3a5e8b1c4f2_make_station_coordinates_nullable.py` chuyển `latitude` và `longitude` thành nullable=True để tương thích dữ liệu trạm cũ.
+    - Chế độ xem Bản đồ toàn cảnh mạng lưới trạm sạc: Bổ sung component `StationsMapView.jsx` với bộ chuyển đổi `[DANH SÁCH] | [BẢN ĐỒ]` trên trang `Stations.jsx`, tự động fitBounds ôm trọn các trạm có tọa độ (maxZoom 15), marker SVG đổi màu theo trạng thái (Xanh lá `ACTIVE`, Vàng `MAINTENANCE`, Xám `INACTIVE`), viền vàng cảnh báo tọa độ nghi ngờ (`10.7769, 106.7009` từ form cũ hoặc ngoài VN), Dark Popup chi tiết (thông tin trạm, số trụ/trụ rảnh, nút xem chi tiết và Google Maps chỉ đường), nút ghim bản đồ trên từng card trạm trong danh sách, thanh Legend và chuyển đổi lớp OSM Dark / Esri Vệ tinh.
   * *Số lượng test case*: Tăng từ **84 lên 90 tests** (thêm 5 tests khóa tạm đăng nhập và 1 test kiểm thử tọa độ trạm sạc `test_station_coordinates_nullable_and_crud` trong `backend/tests/test_stations.py`, tất cả 90 tests đều passed).
 * **Thời điểm thực hiện trước đó**: Ngày **29/09/2026** (theo Git log commit `cb9a5c8: tái tạo` lúc 12:48:02 +0700):
   * *Hạn mức CSDL*: Thay đổi từ `balance >= -1000000` $\longrightarrow$ `balance >= -500000`.
@@ -135,8 +136,8 @@ Căn cứ theo [nguồn tạm: nentangtramsac_bandaydu.md: Sheet Rủi ro dòng 
 
 Căn cứ theo [nguồn tạm: nentangtramsac_bandaydu.md: Sheet DoD-DoR dòng 424-433]:
 - [x] Code review được duyệt bởi ít nhất 1 thành viên khác (quy ước tại `CONTRIBUTING.md`).
-- [x] Unit test cho nhánh logic mới; độ phủ không giảm (84 test cases).
-- [x] CI xanh: build frontend thành công, test backend 84/84 passed.
+- [x] Unit test cho nhánh logic mới; độ phủ không giảm (90 test cases).
+- [x] CI xanh: build frontend thành công, test backend 90/90 passed.
 - [x] Không lưu secret/mật khẩu trong mã nguồn; mật khẩu băm bằng bcrypt.
 - [ ] AC pass trên staging với trụ ảo chạy thật (Đang tạm hoãn do vận hành trên local dev).
 - [x] Không log thông tin nhạy cảm, mã thẻ hoặc mật khẩu vào console stdout.

@@ -150,7 +150,7 @@ Kết quả đo kiểm thực tế:
 *(Nguồn: `frontend/src/pages/`)*
 - `Login.jsx`: Đăng nhập, phân quyền RBAC và chuyển hướng Workspace.
 - `Dashboard.jsx`: Bảng điều hành tổng quan cho Quản trị viên và CPO.
-- `Stations.jsx`: Quản lý danh mục trạm, trụ và cổng sạc.
+- `Stations.jsx`: Quản lý danh mục trạm, gắn trụ sạc, cổng sạc và chế độ xem bản đồ mạng lưới (Leaflet OSM/Esri).
 - `Sessions.jsx`: Theo dõi nhật ký phiên sạc và chi tiết hóa đơn TOU.
 - `Wallet.jsx`: Tra cứu số dư ví, nạp tiền và lịch sử giao dịch ACID.
 - `Simulator.jsx`: Bảng điều khiển giả lập trạm sạc vật lý thời gian thực.
