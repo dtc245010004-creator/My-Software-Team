@@ -41,6 +41,12 @@
 * **Biện pháp xử lý**: Đã kiểm tra chặn IDOR ở các endpoint nhạy cảm (CPO A không thể sửa trạm của CPO B); tiếp tục theo dõi và siết chặt ở Giai đoạn 2.
 * **Trạng thái**: **MONITORING / MITIGATED VIA RBAC TESTS**.
 
+### BUG-06: Nút Admin Demo 1-Click dùng mật khẩu không khớp dữ liệu seed
+* **Mức độ nghiêm trọng**: Severity 3 (Moderate).
+* **Mô tả**: `AuthContext.quickSwitch()` gửi mật khẩu `AdminPass123`, trong khi tài khoản `admin` trong cấu hình seed đang dùng `12345678a`, khiến nút Admin báo tài khoản demo chưa khởi tạo.
+* **Biện pháp xử lý**: Đồng bộ `DEMO_USERS.ADMIN.password` với mật khẩu seed và để `quickSwitch()` đọc username/mật khẩu từ cấu hình này. Sau 5 lần thử sai, tài khoản demo bị khóa tạm; đã xóa bộ đếm và thời điểm khóa cho tài khoản `admin`. Thông báo frontend nay hiển thị chi tiết lỗi API.
+* **Trạng thái**: **FIXED IN SOURCE / FRONTEND DOCKER REBUILT / LOGIN API VERIFIED (200, ADMIN)**.
+
 ---
 
 ## 2. Rào cản kỹ thuật & môi trường (Environment Blockers)

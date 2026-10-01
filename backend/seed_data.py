@@ -47,7 +47,7 @@ def seed_database():
                 username="admin",
                 email="admin@evcsms.vn",
                 full_name="Quản Trị Viên Hệ Thống",
-                password_hash=get_password_hash("AdminPass123"),
+                password_hash=get_password_hash("12345678a"),
                 role="ADMIN",
                 is_active=True,
             ),
@@ -395,7 +395,7 @@ def seed_database():
         )
         print("------------------------------------------------------------------")
         print("THÔNG TIN TÀI KHOẢN ĐĂNG NHẬP NHANH:")
-        print("1. Quản trị viên:    admin / AdminPass123")
+        print("1. Quản trị viên:    admin / 12345678a")
         print("2. Đơn vị CPO:       operator_a / OpPass123 (hoặc operator / OpPass123)")
         print("3. Khách hàng lái xe: customer_user / CusPass123 (Ví có sẵn 250,000 đ)")
         print("4. Khách hàng VIP:   driver_vip / DriverPass123 (Ví có sẵn 1,500,000 đ)")

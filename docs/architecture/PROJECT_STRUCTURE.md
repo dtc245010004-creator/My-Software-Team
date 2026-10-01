@@ -14,6 +14,7 @@
   * Tầng ứng dụng: `backend/app/core/config.py` quy định `NEGATIVE_BALANCE_LIMIT = -300000` (ngưỡng khóa nợ), `MAX_SAFE_DEBT_LIMIT = -500000` (chặn thấu chi tối đa), `MAX_FAILED_LOGIN_ATTEMPTS = 5` và `LOCKOUT_DURATION_MINUTES = 15` (khóa tạm 15 phút khi sai mật khẩu 5 lần).
 * **Cấu hình migration duy nhất**: `backend/alembic.ini` trỏ tới `backend/alembic/`; revision nền `a1b2c3d4e5f6` tạo các bảng lõi trước `03906fa596ea`, revision mới nhất trong cây là `45ab6640633a`. Migration mới được kiểm chứng trên CSDL tạm, chưa áp dụng lên CSDL dự án.
 * **Giao thức OCPP 1.6J**: `backend/app/ocpp/frames.py` là bộ đọc/ghi thuần; gateway `/ocpp/{charge_point_code}` xử lý BootNotification, Authorize, CALLRESULT/CALLERROR chờ lệnh và idempotency CSDL. `dispatcher.py` ghép phản hồi theo message ID bằng `asyncio.Future`; API Reset gọi lại dispatcher dùng chung.
+* **Đăng nhập demo Admin**: `frontend/src/config/roleConfig.js` khai báo `admin / 12345678a`; `frontend/src/context/AuthContext.jsx` dùng lại cấu hình này cho nút 1-Click. Frontend Docker đã được build lại; login API trả HTTP 200 cho `admin`/`ADMIN` sau khi gỡ khóa tạm do 5 lần thử sai.
 * **Số lượng kiểm thử tự động**: Full suite hiện tại có 163 ca passed và 1 warning; năm suite OCPP có tổng 43 ca (01/10/2026). Các tổng lịch sử 84, 89 và 90 ca mâu thuẫn `[CẦN XÁC NHẬN]`.
 * **Khung triển khai Staging & CI/CD**: Đóng gói container hóa qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và quy trình kiểm thử tự động `.github/workflows/ci-staging.yml`.
 * **Bộ chạy Local Dev**: `run.py` khởi chạy Backend FastAPI và Frontend Vite đồng thời trong một terminal; `Ctrl+C` dừng cả hai.
@@ -27,6 +28,7 @@
 * **Hồi quy sau S-15 (01/10/2026 - chưa commit)**: Full backend suite đạt 158 passed, 1 warning trong 117.08 giây; tổng 38 ca OCPP.
 * **Lệnh Reset OCPP từ máy chủ — T-34/T-35 thuộc S-16 (01/10/2026 - chưa commit)**: Thêm dispatcher có timeout cấu hình, ghép phản hồi CALLRESULT/CALLERROR theo message ID và API `POST /api/v1/chargers/{code}/reset` giới hạn Admin/Operator; test bao phủ lệnh online, offline, timeout, CALLERROR và role tài xế.
 * **Hồi quy sau S-16 (01/10/2026 - chưa commit)**: Full backend suite đạt 163 passed, 1 warning trong 122.08 giây; năm suite OCPP có tổng 43 ca.
+* **Admin Demo 1-Click (01/10/2026 - chưa commit)**: Credential trong `DEMO_USERS.ADMIN` được đổi từ `admin / AdminPass123` sang `admin / 12345678a`; `AuthContext.quickSwitch()` dùng cấu hình tập trung và `Login.jsx` hiển thị detail 403 từ API. Build trực tiếp trên host bị chặn do thiếu `vite`, nhưng Docker build và cập nhật container frontend thành công. Tài khoản đã được gỡ khóa tạm; login API trả HTTP 200 với role `ADMIN`.
 * **Chuẩn hóa thư mục migration (01/10/2026 - chưa commit)**: Xóa cây revision cũ `backend/migrations/`; giữ `backend/alembic/` làm nguồn migration duy nhất theo cấu hình `backend/alembic.ini`.
 * **Bộ chạy Local Dev ở thư mục gốc (30/09/2026 - chưa commit)**:
   * Thêm `run.py` để mở Uvicorn và Vite cùng lúc, kiểm tra dependencies cần thiết, và dừng cả hai tiến trình khi nhấn `Ctrl+C`.
