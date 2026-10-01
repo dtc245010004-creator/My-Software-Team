@@ -626,6 +626,25 @@ def create_station(
         station_in.operator_id if current_user.role == "ADMIN" else current_user.id
     )
 
+    # Chống duplicate: Chỉ kiểm tra trùng tên trạm nếu tên không rỗng
+    if station_in.name:
+        dup_station = db.query(Station).filter(Station.name == station_in.name).first()
+        if dup_station:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Trạm sạc với tên này đã tồn tại trong hệ thống."
+            )
+
+    # Mặc định trạm mới tạo qua endpoint này là is_active=False (chờ duyệt), trừ khi schema có truyền rõ
+        # Xac dinh is_active: chi bat True neu client chu dong truyen status='ACTIVE' hoac is_active=True
+    sent_fields = getattr(station_in, "model_fields_set", set())
+    if "is_active" in sent_fields and station_in.is_active is not None:
+        station_is_active = station_in.is_active
+    elif "status" in sent_fields and str(station_in.status).upper() in ("ACTIVE", "STATIONSTATUS.ACTIVE"):
+        station_is_active = True
+    else:
+        station_is_active = False
+
     new_station = Station(
         operator_id=assigned_operator_id,
         name=station_in.name,
@@ -635,7 +654,7 @@ def create_station(
         total_grid_capacity_kw=station_in.total_grid_capacity_kw,
         operating_hours=station_in.operating_hours,
         status=station_in.status,
-        is_active=True,
+        is_active=station_is_active,
     )
     db.add(new_station)
     db.commit()

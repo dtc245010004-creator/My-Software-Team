@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -13,12 +13,22 @@ from app.models.user import User
 
 
 class FakeUser:
-    def __init__(self, id, email, full_name, is_active, role_name):
+    def __init__(self, id, email, full_name, is_active, role_name='OPERATOR', username=None, **kwargs):
         self.id = id
+        self.username = username or 'clean_station_owner'
         self.email = email
         self.full_name = full_name
         self.is_active = is_active
-        self.roles = [SimpleNamespace(name=role_name)]
+        # Chuẩn hóa role in hoa cho deps.py
+        role_val = (kwargs.get('role') or role_name or 'OPERATOR').upper()
+        if role_val == 'STATION_OWNER':
+            role_val = 'OPERATOR'
+        self.role = role_val
+        self.roles = [SimpleNamespace(name=self.role)]
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
 
 def fake_get_db(user_obj):
@@ -57,6 +67,7 @@ def setup_test_db():
         if not owner:
             owner = User(
                 id=999,
+                username="clean_station_owner",
                 email="owner_s04_clean@evcharging.vn",
                 password_hash="fakehash123",
                 full_name="Clean Station Owner",
@@ -72,14 +83,15 @@ def setup_test_db():
 def client(monkeypatch):
     test_owner = FakeUser(
         id=999,
+        username="clean_station_owner",
         email="owner_s04_clean@evcharging.vn",
         full_name="Clean Station Owner",
         is_active=True,
         role_name="station_owner",
     )
 
-    monkeypatch.setattr(rbac, "get_db", lambda: fake_get_db(test_owner))
-    monkeypatch.setattr(rbac, "decode_access_token", lambda token: {"sub": "999"})
+    monkeypatch.setattr(rbac, "get_db", lambda: fake_get_db(test_owner, raising=False), raising=False)
+    monkeypatch.setattr(rbac, "decode_access_token", lambda token: {"sub": "999"}, raising=False)
 
     app.dependency_overrides[get_current_user] = lambda: test_owner
     app.dependency_overrides[get_current_active_user] = lambda: test_owner
@@ -102,7 +114,7 @@ def test_ac1_create_station_valid(client, auth_headers):
         "latitude": 10.8505,
         "longitude": 106.7719,
     }
-    res = client.post("/api/v1/stations/", json=payload, headers=auth_headers)
+    res = client.post("/api/v1/stations", json=payload, headers=auth_headers)
     assert res.status_code == 201
     data = res.json()
     assert data["name"] == payload["name"]
@@ -120,7 +132,7 @@ def test_ac2_create_station_invalid_coordinates(client, auth_headers):
         "latitude": 95.0,
         "longitude": 106.77,
     }
-    res_lat = client.post("/api/v1/stations/", json=payload_lat, headers=auth_headers)
+    res_lat = client.post("/api/v1/stations", json=payload_lat, headers=auth_headers)
     assert res_lat.status_code == 422
 
     payload_lng = {
@@ -129,7 +141,7 @@ def test_ac2_create_station_invalid_coordinates(client, auth_headers):
         "latitude": 10.85,
         "longitude": 190.0,
     }
-    res_lng = client.post("/api/v1/stations/", json=payload_lng, headers=auth_headers)
+    res_lng = client.post("/api/v1/stations", json=payload_lng, headers=auth_headers)
     assert res_lng.status_code == 422
 
 
@@ -141,7 +153,7 @@ def test_ac3_update_station_info(client, auth_headers):
         "longitude": 106.0,
     }
     create_res = client.post(
-        "/api/v1/stations/", json=create_payload, headers=auth_headers
+        "/api/v1/stations", json=create_payload, headers=auth_headers
     )
     assert create_res.status_code == 201
     station_id = create_res.json()["id"]
@@ -166,8 +178,10 @@ def test_ac4_idempotency_duplicate_click(client, auth_headers):
         "latitude": 10.123,
         "longitude": 106.456,
     }
-    res1 = client.post("/api/v1/stations/", json=payload, headers=auth_headers)
+    res1 = client.post("/api/v1/stations", json=payload, headers=auth_headers)
     assert res1.status_code == 201
 
-    res2 = client.post("/api/v1/stations/", json=payload, headers=auth_headers)
+    res2 = client.post("/api/v1/stations", json=payload, headers=auth_headers)
     assert res2.status_code in [400, 409]
+
+

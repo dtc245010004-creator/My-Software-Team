@@ -1,196 +1,46 @@
-﻿from sqlalchemy import (
-    Boolean,
-    CheckConstraint,
-    Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    UniqueConstraint,
-    func,
-)
+﻿from datetime import datetime, timezone
+from app.core.database import Base
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
-
-
 class Station(Base):
-    """MÃ´ hÃ¬nh Tráº¡m sáº¡c xe Ä‘iá»‡n (Quáº£n lÃ½ nguá»“n Ä‘iá»‡n lÆ°á»›i vÃ  táº­p há»£p cÃ¡c trá»¥ sáº¡c)."""
-
     __tablename__ = "stations"
-    __table_args__ = (
-        CheckConstraint(
-            "total_grid_capacity_kw > 0", name="ck_station_grid_capacity_positive"
-        ),
-        CheckConstraint(
-            "status IN ('ACTIVE', 'MAINTENANCE')", name="ck_station_status_valid"
-        ),
-    )
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    operator_id = Column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    name = Column(String(150), nullable=False)
-    address = Column(String(255), nullable=False)
+    __table_args__ = {"extend_existing": True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True, nullable=True)
+    name = Column(String, nullable=True)
+    status = Column(String, default="ACTIVE")
+    operator_id = Column(Integer, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    total_grid_capacity_kw = Column(Float, nullable=False)
-    operating_hours = Column(String(50), default="24/7", nullable=False)
-    status = Column(String(20), default="ACTIVE", nullable=False)  # ACTIVE, MAINTENANCE
-    is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    address = Column(String, nullable=True)
+    operating_hours = Column(String, nullable=True, default="24/7")
+    total_grid_capacity_kw = Column(Float, nullable=True, default=100.0)
+    is_active = Column(Boolean, default=True)
+    last_seen_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
-    # Quan há»‡
-    operator = relationship("User", foreign_keys=[operator_id])
-    charging_points = relationship(
-        "ChargingPoint",
-        back_populates="station",
-        cascade="all, delete-orphan",
-        order_by="ChargingPoint.id",
-    )
+    charging_points = relationship("ChargePoint", back_populates="station", foreign_keys="ChargePoint.station_id", lazy="joined")
 
-    def __repr__(self) -> str:
-        return f"<Station(id={self.id}, name='{self.name}', status='{self.status}', is_active={self.is_active})>"
+    def __init__(self, **kwargs):
+        # Tự động chuẩn hóa trạng thái hợp lệ cho Pydantic validator
+        if "status" in kwargs and kwargs["status"]:
+            st_val = str(kwargs["status"]).upper()
+            if st_val in ("AVAILABLE", "ACTIVE"):
+                kwargs["status"] = "ACTIVE"
+            elif st_val in ("MAINTENANCE", "FAULTED", "UNAVAILABLE"):
+                kwargs["status"] = "MAINTENANCE"
+        else:
+            kwargs["status"] = "ACTIVE"
+        super().__init__(**kwargs)
 
+from app.models.connector import Connector
+from app.models.charge_point import ChargePoint
 
-class ChargingPoint(Base):
-    """MÃ´ hÃ¬nh Trá»¥ sáº¡c (EVSE - Electric Vehicle Supply Equipment)."""
-
-    __tablename__ = "charging_points"
-    __table_args__ = (
-        CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
-        CheckConstraint(
-            "status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
-            name="ck_charger_status_valid",
-        ),
-    )
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    station_id = Column(
-        Integer,
-        ForeignKey("stations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    code = Column(
-        String(50), unique=True, index=True, nullable=False
-    )  # EVSE ID toÃ n há»‡ thá»‘ng
-    vendor = Column(String(100), nullable=False, default="VinFast/ABB")
-    model = Column(String(100), nullable=True)
-    max_power_kw = Column(Float, nullable=False)
-    firmware_version = Column(String(50), default="1.0.0", nullable=True)
-    status = Column(String(20), default="AVAILABLE", nullable=False)
-    power_sharing_enabled = Column(Boolean, default=True, nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    # Quan há»‡
-    station = relationship("Station", back_populates="charging_points")
-    connectors = relationship(
-        "Connector",
-        back_populates="charging_point",
-        cascade="all, delete-orphan",
-        order_by="Connector.connector_number",
-    )
-
-    def __repr__(self) -> str:
-        return (
-            f"<ChargingPoint(id={self.id}, code='{self.code}', status='{self.status}')>"
-        )
-
-
-class Connector(Base):
-    """MÃ´ hÃ¬nh Cá»•ng / SÃºng sáº¡c váº­t lÃ½ (CCS2, Type 2, CHAdeMO)."""
-
-    __tablename__ = "connectors"
-    __table_args__ = (
-        CheckConstraint("connector_number >= 1", name="ck_connector_number_positive"),
-        CheckConstraint("max_power_kw > 0", name="ck_connector_max_power_positive"),
-        CheckConstraint(
-            "connector_type IN ('CCS2', 'TYPE_2', 'CHADEMO')",
-            name="ck_connector_type_valid",
-        ),
-        CheckConstraint(
-            "status IN ('AVAILABLE', 'OCCUPIED', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
-            name="ck_connector_status_valid",
-        ),
-        UniqueConstraint(
-            "charging_point_id", "connector_number", name="uq_charger_connector_number"
-        ),
-    )
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    charging_point_id = Column(
-        Integer,
-        ForeignKey("charging_points.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    connector_number = Column(Integer, nullable=False)  # SÃºng sá»‘ 1, sá»‘ 2...
-    connector_type = Column(String(20), nullable=False)  # CCS2, TYPE_2, CHADEMO
-    max_power_kw = Column(Float, nullable=False)
-    status = Column(String(20), default="AVAILABLE", nullable=False)
-    ocpp_status = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)  # Soft Delete flag
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    # Quan há»‡
-    charging_point = relationship("ChargingPoint", back_populates="connectors")
-
-    def __repr__(self) -> str:
-        return f"<Connector(id={self.id}, charger_id={self.charging_point_id}, #{self.connector_number}, type='{self.connector_type}')>"
-
-
-class StationPowerMetric(Base):
-    """Báº£ng lÆ°u trá»¯ lá»‹ch sá»­ Ä‘o Ä‘áº¿m cÃ´ng suáº¥t phá»¥ táº£i tráº¡m sáº¡c theo tá»«ng phÃºt (Equalizer 24h)."""
-
-    __tablename__ = "station_power_metrics"
-    __table_args__ = (
-        UniqueConstraint("station_id", "timestamp", name="uq_station_minute_snapshot"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    station_id = Column(
-        Integer,
-        ForeignKey("stations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    timestamp = Column(DateTime, nullable=False, index=True)
-    power_kw = Column(Float, nullable=False, default=0.0)
-    active_chargers_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    station = relationship("Station", backref="power_metrics")
-
-    def __repr__(self) -> str:
-        return f"<StationPowerMetric(station_id={self.station_id}, time={self.timestamp}, kw={self.power_kw})>"
-
-
-
-
-
-
-
+ChargingPoint = ChargePoint
+ChargingPointModel = ChargePoint
 
 class ConnectorError(Base):
     __tablename__ = "connector_errors"
@@ -200,3 +50,13 @@ class ConnectorError(Base):
     connector_id = Column(Integer, nullable=False)
     error_code = Column(String, nullable=False)
     vendor_error_code = Column(String, nullable=True)
+
+class StationPowerMetric(Base):
+    __tablename__ = "station_power_metrics"
+    __table_args__ = {"extend_existing": True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    station_id = Column(Integer, nullable=False)
+    power_kw = Column(Float, nullable=True)
+    active_chargers_count = Column(Integer, nullable=True, default=0)
+    timestamp = Column(DateTime, nullable=True)
