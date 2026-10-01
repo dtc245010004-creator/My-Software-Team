@@ -140,6 +140,7 @@ def enrich_station_response(station: Station) -> StationResponse:
     is_oversubscribed = total_installed_power > station.total_grid_capacity_kw
 
     resp = StationResponse.model_validate(station)
+    resp.owner_id = resp.operator_id
     resp.charging_points = chargers_resp
     resp.total_installed_power_kw = total_installed_power
     resp.oversubscription_ratio = oversubscription_ratio
