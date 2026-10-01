@@ -81,6 +81,8 @@ class ChargingPointUpdate(BaseModel):
     def validate_charger_status(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             v_upper = v.upper()
+            if v_upper == "MAINTENANCE":
+                v_upper = "UNAVAILABLE"
             if v_upper not in [
                 "AVAILABLE",
                 "PREPARING",
@@ -100,6 +102,8 @@ class ChargingPointStatusUpdate(BaseModel):
     @classmethod
     def validate_status(cls, v: str) -> str:
         v_upper = v.upper()
+        if v_upper == "MAINTENANCE":
+            v_upper = "UNAVAILABLE"
         if v_upper not in [
             "AVAILABLE",
             "PREPARING",

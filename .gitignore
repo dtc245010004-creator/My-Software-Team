@@ -23,6 +23,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.pyc
 
 # Virtual Environment
 .venv/
@@ -73,3 +74,4 @@ Thumbs.db
 
 # Antigravity CLI / Temp
 temp/
+__init__.*

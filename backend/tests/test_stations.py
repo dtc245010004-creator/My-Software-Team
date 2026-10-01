@@ -140,7 +140,7 @@ def test_customer_forbidden_from_creating_station(client, test_users):
 
 
 def test_operator_create_station_sets_operator_id(client, test_users):
-    """4. Operator tạo trạm thành công -> tự động gắn operator_id."""
+    """4. Operator không có quyền tạo trạm -> HTTP 403 (Chỉ Admin mới có quyền tạo trạm)."""
     payload = {
         "name": "Trạm Sạc Xanh Eco",
         "address": "123 Đường Láng, Hà Nội",
@@ -154,12 +154,7 @@ def test_operator_create_station_sets_operator_id(client, test_users):
         json=payload,
         headers={"Authorization": f"Bearer {test_users['token_op_a']}"},
     )
-    assert res.status_code == 201
-    data = res.json()
-    assert data["name"] == "Trạm Sạc Xanh Eco"
-    assert data["operator_id"] == test_users["op_a"].id
-    assert data["is_active"] is True
-    assert data["status"] == "ACTIVE"
+    assert res.status_code == 403
 
 
 def test_idor_station_level_forbidden(client, db_session, test_users):
@@ -667,8 +662,8 @@ async def test_cumulative_energy_captures_short_session_under_60s(
 
 def test_station_coordinates_nullable_and_crud(client, db_session, test_users):
     """Kiểm tra tạo, sửa tọa độ GPS bản đồ và hỗ trợ trạm cũ có tọa độ null."""
-    token_op = test_users["token_op_a"]
-    headers = {"Authorization": f"Bearer {token_op}"}
+    token_admin = test_users["token_admin"]
+    headers = {"Authorization": f"Bearer {token_admin}"}
 
     # 1. Tạo trạm mới có tọa độ GPS hợp lệ từ bản đồ
     payload = {
