@@ -196,4 +196,4 @@
 * **Nhiệm vụ thực hiện:** Hoàn thành các task OCPP của Story S-07, S-08, S-14, S-15 và S-16: T-14/T-15, T-16/T-17, T-30/T-31, T-32/T-33, T-34/T-35.
 * **Nội dung thực hiện:** Tạo package `backend/app/ocpp/` với parser/serializer frame OCPP 1.6J, gateway WebSocket riêng `/ocpp/{charge_point_code}`, BootNotification, idempotency dựa trên DB và cleanup scheduler, Authorize/idTag, dispatcher dùng chung và API Reset có RBAC. Kênh `/ws/telemetry` không bị thay đổi.
 * **Xác minh:** `pytest backend/tests` chạy từ thư mục tạm đạt **163 passed, 1 warning** ngày 2026-10-01; cảnh báo là `FutureWarning` của `google.generativeai` trong `app/services/ai_service.py`.
-* **Git:** Commit `6370865` (`feat: thêm nền tảng giao tiếp OCPP 1.6J`) do `KimiCoNY` tạo và đã push lên `origin/Duong`.
+
