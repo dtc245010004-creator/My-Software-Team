@@ -6,10 +6,10 @@
 
 ---
 
-## Overall Summary
+## Last Full Run Before OCPP (30/09/2026)
 
 Đợt thực thi kiểm thử toàn diện được thực hiện vào ngày **30/09/2026** trên môi trường cục bộ (Local Development) và cấu hình Staging:
-* **Backend**: Toàn bộ **89/89 test cases** kiểm thử tự động đã **PASS 100%** (0 Failed, 0 Skipped).
+* **Backend**: Báo cáo lần chạy khi đó ghi nhận **89/89 test cases** đã **PASSED** (0 Failed, 0 Skipped). Các tài liệu lịch sử khác ghi tổng 84 hoặc 90 `[CẦN XÁC NHẬN]`; kết quả này không bao gồm thay đổi OCPP.
 * **Frontend**: Lệnh biên dịch sản phẩm `npm --prefix frontend run build` hoàn thành thành công trong 12.40 giây, không phát sinh lỗi cú pháp hay gãy liên kết module.
 * **Độ ổn định hệ thống**: Toàn bộ các cơ chế an toàn ACID (giao dịch trừ tiền ví, khóa tài khoản khi nợ vượt -300.000 VND, giới hạn chống tràn CSDL `balance >= -500000`, khôi phục phiên sạc mồ côi sau sự cố sập nguồn, khóa tạm 15 phút sau 5 lần đăng nhập sai) đều hoạt động chính xác theo đặc tả.
 
@@ -154,3 +154,28 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_deduct_fee_allows_debt_wi
 tests/test_wallet_acid.py::TestWalletServiceACID::test_deduct_fee_exceeding_debt_limit_triggers_debt_lock PASSED
 tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_when_positive PASSED
 ```
+
+## Kiểm thử full backend và khung OCPP (01/10/2026)
+
+* Virtualenv `backend/.venv` đã được đồng bộ theo `backend/requirements.txt`, bao gồm `pydantic-settings`.
+* Full backend suite đạt **148 passed, 1 warning** trong 110.56 giây. Test chạy từ thư mục tạm dưới `backend/.venv`, vì `conftest.py` xóa file `test_ev_csms.db` tương đối với thư mục làm việc; hai file test DB có sẵn được giữ nguyên.
+* `backend/tests/test_ocpp_frames.py` có 20 ca và `backend/tests/test_boot_notification.py` có 8 ca; tổng 28 ca OCPP nằm trong kết quả full suite.
+
+## Kiểm thử chống xử lý CALL OCPP lặp (01/10/2026)
+
+* `backend/tests/test_ocpp_idempotency.py`: 4 ca passed, gồm gửi lại 5 lần, nhận diện trùng qua session CSDL mới, tái sử dụng message ID với action khác và dọn bản ghi quá 7 ngày.
+* Full backend suite: **152 passed, 1 warning trong 116.35 giây**; tổng 32 ca OCPP.
+* Warning hiện có là FutureWarning từ package `google.generativeai`; không phát sinh lỗi test.
+
+## Kiểm thử Authorize OCPP và idTag (01/10/2026)
+
+* `backend/tests/test_authorize.py`: **6 passed** — năm trạng thái Authorize tham số hóa và unique code.
+* Các suite Authorize, BootNotification và idempotency: **18 passed, 1 warning**.
+* Full backend suite: **158 passed, 1 warning trong 117.08 giây**; tổng 38 ca OCPP.
+* Seed trên SQLite tạm tạo 8 thẻ cho 8 tài khoản tài xế role `CUSTOMER`. Migration `45ab6640633a` đã kiểm tra upgrade/downgrade trên DB tạm; DB dự án chưa migrate.
+
+## Kiểm thử CSMS gửi lệnh Reset OCPP (01/10/2026)
+
+* `backend/tests/test_ocpp_reset.py`: **5 passed** — CALLRESULT online, xử lý CALL xen kẽ trong lúc chờ, offline 409 không dispatch, timeout 504 với hạn 0.5 giây trong test, CALLERROR và chặn role CUSTOMER.
+* Full backend suite: **163 passed, 1 warning trong 122.08 giây**; có 43 ca OCPP.
+* Warning hiện có là `FutureWarning` từ `google.generativeai`; không phát sinh lỗi test.

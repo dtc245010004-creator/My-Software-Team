@@ -73,7 +73,8 @@ class ChargingPoint(Base):
     __table_args__ = (
         CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
         CheckConstraint(
-            "status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
+            "status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED', "
+            "'UNAVAILABLE', 'online')",
             name="ck_charger_status_valid",
         ),
     )
@@ -90,6 +91,8 @@ class ChargingPoint(Base):
     )  # EVSE ID toàn hệ thống
     vendor = Column(String(100), nullable=False, default="VinFast/ABB")
     model = Column(String(100), nullable=True)
+    charge_point_vendor = Column(String(100), nullable=True)
+    charge_point_model_name = Column(String(100), nullable=True)
     max_power_kw = Column(Float, nullable=False)
     firmware_version = Column(String(50), default="1.0.0", nullable=True)
     status = Column(String(20), default="AVAILABLE", nullable=False)

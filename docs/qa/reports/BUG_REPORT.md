@@ -55,4 +55,4 @@
 
 1. **Ưu tiên 1 (DevOps)**: Soạn thảo script `start.bat` / `run.ps1` và bộ cấu hình Docker để giảm thiểu thao tác thủ công khi chạy dự án.
 2. **Ưu tiên 2 (Architecture)**: Nghiên cứu phương án triển khai máy chủ OCPP WebSocket độc lập (hoặc tích hợp qua thư viện Python `ocpp`) cho Giai đoạn tiếp theo.
-3. **Ưu tiên 3 (QA)**: Tiếp tục duy trì tỷ lệ 100% PASS cho toàn bộ 84 test cases hiện tại trong suốt quá trình tái cấu trúc tài liệu.
+3. **Ưu tiên 3 (QA)**: Duy trì kiểm thử dựa trên bằng chứng; tổng lịch sử 84/89/90 ca còn mâu thuẫn `[CẦN XÁC NHẬN]`. Full backend suite hiện đạt 158 passed, 1 warning ngày 01/10/2026.

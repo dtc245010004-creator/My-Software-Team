@@ -18,6 +18,7 @@ if sys.platform == "win32":
 import app.models  # noqa: F401
 from app.core.database import Base, SessionLocal, engine
 from app.core.security import get_password_hash
+from app.models.id_tag import IdTag
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
@@ -116,6 +117,20 @@ def seed_database():
             )
 
         db.add_all(users_to_create)
+        db.commit()
+
+        # RBAC hiện tại dùng role CUSTOMER cho tài khoản tài xế.
+        driver_users = [user for user in users_to_create if user.role == "CUSTOMER"]
+        db.add_all(
+            [
+                IdTag(
+                    code=f"DEMO-{user.username.upper()}",
+                    user_id=user.id,
+                    status="active",
+                )
+                for user in driver_users
+            ]
+        )
         db.commit()
 
         # 3. Tạo Ví tiền điện tử (ACID Wallets cho toàn bộ người dùng)

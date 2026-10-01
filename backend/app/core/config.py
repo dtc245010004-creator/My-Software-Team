@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     # Mô phỏng sạc (Simulator)
     SIMULATOR_INTERVAL_SECONDS: int = 2
 
+    # OCPP 1.6J
+    HEARTBEAT_INTERVAL_SECONDS: int = 300
+    OCPP_CALL_TIMEOUT_SECONDS: float = 30.0
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
