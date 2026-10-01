@@ -208,7 +208,16 @@ def start_charging_session(
     try:
         from app.simulator.charging_simulator import simulator_manager
 
-        power = connector.max_power_kw if connector and connector.max_power_kw else 60.0
+        power = (
+            connector.max_power_kw
+            if connector and connector.max_power_kw
+            else 60.0
+        )
+        station_id = (
+            connector.charging_point.station_id
+            if connector and connector.charging_point
+            else None
+        )
         simulator_manager.start_simulation(
             session_id=new_session.id,
             connector_id=connector_id,
@@ -217,6 +226,7 @@ def start_charging_session(
             max_power_kw=power,
             battery_capacity_kwh=battery_capacity_kwh or 60.0,
             initial_soc=initial_soc,
+            station_id=station_id,
         )
     except RuntimeError:
         logger.exception(

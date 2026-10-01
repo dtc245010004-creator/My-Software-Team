@@ -175,13 +175,29 @@ export default function Stations() {
     }
 
     try {
-      await api.put(`/stations/${editingStation.id}`, editFormData);
+      const payload = { ...editFormData };
+      if (role !== 'ADMIN') {
+        // Chủ trạm không được phép sửa công suất lưới và chủ sở hữu
+        payload.total_grid_capacity_kw = editingStation.total_grid_capacity_kw;
+        payload.operator_id = editingStation.operator_id;
+      }
+      await api.put(`/stations/${editingStation.id}`, payload);
       setShowEditModal(false);
       setEditingStation(null);
       setStationValidationError(null);
       fetchStations();
     } catch (err) {
       alert('Lỗi cập nhật trạm sạc: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleToggleChargerStatus = async (chargerId, currentStatus) => {
+    try {
+      const nextStatus = currentStatus === 'AVAILABLE' ? 'UNAVAILABLE' : 'AVAILABLE';
+      await api.patch(`/chargers/${chargerId}/status`, { status: nextStatus });
+      await fetchStations();
+    } catch (err) {
+      alert('Lỗi cập nhật trạng thái trụ sạc: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -308,7 +324,7 @@ export default function Stations() {
             </button>
           </div>
 
-          {(role === 'ADMIN' || role === 'OPERATOR') && (
+          {role === 'ADMIN' && (
             <button
               onClick={handleOpenAddStation}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white text-xs font-semibold transition-colors"
@@ -445,7 +461,7 @@ export default function Stations() {
                     <span className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
                       DANH SÁCH TRỤ SẠC (EVSE BAYS) — {chargers.length} TRỤ VẬT LÝ
                     </span>
-                    {(role === 'ADMIN' || role === 'OPERATOR') && (
+                    {role === 'ADMIN' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -462,7 +478,7 @@ export default function Stations() {
                   {chargers.length === 0 ? (
                     <div className="text-xs text-steel-gray text-center py-6 font-mono border border-dashed border-hairline rounded bg-panel/30">
                       <p>Chưa có trụ sạc nào được gắn vào trạm này.</p>
-                      {(role === 'ADMIN' || role === 'OPERATOR') && (
+                      {role === 'ADMIN' && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -481,17 +497,45 @@ export default function Stations() {
                         <div key={ch.id} className="bg-panel border border-hairline p-3 rounded-sm">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-mono text-xs font-bold text-tech-white">{ch.code}</span>
-                            <span
-                              className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                                ch.status === 'CHARGING'
-                                  ? 'bg-electric-cyan/20 text-electric-cyan'
-                                  : ch.status === 'AVAILABLE'
-                                  ? 'bg-grid-green/20 text-grid-green'
-                                  : 'bg-critical-red/20 text-critical-red'
-                              }`}
-                            >
-                              {ch.status}
-                            </span>
+                            <div className="flex items-center space-x-1.5">
+                              <span
+                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                                  ch.status === 'CHARGING'
+                                    ? 'bg-electric-cyan/20 text-electric-cyan'
+                                    : ch.status === 'AVAILABLE'
+                                    ? 'bg-grid-green/20 text-grid-green'
+                                    : 'bg-critical-red/20 text-critical-red'
+                                }`}
+                              >
+                                {ch.status === 'UNAVAILABLE' ? 'MAINTENANCE' : ch.status}
+                              </span>
+                              {(role === 'ADMIN' || role === 'OPERATOR') && (
+                                <button
+                                  type="button"
+                                  disabled={ch.status === 'CHARGING'}
+                                  title={
+                                    ch.status === 'CHARGING'
+                                      ? 'Trụ đang phục vụ sạc xe, không thể đổi trạng thái'
+                                      : ch.status === 'AVAILABLE'
+                                      ? 'Bấm để chuyển sang trạng thái Bảo trì (MAINTENANCE)'
+                                      : 'Bấm để kích hoạt trạng thái Sẵn sàng (AVAILABLE)'
+                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleChargerStatus(ch.id, ch.status);
+                                  }}
+                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+                                    ch.status === 'CHARGING'
+                                      ? 'opacity-40 cursor-not-allowed border-hairline text-steel-gray'
+                                      : ch.status === 'AVAILABLE'
+                                      ? 'border-caution-amber/40 text-caution-amber hover:bg-caution-amber/20'
+                                      : 'border-grid-green/40 text-grid-green hover:bg-grid-green/20'
+                                  }`}
+                                >
+                                  {ch.status === 'AVAILABLE' ? 'Bảo trì' : 'Mở lại'}
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           <div className="text-xs text-steel-gray font-mono mb-2">
@@ -737,10 +781,18 @@ export default function Stations() {
                     required
                     min="10"
                     step="1"
+                    disabled={role !== 'ADMIN'}
                     value={editFormData.total_grid_capacity_kw}
                     onChange={(e) => setEditFormData({ ...editFormData, total_grid_capacity_kw: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                    className={`w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan ${
+                      role !== 'ADMIN' ? 'opacity-60 cursor-not-allowed bg-obsidian/50' : ''
+                    }`}
                   />
+                  {role !== 'ADMIN' && (
+                    <span className="text-[10px] text-caution-amber mt-1 block">
+                      (Chỉ Quản trị viên hệ thống có quyền sửa công suất lưới định mức)
+                    </span>
+                  )}
                 </div>
               </div>
 
