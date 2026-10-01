@@ -9,21 +9,28 @@ from app.core.datetime_utils import UTCDateTime
 # 1. CỔNG SẠC (CONNECTOR SCHEMAS)
 # ==========================================
 class ConnectorBase(BaseModel):
-    connector_number: int = Field(..., ge=1, description="Thứ tự cổng súng sạc (1, 2...)")
+    connector_number: int = Field(
+        ..., ge=1, description="Thứ tự cổng súng sạc (1, 2...)"
+    )
     connector_type: str = Field(..., description="Chuẩn sạc: CCS2, TYPE_2, CHADEMO")
-    max_power_kw: float = Field(..., gt=0, description="Công suất tối đa của cổng sạc (kW)")
+    max_power_kw: float = Field(
+        ..., gt=0, description="Công suất tối đa của cổng sạc (kW)"
+    )
 
     @field_validator("connector_type")
     @classmethod
     def validate_connector_type(cls, v: str) -> str:
         v_upper = v.upper()
         if v_upper not in ["CCS2", "TYPE_2", "CHADEMO"]:
-            raise ValueError("Chuẩn sạc không hợp lệ. Chỉ chấp nhận: CCS2, TYPE_2, CHADEMO.")
+            raise ValueError(
+                "Chuẩn sạc không hợp lệ. Chỉ chấp nhận: CCS2, TYPE_2, CHADEMO."
+            )
         return v_upper
 
 
 class ConnectorCreate(ConnectorBase):
     pass
+
 
 class ConnectorResponse(ConnectorBase):
     id: int
@@ -39,16 +46,26 @@ class ConnectorResponse(ConnectorBase):
 # 2. TRỤ SẠC (CHARGING POINT SCHEMAS)
 # ==========================================
 class ChargingPointBase(BaseModel):
-    code: str = Field(..., min_length=3, max_length=50, description="Mã định danh trụ sạc EVSE ID")
+    code: str = Field(
+        ..., min_length=3, max_length=50, description="Mã định danh trụ sạc EVSE ID"
+    )
     vendor: str = Field(default="ABB", max_length=100, description="Hãng sản xuất")
-    model: Optional[str] = Field(default=None, max_length=100, description="Model trụ sạc")
-    max_power_kw: float = Field(..., gt=0, description="Công suất tối đa của trụ sạc (kW)")
+    model: Optional[str] = Field(
+        default=None, max_length=100, description="Model trụ sạc"
+    )
+    max_power_kw: float = Field(
+        ..., gt=0, description="Công suất tối đa của trụ sạc (kW)"
+    )
     firmware_version: Optional[str] = Field(default="1.0.0", max_length=50)
-    power_sharing_enabled: bool = Field(default=True, description="Bật tính năng chia tải động giữa các súng")
+    power_sharing_enabled: bool = Field(
+        default=True, description="Bật tính năng chia tải động giữa các súng"
+    )
 
 
 class ChargingPointCreate(ChargingPointBase):
-    connectors: Optional[List[ConnectorCreate]] = Field(default_factory=list, description="Danh sách súng sạc ban đầu")
+    connectors: Optional[List[ConnectorCreate]] = Field(
+        default_factory=list, description="Danh sách súng sạc ban đầu"
+    )
 
 
 class ChargingPointUpdate(BaseModel):
@@ -64,7 +81,15 @@ class ChargingPointUpdate(BaseModel):
     def validate_charger_status(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             v_upper = v.upper()
-            if v_upper not in ["AVAILABLE", "PREPARING", "CHARGING", "FAULTED", "UNAVAILABLE"]:
+            if v_upper == "MAINTENANCE":
+                v_upper = "UNAVAILABLE"
+            if v_upper not in [
+                "AVAILABLE",
+                "PREPARING",
+                "CHARGING",
+                "FAULTED",
+                "UNAVAILABLE",
+            ]:
                 raise ValueError("Trạng thái trụ sạc không hợp lệ.")
             return v_upper
         return v
@@ -77,8 +102,18 @@ class ChargingPointStatusUpdate(BaseModel):
     @classmethod
     def validate_status(cls, v: str) -> str:
         v_upper = v.upper()
-        if v_upper not in ["AVAILABLE", "PREPARING", "CHARGING", "FAULTED", "UNAVAILABLE"]:
-            raise ValueError("Trạng thái không hợp lệ: AVAILABLE, PREPARING, CHARGING, FAULTED, UNAVAILABLE.")
+        if v_upper == "MAINTENANCE":
+            v_upper = "UNAVAILABLE"
+        if v_upper not in [
+            "AVAILABLE",
+            "PREPARING",
+            "CHARGING",
+            "FAULTED",
+            "UNAVAILABLE",
+        ]:
+            raise ValueError(
+                "Trạng thái không hợp lệ: AVAILABLE, PREPARING, CHARGING, FAULTED, UNAVAILABLE."
+            )
         return v_upper
 
 
@@ -102,12 +137,22 @@ class ChargingPointResponse(ChargingPointBase):
 # ==========================================
 class StationBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=150, description="Tên trạm sạc")
-    address: str = Field(..., min_length=5, max_length=255, description="Địa chỉ vật lý chi tiết")
-    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Vĩ độ GPS")
-    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Kinh độ GPS")
-    total_grid_capacity_kw: float = Field(..., gt=0, description="Công suất nguồn trạm (kW)")
+    address: str = Field(
+        ..., min_length=5, max_length=255, description="Địa chỉ vật lý chi tiết"
+    )
+    latitude: Optional[float] = Field(
+        default=None, ge=-90.0, le=90.0, description="Vĩ độ GPS"
+    )
+    longitude: Optional[float] = Field(
+        default=None, ge=-180.0, le=180.0, description="Kinh độ GPS"
+    )
+    total_grid_capacity_kw: float = Field(
+        ..., gt=0, description="Công suất nguồn trạm (kW)"
+    )
     operating_hours: str = Field(default="24/7", max_length=50)
-    status: str = Field(default="ACTIVE", description="Trạng thái vận hành: ACTIVE hoặc MAINTENANCE")
+    status: str = Field(
+        default="ACTIVE", description="Trạng thái vận hành: ACTIVE hoặc MAINTENANCE"
+    )
 
     @field_validator("status")
     @classmethod
@@ -119,7 +164,9 @@ class StationBase(BaseModel):
 
 
 class StationCreate(StationBase):
-    operator_id: Optional[int] = Field(default=None, description="ID Chủ trạm sạc (chỉ Admin được gán)")
+    operator_id: Optional[int] = Field(
+        default=None, description="ID Chủ trạm sạc (chỉ Admin được gán)"
+    )
 
 
 class StationUpdate(BaseModel):
@@ -130,7 +177,9 @@ class StationUpdate(BaseModel):
     total_grid_capacity_kw: Optional[float] = Field(default=None, gt=0)
     operating_hours: Optional[str] = None
     status: Optional[str] = None
-    operator_id: Optional[int] = Field(default=None, description="ID Chủ trạm sạc (chỉ Admin được gán/đổi)")
+    operator_id: Optional[int] = Field(
+        default=None, description="ID Chủ trạm sạc (chỉ Admin được gán/đổi)"
+    )
 
     @field_validator("status")
     @classmethod
@@ -138,7 +187,9 @@ class StationUpdate(BaseModel):
         if v is not None:
             v_upper = v.upper()
             if v_upper not in ["ACTIVE", "MAINTENANCE"]:
-                raise ValueError("Trạng thái trạm chỉ có thể là ACTIVE hoặc MAINTENANCE.")
+                raise ValueError(
+                    "Trạng thái trạm chỉ có thể là ACTIVE hoặc MAINTENANCE."
+                )
             return v_upper
         return v
 
@@ -161,4 +212,5 @@ class StationResponse(StationBase):
 
 class StationDistanceResponse(StationResponse):
     """Schema mở rộng cho API tìm kiếm trả về khoảng cách tính bằng km."""
+
     distance_km: Optional[float] = None

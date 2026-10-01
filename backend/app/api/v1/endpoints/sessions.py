@@ -12,6 +12,8 @@ from app.schemas.session import (
     SessionResponse,
     SessionStartRequest,
     SessionStopRequest,
+    SessionSummaryItem,
+    SessionSummaryResponse,
 )
 from app.services.session_service import (
     start_charging_session,
@@ -29,7 +31,11 @@ router = APIRouter(prefix="/sessions", tags=["Phiên sạc xe điện (Charging 
 )
 def list_sessions(
     station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
-    status_filter: Optional[str] = Query(None, alias="status", description="Lọc theo trạng thái phiên: ACTIVE, COMPLETED, INTERRUPTED"),
+    status_filter: Optional[str] = Query(
+        None,
+        alias="status",
+        description="Lọc theo trạng thái phiên: ACTIVE, COMPLETED, INTERRUPTED",
+    ),
     current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
@@ -42,7 +48,11 @@ def list_sessions(
     if current_user.role == "ADMIN":
         query = db.query(ChargingSession)
         if station_id:
-            query = query.join(ChargingSession.connector).join(Connector.charging_point).filter(ChargingPoint.station_id == station_id)
+            query = (
+                query.join(ChargingSession.connector)
+                .join(Connector.charging_point)
+                .filter(ChargingPoint.station_id == station_id)
+            )
         if status_filter and status_filter.upper() != "ALL":
             query = query.filter(ChargingSession.status == status_filter.upper())
         return query.order_by(ChargingSession.id.desc()).all()
@@ -77,6 +87,133 @@ def list_sessions(
     if status_filter and status_filter.upper() != "ALL":
         query = query.filter(ChargingSession.status == status_filter.upper())
     return query.order_by(ChargingSession.id.desc()).all()
+
+
+@router.get(
+    "/summary",
+    response_model=SessionSummaryResponse,
+    summary="Tổng quan KPI và gom nhóm phiên sạc (Theo ngày hoặc theo trạm)",
+)
+def get_sessions_summary(
+    group_by: str = Query(
+        "date", description="Gom nhóm theo: 'date', 'station', 'month'"
+    ),
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    Trả về KPI tổng quan và danh sách gom nhóm:
+    - ADMIN: Toàn bộ hệ thống.
+    - OPERATOR: Chỉ các trạm thuộc quyền sở hữu.
+    - CUSTOMER: Các phiên của chính mình.
+    """
+    if current_user.role == "ADMIN":
+        query = db.query(ChargingSession)
+    elif current_user.role == "OPERATOR":
+        accessible_ids = get_accessible_station_ids(current_user, db)
+        if not accessible_ids:
+            return SessionSummaryResponse(
+                group_by=group_by,
+                kpi={
+                    "total_sessions": 0,
+                    "total_kwh": 0.0,
+                    "total_revenue": 0.0,
+                    "completed_sessions": 0,
+                },
+                items=[],
+            )
+        query = (
+            db.query(ChargingSession)
+            .join(ChargingSession.connector)
+            .join(Connector.charging_point)
+            .filter(ChargingPoint.station_id.in_(accessible_ids))
+        )
+    else:
+        query = db.query(ChargingSession).filter(
+            ChargingSession.user_id == current_user.id
+        )
+
+    sessions = query.all()
+
+    total_sessions_count = len(sessions)
+    total_kwh = sum(float(s.total_kwh or 0) for s in sessions)
+    total_amount = sum(float(s.total_amount or 0) for s in sessions)
+    completed_sessions_count = sum(1 for s in sessions if s.status == "COMPLETED")
+
+    kpi = {
+        "total_sessions": total_sessions_count,
+        "total_kwh": round(total_kwh, 2),
+        "total_revenue": round(total_amount, 2),
+        "completed_sessions": completed_sessions_count,
+    }
+
+    groups: dict[str, dict] = {}
+    for s in sessions:
+        if group_by == "station":
+            st_id = s.station_id
+            st_name = s.station_name or (
+                f"Trạm #{st_id}" if st_id else "Không xác định"
+            )
+            key = f"station_{st_id}"
+            if key not in groups:
+                groups[key] = {
+                    "group_key": st_name,
+                    "station_id": st_id,
+                    "station_name": st_name,
+                    "date": None,
+                    "total_sessions": 0,
+                    "total_kwh": 0.0,
+                    "total_amount": 0.0,
+                    "completed_sessions": 0,
+                }
+        elif group_by == "month":
+            month_str = s.start_time.strftime("%Y-%m") if s.start_time else "Chưa rõ"
+            key = month_str
+            if key not in groups:
+                groups[key] = {
+                    "group_key": month_str,
+                    "station_id": None,
+                    "station_name": None,
+                    "date": month_str,
+                    "total_sessions": 0,
+                    "total_kwh": 0.0,
+                    "total_amount": 0.0,
+                    "completed_sessions": 0,
+                }
+        else:
+            # group_by == 'date'
+            date_str = s.start_time.strftime("%Y-%m-%d") if s.start_time else "Chưa rõ"
+            key = date_str
+            if key not in groups:
+                groups[key] = {
+                    "group_key": date_str,
+                    "station_id": None,
+                    "station_name": None,
+                    "date": date_str,
+                    "total_sessions": 0,
+                    "total_kwh": 0.0,
+                    "total_amount": 0.0,
+                    "completed_sessions": 0,
+                }
+
+        groups[key]["total_sessions"] += 1
+        groups[key]["total_kwh"] += float(s.total_kwh or 0)
+        groups[key]["total_amount"] += float(s.total_amount or 0)
+        if s.status == "COMPLETED":
+            groups[key]["completed_sessions"] += 1
+
+    items = []
+    for g in groups.values():
+        g["total_kwh"] = round(g["total_kwh"], 2)
+        g["total_amount"] = round(g["total_amount"], 2)
+        items.append(SessionSummaryItem(**g))
+
+    if group_by in ("date", "month"):
+        items.sort(key=lambda x: x.group_key, reverse=True)
+    else:
+        items.sort(key=lambda x: x.total_amount, reverse=True)
+
+    return SessionSummaryResponse(group_by=group_by, kpi=kpi, items=items)
 
 
 @router.post(
@@ -171,8 +308,14 @@ def get_session_detail(
 
     if current_user.role == "OPERATOR":
         connector = session.connector
-        station = connector.charging_point.station if connector and connector.charging_point else None
-        if (station and station.operator_id == current_user.id) or session.user_id == current_user.id:
+        station = (
+            connector.charging_point.station
+            if connector and connector.charging_point
+            else None
+        )
+        if (
+            station and station.operator_id == current_user.id
+        ) or session.user_id == current_user.id:
             return session
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

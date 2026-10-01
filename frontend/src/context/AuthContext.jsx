@@ -67,12 +67,8 @@ export const AuthProvider = ({ children }) => {
     try {
       if (roleKey === 'ADMIN') {
         await login('admin', 'AdminPass123');
-      } else if (roleKey === 'OPERATOR_A' || roleKey === 'OPERATOR') {
+      } else if (roleKey === 'OPERATOR' || roleKey === 'OPERATOR_A' || roleKey === 'OPERATOR_B') {
         await login('operator_a', 'OpPass123');
-      } else if (roleKey === 'OPERATOR_B') {
-        await login('operator', 'OpPass123');
-      } else if (roleKey === 'DEBT') {
-        await login('driver_debt', 'DriverPass123');
       } else {
         // Role Tài xế không cần đăng nhập: chuyển trực tiếp sang chế độ tài xế tự do
         logout();
@@ -88,9 +84,7 @@ export const AuthProvider = ({ children }) => {
   if (user?.role === 'ADMIN') {
     currentDemoKey = 'ADMIN';
   } else if (user?.role === 'OPERATOR') {
-    currentDemoKey = user.username === 'operator' ? 'OPERATOR_B' : 'OPERATOR_A';
-  } else if (user?.username === 'driver_debt') {
-    currentDemoKey = 'DEBT';
+    currentDemoKey = 'OPERATOR';
   }
 
   // Nếu chưa đăng nhập, mặc định hoạt động dưới vai trò CUSTOMER (Tài xế sạc không cần đăng nhập)

@@ -11,9 +11,12 @@ import Wallet from './pages/Wallet';
 import Sessions from './pages/Sessions';
 import AIAdvisor from './pages/AIAdvisor';
 import Login from './pages/Login';
+import AdminPanel from './pages/AdminPanel';
+import DriverMap from './pages/DriverMap';
+import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
-  const { user, loading } = useAuth();
+  const { user, role, loading } = useAuth();
 
   if (loading) {
     return (
@@ -23,19 +26,60 @@ function AppLayout() {
     );
   }
 
+  const homeRoute = getHomeRouteByRole(role);
+
   return (
     <div className="min-h-screen bg-obsidian text-tech-white flex flex-col font-sans">
       <Header />
       <Navigation />
       <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/stations" element={<Stations />} />
-          <Route path="/simulator" element={<Simulator />} />
-          <Route path="/wallet" element={<Wallet />} />
+          {/* Trang chủ /: Chỉ ADMIN và OPERATOR xem Dashboard; CUSTOMER tự động chuyển sang Bản đồ */}
+          <Route
+            path="/"
+            element={
+              role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <Dashboard />
+            }
+          />
+          {/* Bản đồ trạm sạc: Dành cho Tài xế */}
+          <Route path="/map" element={<DriverMap />} />
+          {/* Quản lý Hạ tầng trạm sạc: ADMIN và OPERATOR */}
+          <Route
+            path="/stations"
+            element={
+              role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <Stations />
+            }
+          />
+          {/* Giả lập sạc & Ví: Chỉ mở cho CUSTOMER; ADMIN & OPERATOR bị chặn URL */}
+          <Route
+            path="/simulator"
+            element={
+              role === 'CUSTOMER' ? <Simulator /> : <Navigate to={homeRoute} replace />
+            }
+          />
+          <Route
+            path="/wallet"
+            element={
+              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
+            }
+          />
+          {/* Nhật ký phiên sạc: Mọi vai trò đều được xem (phân vùng dữ liệu tại backend) */}
           <Route path="/sessions" element={<Sessions />} />
-          <Route path="/ai-advisor" element={<AIAdvisor />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* AI Cố Vấn: ADMIN và OPERATOR */}
+          <Route
+            path="/ai-advisor"
+            element={
+              role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <AIAdvisor />
+            }
+          />
+          {/* Admin Panel: Chỉ ADMIN */}
+          <Route
+            path="/admin"
+            element={
+              role === 'ADMIN' ? <AdminPanel /> : <Navigate to={homeRoute} replace />
+            }
+          />
+          <Route path="*" element={<Navigate to={homeRoute} replace />} />
         </Routes>
       </main>
     </div>

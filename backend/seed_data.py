@@ -172,7 +172,9 @@ def seed_database():
         db.commit()
 
         # 4. Tạo Hạ tầng Trạm sạc (ST-1, ST-2 thuộc Chủ A; ST-3 thuộc Chủ B; ST-4 chưa gán chủ)
-        print("[+] Đang tạo hạ tầng trạm sạc phân quyền (Chủ A, Chủ B, Trạm chưa gán chủ)...")
+        print(
+            "[+] Đang tạo hạ tầng trạm sạc phân quyền (Chủ A, Chủ B, Trạm chưa gán chủ)..."
+        )
         cpo_a = next(u for u in users_to_create if u.username == "operator_a")
         cpo_b = next(u for u in users_to_create if u.username == "operator")
 

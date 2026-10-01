@@ -14,11 +14,15 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=True)
-    role = Column(String(20), default="CUSTOMER", nullable=False)  # ADMIN, OPERATOR, CUSTOMER
+    role = Column(
+        String(20), default="CUSTOMER", nullable=False
+    )  # ADMIN, OPERATOR, CUSTOMER
     is_active = Column(Boolean, default=True, nullable=False)
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
