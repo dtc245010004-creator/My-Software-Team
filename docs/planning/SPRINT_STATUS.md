@@ -13,7 +13,7 @@
 * **Mô hình Scrum**: Sprint 1 tuần (5 ngày làm việc / sprint). Đơn vị ước lượng: Story Point (Fibonacci) `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Khung theo dõi 4 chiều**:
   1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi; 84 ca kiểm thử tự động passed.
-  2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84.
+  2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84; chuẩn hóa migration về `backend/alembic/` (01/10/2026, chưa commit).
   3. *Sắp thay đổi*: Kế hoạch Sprint 2 (20 SP) xử lý tin nhắn giao thức OCPP 1.6J và màn hình theo dõi trụ sạc.
   4. *Cần thay đổi / Tồn đọng*: Kết nối phần cứng trạm thật (S-05 AC3), cổng thanh toán thật (R-02), cấu hình Docker môi trường (R-06).
 
@@ -53,10 +53,12 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Backend API**: 8 router modules REST API (34 endpoints) và 1 kênh WebSocket `/ws/telemetry`.
 * **Frontend SPA**: 6 màn hình chức năng tại `frontend/src/pages/`.
 * **Kiểm thử tự động**: 90 ca kiểm thử passed (xác nhận qua `pytest backend/tests` và chạy thực tế).
-* **Migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo bảng lõi; cây revision hiện có một head duy nhất `f2c9a6d81b40`. Trạng thái áp dụng trên cơ sở dữ liệu đích chưa được xác minh.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; cây revision có một head `f2c9a6d81b40`. Trạng thái áp dụng trên cơ sở dữ liệu đích chưa được xác minh.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
+* **Thời điểm thực hiện bổ sung**: Ngày **01/10/2026** (chưa commit), theo yêu cầu của người dùng:
+  * Xóa `backend/migrations/` vì không được cấu hình trong `backend/alembic.ini`; giữ `backend/alembic/` làm nguồn duy nhất. Không chạy migration lên database.
 * **Thời điểm thực hiện**: Ngày **30/09/2026** (chưa commit), thực hiện **theo yêu cầu của người dùng**:
   * *Khung Staging & CI/CD*: Bổ sung Dockerfile đa tầng cho Backend/Frontend, cấu hình Reverse Proxy Nginx, file `docker-compose.staging.yml` và pipeline GitHub Actions `.github/workflows/ci-staging.yml` cho Story S-01.
   * *Bảo vệ đăng nhập chống vét cạn*: Thêm 2 cột `failed_login_attempts` và `locked_until` vào bảng `users` qua migration Alembic `149038e71dc9`, cập nhật endpoint `POST /api/v1/auth/login` đếm số lần sai và khóa tạm 15 phút khi sai liên tiếp 5 lần cho Story S-02.

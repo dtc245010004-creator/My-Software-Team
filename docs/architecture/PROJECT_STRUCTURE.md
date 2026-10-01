@@ -12,13 +12,14 @@
 * **Hạn mức ví điện tử & Bảo mật xác thực**:
   * Tầng cơ sở dữ liệu: `backend/app/models/wallet.py` dòng 11 có ràng buộc cứng `CheckConstraint("balance >= -500000", name="check_min_balance")`. Bảng `users` trang bị 2 cột `failed_login_attempts` và `locked_until`.
   * Tầng ứng dụng: `backend/app/core/config.py` quy định `NEGATIVE_BALANCE_LIMIT = -300000` (ngưỡng khóa nợ), `MAX_SAFE_DEBT_LIMIT = -500000` (chặn thấu chi tối đa), `MAX_FAILED_LOGIN_ATTEMPTS = 5` và `LOCKOUT_DURATION_MINUTES = 15` (khóa tạm 15 phút khi sai mật khẩu 5 lần).
-* **Cây migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo các bảng lõi trước `03906fa596ea`; cây hiện quy về một head `f2c9a6d81b40`, nối merge revision `795931a69149` với migration `e4b6f9a2c1d3`.
+* **Cấu hình migration duy nhất**: `backend/alembic.ini` trỏ tới `backend/alembic/`; revision nền `a1b2c3d4e5f6` tạo các bảng lõi trước `03906fa596ea`, cây hiện quy về một head `f2c9a6d81b40`.
 * **Số lượng kiểm thử tự động**: Đạt **89 ca kiểm thử** tự động được xác thực thực tế (toàn bộ 89/89 PASS khi chạy `pytest`).
 * **Khung triển khai Staging & CI/CD**: Đóng gói container hóa qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và quy trình kiểm thử tự động `.github/workflows/ci-staging.yml`.
 * **Bộ chạy Local Dev**: `run.py` khởi chạy Backend FastAPI và Frontend Vite đồng thời trong một terminal; `Ctrl+C` dừng cả hai.
 * **Cơ cấu tổ chức tài liệu**: Phân tách thành 6 phân khu chuyên trách trong `docs/` (`architecture/`, `devops/`, `planning/`, `qa/`, `design/`, `research/`) gồm 24 file chuẩn mực.
 
 ### 0.2. Đã thay đổi
+* **Chuẩn hóa thư mục migration (01/10/2026 - chưa commit)**: Xóa cây revision cũ `backend/migrations/`; giữ `backend/alembic/` làm nguồn migration duy nhất theo cấu hình `backend/alembic.ini`.
 * **Bộ chạy Local Dev ở thư mục gốc (30/09/2026 - chưa commit)**:
   * Thêm `run.py` để mở Uvicorn và Vite cùng lúc, kiểm tra dependencies cần thiết, và dừng cả hai tiến trình khi nhấn `Ctrl+C`.
 * **Hợp nhất cây migration Alembic (30/09/2026, commit `d7acaf4`)**:
