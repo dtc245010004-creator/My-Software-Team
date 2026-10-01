@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
@@ -54,6 +54,7 @@ function getErrorMessage(error, fallback) {
 
 export default function AdminPanel() {
   const { role, rawUser, logout } = useAuth();
+  const navigate = useNavigate();
 
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState('');
@@ -80,9 +81,10 @@ export default function AdminPanel() {
     setError('');
     try {
       const response = await api.get('/admin/users');
-      const payload = Array.isArray(response.data)
-        ? response.data
-        : response.data.users ?? [];
+      const data = response.data;
+      const payload = Array.isArray(data)
+        ? data
+        : data.users ?? data.items ?? data.data ?? [];
       setUsers(payload.map(normalizeUser));
     } catch (err) {
       setUsers([]);
@@ -142,8 +144,13 @@ export default function AdminPanel() {
     setError('');
     setMessage('');
 
+    const endpointByAction = {
+      lock: `/admin/users/${id}/lock-login`,
+      unlock: `/admin/users/${id}/unlock-login`,
+    };
+
     try {
-      await api.post(`/admin/users/${id}/${action}`);
+      await api.patch(endpointByAction[action]);
       setMessage(successText);
       await loadUsers();
     } catch (err) {
@@ -160,7 +167,8 @@ export default function AdminPanel() {
     setMessage('');
 
     try {
-      await api.post('/admin/users', newUser);
+      const { role: _role, ...registerData } = newUser;
+      await api.post('/auth/register', registerData);
       setShowCreate(false);
       setNewUser({
         username: '',
@@ -173,22 +181,6 @@ export default function AdminPanel() {
       await loadUsers();
     } catch (err) {
       setError(getErrorMessage(err, 'Không thể tạo tài khoản.'));
-    } finally {
-      setActionId(null);
-    }
-  };
-
-  const handleRoleChange = async (id, nextRole) => {
-    setActionId(id);
-    setError('');
-    setMessage('');
-
-    try {
-      await api.patch(`/admin/users/${id}/role`, { role: nextRole });
-      setMessage('Đã cập nhật vai trò. Vai trò mới áp dụng từ API tiếp theo.');
-      await loadUsers();
-    } catch (err) {
-      setError(getErrorMessage(err, 'Không thể cập nhật vai trò.'));
     } finally {
       setActionId(null);
     }
@@ -221,35 +213,61 @@ export default function AdminPanel() {
         <nav className="admin-nav">
           <div className="admin-nav-label">ĐIỀU HÀNH</div>
 
-          <div className="admin-nav-item">
+          <button
+            type="button"
+            className="admin-nav-item"
+            onClick={() => navigate('/')}
+          >
             <Activity size={18} />
             <span>Bảng điều khiển</span>
-          </div>
+          </button>
 
-          <div className="admin-nav-item active">
+          <button
+            type="button"
+            className="admin-nav-item active"
+            onClick={() => navigate('/admin')}
+          >
             <Users size={18} />
             <span>Quản lý tài khoản</span>
-          </div>
+          </button>
 
-          <div className="admin-nav-item">
+          <button
+            type="button"
+            className="admin-nav-item"
+            onClick={() => navigate('/admin')}
+            title="Phân quyền người dùng sẽ được mở trong module quản trị"
+          >
             <ShieldCheck size={18} />
             <span>Phân quyền</span>
-          </div>
+          </button>
 
-          <div className="admin-nav-item">
+          <button
+            type="button"
+            className="admin-nav-item"
+            onClick={() => navigate('/stations')}
+          >
             <Zap size={18} />
             <span>Trạm sạc</span>
-          </div>
+          </button>
 
-          <div className="admin-nav-item">
+          <button
+            type="button"
+            className="admin-nav-item"
+            onClick={() => navigate('/sessions')}
+          >
             <UserCog size={18} />
             <span>Phiên sạc</span>
-          </div>
+          </button>
 
-          <div className="admin-nav-item">
+          <button
+            type="button"
+            className="admin-nav-item"
+            onClick={() => navigate('/admin')}
+            title="Cấu hình hệ thống sẽ được mở trong module quản trị"
+          >
             <Settings size={18} />
             <span>Cấu hình hệ thống</span>
-          </div>
+          </button>
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -342,7 +360,11 @@ export default function AdminPanel() {
             <option value="LOCKED">Locked</option>
           </select>
 
-          <button className="admin-create" onClick={() => setShowCreate(true)}>
+          <button
+            className="admin-create"
+            onClick={() => setShowCreate(true)}
+            title="Tài khoản mới sẽ được tạo qua API đăng ký hiện có"
+          >
             <Plus size={17} />
             Tạo tài khoản
           </button>
@@ -402,26 +424,45 @@ export default function AdminPanel() {
                         <td>{user.full_name || '—'}</td>
                         <td className="email-cell">{user.email || '—'}</td>
                         <td>
-                          <select
-                            className="role-select"
-                            value={ROLE_OPTIONS.includes(user.role) ? user.role : 'CUSTOMER'}
-                            onChange={(event) =>
-                              handleRoleChange(user.id, event.target.value)
-                            }
-                            disabled={busy || user.username === rawUser?.username}
-                            title={
-                              user.username === rawUser?.username
-                                ? 'Không cho tự đổi role của tài khoản ADMIN hiện tại'
-                                : 'Đổi vai trò'
-                            }
-                          >
-                            {ROLE_OPTIONS.map((item) => (
-                              <option key={item} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
+  <select
+    className="role-select"
+    value={user.role}
+    disabled={busy}
+    onChange={async (event) => {
+      const nextRole = event.target.value;
+
+      if (nextRole === user.role) return;
+
+      setActionId(user.id);
+      setError('');
+      setMessage('');
+
+      try {
+        await api.patch(`/admin/users/${user.id}/role`, {
+          role: nextRole,
+        });
+
+        setMessage(
+          `Đã đổi vai trò tài khoản ${user.username} thành ${nextRole}.`
+        );
+
+        await loadUsers();
+      } catch (err) {
+        setError(
+          getErrorMessage(err, 'Không thể cập nhật vai trò tài khoản.')
+        );
+      } finally {
+        setActionId(null);
+      }
+    }}
+  >
+    {ROLE_OPTIONS.map((item) => (
+      <option key={item} value={item}>
+        {item}
+      </option>
+    ))}
+  </select>
+</td>
                         <td>
                           {locked ? (
                             <div className="status locked">
@@ -512,8 +553,7 @@ export default function AdminPanel() {
         <div className="admin-note">
           <Lock size={15} />
           <span>
-            Khóa thủ công nên đồng thời vô hiệu hóa session hiện tại của tài khoản.
-            Tài khoản bị khóa sẽ không đăng nhập được cho tới khi ADMIN mở khóa.
+            Nút Khóa/Mở dùng endpoint lock-login/unlock-login hiện có của backend.             API đổi role quản trị chưa được expose trong backend hiện tại.
           </span>
         </div>
       </main>
@@ -598,24 +638,10 @@ export default function AdminPanel() {
               />
             </label>
 
-            <label>
-              Vai trò
-              <select
-                value={newUser.role}
-                onChange={(event) =>
-                  setNewUser((current) => ({
-                    ...current,
-                    role: event.target.value,
-                  }))
-                }
-              >
-                {ROLE_OPTIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="admin-form-note">
+              Tài khoản tạo từ API đăng ký hiện tại sẽ nhận vai trò mặc định của backend.
+              Endpoint quản trị đổi role chưa có trong backend hiện tại.
+            </div>
 
             <div className="admin-modal-actions">
               <button
