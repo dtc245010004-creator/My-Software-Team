@@ -1,4 +1,4 @@
-﻿from typing import List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -6,15 +6,15 @@ from app.core.datetime_utils import UTCDateTime
 
 
 # ==========================================
-# 1. Cá»”NG Sáº C (CONNECTOR SCHEMAS)
+# 1. CỔNG SẠC (CONNECTOR SCHEMAS)
 # ==========================================
 class ConnectorBase(BaseModel):
     connector_number: int = Field(
-        ..., ge=1, description="Thá»© tá»± cá»•ng sÃºng sáº¡c (1, 2...)"
+        ..., ge=1, description="Thứ tự cổng súng sạc (1, 2...)"
     )
-    connector_type: str = Field(..., description="Chuáº©n sáº¡c: CCS2, TYPE_2, CHADEMO")
+    connector_type: str = Field(..., description="Chuẩn sạc: CCS2, TYPE_2, CHADEMO")
     max_power_kw: float = Field(
-        ..., gt=0, description="CÃ´ng suáº¥t tá»‘i Ä‘a cá»§a cá»•ng sáº¡c (kW)"
+        ..., gt=0, description="Công suất tối đa của cổng sạc (kW)"
     )
 
     @field_validator("connector_type")
@@ -23,7 +23,7 @@ class ConnectorBase(BaseModel):
         v_upper = v.upper()
         if v_upper not in ["CCS2", "TYPE_2", "CHADEMO"]:
             raise ValueError(
-                "Chuáº©n sáº¡c khÃ´ng há»£p lá»‡. Chá»‰ cháº¥p nháº­n: CCS2, TYPE_2, CHADEMO."
+                "Chuẩn sạc không hợp lệ. Chỉ chấp nhận: CCS2, TYPE_2, CHADEMO."
             )
         return v_upper
 
@@ -43,28 +43,28 @@ class ConnectorResponse(ConnectorBase):
 
 
 # ==========================================
-# 2. TRá»¤ Sáº C (CHARGING POINT SCHEMAS)
+# 2. TRỤ SẠC (CHARGING POINT SCHEMAS)
 # ==========================================
 class ChargingPointBase(BaseModel):
     code: str = Field(
-        ..., min_length=3, max_length=50, description="MÃ£ Ä‘á»‹nh danh trá»¥ sáº¡c EVSE ID"
+        ..., min_length=3, max_length=50, description="Mã định danh trụ sạc EVSE ID"
     )
-    vendor: str = Field(default="ABB", max_length=100, description="HÃ£ng sáº£n xuáº¥t")
+    vendor: str = Field(default="ABB", max_length=100, description="Hãng sản xuất")
     model: Optional[str] = Field(
-        default=None, max_length=100, description="Model trá»¥ sáº¡c"
+        default=None, max_length=100, description="Model trụ sạc"
     )
     max_power_kw: float = Field(
-        ..., gt=0, description="CÃ´ng suáº¥t tá»‘i Ä‘a cá»§a trá»¥ sáº¡c (kW)"
+        ..., gt=0, description="Công suất tối đa của trụ sạc (kW)"
     )
     firmware_version: Optional[str] = Field(default="1.0.0", max_length=50)
     power_sharing_enabled: bool = Field(
-        default=True, description="Báº­t tÃ­nh nÄƒng chia táº£i Ä‘á»™ng giá»¯a cÃ¡c sÃºng"
+        default=True, description="Bật tính năng chia tải động giữa các súng"
     )
 
 
 class ChargingPointCreate(ChargingPointBase):
     connectors: Optional[List[ConnectorCreate]] = Field(
-        default_factory=list, description="Danh sÃ¡ch sÃºng sáº¡c ban Ä‘áº§u"
+        default_factory=list, description="Danh sách súng sạc ban đầu"
     )
 
 
@@ -90,13 +90,13 @@ class ChargingPointUpdate(BaseModel):
                 "FAULTED",
                 "UNAVAILABLE",
             ]:
-                raise ValueError("Tráº¡ng thÃ¡i trá»¥ sáº¡c khÃ´ng há»£p lá»‡.")
+                raise ValueError("Trạng thái trụ sạc không hợp lệ.")
             return v_upper
         return v
 
 
 class ChargingPointStatusUpdate(BaseModel):
-    status: str = Field(..., description="Tráº¡ng thÃ¡i váº­n hÃ nh má»›i cá»§a trá»¥")
+    status: str = Field(..., description="Trạng thái vận hành mới của trụ")
 
     @field_validator("status")
     @classmethod
@@ -112,7 +112,7 @@ class ChargingPointStatusUpdate(BaseModel):
             "UNAVAILABLE",
         ]:
             raise ValueError(
-                "Tráº¡ng thÃ¡i khÃ´ng há»£p lá»‡: AVAILABLE, PREPARING, CHARGING, FAULTED, UNAVAILABLE."
+                "Trạng thái không hợp lệ: AVAILABLE, PREPARING, CHARGING, FAULTED, UNAVAILABLE."
             )
         return v_upper
 
@@ -125,7 +125,7 @@ class ChargingPointResponse(ChargingPointBase):
     created_at: UTCDateTime
     connectors: List[ConnectorResponse] = Field(default_factory=list)
 
-    # Chá»‰ sá»‘ tÃ­nh toÃ¡n táº¡i táº§ng Charger (Charger vs Connectors)
+    # Chỉ số tính toán tại tầng Charger (Charger vs Connectors)
     total_connector_power_kw: float = 0.0
     is_power_sharing: bool = False
 
@@ -133,23 +133,25 @@ class ChargingPointResponse(ChargingPointBase):
 
 
 # ==========================================
-# 3. TRáº M Sáº C (STATION SCHEMAS)
+# 3. TRẠM SẠC (STATION SCHEMAS)
 # ==========================================
 class StationBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=150, description="TÃªn tráº¡m sáº¡c")
+    name: str = Field(..., min_length=2, max_length=150, description="Tên trạm sạc")
     address: str = Field(
-        ..., min_length=5, max_length=255, description="Äá»‹a chá»‰ váº­t lÃ½ chi tiáº¿t"
+        ..., min_length=5, max_length=255, description="Địa chỉ vật lý chi tiết"
     )
     latitude: Optional[float] = Field(
-        default=None, ge=-90.0, le=90.0, description="VÄ© Ä‘á»™ GPS"
+        default=None, ge=-90.0, le=90.0, description="Vĩ độ GPS"
     )
     longitude: Optional[float] = Field(
-        default=None, ge=-180.0, le=180.0, description="Kinh Ä‘á»™ GPS"
+        default=None, ge=-180.0, le=180.0, description="Kinh độ GPS"
     )
-    total_grid_capacity_kw: float = Field(default=100.0, gt=0, description="Tong cong suat luoi dinh muc kW")
-    operating_hours: Optional[str] = Field(default="24/7", max_length=50)
+    total_grid_capacity_kw: float = Field(
+        ..., gt=0, description="Công suất nguồn trạm (kW)"
+    )
+    operating_hours: str = Field(default="24/7", max_length=50)
     status: str = Field(
-        default="ACTIVE", description="Tráº¡ng thÃ¡i váº­n hÃ nh: ACTIVE hoáº·c MAINTENANCE"
+        default="ACTIVE", description="Trạng thái vận hành: ACTIVE hoặc MAINTENANCE"
     )
 
     @field_validator("status")
@@ -157,13 +159,13 @@ class StationBase(BaseModel):
     def validate_station_status(cls, v: str) -> str:
         v_upper = v.upper()
         if v_upper not in ["ACTIVE", "MAINTENANCE"]:
-            raise ValueError("Tráº¡ng thÃ¡i tráº¡m chá»‰ cÃ³ thá»ƒ lÃ  ACTIVE hoáº·c MAINTENANCE.")
+            raise ValueError("Trạng thái trạm chỉ có thể là ACTIVE hoặc MAINTENANCE.")
         return v_upper
 
 
 class StationCreate(StationBase):
     operator_id: Optional[int] = Field(
-        default=None, description="ID Chá»§ tráº¡m sáº¡c (chá»‰ Admin Ä‘Æ°á»£c gÃ¡n)"
+        default=None, description="ID Chủ trạm sạc (chỉ Admin được gán)"
     )
 
 
@@ -172,11 +174,11 @@ class StationUpdate(BaseModel):
     address: Optional[str] = Field(default=None, min_length=5, max_length=255)
     latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
     longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
-    total_grid_capacity_kw: float = Field(default=100.0, gt=0, description="Tong cong suat luoi dinh muc kW")
+    total_grid_capacity_kw: Optional[float] = Field(default=None, gt=0)
     operating_hours: Optional[str] = None
     status: Optional[str] = None
     operator_id: Optional[int] = Field(
-        default=None, description="ID Chá»§ tráº¡m sáº¡c (chá»‰ Admin Ä‘Æ°á»£c gÃ¡n/Ä‘á»•i)"
+        default=None, description="ID Chủ trạm sạc (chỉ Admin được gán/đổi)"
     )
 
     @field_validator("status")
@@ -186,7 +188,7 @@ class StationUpdate(BaseModel):
             v_upper = v.upper()
             if v_upper not in ["ACTIVE", "MAINTENANCE"]:
                 raise ValueError(
-                    "Tráº¡ng thÃ¡i tráº¡m chá»‰ cÃ³ thá»ƒ lÃ  ACTIVE hoáº·c MAINTENANCE."
+                    "Trạng thái trạm chỉ có thể là ACTIVE hoặc MAINTENANCE."
                 )
             return v_upper
         return v
@@ -201,7 +203,7 @@ class StationResponse(StationBase):
     updated_at: UTCDateTime
     charging_points: List[ChargingPointResponse] = Field(default_factory=list)
 
-    # Chá»‰ sá»‘ tÃ­nh toÃ¡n táº¡i táº§ng Station (Station vs Chargers - Oversubscription)
+    # Chỉ số tính toán tại tầng Station (Station vs Chargers - Oversubscription)
     total_installed_power_kw: float = 0.0
     oversubscription_ratio: float = 0.0
     is_oversubscribed: bool = False
@@ -210,9 +212,6 @@ class StationResponse(StationBase):
 
 
 class StationDistanceResponse(StationResponse):
-    """Schema má»Ÿ rá»™ng cho API tÃ¬m kiáº¿m tráº£ vá» khoáº£ng cÃ¡ch tÃ­nh báº±ng km."""
+    """Schema mở rộng cho API tìm kiếm trả về khoảng cách tính bằng km."""
 
     distance_km: Optional[float] = None
-
-
-

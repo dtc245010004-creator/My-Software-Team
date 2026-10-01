@@ -609,44 +609,20 @@ def get_station(
     "",
     response_model=StationResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Tạo trạm sạc mới (Dành cho CPO / ADMIN)",
+    summary="Tạo trạm sạc mới (Chỉ dành cho ADMIN)",
 )
 def create_station(
     station_in: StationCreate,
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    current_user: User = Depends(require_roles(["ADMIN"])),
     db: Session = Depends(get_db),
 ):
     """
     Tạo trạm sạc mới:
-    - Bắt buộc vai trò ADMIN hoặc OPERATOR.
-    - Nếu là OPERATOR: Tự động gắn operator_id = current_user.id.
-    - Nếu là ADMIN: Cho phép gán operator_id theo station_in (hoặc None nếu để trạm tự do).
+    - Bắt buộc vai trò ADMIN.
+    - Cho phép gán operator_id theo station_in (hoặc None nếu để trạm tự do).
     """
-    assigned_operator_id = (
-        station_in.operator_id if current_user.role == "ADMIN" else current_user.id
-    )
-
-    # Chống duplicate: Chỉ kiểm tra trùng tên trạm nếu tên không rỗng
-    if station_in.name:
-        dup_station = db.query(Station).filter(Station.name == station_in.name).first()
-        if dup_station:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Trạm sạc với tên này đã tồn tại trong hệ thống."
-            )
-
-    # Mặc định trạm mới tạo qua endpoint này là is_active=False (chờ duyệt), trừ khi schema có truyền rõ
-        # Xac dinh is_active: chi bat True neu client chu dong truyen status='ACTIVE' hoac is_active=True
-    sent_fields = getattr(station_in, "model_fields_set", set())
-    if "is_active" in sent_fields and station_in.is_active is not None:
-        station_is_active = station_in.is_active
-    elif "status" in sent_fields and str(station_in.status).upper() in ("ACTIVE", "STATIONSTATUS.ACTIVE"):
-        station_is_active = True
-    else:
-        station_is_active = False
-
     new_station = Station(
-        operator_id=assigned_operator_id,
+        operator_id=station_in.operator_id,
         name=station_in.name,
         address=station_in.address,
         latitude=station_in.latitude,
@@ -654,7 +630,7 @@ def create_station(
         total_grid_capacity_kw=station_in.total_grid_capacity_kw,
         operating_hours=station_in.operating_hours,
         status=station_in.status,
-        is_active=station_is_active,
+        is_active=True,
     )
     db.add(new_station)
     db.commit()
@@ -673,7 +649,7 @@ def update_station(
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
-    """Cập nhật trạm sạc: Kiểm tra quyền sở hữu (Owner hoặc Admin). Chỉ Admin được đổi chủ trạm."""
+    """Cập nhật trạm sạc: Kiểm tra quyền sở hữu (Owner hoặc Admin). Chỉ Admin được đổi chủ trạm, công suất lưới, địa chỉ. Chủ trạm chỉ được cập nhật operating_hours."""
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
         raise HTTPException(
@@ -684,14 +660,24 @@ def update_station(
 
     update_data = station_in.model_dump(exclude_unset=True)
 
-    # Chặn thay đổi chủ trạm nếu không phải ADMIN
-    if "operator_id" in update_data and current_user.role != "ADMIN":
-        if update_data["operator_id"] != station.operator_id:
+    if current_user.role != "ADMIN":
+        # Chặn thay đổi công suất lưới nếu không phải ADMIN
+        if (
+            "total_grid_capacity_kw" in update_data
+            and update_data["total_grid_capacity_kw"]
+            != station.total_grid_capacity_kw
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ Quản trị viên (Admin) mới có quyền thay đổi công suất nguồn lưới (total_grid_capacity_kw).",
+            )
+        # Chặn thay đổi chủ trạm nếu không phải ADMIN
+        if "operator_id" in update_data and update_data["operator_id"] != station.operator_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Chỉ Quản trị viên (Admin) mới có quyền gán hoặc thay đổi Chủ trạm.",
             )
-        update_data.pop("operator_id")
+        update_data.pop("operator_id", None)
 
     for field, value in update_data.items():
         setattr(station, field, value)
