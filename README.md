@@ -116,7 +116,7 @@ Khởi chạy cả Backend và Frontend trong cùng terminal:
 
 | Vai trò (Role) | Tên đăng nhập | Email | Mật khẩu mặc định | Chức năng chính |
 | :--- | :--- | :--- | :--- | :--- |
-| **Quản trị viên (ADMIN)** | `admin` | `admin@evcsms.vn` | `AdminPass123` | Quản trị toàn hệ thống, cấu hình tham số, giám sát tải busbar |
+| **Quản trị viên (ADMIN)** | `admin` | `admin@evcsms.vn` | `12345678a` | Quản trị toàn hệ thống, cấu hình tham số, giám sát tải busbar |
 | **Quản trị viên dự phòng (ADMIN)** | `admin2` | `admin2@evcsms.vn` | `AdminPass123` | Quản trị viên dự phòng hệ thống |
 | **Chủ trạm (OPERATOR)** | `operator` | `operator@evcsms.vn` | `OpPass123` | Quản lý trạm sạc, trụ sạc, cổng sạc, xem telemetry, AI Advisor |
 | **Chủ trạm VinFast** | `operator_a` | `cpo_vinfast@evcsms.vn` | `OpPass123` | Quản trị mạng lưới trạm sạc khu vực |
