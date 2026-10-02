@@ -1,3 +1,6 @@
+import logging
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 from typing import Any, Dict
 
@@ -56,5 +59,9 @@ async def handle(db: Session, payload: Dict[str, Any], charge_point: ChargingPoi
             db.add(conn_error)
 
         db.commit()
+    else:
+        logger.warning(
+            f"Bỏ qua đầu nối chưa khai báo: connectorId={connector_id} không tồn tại trên trụ {charge_point_id}."
+        )
 
     return {}
