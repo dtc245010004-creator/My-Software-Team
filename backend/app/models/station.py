@@ -72,9 +72,21 @@ class ChargingPoint(Base):
     code = Column(String(100), nullable=True, unique=True, index=True)
     vendor = Column(String(100), nullable=True, default="Generic")
     model = Column(String(100), nullable=True)
+
+    # Synonyms / Aliases phục vụ Pydantic response và các test case
+    charge_point_vendor = synonym("vendor")
+    charge_point_model = synonym("model")
+    charge_point_model_name = synonym("model")
+    charger_code = synonym("code")
+
+    firmware_version = Column(String(100), nullable=True)
     status = Column(String(50), nullable=True, default="AVAILABLE")
     max_power_kw = Column(Float, nullable=True, default=22.0)
+    power_sharing_enabled = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True)
     last_seen_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=datetime.utcnow, nullable=True)
 
     station = relationship("Station", back_populates="charging_points")
     connectors = relationship(
@@ -85,10 +97,24 @@ class ChargingPoint(Base):
     )
 
     def __init__(self, **kwargs):
-        if "charge_point_id" in kwargs and "code" not in kwargs:
-            kwargs["code"] = kwargs["charge_point_id"]
-        elif "code" in kwargs and "charge_point_id" not in kwargs:
-            kwargs["charge_point_id"] = kwargs["code"]
+        c_code = kwargs.get("code") or kwargs.get("charge_point_id") or kwargs.get("charger_code")
+        if c_code:
+            kwargs["code"] = c_code
+            kwargs["charge_point_id"] = c_code
+
+        c_vendor = kwargs.get("vendor") or kwargs.get("charge_point_vendor")
+        if c_vendor:
+            kwargs["vendor"] = c_vendor
+
+        c_model = kwargs.get("model") or kwargs.get("charge_point_model") or kwargs.get("charge_point_model_name")
+        if c_model:
+            kwargs["model"] = c_model
+
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = datetime.now(timezone.utc)
+        if "updated_at" not in kwargs:
+            kwargs["updated_at"] = datetime.now(timezone.utc)
+
         valid_cols = {c.name for c in self.__table__.columns}
         filtered = {k: v for k, v in kwargs.items() if k in valid_cols or hasattr(type(self), k)}
         for k, v in kwargs.items():
