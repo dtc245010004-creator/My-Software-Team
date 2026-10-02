@@ -20,7 +20,12 @@ def upgrade() -> None:
         batch_op.add_column(
             sa.Column("charge_point_model_name", sa.String(100), nullable=True)
         )
-        batch_op.drop_constraint("ck_charger_status_valid", type_="check")
+        bind = op.get_bind()
+    if bind.dialect.name != "sqlite":
+        try:
+            batch_op.drop_constraint("ck_charger_status_valid", type_="check")
+        except Exception:
+            pass
         batch_op.create_check_constraint(
             "ck_charger_status_valid",
             "status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED', "
@@ -35,7 +40,12 @@ def downgrade() -> None:
         )
     )
     with op.batch_alter_table("charging_points") as batch_op:
-        batch_op.drop_constraint("ck_charger_status_valid", type_="check")
+        bind = op.get_bind()
+    if bind.dialect.name != "sqlite":
+        try:
+            batch_op.drop_constraint("ck_charger_status_valid", type_="check")
+        except Exception:
+            pass
         batch_op.create_check_constraint(
             "ck_charger_status_valid",
             "status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
