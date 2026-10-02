@@ -60,26 +60,20 @@ class Station(Base):
 
 class ChargingPoint(Base):
     __tablename__ = "charging_points"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
+        {"extend_existing": True},
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     station_id = Column(Integer, ForeignKey("stations.id", ondelete="CASCADE"), nullable=False, index=True)
     charge_point_id = Column(String(100), nullable=True, index=True)
     code = Column(String(100), nullable=True, unique=True, index=True)
     model = Column(String(100), nullable=True)
-    vendor = Column(String(100), nullable=True, default="Generic")
-    serial_number = Column(String(100), nullable=True)
-    firmware_version = Column(String(50), nullable=True, default="1.0.0")
-    max_power_kw = Column(Float, nullable=True, default=60.0)
-    power_sharing_enabled = Column(Boolean, nullable=False, default=True)
-    status = Column(String(50), default="Available")
-    is_active = Column(Boolean, nullable=False, default=True)
-    last_seen_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+    __table_args__ = (
+        CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
+        {"extend_existing": True},
+    )
     )
 
     station = relationship("Station", back_populates="charging_points")
