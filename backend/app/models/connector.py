@@ -1,7 +1,19 @@
 ﻿from datetime import datetime, timezone
-from app.core.database import Base
-from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey, UniqueConstraint
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
+
+from app.core.database import Base
+
 
 class Connector(Base):
     __tablename__ = "connectors"

@@ -1,7 +1,10 @@
 ﻿from datetime import datetime, timezone
-from app.core.database import Base
-from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey
+
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+
+from app.core.database import Base
+
 
 class ChargePoint(Base):
     __tablename__ = "charging_points"
@@ -31,10 +34,13 @@ class ChargePoint(Base):
         lazy="joined"
     )
 
-    def __init__(self, **kwargs):
-        if "code" in kwargs and "charge_point_id" not in kwargs:
-            kwargs["charge_point_id"] = kwargs["code"]
-        elif "charge_point_id" in kwargs and "code" not in kwargs:
-            kwargs["code"] = kwargs["charge_point_id"]
+def __init__(self, **kwargs):
+        # Đồng bộ các tên thuộc tính tương đương
+        if "charge_point_string_id" in kwargs:
+            val = kwargs.pop("charge_point_string_id")
+            for candidate in ["identity", "charge_point_id", "charger_code", "code"]:
+                if hasattr(type(self), candidate):
+                    kwargs[candidate] = val
+                    break
         super().__init__(**kwargs)
 

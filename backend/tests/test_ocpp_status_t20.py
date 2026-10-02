@@ -1,10 +1,10 @@
-﻿import pytest
-from datetime import datetime, timezone
-from unittest.mock import MagicMock
+﻿from unittest.mock import MagicMock
 
-from app.ocpp.status_mapping import map_ocpp_to_internal
-from app.ocpp.handlers.status_notification import handle
+import pytest
+
 from app.models.station import ChargingPoint, Connector, ConnectorError
+from app.ocpp.handlers.status_notification import handle
+from app.ocpp.status_mapping import map_ocpp_to_internal
 
 
 @pytest.mark.parametrize(

@@ -1,62 +1,194 @@
-﻿from datetime import datetime, timezone
+import enum
+from datetime import datetime, timezone
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+)
+from sqlalchemy.orm import relationship, synonym
+
 from app.core.database import Base
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
-from sqlalchemy.orm import relationship
+
+
+class StationStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    UNDER_MAINTENANCE = "UNDER_MAINTENANCE"
+
 
 class Station(Base):
     __tablename__ = "stations"
-    __table_args__ = {"extend_existing": True}
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String, unique=True, index=True, nullable=True)
-    name = Column(String, nullable=True)
-    status = Column(String, default="ACTIVE")
-    operator_id = Column(Integer, nullable=True)
+    operator_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    address = Column(String(500), nullable=False)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    address = Column(String, nullable=True)
-    operating_hours = Column(String, nullable=True, default="24/7")
     total_grid_capacity_kw = Column(Float, nullable=True, default=100.0)
-    is_active = Column(Boolean, default=True)
-    last_seen_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    operating_hours = Column(String(100), nullable=True, default="24/7")
+    status = Column(String(50), nullable=False, default=StationStatus.ACTIVE.value)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
-    charging_points = relationship("ChargePoint", back_populates="station", foreign_keys="ChargePoint.station_id", lazy="joined")
+    # Relationships
+    operator = relationship("User", foreign_keys=[operator_id], lazy="joined")
+    charging_points = relationship("ChargingPoint", back_populates="station", cascade="all, delete-orphan", lazy="select")
+    power_metrics = relationship("StationPowerMetric", back_populates="station", cascade="all, delete-orphan", lazy="select")
 
     def __init__(self, **kwargs):
-        # Tự động chuẩn hóa trạng thái hợp lệ cho Pydantic validator
-        if "status" in kwargs and kwargs["status"]:
-            st_val = str(kwargs["status"]).upper()
-            if st_val in ("AVAILABLE", "ACTIVE"):
-                kwargs["status"] = "ACTIVE"
-            elif st_val in ("MAINTENANCE", "FAULTED", "UNAVAILABLE"):
-                kwargs["status"] = "MAINTENANCE"
-        else:
-            kwargs["status"] = "ACTIVE"
+        kwargs.pop("vendor", None)
         super().__init__(**kwargs)
 
-from app.models.connector import Connector
-from app.models.charge_point import ChargePoint
 
-ChargingPoint = ChargePoint
-ChargingPointModel = ChargePoint
+class ChargingPoint(Base):
+    __tablename__ = "charging_points"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    station_id = Column(Integer, ForeignKey("stations.id", ondelete="CASCADE"), nullable=False, index=True)
+    charge_point_id = Column(String(100), nullable=True, index=True)
+    code = Column(String(100), nullable=True, unique=True, index=True)
+    model = Column(String(100), nullable=True)
+    vendor = Column(String(100), nullable=True, default="Generic")
+    serial_number = Column(String(100), nullable=True)
+    firmware_version = Column(String(50), nullable=True, default="1.0.0")
+    max_power_kw = Column(Float, nullable=True, default=60.0)
+    power_sharing_enabled = Column(Boolean, nullable=False, default=True)
+    status = Column(String(50), default="Available")
+    is_active = Column(Boolean, nullable=False, default=True)
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    station = relationship("Station", back_populates="charging_points")
+    connectors = relationship(
+        "Connector",
+        back_populates="charging_point",
+        primaryjoin="ChargingPoint.id == Connector.charge_point_id",
+        cascade="all, delete-orphan",
+    )
+
+    def __init__(self, **kwargs):
+        if "charge_point_string_id" in kwargs:
+            kwargs["charge_point_id"] = kwargs.pop("charge_point_string_id")
+        if "code" in kwargs and not kwargs.get("charge_point_id"):
+            kwargs["charge_point_id"] = kwargs["code"]
+        elif "charge_point_id" in kwargs and not kwargs.get("code"):
+            kwargs["code"] = kwargs["charge_point_id"]
+        if not kwargs.get("vendor"):
+            kwargs["vendor"] = "Generic"
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = datetime.now(timezone.utc)
+        super().__init__(**kwargs)
+
+
+class Connector(Base):
+    __tablename__ = "connectors"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    charge_point_id = Column(Integer, ForeignKey("charging_points.id", ondelete="CASCADE"), nullable=False, index=True)
+    charging_point_id = synonym("charge_point_id")
+
+    connector_id = Column(Integer, nullable=True)
+    connector_number = Column(Integer, nullable=True)
+    connector_type = Column(String(50), nullable=True, default="Type 2")
+    status = Column(String(50), default="AVAILABLE")
+    ocpp_status = Column(String(50), default="Available")
+    max_kw = Column(Float, nullable=True, default=22.0)
+    max_power_kw = Column(Float, nullable=True, default=22.0)
+    type = Column(String(50), nullable=True, default="Type 2")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    charging_point = relationship(
+        "ChargingPoint",
+        back_populates="connectors",
+        primaryjoin="ChargingPoint.id == Connector.charge_point_id",
+    )
+    errors = relationship("ConnectorError", back_populates="connector", cascade="all, delete-orphan")
+
+    def __init__(self, **kwargs):
+        if "charging_point_id" in kwargs and not kwargs.get("charge_point_id"):
+            kwargs["charge_point_id"] = kwargs.pop("charging_point_id")
+        if "connector_number" in kwargs and not kwargs.get("connector_id"):
+            kwargs["connector_id"] = kwargs["connector_number"]
+        elif "connector_id" in kwargs and not kwargs.get("connector_number"):
+            kwargs["connector_number"] = kwargs["connector_id"]
+        if "connector_type" in kwargs and not kwargs.get("type"):
+            kwargs["type"] = kwargs["connector_type"]
+        if "max_power_kw" in kwargs and not kwargs.get("max_kw"):
+            kwargs["max_kw"] = kwargs["max_power_kw"]
+        if "created_at" not in kwargs:
+            kwargs["created_at"] = datetime.now(timezone.utc)
+        super().__init__(**kwargs)
+
 
 class ConnectorError(Base):
     __tablename__ = "connector_errors"
     __table_args__ = {"extend_existing": True}
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    connector_id = Column(Integer, nullable=False)
-    error_code = Column(String, nullable=False)
-    vendor_error_code = Column(String, nullable=True)
+    connector_id = Column(Integer, ForeignKey("connectors.id", ondelete="CASCADE"), nullable=False, index=True)
+    error_code = Column(String(100), nullable=False)
+    vendor_error_code = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+
+    connector = relationship("Connector", back_populates="errors")
+
 
 class StationPowerMetric(Base):
     __tablename__ = "station_power_metrics"
     __table_args__ = {"extend_existing": True}
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    station_id = Column(Integer, nullable=False)
-    power_kw = Column(Float, nullable=True)
-    active_chargers_count = Column(Integer, nullable=True, default=0)
-    timestamp = Column(DateTime, nullable=True)
+    station_id = Column(Integer, ForeignKey("stations.id", ondelete="CASCADE"), nullable=False, index=True)
+    recorded_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    total_active_power_kw = Column(Float, default=0.0)
+    power_kw = Column(Float, default=0.0)
+    grid_limit_kw = Column(Float, default=100.0)
+    active_sessions_count = Column(Integer, default=0)
+    active_chargers_count = Column(Integer, default=0)
+
+    station = relationship("Station", back_populates="power_metrics")
+
+    def __init__(self, **kwargs):
+        if "power_kw" in kwargs and not kwargs.get("total_active_power_kw"):
+            kwargs["total_active_power_kw"] = kwargs["power_kw"]
+        elif "total_active_power_kw" in kwargs and not kwargs.get("power_kw"):
+            kwargs["power_kw"] = kwargs["total_active_power_kw"]
+        if "timestamp" in kwargs and not kwargs.get("recorded_at"):
+            kwargs["recorded_at"] = kwargs["timestamp"]
+        elif "recorded_at" in kwargs and not kwargs.get("timestamp"):
+            kwargs["timestamp"] = kwargs["recorded_at"]
+        if "active_chargers_count" in kwargs and not kwargs.get("active_sessions_count"):
+            kwargs["active_sessions_count"] = kwargs["active_chargers_count"]
+        super().__init__(**kwargs)

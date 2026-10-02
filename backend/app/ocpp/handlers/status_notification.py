@@ -1,91 +1,60 @@
-﻿"""
-Handler xử lý tin nhắn OCPP StatusNotification.
-"""
 from datetime import datetime, timezone
-import logging
+from typing import Any, Dict
+
 from sqlalchemy.orm import Session
 
 from app.models.station import ChargingPoint, Connector, ConnectorError
 from app.ocpp.status_mapping import map_ocpp_to_internal
 
-logger = logging.getLogger("ev_csms.ocpp.status_notification")
 
+def parse_timestamp_safe(ts_val):
+    if not ts_val:
+        return None
+    if isinstance(ts_val, datetime):
+        return ts_val
+    try:
+        # Hỗ trợ ISO 8601 (kể cả kết thúc bằng Z)
+        clean_ts = str(ts_val).replace("Z", "+00:00")
+        return datetime.fromisoformat(clean_ts)
+    except (ValueError, TypeError):
+        return None
 
-async def handle(
-    db: Session,
-    payload: dict,
-    charge_point: ChargingPoint,
-    charge_point_id: int,
-) -> dict:
-    """
-    Hàm thực thi xử lý thông điệp StatusNotification từ trạm sạc theo chuẩn T-20.
-    """
-    connector_id: int = payload.get("connectorId", 0)
-    status_str: str = payload.get("status", "Unknown")
-    error_code: str = payload.get("errorCode", "NoError")
-    vendor_error_code: str | None = payload.get("vendorErrorCode")
+async def handle(db: Session, payload: Dict[str, Any], charge_point: ChargingPoint, charge_point_id: Any) -> Dict[str, Any]:
+    connector_id = payload.get("connectorId", 0)
+    raw_status = payload.get("status", "Available")
+    error_code = payload.get("errorCode", "NoError")
+    vendor_error_code = payload.get("vendorErrorCode")
+    timestamp = payload.get("timestamp")
 
-    logger.info(
-        "Nhận StatusNotification từ charge_point_id=%s, connectorId=%s, status=%s, errorCode=%s",
-        charge_point_id,
-        connector_id,
-        status_str,
-        error_code,
-    )
+    now = datetime.now(timezone.utc)
+    charge_point.last_seen_at = now
 
-    connector: Connector | None = None
+    internal_status = map_ocpp_to_internal(raw_status)
 
-    # 1. Kiểm tra nếu connectorId > 0 nhưng không tồn tại trong khai báo -> Bỏ qua (T-22)
-    if connector_id > 0:
-        connector = (
-            db.query(Connector)
-            .filter_by(charging_point_id=charge_point_id, connector_number=connector_id)
-            .first()
-        )
-        if not connector:
-            logger.warning(
-                "Cảnh báo: Trụ %s gửi connectorId=%s không tồn tại trong khai báo. Bỏ qua.",
-                charge_point_id,
-                connector_id,
-            )
-            return {}
-
-    # Chuyển đổi trạng thái OCPP sang trạng thái nội bộ
-    internal_status = map_ocpp_to_internal(status_str)
-
-    # 2 & 3. Cập nhật trạng thái cấp trụ (connectorId = 0) hoặc cấp đầu nối (connectorId > 0)
     if connector_id == 0:
         charge_point.status = internal_status
-    elif connector is not None:
+        db.commit()
+        return {}
+
+    connector = (
+        db.query(Connector)
+        .filter_by(charge_point_id=charge_point.id, connector_number=connector_id)
+        .first()
+    )
+
+    if connector:
         connector.status = internal_status
-        if hasattr(connector, "ocpp_status"):
-            connector.ocpp_status = status_str
+        connector.ocpp_status = raw_status
 
-    # 5. Cập nhật cột last_seen_at trên ChargingPoint
-    charge_point.last_seen_at = datetime.now(timezone.utc)
+        if error_code and error_code != "NoError":
+            conn_error = ConnectorError(
+                connector_id=connector.id,
+                error_code=error_code,
+                vendor_error_code=vendor_error_code,
+                created_at=parse_timestamp_safe(timestamp),
+            )
+            db.add(conn_error)
 
-    # 4. Lưu errorCode vào bảng connector_errors nếu khác NoError (Task T-21)
-    if error_code != "NoError" and connector_id > 0 and connector is not None:
-        error_entry = ConnectorError(
-            connector_id=connector.id,
-            error_code=error_code,
-            vendor_error_code=vendor_error_code,
-        )
-        db.add(error_entry)
-        logger.info(
-            "Đã ghi nhận lỗi đầu nối: connector_id=%s, errorCode=%s, vendorErrorCode=%s",
-            connector.id,
-            error_code,
-            vendor_error_code,
-        )
-
-    db.commit()
+        db.commit()
 
     return {}
-
-
-class StatusNotificationHandler:
-    """Lớp bọc tương thích ngược với __init__.py"""
-    @staticmethod
-    async def handle(db, payload, charge_point, charge_point_id):
-        return await handle(db, payload, charge_point, charge_point_id)
