@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -69,12 +70,11 @@ class ChargingPoint(Base):
     station_id = Column(Integer, ForeignKey("stations.id", ondelete="CASCADE"), nullable=False, index=True)
     charge_point_id = Column(String(100), nullable=True, index=True)
     code = Column(String(100), nullable=True, unique=True, index=True)
+    vendor = Column(String(100), nullable=True, default="Generic")
     model = Column(String(100), nullable=True)
-    __table_args__ = (
-        CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
-        {"extend_existing": True},
-    )
-    )
+    status = Column(String(50), nullable=True, default="AVAILABLE")
+    max_power_kw = Column(Float, nullable=True, default=22.0)
+    last_seen_at = Column(DateTime, nullable=True)
 
     station = relationship("Station", back_populates="charging_points")
     connectors = relationship(
@@ -85,18 +85,16 @@ class ChargingPoint(Base):
     )
 
     def __init__(self, **kwargs):
-        if "charge_point_string_id" in kwargs:
-            kwargs["charge_point_id"] = kwargs.pop("charge_point_string_id")
-        if "code" in kwargs and not kwargs.get("charge_point_id"):
-            kwargs["charge_point_id"] = kwargs["code"]
-        elif "charge_point_id" in kwargs and not kwargs.get("code"):
+        if "charge_point_id" in kwargs and "code" not in kwargs:
             kwargs["code"] = kwargs["charge_point_id"]
-        if not kwargs.get("vendor"):
-            kwargs["vendor"] = "Generic"
-        if "created_at" not in kwargs:
-            kwargs["created_at"] = datetime.now(timezone.utc)
-        super().__init__(**kwargs)
-
+        elif "code" in kwargs and "charge_point_id" not in kwargs:
+            kwargs["charge_point_id"] = kwargs["code"]
+        valid_cols = {c.name for c in self.__table__.columns}
+        filtered = {k: v for k, v in kwargs.items() if k in valid_cols or hasattr(type(self), k)}
+        for k, v in kwargs.items():
+            if k not in filtered:
+                setattr(self, k, v)
+        super().__init__(**filtered)
 
 class Connector(Base):
     __tablename__ = "connectors"
