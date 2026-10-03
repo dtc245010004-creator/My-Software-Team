@@ -3,15 +3,21 @@ from typing import List
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.websocket import ws_manager
 from app.models.station import ChargingPoint, Station
 from app.models.user import User
 from app.schemas.station import (
+    ChargerGridItem,
+    ChargerTreeItem,
     ChargingPointResponse,
     ConnectorResponse,
+    ConnectorStatusCount,
+    ConnectorTreeItem,
+    StationGridItem,
     StationResponse,
+    StationTreeItem,
 )
 
 
@@ -248,3 +254,235 @@ async def broadcast_status_change(
         **(extra or {}),
     }
     await ws_manager.broadcast(payload)
+
+
+def get_station_tree(db: Session, user: User) -> list[StationTreeItem]:
+    """Lấy cây trạm -> trụ -> đầu nối đã lọc theo quyền sở hữu (RBAC).
+
+    - Admin / Operator (OPERATOR): thấy toàn bộ các trạm chưa soft-delete.
+    - Chủ trạm (OPERATOR có operator_id trên trạm): chỉ thấy trạm của mình.
+    - Sử dụng joinedload để nạp quan hệ ChargingPoint và Connector,
+      tránh N+1 query.
+    """
+    role_names = getattr(user, "role_names", None)
+    if role_names is None and hasattr(user, "roles"):
+        role_names = [role.name for role in (user.roles or [])]
+
+    is_admin_or_global_operator = (
+        user.role == "ADMIN"
+        or (role_names and any(r in ("admin", "operator", "van_hanh_vien") for r in role_names))
+    )
+
+    stmt = (
+        db.query(Station)
+        .options(
+            joinedload(Station.charging_points)
+            .joinedload(ChargingPoint.connectors)
+        )
+        .filter(Station.is_active.is_(True))
+        .filter(Station.deleted_at.is_(None))
+    )
+
+    if not is_admin_or_global_operator:
+        stmt = stmt.filter(Station.operator_id == user.id)
+
+    stations = stmt.all()
+
+    results: list[StationTreeItem] = []
+    for station in stations:
+        chargers: list[ChargerTreeItem] = []
+        for cp in station.charging_points:
+            connectors = [
+                ConnectorTreeItem(
+                    id=c.id,
+                    connector_number=c.connector_number,
+                    connector_type=c.connector_type or "",
+                    status=c.status or "",
+                    max_power_kw=c.max_power_kw or 0.0,
+                    is_active=c.is_active,
+                )
+                for c in cp.connectors
+                if c.is_active
+            ]
+            chargers.append(
+                ChargerTreeItem(
+                    id=cp.id,
+                    code=cp.code or "",
+                    vendor=cp.vendor or "",
+                    model=cp.model,
+                    status=cp.status or "",
+                    max_power_kw=cp.max_power_kw or 0.0,
+                    power_sharing_enabled=cp.power_sharing_enabled,
+                    is_active=cp.is_active,
+                    last_seen_at=cp.last_seen_at,
+                    connectors=connectors,
+                )
+            )
+        results.append(
+            StationTreeItem(
+                id=station.id,
+                name=station.name,
+                address=station.address,
+                latitude=station.latitude,
+                longitude=station.longitude,
+                total_grid_capacity_kw=station.total_grid_capacity_kw or 0.0,
+                is_active=station.is_active,
+                chargers=chargers,
+            )
+        )
+    return results
+
+
+def classify_connector_status(raw_status: str | None) -> str:
+    """Chuẩn hóa trạng thái đầu nối về 1 trong 4 nhóm:
+    - 'available'
+    - 'charging'
+    - 'faulted'
+    - 'unavailable'
+    """
+    if not raw_status:
+        return "unavailable"
+    s = str(raw_status).strip().lower()
+    if s in ("available", "ready", "idle", "kha_dung"):
+        return "available"
+    if s in (
+        "charging",
+        "preparing",
+        "finishing",
+        "suspended_ev",
+        "suspended_evse",
+        "dang_sac",
+    ):
+        return "charging"
+    if s in ("faulted", "error", "loi"):
+        return "faulted"
+    return "unavailable"
+
+
+def get_station_grid(db: Session, user: User) -> list[StationGridItem]:
+    """Lấy dữ liệu hiển thị dạng lưới (Grid View) theo quyền hạn (T-24).
+
+    - Admin: Toàn bộ trạm sạc chưa xóa mềm.
+    - Operator: Chỉ các trạm thuộc sở hữu (operator_id == user.id).
+    - Sử dụng joinedload để tránh N+1 query.
+    - Tổng hợp số lượng đầu nối theo từng trạng thái cho mỗi trụ và mỗi trạm.
+    """
+    role_names = getattr(user, "role_names", None)
+    if role_names is None and hasattr(user, "roles"):
+        role_names = [role.name for role in (user.roles or [])]
+
+    is_admin_or_global_operator = (
+        user.role == "ADMIN"
+        or (
+            role_names
+            and any(r in ("admin", "operator", "van_hanh_vien") for r in role_names)
+        )
+    )
+
+    stmt = (
+        db.query(Station)
+        .options(
+            joinedload(Station.charging_points).joinedload(ChargingPoint.connectors)
+        )
+        .filter(Station.is_active.is_(True))
+        .filter(Station.deleted_at.is_(None))
+    )
+
+    if not is_admin_or_global_operator:
+        stmt = stmt.filter(Station.operator_id == user.id)
+
+    stations = stmt.all()
+
+    results: list[StationGridItem] = []
+    for station in stations:
+        chargers: list[ChargerGridItem] = []
+        st_avail = 0
+        st_charg = 0
+        st_fault = 0
+        st_unavail = 0
+
+        # Lọc danh sách trụ active của trạm
+        active_cps = [cp for cp in station.charging_points if cp.is_active]
+
+        for cp in active_cps:
+            cp_avail = 0
+            cp_charg = 0
+            cp_fault = 0
+            cp_unavail = 0
+
+            # Lọc danh sách đầu nối active của trụ
+            active_conns = [c for c in cp.connectors if c.is_active]
+            for conn in active_conns:
+                cat = classify_connector_status(conn.status)
+                if cat == "available":
+                    cp_avail += 1
+                elif cat == "charging":
+                    cp_charg += 1
+                elif cat == "faulted":
+                    cp_fault += 1
+                else:
+                    cp_unavail += 1
+
+            cp_total = cp_avail + cp_charg + cp_fault + cp_unavail
+            st_avail += cp_avail
+            st_charg += cp_charg
+            st_fault += cp_fault
+            st_unavail += cp_unavail
+
+            chargers.append(
+                ChargerGridItem(
+                    id=cp.id,
+                    station_id=station.id,
+                    code=cp.code or "",
+                    vendor=cp.vendor or "",
+                    model=cp.model,
+                    status=cp.status or "AVAILABLE",
+                    max_power_kw=cp.max_power_kw or 0.0,
+                    power_sharing_enabled=cp.power_sharing_enabled,
+                    is_active=cp.is_active,
+                    available_connectors=cp_avail,
+                    charging_connectors=cp_charg,
+                    faulted_connectors=cp_fault,
+                    unavailable_connectors=cp_unavail,
+                    total_connectors=cp_total,
+                    connector_counts=ConnectorStatusCount(
+                        available=cp_avail,
+                        charging=cp_charg,
+                        faulted=cp_fault,
+                        unavailable=cp_unavail,
+                        total=cp_total,
+                    ),
+                )
+            )
+
+        st_total = st_avail + st_charg + st_fault + st_unavail
+
+        results.append(
+            StationGridItem(
+                id=station.id,
+                name=station.name,
+                address=station.address,
+                latitude=station.latitude,
+                longitude=station.longitude,
+                total_grid_capacity_kw=station.total_grid_capacity_kw or 0.0,
+                status=station.status or "ACTIVE",
+                is_active=station.is_active,
+                total_chargers=len(chargers),
+                available_connectors=st_avail,
+                charging_connectors=st_charg,
+                faulted_connectors=st_fault,
+                unavailable_connectors=st_unavail,
+                total_connectors=st_total,
+                connector_counts=ConnectorStatusCount(
+                    available=st_avail,
+                    charging=st_charg,
+                    faulted=st_fault,
+                    unavailable=st_unavail,
+                    total=st_total,
+                ),
+                chargers=chargers,
+            )
+        )
+
+    return results
+
