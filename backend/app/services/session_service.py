@@ -429,3 +429,137 @@ def reconcile_interrupted_sessions(db: Session) -> int:
         f"Đã phục hồi và giải phóng {count} phiên sạc bị gián đoạn do server crash."
     )
     return count
+
+
+def force_close_abnormal_session(
+    db: Session,
+    user: User,
+    session_id: int,
+    reason: str,
+    meter_stop_kwh: Decimal | None = None,
+) -> ChargingSession:
+    """
+    Đóng tay thủ công một phiên sạc bất thường (SCRUM-52 / SCRUM-148):
+    - RBAC: Chỉ vai trò Vận hành viên (OPERATOR), Kế toán (ACCOUNTANT) và Quản trị viên (ADMIN) mới được thực hiện.
+    - Validation: Chặn đóng tay nếu không có lý do can thiệp.
+    - Quyết toán số đo cuối và giải phóng cổng sạc.
+    """
+    clean_reason = (reason or "").strip()
+    if not clean_reason or len(clean_reason) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bắt buộc phải cung cấp lý do can thiệp để đóng phiên sạc (tối thiểu 3 ký tự).",
+        )
+
+    if user.role not in ("OPERATOR", "ACCOUNTANT", "ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ vai trò vận hành viên và kế toán mới được thực hiện đóng tay phiên sạc.",
+        )
+
+    session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy phiên sạc.",
+        )
+
+    # Nếu là OPERATOR: Kiểm tra quyền quản lý trạm sạc
+    if user.role == "OPERATOR":
+        from app.services.station_service import get_accessible_station_ids
+
+        accessible_ids = get_accessible_station_ids(user, db)
+        if session.station_id not in accessible_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền can thiệp vào phiên sạc của trạm này.",
+            )
+
+    if session.status == "COMPLETED":
+        return session
+
+    # Xác định số đo công tơ kết thúc
+    if meter_stop_kwh is None:
+        try:
+            from app.simulator.charging_simulator import simulator_manager
+
+            sim = simulator_manager.get_simulator(session_id)
+            if sim:
+                meter_stop_kwh = sim.current_energy_kwh
+            else:
+                meter_stop_kwh = session.meter_stop_kwh or session.total_kwh or Decimal("0.00")
+        except Exception:
+            meter_stop_kwh = session.meter_stop_kwh or session.total_kwh or Decimal("0.00")
+
+    if meter_stop_kwh < session.meter_start_kwh:
+        meter_stop_kwh = session.meter_start_kwh
+
+    total_kwh = max(Decimal("0.00"), meter_stop_kwh - session.meter_start_kwh)
+    total_amount = round(total_kwh * session.applied_price_per_kwh, 2)
+
+    try:
+        if total_amount > 0 and session.status == "ACTIVE":
+            deduct_charging_fee(
+                db=db,
+                user_id=session.user_id,
+                session_id=session.id,
+                amount=total_amount,
+            )
+
+        now = datetime.now(timezone.utc)
+        session.end_time = now
+        session.meter_stop_kwh = meter_stop_kwh
+        session.total_kwh = total_kwh
+        session.total_amount = total_amount
+        session.status = "COMPLETED"
+        session.stop_reason = f"ĐÓNG TAY THỦ CÔNG: {clean_reason}"
+
+        # Mở khóa cổng sạc về AVAILABLE
+        db.execute(
+            text("UPDATE connectors SET status = 'AVAILABLE' WHERE id = :cid;"),
+            {"cid": session.connector_id},
+        )
+
+        connector = (
+            db.query(Connector).filter(Connector.id == session.connector_id).first()
+        )
+        if connector and connector.charging_point_id:
+            other_active = (
+                db.query(Connector)
+                .filter(
+                    Connector.charging_point_id == connector.charging_point_id,
+                    Connector.status == "CHARGING",
+                    Connector.id != session.connector_id,
+                    Connector.is_active.is_(True),
+                )
+                .count()
+            )
+            if other_active == 0:
+                db.execute(
+                    text(
+                        "UPDATE charging_points SET status = 'AVAILABLE' WHERE id = :cpid AND status = 'CHARGING';"
+                    ),
+                    {"cpid": connector.charging_point_id},
+                )
+
+        db.commit()
+        db.refresh(session)
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi khi đóng tay phiên sạc: {exc!s}",
+        ) from exc
+
+    # Dọn dẹp simulator nếu còn chạy ngầm
+    try:
+        from app.simulator.charging_simulator import simulator_manager
+
+        simulator_manager.stop_simulation(session.id)
+    except Exception:
+        pass
+
+    return session
