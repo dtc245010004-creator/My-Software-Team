@@ -55,7 +55,7 @@ async def ocpp_endpoint(
     charge_point_code: str,
     db: Session = Depends(get_db),
 ) -> None:
-    """Nhận kết nối OCPP và điều phối BootNotification cùng Authorize."""
+    """Nhận kết nối OCPP và điều phối các message OCPP."""
 
     charging_point = (
         db.query(ChargingPoint)
@@ -80,24 +80,30 @@ async def ocpp_endpoint(
         await websocket.close(code=1002)
         return
 
+    # Kết thúc transaction truy vấn xác thực trước khi giữ WebSocket lâu dài.
+    db.commit()
+
     await websocket.accept(subprotocol="ocpp1.6")
 
+    # T-28/T-29:
+    # Cùng một mã trụ chỉ có một kết nối đang hoạt động.
+    # Kết nối mới thay thế kết nối cũ.
     async with connection_registry_lock:
         previous_connection = active_ocpp_connections.get(charge_point_code)
 
         if previous_connection is not None and previous_connection is not websocket:
             try:
                 await previous_connection.close(code=1000)
-
-                logger.info(
-                    "Kết nối OCPP cũ bị thay thế code=%s",
-                    charge_point_code,
-                )
             except (OSError, RuntimeError):
                 logger.info(
                     "Kết nối OCPP cũ đã đóng hoặc không thể đóng code=%s",
                     charge_point_code,
                 )
+
+            logger.info(
+                "Kết nối OCPP cũ bị thay thế code=%s",
+                charge_point_code,
+            )
 
         active_ocpp_connections[charge_point_code] = websocket
 
@@ -107,12 +113,12 @@ async def ocpp_endpoint(
         while True:
             raw_frame = await websocket.receive_text()
 
-            # T-18: mọi message OCPP đi vào đều cập nhật last_seen_at.
+            # T-18:
+            # Mọi message OCPP đi vào đều cập nhật last_seen_at.
             touch_last_seen(db, charging_point.id)
 
             try:
                 frame = parse_frame(raw_frame)
-
             except OcppFrameError as exc:
                 if exc.message_id is None:
                     await websocket.close(code=1002)
@@ -135,7 +141,6 @@ async def ocpp_endpoint(
                         {},
                     )
                 )
-
                 continue
 
             if isinstance(frame, (CallResultFrame, CallErrorFrame)):
@@ -152,7 +157,6 @@ async def ocpp_endpoint(
                                 frame.details,
                             )
                         )
-
                     continue
 
                 if not is_booted:
@@ -212,7 +216,6 @@ async def ocpp_endpoint(
                         {},
                     )
                 )
-
                 continue
 
             handler = call_handlers.get(frame.action)
@@ -226,7 +229,6 @@ async def ocpp_endpoint(
                         {},
                     )
                 )
-
                 continue
 
             result = handler(
@@ -263,5 +265,7 @@ async def ocpp_endpoint(
         pass
 
     finally:
+        # Chỉ xóa registry nếu đây vẫn là connection đang được đăng ký.
+        # Nhờ kiểm tra identity nên connection cũ không thể xóa connection mới.
         if active_ocpp_connections.get(charge_point_code) is websocket:
             del active_ocpp_connections[charge_point_code]

@@ -1,4 +1,5 @@
 ﻿import json
+import logging
 
 import pytest
 from sqlalchemy.orm import Session
@@ -23,9 +24,11 @@ def _create_charging_point(
         code=code,
         max_power_kw=60.0,
     )
+
     db_session.add(charging_point)
     db_session.commit()
     db_session.refresh(charging_point)
+
     return charging_point
 
 
@@ -51,22 +54,38 @@ def _boot(websocket, message_id: str) -> None:
 def test_second_connection_replaces_first(
     client: TestClient,
     db_session: Session,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    _create_charging_point(db_session, "CP-S13-DUPLICATE")
+    code = "CP-S13-DUPLICATE"
 
-    with client.websocket_connect(
-        "/ocpp/CP-S13-DUPLICATE",
-        subprotocols=["ocpp1.6"],
-    ) as first_websocket:
-        _boot(first_websocket, "boot-first")
+    _create_charging_point(db_session, code)
 
+    with caplog.at_level(logging.INFO, logger="app.ocpp.gateway"):
         with client.websocket_connect(
-            "/ocpp/CP-S13-DUPLICATE",
+            f"/ocpp/{code}",
             subprotocols=["ocpp1.6"],
-        ) as second_websocket:
-            with pytest.raises(WebSocketDisconnect) as exc_info:
-                first_websocket.receive_text()
+        ) as first_websocket:
+            _boot(first_websocket, "boot-first")
 
-            assert exc_info.value.code == 1000
+            with client.websocket_connect(
+                f"/ocpp/{code}",
+                subprotocols=["ocpp1.6"],
+            ) as second_websocket:
+                with pytest.raises(WebSocketDisconnect) as exc_info:
+                    first_websocket.receive_text()
 
-            _boot(second_websocket, "boot-second")
+                assert exc_info.value.code == 1000
+
+                replacement_logs = [
+                    record
+                    for record in caplog.records
+                    if (
+                        record.levelno == logging.INFO
+                        and "Kết nối OCPP cũ bị thay thế" in record.getMessage()
+                    )
+                ]
+
+                assert len(replacement_logs) == 1
+                assert code in replacement_logs[0].getMessage()
+
+                _boot(second_websocket, "boot-second")
