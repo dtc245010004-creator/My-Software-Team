@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.models.ocpp_message import OcppMessage
 from app.models.station import ChargingPoint
+from app.ocpp.dispatcher import OcppCallError, pending_responses
 from app.ocpp.frames import (
     CallErrorFrame,
     CallFrame,
@@ -18,7 +19,6 @@ from app.ocpp.frames import (
     build_call_result,
     parse_frame,
 )
-from app.ocpp.dispatcher import OcppCallError, pending_responses
 from app.ocpp.handlers.authorize import handle_authorize
 from app.ocpp.handlers.boot_notification import handle_boot_notification
 from app.ocpp.handlers.heartbeat import handle_heartbeat

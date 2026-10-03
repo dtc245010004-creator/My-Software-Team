@@ -1,10 +1,12 @@
-﻿import pytest
-import logging
+﻿import logging
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.models.station import Base, ChargingPoint, Connector
 from app.ocpp.handlers.status_notification import handle
+
 
 @pytest.fixture
 def db_session():

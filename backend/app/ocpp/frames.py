@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass
 from typing import Any, TypeAlias
 
-
 # Phạm vi action của Spike K-01 dùng cho lớp nền S-07.
 SUPPORTED_ACTIONS = frozenset(
     {
