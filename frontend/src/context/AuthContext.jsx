@@ -69,6 +69,8 @@ export const AuthProvider = ({ children }) => {
         await login('admin', 'AdminPass123');
       } else if (roleKey === 'OPERATOR' || roleKey === 'OPERATOR_A' || roleKey === 'OPERATOR_B') {
         await login('operator_a', 'OpPass123');
+      } else if (roleKey === 'ACCOUNTANT') {
+        await login('accountant', 'AccPass123');
       } else {
         // Role Tài xế không cần đăng nhập: chuyển trực tiếp sang chế độ tài xế tự do
         logout();
@@ -85,6 +87,8 @@ export const AuthProvider = ({ children }) => {
     currentDemoKey = 'ADMIN';
   } else if (user?.role === 'OPERATOR') {
     currentDemoKey = 'OPERATOR';
+  } else if (user?.role === 'ACCOUNTANT') {
+    currentDemoKey = 'ACCOUNTANT';
   }
 
   // Nếu chưa đăng nhập, mặc định hoạt động dưới vai trò CUSTOMER (Tài xế sạc không cần đăng nhập)

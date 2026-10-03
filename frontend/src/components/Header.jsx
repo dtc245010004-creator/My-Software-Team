@@ -74,14 +74,26 @@ export default function Header() {
           <button
             onClick={() => handleRoleChange('OPERATOR')}
             disabled={switching}
-            title="Chủ trạm sạc: Quản lý trạm sở hữu"
+            title="Vận hành viên: Quản lý trạm & xử lý sự cố"
             className={`px-2.5 py-1 rounded transition-colors ${
               currentDemoKey === 'OPERATOR'
                 ? 'bg-caution-amber/20 text-caution-amber border border-caution-amber/40 font-bold'
                 : 'text-steel-gray hover:text-tech-white'
             }`}
           >
-            Chủ trạm sạc
+            Vận hành viên
+          </button>
+          <button
+            onClick={() => handleRoleChange('ACCOUNTANT')}
+            disabled={switching}
+            title="Kế toán: Đối soát hóa đơn & phiên sạc bất thường"
+            className={`px-2.5 py-1 rounded transition-colors ${
+              currentDemoKey === 'ACCOUNTANT'
+                ? 'bg-electric-cyan/20 text-electric-cyan border border-electric-cyan/40 font-bold'
+                : 'text-steel-gray hover:text-tech-white'
+            }`}
+          >
+            Kế toán
           </button>
           <button
             onClick={() => handleRoleChange('CUSTOMER')}

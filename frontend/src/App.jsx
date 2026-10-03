@@ -13,6 +13,7 @@ import AIAdvisor from './pages/AIAdvisor';
 import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import DriverMap from './pages/DriverMap';
+import AbnormalSessions from './pages/AbnormalSessions';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -65,6 +66,15 @@ function AppLayout() {
           />
           {/* Nhật ký phiên sạc: Mọi vai trò đều được xem (phân vùng dữ liệu tại backend) */}
           <Route path="/sessions" element={<Sessions />} />
+          {/* Danh sách phiên bất thường trên màn hình vận hành (SCRUM-52 / SCRUM-148): Chỉ Vận hành viên (OPERATOR) và Kế toán (ACCOUNTANT) */}
+          <Route
+            path="/abnormal-sessions"
+            element={
+              ['ADMIN', 'OPERATOR', 'ACCOUNTANT'].includes(role)
+                ? <AbnormalSessions />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
           {/* AI Cố Vấn: ADMIN và OPERATOR */}
           <Route
             path="/ai-advisor"
