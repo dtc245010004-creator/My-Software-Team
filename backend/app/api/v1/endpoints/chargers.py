@@ -1,6 +1,6 @@
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -80,6 +80,59 @@ async def reset_charging_point(
                 "details": exc.details,
             },
         ) from exc
+
+
+@router.get(
+    "/chargers",
+    response_model=List[ChargingPointResponse],
+    summary="Lấy danh sách tất cả trụ sạc toàn hệ thống hoặc theo bộ lọc (Màn hình lưới theo dõi)",
+)
+def list_chargers(
+    station_id: Optional[int] = Query(None, description="Lọc theo ID trạm sạc"),
+    status: Optional[str] = Query(None, description="Lọc theo trạng thái vận hành"),
+    search: Optional[str] = Query(None, description="Tìm theo mã EVSE ID, hãng hoặc model"),
+    skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+    limit: int = Query(100, ge=1, le=500, description="Số bản ghi tối đa"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lấy danh sách trụ sạc phục vụ màn hình lưới theo dõi trạng thái:
+    - ADMIN: Xem tất cả trụ sạc trong toàn hệ thống.
+    - OPERATOR: Xem các trụ sạc thuộc các trạm do mình sở hữu/quản lý.
+    - CUSTOMER / Khách vãng lai: Xem các trụ sạc đang hoạt động (is_active=True).
+    """
+    query = db.query(ChargingPoint)
+
+    if current_user and current_user.role == "OPERATOR":
+        query = query.join(Station).filter(Station.operator_id == current_user.id)
+    elif current_user and current_user.role == "ADMIN":
+        pass
+    else:
+        query = query.filter(ChargingPoint.is_active.is_(True))
+
+    if station_id is not None:
+        query = query.filter(ChargingPoint.station_id == station_id)
+
+    if status:
+        query = query.filter(ChargingPoint.status == status.upper())
+
+    if search:
+        search_term = f"%{search.strip()}%"
+        query = query.filter(
+            ChargingPoint.code.ilike(search_term)
+            | ChargingPoint.vendor.ilike(search_term)
+            | ChargingPoint.model.ilike(search_term)
+        )
+
+    chargers = (
+        query.order_by(ChargingPoint.station_id.asc(), ChargingPoint.id.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return [enrich_charger_response(c) for c in chargers]
 
 
 @router.post(
