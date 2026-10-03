@@ -123,6 +123,28 @@ def enrich_charger_response(charger: ChargingPoint) -> ChargingPointResponse:
     resp.connectors = connectors_resp
     resp.total_connector_power_kw = total_connector_power
     resp.is_power_sharing = is_power_sharing
+
+    if getattr(charger, "station", None):
+        resp.station_name = charger.station.name
+
+    try:
+        from app.simulator.charging_simulator import simulator_manager
+
+        current_kw = 0.0
+        active_sid = None
+        active_soc = None
+        conn_ids = {c.id for c in charger.connectors}
+        for sid, sim in simulator_manager.active_simulators.items():
+            if sim.connector_id in conn_ids:
+                current_kw += getattr(sim, "power_kw", 0.0)
+                active_sid = sid
+                active_soc = getattr(sim, "current_soc", 0.0)
+        resp.current_power_kw = round(current_kw, 2)
+        resp.active_session_id = active_sid
+        resp.active_session_soc = active_soc
+    except Exception:
+        resp.current_power_kw = 0.0
+
     return resp
 
 

@@ -129,6 +129,12 @@ class ChargingPointResponse(ChargingPointBase):
     total_connector_power_kw: float = 0.0
     is_power_sharing: bool = False
 
+    # Thông tin bổ trợ cho Màn hình lưới (Grid Monitor)
+    station_name: Optional[str] = None
+    current_power_kw: float = 0.0
+    active_session_id: Optional[int] = None
+    active_session_soc: Optional[float] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
