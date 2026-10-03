@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass
 from typing import Any, TypeAlias
 
-
 # Phạm vi action của Spike K-01 dùng cho lớp nền S-07.
 SUPPORTED_ACTIONS = frozenset(
     {
@@ -63,7 +62,7 @@ class OcppFrameError(ValueError):
 
 
 def _reject_non_finite(value: str) -> None:
-    raise ValueError(f"Giá trị JSON không hợp lệ: {value}")
+    raise ValueError(f"Giá trị JSON không hợp lệ: {value}")  # noqa: TRY003
 
 
 def _error(
