@@ -12,8 +12,8 @@
 * **Mục tiêu sản phẩm (Product Goal)**: Đơn vị vận hành mạng lưới trạm sạc nắm được mọi phiên sạc theo thời gian thực qua giao thức OCPP, tính đúng tiền theo biểu giá nhiều khung, không để trạm vượt công suất, và đối soát được doanh thu khớp với số kWh đã cấp `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Mô hình Scrum**: Sprint 1 tuần (5 ngày làm việc / sprint). Đơn vị ước lượng: Story Point (Fibonacci) `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Khung theo dõi 4 chiều**:
-  1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi; 84 ca kiểm thử tự động passed.
-  2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84.
+  1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi; backend hiện có 163 test đã passed trong lần full suite ngày 01/10/2026, gồm 43 ca OCPP.
+  2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84; chuẩn hóa migration về `backend/alembic/`; đồng bộ nút Admin demo 1-Click với tài khoản `admin / 12345678a` (01/10/2026, chưa commit).
   3. *Sắp thay đổi*: Kế hoạch Sprint 2 (20 SP) xử lý tin nhắn giao thức OCPP 1.6J và màn hình theo dõi trụ sạc.
   4. *Cần thay đổi / Tồn đọng*: Kết nối phần cứng trạm thật (S-05 AC3), cổng thanh toán thật (R-02), cấu hình Docker môi trường (R-06).
 
@@ -51,12 +51,24 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 
 ### Hiện trạng thành phần phần mềm
 * **Backend API**: 8 router modules REST API (34 endpoints) và 1 kênh WebSocket `/ws/telemetry`.
+* **Bộ khung và gateway OCPP 1.6J**: `frames.py` thuần đọc/ghi CALL, CALLRESULT, CALLERROR; `dispatcher.py` chờ phản hồi lệnh máy chủ theo message ID; gateway `/ocpp/{charge_point_code}` xử lý BootNotification, Authorize và idempotency CSDL, tách biệt `/ws/telemetry`. API chargers có lệnh Reset cho Admin/Operator.
+* **Timeout lệnh OCPP**: `OCPP_CALL_TIMEOUT_SECONDS = 30.0`; endpoint Reset ghi đè 30 giây theo hợp đồng API.
 * **Frontend SPA**: 6 màn hình chức năng tại `frontend/src/pages/`.
-* **Kiểm thử tự động**: 90 ca kiểm thử passed (xác nhận qua `pytest backend/tests` và chạy thực tế).
-* **Migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo bảng lõi; cây revision hiện có một head duy nhất `f2c9a6d81b40`. Trạng thái áp dụng trên cơ sở dữ liệu đích chưa được xác minh.
+* **Đăng nhập demo Admin**: Nút 1-Click đọc username/mật khẩu từ `DEMO_USERS.ADMIN`; cấu hình mã nguồn hiện tại là `admin / 12345678a`. Frontend Docker đã build lại; đăng nhập API xác nhận HTTP 200, user `admin`, role `ADMIN` sau khi gỡ khóa tạm.
+* **Kiểm thử tự động**: Full backend suite đạt 163 passed, 1 warning ngày 01/10/2026. Số lịch sử 90 ca ở tài liệu này mâu thuẫn với 84/89 ca trong README và QA Inventory `[CẦN XÁC NHẬN]`.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; revision mới nhất trong cây là `45ab6640633a`. Các migration mới được kiểm chứng trên DB tạm, chưa áp dụng lên CSDL dự án.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
+* **T-14/T-15 thuộc S-07 (01/10/2026 - chưa commit)**: Thêm package khung OCPP 1.6J và bộ test parametrize; 20/20 ca OCPP passed riêng và full backend suite đạt 140 passed, 1 warning.
+* **T-16/T-17 thuộc S-08 (01/10/2026 - chưa commit)**: Bổ sung gateway WebSocket OCPP, handler BootNotification, migration metadata trụ và trạng thái `online`, cấu hình heartbeat; 8 test WebSocket và full backend suite đạt 148 passed, 1 warning.
+* **T-30/T-31 thuộc S-14 (01/10/2026 - chưa commit)**: Thêm model và migration `OcppMessage`, phát lại phản hồi CALL theo khóa CSDL bền vững, cảnh báo khi action khác, và job scheduler dọn bản ghi quá 7 ngày. 4 test idempotency mới và full backend suite 152 passed, 1 warning.
+* **T-32/T-33 thuộc S-15 (01/10/2026 - chưa commit)**: Thêm model/migration `IdTag`, seed một thẻ mẫu cho mỗi tài khoản `CUSTOMER`, handler Authorize kiểm tra thẻ và trạm, cùng 6 test gồm 5 kết quả nghiệp vụ và unique code. Full suite đạt 158 passed, 1 warning; tổng 38 ca OCPP.
+* **T-34/T-35 thuộc S-16 (01/10/2026 - chưa commit)**: Thêm dispatcher dùng lại được để gửi CALL và nhận đúng CALLRESULT/CALLERROR mà không chặn gateway; endpoint Reset giới hạn role Admin/Operator, báo 409 khi offline và 504 khi timeout. Test tích hợp dùng WebSocket trụ thật trong TestClient.
+* **Hồi quy sau S-16**: Full suite đạt 163 passed, 1 warning trong 122.08 giây; tổng 43 ca OCPP.
+* **Sửa lỗi Admin Demo 1-Click (01/10/2026, mã nguồn commit `7f764ea`)**: Đồng bộ credential `admin / 12345678a` giữa `frontend/src/config/roleConfig.js`, `frontend/src/context/AuthContext.jsx` và `backend/seed_data.py`; build trực tiếp trên host thiếu `vite`, Docker build thành công và container frontend đã được cập nhật. Đã gỡ khóa tạm sau 5 lần thử sai; login API trả HTTP 200 với role `ADMIN`.
+* **Thời điểm thực hiện bổ sung**: Ngày **01/10/2026** (chưa commit), theo yêu cầu của người dùng:
+  * Xóa `backend/migrations/` vì không được cấu hình trong `backend/alembic.ini`; giữ `backend/alembic/` làm nguồn duy nhất. Không chạy migration lên database.
 * **Thời điểm thực hiện**: Ngày **30/09/2026** (chưa commit), thực hiện **theo yêu cầu của người dùng**:
   * *Khung Staging & CI/CD*: Bổ sung Dockerfile đa tầng cho Backend/Frontend, cấu hình Reverse Proxy Nginx, file `docker-compose.staging.yml` và pipeline GitHub Actions `.github/workflows/ci-staging.yml` cho Story S-01.
   * *Bảo vệ đăng nhập chống vét cạn*: Thêm 2 cột `failed_login_attempts` và `locked_until` vào bảng `users` qua migration Alembic `149038e71dc9`, cập nhật endpoint `POST /api/v1/auth/login` đếm số lần sai và khóa tạm 15 phút khi sai liên tiếp 5 lần cho Story S-02.

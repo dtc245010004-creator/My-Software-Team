@@ -18,6 +18,7 @@ if sys.platform == "win32":
 import app.models  # noqa: F401
 from app.core.database import Base, SessionLocal, engine
 from app.core.security import get_password_hash
+from app.models.id_tag import IdTag
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
@@ -46,7 +47,7 @@ def seed_database():
                 username="admin",
                 email="admin@evcsms.vn",
                 full_name="Quản Trị Viên Hệ Thống",
-                password_hash=get_password_hash("AdminPass123"),
+                password_hash=get_password_hash("12345678a"),
                 role="ADMIN",
                 is_active=True,
             ),
@@ -116,6 +117,20 @@ def seed_database():
             )
 
         db.add_all(users_to_create)
+        db.commit()
+
+        # RBAC hiện tại dùng role CUSTOMER cho tài khoản tài xế.
+        driver_users = [user for user in users_to_create if user.role == "CUSTOMER"]
+        db.add_all(
+            [
+                IdTag(
+                    code=f"DEMO-{user.username.upper()}",
+                    user_id=user.id,
+                    status="active",
+                )
+                for user in driver_users
+            ]
+        )
         db.commit()
 
         # 3. Tạo Ví tiền điện tử (ACID Wallets cho toàn bộ người dùng)
@@ -380,7 +395,7 @@ def seed_database():
         )
         print("------------------------------------------------------------------")
         print("THÔNG TIN TÀI KHOẢN ĐĂNG NHẬP NHANH:")
-        print("1. Quản trị viên:    admin / AdminPass123")
+        print("1. Quản trị viên:    admin / 12345678a")
         print("2. Đơn vị CPO:       operator_a / OpPass123 (hoặc operator / OpPass123)")
         print("3. Khách hàng lái xe: customer_user / CusPass123 (Ví có sẵn 250,000 đ)")
         print("4. Khách hàng VIP:   driver_vip / DriverPass123 (Ví có sẵn 1,500,000 đ)")

@@ -85,7 +85,7 @@ flowchart TD
 
 ## 8. Exit Criteria (Tiêu chí kết thúc kiểm thử)
 
-* **100% test cases** trong bộ kiểm kê (hiện tại là 84 tests) đạt trạng thái **PASS**.
+* Toàn bộ 148 test cases được kiểm kê tại lần chạy ngày 01/10/2026 cần đạt trạng thái **PASS**.
 * Không có lỗi nghiêm trọng cấp độ 1 (P0/Critical Blocker) hoặc cấp độ 2 (P1/Major Defect) còn mở.
 * Lệnh biên dịch frontend `npm run build` kết thúc thành công với mã thoát 0.
 * Tất cả các thay đổi đều có nhật ký hồi quy chứng minh không gây tác dụng phụ.
