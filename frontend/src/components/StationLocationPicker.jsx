@@ -237,24 +237,23 @@ export default function StationLocationPicker({
       }
     }
 
-    // Ghép địa chỉ hiện tại
+    // Ghép địa chỉ hiện tại và báo cho component cha ngay lập tức (không chặn bởi mạng)
     const assembledAddr = assembleFullAddress();
-
-    // Reverse geocode gợi ý địa chỉ nếu địa chỉ đang để trống
-    if (!detailAddress && !province && !district && !commune) {
-      try {
-        const suggested = await reverseGeocode(roundedLat, roundedLng);
-        if (suggested) {
-          setDetailAddress(suggested);
-          notifyParent(roundedLat, roundedLng, suggested);
-          return;
-        }
-      } catch (err) {
-        console.warn('Lỗi reverse geocode:', err);
-      }
-    }
-
     notifyParent(roundedLat, roundedLng, assembledAddr);
+
+    // Reverse geocode gợi ý địa chỉ ngầm nếu địa chỉ đang để trống
+    if (!detailAddress && !province && !district && !commune) {
+      reverseGeocode(roundedLat, roundedLng)
+        .then((suggested) => {
+          if (suggested) {
+            setDetailAddress(suggested);
+            notifyParent(roundedLat, roundedLng, suggested);
+          }
+        })
+        .catch((err) => {
+          console.warn('Lỗi reverse geocode:', err);
+        });
+    }
   };
 
   // Ghép chuỗi địa chỉ từ chi tiết đến tổng quát
@@ -489,6 +488,7 @@ export default function StationLocationPicker({
             onChange={(e) => {
               const val = e.target.value;
               setDistrict(val);
+              notifyParent(lat, lng, [detailAddress, commune, val, province].filter(Boolean).join(', '));
               scheduleDebouncedGeocode({ province, district: val, commune, detailAddress });
             }}
             className="w-full bg-obsidian border border-hairline p-1.5 rounded text-tech-white text-xs focus:outline-none focus:border-electric-cyan"
@@ -507,6 +507,7 @@ export default function StationLocationPicker({
             onChange={(e) => {
               const val = e.target.value;
               setCommune(val);
+              notifyParent(lat, lng, [detailAddress, val, district, province].filter(Boolean).join(', '));
               scheduleDebouncedGeocode({ province, district, commune: val, detailAddress });
             }}
             className="w-full bg-obsidian border border-hairline p-1.5 rounded text-tech-white text-xs focus:outline-none focus:border-electric-cyan"
@@ -526,6 +527,7 @@ export default function StationLocationPicker({
               onChange={(e) => {
                 const val = e.target.value;
                 setDetailAddress(val);
+                notifyParent(lat, lng, [val, commune, district, province].filter(Boolean).join(', '));
                 scheduleDebouncedGeocode({ province, district, commune, detailAddress: val });
               }}
               className="flex-1 bg-obsidian border border-hairline p-1.5 rounded text-tech-white text-xs focus:outline-none focus:border-electric-cyan"
