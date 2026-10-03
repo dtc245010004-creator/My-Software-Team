@@ -10,6 +10,8 @@
 
 Tài liệu này xác nhận tính toàn vẹn và mức độ tương thích giao tiếp dữ liệu giữa tầng Giao diện người dùng (Client SPA) và Máy chủ dịch vụ (Server API) đối với toàn bộ các tính năng cốt lõi của Giai đoạn 1.
 
+Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa trụ sạc và CSMS, không thuộc hợp đồng trình duyệt `/ws/telemetry`; BootNotification được ghi nhận tại [hồ sơ S-08](../stories/S-08.md), ủy quyền `Authorize` bằng `idTag` tại [hồ sơ S-15](../stories/S-15.md), và lệnh Reset do Admin/Operator gửi xuống tại [hồ sơ S-16](../stories/S-16.md).
+
 ---
 
 ## Test Environment

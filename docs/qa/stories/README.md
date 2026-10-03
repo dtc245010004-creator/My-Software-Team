@@ -2,7 +2,7 @@
 
 > **Loại tài liệu**: Danh mục và hướng dẫn hồ sơ nghiệm thu Story (Story Acceptance Index)  
 > **Tham chiếu chuẩn mực**: `taicautruc.md` Mục 2.4 & Mục 3  
-> **Trạng thái**: ACTIVE (Nguồn sự thật nghiệm thu tính năng Giai đoạn 1)
+> **Trạng thái**: ACTIVE (hồ sơ nghiệm thu Giai đoạn 1 và Story Sprint 2 đang triển khai)
 
 ---
 
@@ -15,7 +15,7 @@ Mỗi User Story trong hệ thống phải có một hồ sơ độc lập (`S-x
 
 ---
 
-## 2. Danh mục các Story đã xác minh trong Giai đoạn 1
+## 2. Danh mục hồ sơ Story hiện có
 
 | Mã Story | Tiêu đề nghiệp vụ | Phạm vi mã nguồn chính | Bộ kiểm thử liên kết | Trạng thái nghiệm thu |
 | :---: | :--- | :--- | :--- | :---: |
@@ -24,6 +24,11 @@ Mỗi User Story trong hệ thống phải có một hồ sơ độc lập (`S-x
 | [`S-03`](S-03.md) | Mỗi vai trò chỉ thao tác phần việc của mình (RBAC) | `backend/app/core/security.py`, `deps.py` | `test_auth.py`, `test_stations.py` | **ACCEPTED** |
 | [`S-04`](S-04.md) | Chủ trạm tạo và sửa thông tin trạm sạc | `backend/app/api/v1/endpoints/stations.py` | `test_stations.py` (15 tests) | **ACCEPTED** |
 | [`S-05`](S-05.md) | Chủ trạm thêm trụ và đầu nối, mã trụ là duy nhất | `backend/app/api/v1/endpoints/chargers.py` | `test_stations.py` | **IN_PROGRESS / CONDITIONAL** |
+| [`S-07`](S-07.md) | Đọc và ghi ba loại khung tin nhắn OCPP 1.6J | `backend/app/ocpp/frames.py` | `test_ocpp_frames.py` (20 ca) | **IN_PROGRESS / PARTIAL** — T-14/T-15 hoàn thành; còn thiếu điều phối đầy đủ action và tương quan CALL/CALLRESULT |
+| [`S-08`](S-08.md) | Nhận BootNotification và phản hồi theo trạng thái trạm | `backend/app/ocpp/gateway.py`, `handlers/boot_notification.py` | `test_boot_notification.py` (8 ca) | **ACCEPTED** — T-16/T-17 hoàn thành; 4/4 AC được kiểm chứng |
+| [`S-14`](S-14.md) | Chống xử lý lặp tin nhắn OCPP bằng lưu trữ CSDL | `backend/app/ocpp/gateway.py`, `backend/app/models/ocpp_message.py`, `backend/app/services/scheduler_service.py` | `test_ocpp_idempotency.py` (4 ca) | **ACCEPTED** — T-30/T-31 hoàn thành; 4/4 AC được kiểm chứng |
+| [`S-15`](S-15.md) | Phân quyền sạc OCPP bằng thẻ idTag | `backend/app/models/id_tag.py`, `backend/app/ocpp/handlers/authorize.py` | `test_authorize.py` (6 ca) | **ACCEPTED** — T-32/T-33 hoàn thành; 5 trạng thái Authorize và mã thẻ duy nhất được kiểm chứng |
+| [`S-16`](S-16.md) | Máy chủ gửi lệnh Reset OCPP và chờ phản hồi trụ | `backend/app/ocpp/dispatcher.py`, `backend/app/api/v1/endpoints/chargers.py` | `test_ocpp_reset.py` | **ACCEPTED** — T-34/T-35 hoàn thành; phản hồi tương quan, offline, timeout và quyền được kiểm chứng |
 
 ---
 
@@ -43,4 +48,5 @@ Theo Hiến chương kiểm thử `docs/qa/STANDARD.md`, mỗi hồ sơ Story b�
 * **Tổng số Story của Giai đoạn 1**: 05 Stories.
 * **Đã nghiệm thu hoàn tất (`ACCEPTED`)**: 04 Stories (S-01, S-02, S-03, S-04).
 * **Nghiệm thu có điều kiện / Tạm hoãn 1 phần (`IN_PROGRESS / CONDITIONAL`)**: 01 Story (S-05 — Đạt AC1, AC2, AC4; riêng AC3 kết nối trạm thật qua OCPP được dời sang giai đoạn tiếp theo theo biên bản tham vấn gửi PO).
+* **Sprint 2**: S-07 còn **IN_PROGRESS / PARTIAL**; S-08, S-14, S-15 và S-16 **ACCEPTED** với các AC trong phạm vi đã có test tự động.
 * **Số lỗi nghiêm trọng còn mở**: 0 lỗi.

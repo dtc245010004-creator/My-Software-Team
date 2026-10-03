@@ -203,6 +203,7 @@ class StationUpdate(BaseModel):
 class StationResponse(StationBase):
     id: int
     operator_id: Optional[int] = None
+    owner_id: Optional[int] = None
     is_active: bool
     created_at: UTCDateTime
     updated_at: UTCDateTime
@@ -220,3 +221,109 @@ class StationDistanceResponse(StationResponse):
     """Schema mở rộng cho API tìm kiếm trả về khoảng cách tính bằng km."""
 
     distance_km: Optional[float] = None
+
+# ==========================================
+# 4. CÂY TRẠM - TRỤ - CỔNG (STATION TREE SCHEMAS)
+# ==========================================
+
+class ConnectorTreeItem(BaseModel):
+    id: int
+    connector_number: int
+    connector_type: str
+    status: str
+    max_power_kw: float
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChargerTreeItem(BaseModel):
+    id: int
+    code: str
+    vendor: str
+    model: Optional[str] = None
+    status: str
+    max_power_kw: float
+    power_sharing_enabled: bool
+    is_active: bool
+    last_seen_at: Optional[UTCDateTime] = None
+    connectors: List[ConnectorTreeItem] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StationTreeItem(BaseModel):
+    id: int
+    name: str
+    address: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    total_grid_capacity_kw: float
+    is_active: bool
+    chargers: List[ChargerTreeItem] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
+# 5. MÀN HÌNH THEO DÕI DẠNG LƯỚI (STATION GRID SCHEMAS - T-24)
+# ==========================================
+
+class ConnectorStatusCount(BaseModel):
+    """Thống kê số lượng đầu nối theo từng trạng thái thực tế."""
+
+    available: int = 0
+    charging: int = 0
+    faulted: int = 0
+    unavailable: int = 0
+    total: int = 0
+
+
+class ChargerGridItem(BaseModel):
+    """Thông tin thẻ trụ sạc trong màn hình lưới."""
+
+    id: int
+    station_id: int
+    code: str
+    vendor: str
+    model: Optional[str] = None
+    status: str
+    max_power_kw: float
+    power_sharing_enabled: bool
+    is_active: bool
+    available_connectors: int = 0
+    charging_connectors: int = 0
+    faulted_connectors: int = 0
+    unavailable_connectors: int = 0
+    total_connectors: int = 0
+    connector_counts: ConnectorStatusCount = Field(
+        default_factory=ConnectorStatusCount
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StationGridItem(BaseModel):
+    """Thông tin thẻ trạm sạc trong màn hình lưới."""
+
+    id: int
+    name: str
+    address: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    total_grid_capacity_kw: float
+    status: str
+    is_active: bool
+    total_chargers: int = 0
+    available_connectors: int = 0
+    charging_connectors: int = 0
+    faulted_connectors: int = 0
+    unavailable_connectors: int = 0
+    total_connectors: int = 0
+    connector_counts: ConnectorStatusCount = Field(
+        default_factory=ConnectorStatusCount
+    )
+    chargers: List[ChargerGridItem] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
