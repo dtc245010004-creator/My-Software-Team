@@ -63,7 +63,10 @@ class Station(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Station(id={self.id}, name='{self.name}', status='{self.status}', is_active={self.is_active})>"
+        return (
+            f"<Station(id={self.id}, name='{self.name}', "
+            f"status='{self.status}', is_active={self.is_active})>"
+        )
 
 
 class ChargingPoint(Base):
@@ -73,7 +76,8 @@ class ChargingPoint(Base):
     __table_args__ = (
         CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
         CheckConstraint(
-            "status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED', 'UNAVAILABLE')",
+            "status IN ('AVAILABLE', 'PREPARING', 'CHARGING', 'FAULTED', "
+            "'UNAVAILABLE', 'online')",
             name="ck_charger_status_valid",
         ),
     )
@@ -90,6 +94,8 @@ class ChargingPoint(Base):
     )  # EVSE ID toàn hệ thống
     vendor = Column(String(100), nullable=False, default="VinFast/ABB")
     model = Column(String(100), nullable=True)
+    charge_point_vendor = Column(String(100), nullable=True)
+    charge_point_model_name = Column(String(100), nullable=True)
     max_power_kw = Column(Float, nullable=False)
     firmware_version = Column(String(50), default="1.0.0", nullable=True)
     status = Column(String(20), default="AVAILABLE", nullable=False)
@@ -98,6 +104,7 @@ class ChargingPoint(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
 
     # Quan hệ
     station = relationship("Station", back_populates="charging_points")
@@ -110,7 +117,8 @@ class ChargingPoint(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<ChargingPoint(id={self.id}, code='{self.code}', status='{self.status}')>"
+            f"<ChargingPoint(id={self.id}, code='{self.code}', "
+            f"status='{self.status}')>"
         )
 
 
@@ -119,8 +127,12 @@ class Connector(Base):
 
     __tablename__ = "connectors"
     __table_args__ = (
-        CheckConstraint("connector_number >= 1", name="ck_connector_number_positive"),
-        CheckConstraint("max_power_kw > 0", name="ck_connector_max_power_positive"),
+        CheckConstraint(
+            "connector_number >= 1", name="ck_connector_number_positive"
+        ),
+        CheckConstraint(
+            "max_power_kw > 0", name="ck_connector_max_power_positive"
+        ),
         CheckConstraint(
             "connector_type IN ('CCS2', 'TYPE_2', 'CHADEMO')",
             name="ck_connector_type_valid",
@@ -130,7 +142,9 @@ class Connector(Base):
             name="ck_connector_status_valid",
         ),
         UniqueConstraint(
-            "charging_point_id", "connector_number", name="uq_charger_connector_number"
+            "charging_point_id",
+            "connector_number",
+            name="uq_charger_connector_number",
         ),
     )
 
@@ -154,7 +168,10 @@ class Connector(Base):
     charging_point = relationship("ChargingPoint", back_populates="connectors")
 
     def __repr__(self) -> str:
-        return f"<Connector(id={self.id}, charger_id={self.charging_point_id}, #{self.connector_number}, type='{self.connector_type}')>"
+        return (
+            f"<Connector(id={self.id}, charger_id={self.charging_point_id}, "
+            f"#{self.connector_number}, type='{self.connector_type}')>"
+        )
 
 
 class StationPowerMetric(Base):
@@ -162,7 +179,9 @@ class StationPowerMetric(Base):
 
     __tablename__ = "station_power_metrics"
     __table_args__ = (
-        UniqueConstraint("station_id", "timestamp", name="uq_station_minute_snapshot"),
+        UniqueConstraint(
+            "station_id", "timestamp", name="uq_station_minute_snapshot"
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -182,4 +201,7 @@ class StationPowerMetric(Base):
     station = relationship("Station", backref="power_metrics")
 
     def __repr__(self) -> str:
-        return f"<StationPowerMetric(station_id={self.station_id}, time={self.timestamp}, kw={self.power_kw})>"
+        return (
+            f"<StationPowerMetric(station_id={self.station_id}, "
+            f"time={self.timestamp}, kw={self.power_kw})>"
+        )

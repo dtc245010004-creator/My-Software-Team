@@ -1,3 +1,5 @@
+from app.models.id_tag import IdTag
+from app.models.ocpp_message import OcppMessage
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station, StationPowerMetric
 from app.models.tariff import Tariff
@@ -8,6 +10,8 @@ __all__ = [
     "ChargingPoint",
     "ChargingSession",
     "Connector",
+    "IdTag",
+    "OcppMessage",
     "Station",
     "StationPowerMetric",
     "Tariff",
