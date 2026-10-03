@@ -27,6 +27,22 @@ export default function Stations() {
   const [selectedStationForCharger, setSelectedStationForCharger] = useState(null);
   const [chargerSubmitting, setChargerSubmitting] = useState(false);
   const [chargerError, setChargerError] = useState(null);
+  // Lỗi hiển thị trực tiếp tại ô nhập "Mã trụ" (trùng mã / sai định dạng)
+  const [chargerCodeError, setChargerCodeError] = useState(null);
+
+  // Form thêm đầu nối (connector) vào trụ sạc đã có
+  const [showAddConnectorModal, setShowAddConnectorModal] = useState(false);
+  const [selectedChargerForConnector, setSelectedChargerForConnector] = useState(null);
+  const [connectorFormData, setConnectorFormData] = useState({
+    connector_number: 1,
+    connector_type: 'CCS2',
+    max_power_kw: 60.0,
+  });
+  const [connectorSubmitting, setConnectorSubmitting] = useState(false);
+  const [connectorError, setConnectorError] = useState(null);
+  const [connectorNumberError, setConnectorNumberError] = useState(null);
+
+  const canManageChargers = role === 'ADMIN' || role === 'OPERATOR';
 
   // Form tạo trụ sạc mới
   const [chargerFormData, setChargerFormData] = useState({
@@ -228,9 +244,42 @@ export default function Stations() {
     }, 50);
   };
 
+  // Trích thông báo lỗi dạng chuỗi từ phản hồi API (detail string hoặc mảng lỗi Pydantic 422)
+  const extractErrorMessage = (err) => {
+    const detail = err.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) return detail.map((d) => d.msg).join(', ');
+    return err.message;
+  };
+
+  // Kiểm tra trùng mã trụ phía client dựa trên danh sách trụ đã tải về.
+  // Lưu ý: OPERATOR chỉ tải được trạm của mình nên trùng mã ở trạm khác chỉ bị phát hiện khi backend trả lỗi.
+  const findDuplicateChargerCode = (rawCode) => {
+    const code = rawCode.trim().toUpperCase();
+    if (!code) return null;
+    for (const st of stations) {
+      const match = (st.charging_points || []).find((ch) => (ch.code || '').toUpperCase() === code);
+      if (match) return { code, stationName: st.name };
+    }
+    return null;
+  };
+
+  const validateChargerCode = (rawCode) => {
+    const code = rawCode.trim();
+    if (code.length > 0 && code.length < 3) {
+      return 'Mã trụ phải có tối thiểu 3 ký tự.';
+    }
+    const dup = findDuplicateChargerCode(code);
+    if (dup) {
+      return `Mã trụ '${dup.code}' đã tồn tại (thuộc trạm ${dup.stationName}). Vui lòng nhập mã khác.`;
+    }
+    return null;
+  };
+
   const handleOpenAddCharger = (station) => {
     setSelectedStationForCharger(station);
     setChargerError(null);
+    setChargerCodeError(null);
     setChargerFormData({
       code: '',
       vendor: 'VinFast',
@@ -248,8 +297,15 @@ export default function Stations() {
     e.preventDefault();
     if (!selectedStationForCharger) return;
 
+    const codeValidation = validateChargerCode(chargerFormData.code);
+    if (codeValidation) {
+      setChargerCodeError(codeValidation);
+      return;
+    }
+
     setChargerSubmitting(true);
     setChargerError(null);
+    setChargerCodeError(null);
 
     try {
       const numConn = parseInt(chargerFormData.num_connectors, 10) || 1;
@@ -278,11 +334,81 @@ export default function Stations() {
       await fetchStations();
     } catch (err) {
       console.error('Lỗi thêm trụ sạc:', err);
+      const msg = extractErrorMessage(err) || 'Lỗi không xác định khi tạo trụ sạc.';
       const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail.map((d) => d.msg).join(', ') : err.message);
-      setChargerError(msg || 'Lỗi không xác định khi tạo trụ sạc.');
+      const isCodeFieldError =
+        (err.response?.status === 400 && typeof detail === 'string' && detail.includes('Mã trụ')) ||
+        (Array.isArray(detail) && detail.some((d) => Array.isArray(d.loc) && d.loc.includes('code')));
+      if (isCodeFieldError) {
+        // Backend trả 400 khi trùng mã trụ -> hiển thị ngay tại ô "Mã trụ"
+        setChargerCodeError(msg);
+      } else {
+        setChargerError(msg);
+      }
     } finally {
       setChargerSubmitting(false);
+    }
+  };
+
+  const handleOpenAddConnector = (charger) => {
+    const usedNumbers = (charger.connectors || []).map((c) => c.connector_number);
+    const nextNumber = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
+    setSelectedChargerForConnector(charger);
+    setConnectorError(null);
+    setConnectorNumberError(null);
+    setConnectorFormData({
+      connector_number: nextNumber,
+      connector_type: 'CCS2',
+      max_power_kw: charger.max_power_kw || 60.0,
+    });
+    setShowAddConnectorModal(true);
+  };
+
+  const validateConnectorNumber = (num) => {
+    if (!Number.isInteger(num) || num < 1) {
+      return 'Số thứ tự đầu nối phải là số nguyên lớn hơn hoặc bằng 1.';
+    }
+    const exists = (selectedChargerForConnector?.connectors || []).some((c) => c.connector_number === num);
+    if (exists) {
+      return `Đầu nối #${num} đã tồn tại trên trụ ${selectedChargerForConnector.code}.`;
+    }
+    return null;
+  };
+
+  const handleCreateConnector = async (e) => {
+    e.preventDefault();
+    if (!selectedChargerForConnector) return;
+
+    const num = parseInt(connectorFormData.connector_number, 10);
+    const numValidation = validateConnectorNumber(num);
+    if (numValidation) {
+      setConnectorNumberError(numValidation);
+      return;
+    }
+
+    setConnectorSubmitting(true);
+    setConnectorError(null);
+    setConnectorNumberError(null);
+
+    try {
+      await api.post(`/chargers/${selectedChargerForConnector.id}/connectors`, {
+        connector_number: num,
+        connector_type: connectorFormData.connector_type,
+        max_power_kw: parseFloat(connectorFormData.max_power_kw) || 0,
+      });
+      setShowAddConnectorModal(false);
+      await fetchStations();
+    } catch (err) {
+      console.error('Lỗi thêm đầu nối:', err);
+      const msg = extractErrorMessage(err) || 'Lỗi không xác định khi thêm đầu nối.';
+      const detail = err.response?.data?.detail;
+      if (err.response?.status === 400 && typeof detail === 'string' && detail.includes('đã tồn tại')) {
+        setConnectorNumberError(msg);
+      } else {
+        setConnectorError(msg);
+      }
+    } finally {
+      setConnectorSubmitting(false);
     }
   };
 
@@ -461,7 +587,7 @@ export default function Stations() {
                     <span className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
                       DANH SÁCH TRỤ SẠC (EVSE BAYS) — {chargers.length} TRỤ VẬT LÝ
                     </span>
-                    {role === 'ADMIN' && (
+                    {canManageChargers && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -478,7 +604,7 @@ export default function Stations() {
                   {chargers.length === 0 ? (
                     <div className="text-xs text-steel-gray text-center py-6 font-mono border border-dashed border-hairline rounded bg-panel/30">
                       <p>Chưa có trụ sạc nào được gắn vào trạm này.</p>
-                      {role === 'ADMIN' && (
+                      {canManageChargers && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -544,13 +670,32 @@ export default function Stations() {
 
                           {/* Connectors list */}
                           <div className="space-y-1.5 pt-2 border-t border-hairline">
-                            <span className="text-[10px] text-steel-gray font-mono block">CỔNG SẠC (CONNECTORS):</span>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-steel-gray font-mono block">CỔNG SẠC (CONNECTORS):</span>
+                              {canManageChargers && (
+                                <button
+                                  type="button"
+                                  title={`Thêm đầu nối mới vào trụ ${ch.code}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenAddConnector(ch);
+                                  }}
+                                  className="flex items-center space-x-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded border border-electric-cyan/40 text-electric-cyan hover:bg-electric-cyan/10 transition-colors"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  <span>ĐẦU NỐI</span>
+                                </button>
+                              )}
+                            </div>
+                            {(ch.connectors || []).length === 0 && (
+                              <div className="text-[11px] text-steel-gray font-mono italic">Trụ chưa có đầu nối nào.</div>
+                            )}
                             {(ch.connectors || []).map((conn) => (
                               <div
                                 key={conn.id}
                                 className="bg-obsidian border border-hairline px-2 py-1 rounded flex items-center justify-between text-xs font-mono"
                               >
-                                <span>Súng #{conn.connector_number} ({conn.connector_type})</span>
+                                <span>Súng #{conn.connector_number} ({conn.connector_type}) • {conn.max_power_kw} kW</span>
                                 <span className={conn.status === 'CHARGING' ? 'text-electric-cyan font-bold' : 'text-grid-green'}>
                                   {conn.status}
                                 </span>
@@ -921,9 +1066,25 @@ export default function Stations() {
                   required
                   placeholder="Ví dụ: VIN-Q1-03 hoặc ABB-TF54-01"
                   value={chargerFormData.code}
-                  onChange={(e) => setChargerFormData({ ...chargerFormData, code: e.target.value.toUpperCase() })}
-                  className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan uppercase"
+                  onChange={(e) => {
+                    const nextCode = e.target.value.toUpperCase();
+                    setChargerFormData({ ...chargerFormData, code: nextCode });
+                    setChargerCodeError(validateChargerCode(nextCode));
+                  }}
+                  aria-invalid={Boolean(chargerCodeError)}
+                  aria-describedby={chargerCodeError ? 'charger-code-error' : undefined}
+                  className={`w-full bg-obsidian border p-2 rounded text-tech-white focus:outline-none uppercase ${
+                    chargerCodeError
+                      ? 'border-critical-red focus:border-critical-red'
+                      : 'border-hairline focus:border-electric-cyan'
+                  }`}
                 />
+                {chargerCodeError && (
+                  <p id="charger-code-error" className="mt-1 flex items-start space-x-1 text-[11px] text-critical-red">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>{chargerCodeError}</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1034,7 +1195,7 @@ export default function Stations() {
                 </button>
                 <button
                   type="submit"
-                  disabled={chargerSubmitting}
+                  disabled={chargerSubmitting || Boolean(chargerCodeError)}
                   className="px-4 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white font-bold disabled:opacity-50 flex items-center space-x-1.5"
                 >
                   {chargerSubmitting ? (
@@ -1043,6 +1204,128 @@ export default function Stations() {
                     <>
                       <Plus className="w-4 h-4" />
                       <span>XÁC NHẬN GẮN TRỤ</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Add Connector */}
+      {showAddConnectorModal && selectedChargerForConnector && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-panel border border-hairline p-6 rounded-sm max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-hairline">
+              <div>
+                <h2 className="text-base font-bold text-tech-white">THÊM ĐẦU NỐI VÀO TRỤ SẠC</h2>
+                <p className="text-xs text-steel-gray font-mono mt-0.5">
+                  TRỤ: <span className="text-electric-cyan font-bold">{selectedChargerForConnector.code}</span>
+                  {' '}• Hiện có {(selectedChargerForConnector.connectors || []).length} đầu nối
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddConnectorModal(false)}
+                className="text-steel-gray hover:text-tech-white p-1 rounded hover:bg-obsidian transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {connectorError && (
+              <div className="mb-4 p-3 rounded bg-critical-red/10 border border-critical-red/30 flex items-start space-x-2 text-xs font-mono text-critical-red">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{connectorError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateConnector} className="space-y-3 font-mono text-xs">
+              <div>
+                <label className="text-steel-gray block mb-1">
+                  SỐ THỨ TỰ ĐẦU NỐI <span className="text-critical-red">*</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="1"
+                  value={connectorFormData.connector_number}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setConnectorFormData({ ...connectorFormData, connector_number: next });
+                    setConnectorNumberError(validateConnectorNumber(parseInt(next, 10)));
+                  }}
+                  aria-invalid={Boolean(connectorNumberError)}
+                  aria-describedby={connectorNumberError ? 'connector-number-error' : undefined}
+                  className={`w-full bg-obsidian border p-2 rounded text-tech-white focus:outline-none ${
+                    connectorNumberError
+                      ? 'border-critical-red focus:border-critical-red'
+                      : 'border-hairline focus:border-electric-cyan'
+                  }`}
+                />
+                {connectorNumberError ? (
+                  <p id="connector-number-error" className="mt-1 flex items-start space-x-1 text-[11px] text-critical-red">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>{connectorNumberError}</span>
+                  </p>
+                ) : (
+                  <span className="text-[10px] text-steel-gray mt-1 block">
+                    Đã dùng: {(selectedChargerForConnector.connectors || []).map((c) => `#${c.connector_number}`).join(', ') || 'chưa có'}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-steel-gray block mb-1">CHUẨN ĐẦU NỐI</label>
+                  <select
+                    value={connectorFormData.connector_type}
+                    onChange={(e) => setConnectorFormData({ ...connectorFormData, connector_type: e.target.value })}
+                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                  >
+                    <option value="CCS2">CCS2 (DC sạc nhanh)</option>
+                    <option value="TYPE_2">TYPE_2 (AC sạc tiêu chuẩn)</option>
+                    <option value="CHADEMO">CHADEMO (DC tiêu chuẩn Nhật)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-steel-gray block mb-1">
+                    CÔNG SUẤT TỐI ĐA (KW) <span className="text-critical-red">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0.5"
+                    step="0.5"
+                    value={connectorFormData.max_power_kw}
+                    onChange={(e) => setConnectorFormData({ ...connectorFormData, max_power_kw: e.target.value })}
+                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-4 border-t border-hairline">
+                <button
+                  type="button"
+                  disabled={connectorSubmitting}
+                  onClick={() => setShowAddConnectorModal(false)}
+                  className="px-3 py-1.5 rounded bg-hairline text-steel-gray hover:text-tech-white disabled:opacity-50"
+                >
+                  HỦY BỎ
+                </button>
+                <button
+                  type="submit"
+                  disabled={connectorSubmitting || Boolean(connectorNumberError)}
+                  className="px-4 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white font-bold disabled:opacity-50 flex items-center space-x-1.5"
+                >
+                  {connectorSubmitting ? (
+                    <span>ĐANG LƯU...</span>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>XÁC NHẬN THÊM ĐẦU NỐI</span>
                     </>
                   )}
                 </button>
