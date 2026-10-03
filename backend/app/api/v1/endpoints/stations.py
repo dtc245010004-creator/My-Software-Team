@@ -1,8 +1,11 @@
+import asyncio
+import json
 import math
 from datetime import timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_optional_current_user, require_roles
@@ -11,6 +14,7 @@ from app.core.datetime_utils import get_vn_now, to_vn_time
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
+from app.services.event_broadcaster import sse_broadcaster
 from app.schemas.station import (
     StationCreate,
     StationDistanceResponse,
@@ -620,6 +624,65 @@ def list_station_grid(
 ) -> list[StationGridItem]:
     """API lấy dữ liệu giám sát trạm/trụ dạng lưới (Grid View)."""
     return get_station_grid(db, current_user)
+
+
+async def _station_event_generator(user: User, limit: Optional[int] = None):
+    queue = await sse_broadcaster.subscribe(user)
+    try:
+        # Gửi sự kiện khởi tạo kết nối (phục vụ test và client handshake)
+        yield f"data: {json.dumps({'event': 'connected', 'user_id': user.id})}\n\n"
+        count = 0
+        if limit is not None and limit <= 1:
+            return
+
+        while True:
+            payload = await queue.get()
+            yield f"data: {json.dumps(payload)}\n\n"
+            count += 1
+            if limit is not None and count >= limit:
+                break
+    except (asyncio.CancelledError, GeneratorExit):
+        pass
+    finally:
+        await sse_broadcaster.unsubscribe(queue)
+
+
+@router.get(
+    "/events",
+    summary="Kênh SSE đẩy trạng thái trạm/trụ/đầu nối theo thời gian thực",
+)
+async def get_station_events(
+    limit: Optional[int] = Query(None, description="Giới hạn số message rồi ngắt (dùng cho test)"),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+):
+    return StreamingResponse(
+        _station_event_generator(current_user, limit),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get(
+    "/stream",
+    summary="Alias của kênh SSE /events",
+)
+async def get_station_stream(
+    limit: Optional[int] = Query(None, description="Giới hạn số message rồi ngắt (dùng cho test)"),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+):
+    return StreamingResponse(
+        _station_event_generator(current_user, limit),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get(
