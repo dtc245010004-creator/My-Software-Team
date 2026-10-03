@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass
 from typing import Any, TypeAlias
 
-
 # Phạm vi action của Spike K-01 dùng cho lớp nền S-07.
 SUPPORTED_ACTIONS = frozenset(
     {
@@ -50,6 +49,13 @@ class CallErrorFrame:
 Frame: TypeAlias = CallFrame | CallResultFrame | CallErrorFrame
 
 
+class NonFiniteJsonValueError(ValueError):
+    """Lỗi khi JSON chứa giá trị số không hữu hạn."""
+
+    def __init__(self, value: str) -> None:
+        super().__init__(f"Giá trị JSON không hợp lệ: {value}")
+
+
 class OcppFrameError(ValueError):
     """Lỗi khung kèm mã CALLERROR để tầng giao tiếp có thể phản hồi."""
 
@@ -63,7 +69,7 @@ class OcppFrameError(ValueError):
 
 
 def _reject_non_finite(value: str) -> None:
-    raise ValueError(f"Giá trị JSON không hợp lệ: {value}")
+    raise NonFiniteJsonValueError(value)
 
 
 def _error(

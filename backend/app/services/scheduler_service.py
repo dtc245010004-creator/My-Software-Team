@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.core.websocket import ws_manager
-from app.models.session import ChargingSession
 from app.models.ocpp_message import OcppMessage
+from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.services.ai_service import AIService, latest_smart_charging_cache
 from app.simulator.charging_simulator import simulator_manager
@@ -312,11 +312,12 @@ def cleanup_old_ocpp_messages_job(db: Session = None) -> int:
         db.commit()
         if deleted_count:
             logger.info("Đã xóa %s bản ghi OCPP quá 7 ngày", deleted_count)
-        return deleted_count
     except SQLAlchemyError:
         db.rollback()
         logger.exception("Lỗi dọn dẹp bản ghi OCPP cũ")
         return 0
+    else:
+        return deleted_count
     finally:
         if should_close:
             db.close()
