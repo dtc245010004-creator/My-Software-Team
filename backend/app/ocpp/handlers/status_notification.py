@@ -31,6 +31,7 @@ async def handle(db: Session, payload: Dict[str, Any], charge_point: ChargingPoi
 
     now = datetime.now(timezone.utc)
     charge_point.last_seen_at = now
+    charge_point.status = "Online"
 
     internal_status = map_ocpp_to_internal(raw_status)
 
