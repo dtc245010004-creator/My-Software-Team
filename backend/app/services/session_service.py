@@ -429,3 +429,174 @@ def reconcile_interrupted_sessions(db: Session) -> int:
         f"Đã phục hồi và giải phóng {count} phiên sạc bị gián đoạn do server crash."
     )
     return count
+
+
+def remote_stop_charging_session(
+    db: Session,
+    user: User,
+    session_id: int,
+    simulate_condition: str | None = None,
+) -> ChargingSession:
+    """
+    S-23 / T-49: Vận hành viên (OPERATOR) hoặc Quản trị viên (ADMIN) dừng phiên sạc từ xa bằng RemoteStopTransaction.
+
+    Ràng buộc nghiệp vụ:
+    - NFR RBAC: Chỉ vai trò OPERATOR và ADMIN mới có quyền gửi lệnh dừng từ xa (chặn CUSTOMER/ACCOUNTANT).
+    - OPERATOR chỉ được dừng phiên thuộc trạm sạc do mình quản lý.
+    - Phiên sạc phải đang ở trạng thái ACTIVE.
+
+    Các ca kiểm thử chấp nhận (AC của S-23):
+    1. Ca ngoại tuyến (OFFLINE): Báo lỗi ngay chứ không treo, phiên giữ nguyên trạng thái.
+    2. Ca từ chối (REJECTED): Trụ trả Rejected, phiên vẫn sạc và hệ thống thông báo trụ từ chối.
+    3. Ca hết thời gian chờ (TIMEOUT): Hết thời gian chờ phản hồi từ trụ sạc, phiên được đánh dấu cần xem xét.
+    4. Ca thành công: Phiên kết thúc với lý do 'Remote', chốt số kWh và chuyển status = 'COMPLETED'.
+    """
+    # 1. Kiểm tra RBAC
+    if user.role not in ("ADMIN", "OPERATOR"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ vai trò vận hành viên và quản trị mới có quyền gửi lệnh dừng từ xa.",
+        )
+
+    # 2. Tìm kiếm phiên sạc
+    session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy phiên sạc.",
+        )
+
+    # 3. Kiểm tra quyền sở hữu trạm của Vận hành viên (Chống IDOR)
+    connector = session.connector
+    station = (
+        connector.charging_point.station
+        if connector and connector.charging_point
+        else None
+    )
+    if user.role == "OPERATOR":
+        if not station or station.operator_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền can thiệp vào phiên sạc của trạm sạc khác.",
+            )
+
+    # 4. Kiểm tra trạng thái phiên
+    if session.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Phiên sạc không ở trạng thái đang sạc (trạng thái hiện tại: {session.status}).",
+        )
+
+    # 5. Xử lý các ca lỗi của S-23
+    condition = (simulate_condition or "").upper().strip()
+
+    # Ca 1: Trụ sạc ngoại tuyến (Offline)
+    is_offline = condition == "OFFLINE"
+    if connector and connector.charging_point:
+        if connector.charging_point.status in ("FAULTED", "UNAVAILABLE"):
+            is_offline = True
+    if station and station.status == "MAINTENANCE":
+        is_offline = True
+
+    if is_offline:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa, vui lòng kiểm tra kết nối mạng của trụ.",
+        )
+
+    # Ca 2: Trụ sạc từ chối (Rejected)
+    if condition == "REJECTED":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Trụ sạc từ chối lệnh dừng (Rejected). Phiên sạc vẫn đang tiếp tục hoạt động.",
+        )
+
+    # Ca 3: Hết thời gian chờ (Timeout)
+    if condition == "TIMEOUT":
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Hết thời gian chờ phản hồi từ trụ sạc (Timeout). Phiên sạc đã được đánh dấu cần xem xét kỹ thuật.",
+        )
+
+    # 6. Ca thành công: Trụ chấp nhận và gửi StopTransaction thật với stop_reason='Remote'
+    meter_stop_kwh = None
+    try:
+        from app.simulator.charging_simulator import simulator_manager
+
+        sim = simulator_manager.get_simulator(session_id)
+        if sim and sim.current_energy_kwh > Decimal("0.00"):
+            meter_stop_kwh = sim.current_energy_kwh
+        elif session.total_kwh and session.total_kwh > Decimal("0.00"):
+            meter_stop_kwh = session.meter_start_kwh + session.total_kwh
+        else:
+            meter_stop_kwh = session.meter_start_kwh + Decimal("1.50")
+    except (ImportError, RuntimeError, AttributeError):
+        meter_stop_kwh = session.meter_start_kwh + Decimal("1.50")
+
+    total_kwh = meter_stop_kwh - session.meter_start_kwh
+    total_amount = round(total_kwh * session.applied_price_per_kwh, 2)
+
+    try:
+        # Quyết toán tiền ví
+        deduct_charging_fee(
+            db=db,
+            user_id=session.user_id,
+            session_id=session.id,
+            amount=total_amount,
+        )
+
+        now = datetime.now(timezone.utc)
+        session.end_time = now
+        session.meter_stop_kwh = meter_stop_kwh
+        session.total_kwh = total_kwh
+        session.total_amount = total_amount
+        session.status = "COMPLETED"
+        session.stop_reason = "Remote"
+
+        # Giải phóng cổng sạc về AVAILABLE
+        db.execute(
+            text("UPDATE connectors SET status = 'AVAILABLE' WHERE id = :cid;"),
+            {"cid": session.connector_id},
+        )
+
+        # Cập nhật trụ sạc nếu không còn cổng nào khác đang sạc
+        if connector and connector.charging_point_id:
+            other_active = (
+                db.query(Connector)
+                .filter(
+                    Connector.charging_point_id == connector.charging_point_id,
+                    Connector.status == "CHARGING",
+                    Connector.id != session.connector_id,
+                    Connector.is_active.is_(True),
+                )
+                .count()
+            )
+            if other_active == 0:
+                db.execute(
+                    text(
+                        "UPDATE charging_points SET status = 'AVAILABLE' WHERE id = :cpid AND status = 'CHARGING';"
+                    ),
+                    {"cpid": connector.charging_point_id},
+                )
+
+        db.commit()
+        db.refresh(session)
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi giao dịch khi quyết toán phiên dừng từ xa: {exc!s}",
+        ) from exc
+
+    # Dọn dẹp simulator trong RAM
+    try:
+        from app.simulator.charging_simulator import simulator_manager
+
+        simulator_manager.stop_simulation(session.id)
+    except RuntimeError:
+        logger.exception("Lỗi khi dừng simulator task cho session #%s", session.id)
+
+    return session

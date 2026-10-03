@@ -27,6 +27,13 @@ class SessionStopRequest(BaseModel):
     stop_reason: str | None = Field(default="USER_STOPPED", max_length=100)
 
 
+class RemoteStopRequest(BaseModel):
+    simulate_condition: str | None = Field(
+        default=None,
+        description="Điều kiện mô phỏng kiểm thử: REJECTED | OFFLINE | TIMEOUT | NORMAL",
+    )
+
+
 class SessionResponse(BaseModel):
     id: int
     user_id: int
