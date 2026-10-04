@@ -167,12 +167,46 @@ class Connector(Base):
     # Quan hệ
     charging_point = relationship("ChargingPoint", back_populates="connectors")
 
+    errors = relationship(
+        "ConnectorError",
+        back_populates="connector",
+        cascade="all, delete-orphan",
+        order_by="ConnectorError.id",
+    )
+
     def __repr__(self) -> str:
         return (
             f"<Connector(id={self.id}, charger_id={self.charging_point_id}, "
             f"#{self.connector_number}, type='{self.connector_type}')>"
         )
 
+class ConnectorError(Base):
+    """Lịch sử lỗi của đầu nối do StatusNotification báo (chỉ thêm, không xóa)."""
+
+    __tablename__ = "connector_errors"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    connector_id = Column(
+        Integer,
+        ForeignKey("connectors.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    error_code = Column(String(50), nullable=False)
+    vendor_error_code = Column(String(50), nullable=True)
+    info = Column(String(50), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Quan hệ
+    connector = relationship("Connector", back_populates="errors")
+
+    def __repr__(self) -> str:
+        return (
+            f"<ConnectorError(id={self.id}, connector_id={self.connector_id}, "
+            f"error_code='{self.error_code}')>"
+        )
 
 class StationPowerMetric(Base):
     """Bảng lưu trữ lịch sử đo đếm công suất phụ tải trạm sạc theo từng phút (Equalizer 24h)."""
