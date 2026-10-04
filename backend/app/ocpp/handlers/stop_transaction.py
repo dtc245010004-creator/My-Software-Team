@@ -52,6 +52,7 @@ def handle_stop_transaction(
     meter_stop = payload.get("meterStop")
     raw_timestamp = payload.get("timestamp")
     reason = payload.get("reason")
+    id_tag_stop = payload.get("idTag")
     stop_time = parse_timestamp_safe(raw_timestamp)
 
     # 1. Tra cứu phiên sạc
@@ -108,6 +109,8 @@ def handle_stop_transaction(
         session.stop_reason = reason or "CounterRollback"
         session.stop_time = stop_time
         session.end_time = stop_time
+        if id_tag_stop:
+            session.stop_id_tag = str(id_tag_stop)
     else:
         # Số đo hợp lệ
         session.status = "COMPLETED"
@@ -118,6 +121,8 @@ def handle_stop_transaction(
         session.stop_reason = reason or "Local"
         session.stop_time = stop_time
         session.end_time = stop_time
+        if id_tag_stop:
+            session.stop_id_tag = str(id_tag_stop)
 
         if session.applied_price_per_kwh:
             session.total_amount = round(

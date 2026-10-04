@@ -21,6 +21,7 @@ def upgrade() -> None:
     # 1. Thêm các cột cho charging_sessions (Task T-36)
     with op.batch_alter_table("charging_sessions") as batch_op:
         batch_op.add_column(sa.Column("id_tag", sa.String(length=100), nullable=True))
+        batch_op.add_column(sa.Column("stop_id_tag", sa.String(length=100), nullable=True))
         batch_op.add_column(
             sa.Column(
                 "meter_start",
@@ -80,5 +81,6 @@ def downgrade() -> None:
         batch_op.drop_index("ix_charging_sessions_id_tag")
         batch_op.drop_column("meter_stop")
         batch_op.drop_column("meter_start")
+        batch_op.drop_column("stop_id_tag")
         batch_op.drop_column("id_tag")
 
