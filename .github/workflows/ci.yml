@@ -67,7 +67,7 @@ jobs:
       - name: Apply migrations to PostgreSQL
         working-directory: backend
         env:
-          DATABASE_URL: postgresql+psycopg://csms:csms@localhost:5432/csms
+          DATABASE_URL: postgresql+psycopg2://csms:csms@localhost:5432/csms
           AUTO_CREATE_SCHEMA: "false"
           SECRET_KEY: ci-only-not-a-secret
         run: |
