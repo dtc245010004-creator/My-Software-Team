@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { DEMO_USERS } from '../config/roleConfig';
 
 const AuthContext = createContext(null);
 
@@ -66,7 +67,7 @@ export const AuthProvider = ({ children }) => {
   const quickSwitch = async (roleKey) => {
     try {
       if (roleKey === 'ADMIN') {
-        await login('admin', 'AdminPass123');
+        await login(DEMO_USERS.ADMIN.username, DEMO_USERS.ADMIN.password);
       } else if (roleKey === 'OPERATOR' || roleKey === 'OPERATOR_A' || roleKey === 'OPERATOR_B') {
         await login('operator_a', 'OpPass123');
       } else {
@@ -74,7 +75,7 @@ export const AuthProvider = ({ children }) => {
         logout();
       }
     } catch (err) {
-      console.warn('Tài khoản demo mặc định chưa tồn tại, vui lòng đăng ký hoặc đăng nhập:', err);
+      console.warn('Đăng nhập nhanh demo thất bại:', err);
       throw err;
     }
   };

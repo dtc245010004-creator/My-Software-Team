@@ -109,7 +109,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-  Revision nền `a1b2c3d4e5f6` tạo các bảng lõi; cây migration hiện quy về một head (`f2c9a6d81b40`). Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
+  `backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`. Revision mới nhất trong cây là `45ab6640633a`, tạo bảng `id_tags`; migration trước đó `057c4ed34525` tạo `ocpp_messages`. Thẻ mẫu `DEMO-<USERNAME>` được tạo cho tài khoản tài xế role `CUSTOMER` khi nạp seed. Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
 
 ---
 
@@ -121,7 +121,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
 Căn cứ theo `backend/pytest.ini`, `backend/tests/` và `frontend/package.json:9`:
 
 ### Kiểm thử Backend (Pytest)
-Thực thi toàn bộ bộ test tự động (hiện có 84 test cases đã xác thực):
+Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Tổng lịch sử cũ 84/89/90 vẫn mâu thuẫn `[CẦN XÁC NHẬN]`; lần chạy mới nhất ngày 01/10/2026 đạt 163 passed, 1 warning (đã gồm 43 ca OCPP):
 ```powershell
 cd backend
 pytest
@@ -181,6 +181,8 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `BACKEND_CORS_ORIGINS` | JSON List | `["http://localhost:5173", ...]` | Danh sách origin trình duyệt được phép gọi API |
 | `GEMINI_API_KEY` | String | `""` | Khóa API dịch vụ AI Google Gemini (tùy chọn) |
 | `AI_MODEL_NAME` | String | `gemini-1.5-flash` | Định danh mô hình AI phân tích tải trạm |
+| `HEARTBEAT_INTERVAL_SECONDS` | Integer | `300` | Chu kỳ heartbeat trả trong BootNotification OCPP 1.6J (giây) |
+| `OCPP_CALL_TIMEOUT_SECONDS` | Float | `30.0` | Thời gian chờ CALL do CSMS gửi xuống trụ khi không truyền timeout riêng (giây) |
 
 ---
 
