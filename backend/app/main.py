@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.websocket import ws_manager
+from app.ocpp.gateway import router as ocpp_router
 from app.routers.admin_users import router as admin_users_router
 
 # Thiết lập ghi log
@@ -87,6 +88,7 @@ if settings.BACKEND_CORS_ORIGINS:
 # Đăng ký API router v1
 app.include_router(api_router)
 app.include_router(admin_users_router, prefix="/api/v1")
+app.include_router(ocpp_router)
 
 
 @app.get("/", summary="Trang chủ API")

@@ -47,7 +47,10 @@ export default function Login() {
       await quickSwitch(role);
       navigate('/');
     } catch (err) {
-      setError('Tài khoản demo chưa khởi tạo. Vui lòng đăng nhập bằng form bên dưới.');
+      setError(
+        err.response?.data?.detail ||
+          'Không thể đăng nhập tài khoản demo. Hãy kiểm tra thông tin đăng nhập và backend.'
+      );
     } finally {
       setLoading(false);
     }
