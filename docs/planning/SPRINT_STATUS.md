@@ -69,6 +69,9 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Sửa lỗi Admin Demo 1-Click (01/10/2026, mã nguồn commit `7f764ea`)**: Đồng bộ credential `admin / 12345678a` giữa `frontend/src/config/roleConfig.js`, `frontend/src/context/AuthContext.jsx` và `backend/seed_data.py`; build trực tiếp trên host thiếu `vite`, Docker build thành công và container frontend đã được cập nhật. Đã gỡ khóa tạm sau 5 lần thử sai; login API trả HTTP 200 với role `ADMIN`.
 * **Thời điểm thực hiện bổ sung**: Ngày **01/10/2026** (chưa commit), theo yêu cầu của người dùng:
   * Xóa `backend/migrations/` vì không được cấu hình trong `backend/alembic.ini`; giữ `backend/alembic/` làm nguồn duy nhất. Không chạy migration lên database.
+* **Giao diện Quản lý Trụ & Đầu nối (S-05)**: Ngày **03/10/2026** (chưa commit), thực hiện **theo yêu cầu của người dùng**:
+  * `frontend/src/pages/Stations.jsx`: thêm form **Thêm đầu nối** cho từng trụ; báo lỗi trùng mã trụ ngay tại ô "Mã trụ" (trước đây là banner chung); báo lỗi trùng số thứ tự đầu nối tại ô nhập; nút gắn trụ đổi từ chỉ `ADMIN` sang `ADMIN` + `OPERATOR`.
+  * Không thay đổi backend, CSDL hay test tự động.
 * **Thời điểm thực hiện**: Ngày **30/09/2026** (chưa commit), thực hiện **theo yêu cầu của người dùng**:
   * *Khung Staging & CI/CD*: Bổ sung Dockerfile đa tầng cho Backend/Frontend, cấu hình Reverse Proxy Nginx, file `docker-compose.staging.yml` và pipeline GitHub Actions `.github/workflows/ci-staging.yml` cho Story S-01.
   * *Bảo vệ đăng nhập chống vét cạn*: Thêm 2 cột `failed_login_attempts` và `locked_until` vào bảng `users` qua migration Alembic `149038e71dc9`, cập nhật endpoint `POST /api/v1/auth/login` đếm số lần sai và khóa tạm 15 phút khi sai liên tiếp 5 lần cho Story S-02.

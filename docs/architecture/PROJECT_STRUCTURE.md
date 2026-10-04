@@ -30,6 +30,8 @@
 * **Hồi quy sau S-16 (01/10/2026 - chưa commit)**: Full backend suite đạt 163 passed, 1 warning trong 122.08 giây; năm suite OCPP có tổng 43 ca.
 * **Admin Demo 1-Click (01/10/2026, mã nguồn commit `7f764ea`)**: Credential trong `DEMO_USERS.ADMIN` được đổi từ `admin / AdminPass123` sang `admin / 12345678a`; `AuthContext.quickSwitch()` dùng cấu hình tập trung và `Login.jsx` hiển thị detail 403 từ API. Build trực tiếp trên host bị chặn do thiếu `vite`, nhưng Docker build và cập nhật container frontend thành công. Tài khoản đã được gỡ khóa tạm; login API trả HTTP 200 với role `ADMIN`.
 * **Chuẩn hóa thư mục migration (01/10/2026 - chưa commit)**: Xóa cây revision cũ `backend/migrations/`; giữ `backend/alembic/` làm nguồn migration duy nhất theo cấu hình `backend/alembic.ini`.
+* **Giao diện Quản lý Trụ & Đầu nối - S-05 (03/10/2026 - chưa commit)**:
+  * `frontend/src/pages/Stations.jsx`: thêm form Thêm đầu nối, báo lỗi trùng mã trụ tại ô "Mã trụ", báo lỗi trùng số thứ tự đầu nối tại ô nhập, mở nút gắn trụ cho `OPERATOR`. Không đổi cấu trúc thư mục, không thêm file.
 * **Bộ chạy Local Dev ở thư mục gốc (30/09/2026 - chưa commit)**:
   * Thêm `run.py` để mở Uvicorn và Vite cùng lúc, kiểm tra dependencies cần thiết, và dừng cả hai tiến trình khi nhấn `Ctrl+C`.
 * **Hợp nhất cây migration Alembic (30/09/2026, commit `d7acaf4`)**:
