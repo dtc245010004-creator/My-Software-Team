@@ -74,5 +74,6 @@ Thumbs.db
 
 # Antigravity CLI / Temp
 temp/
-tools/ocpp-spike/verify_ocpp_staging.py
-
+__init__.*
+!backend/app/ocpp/__init__.py
+!backend/app/ocpp/handlers/__init__.py
