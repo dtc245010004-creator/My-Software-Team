@@ -9,6 +9,7 @@ from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.session_service import (
+    remote_stop_charging_session,
     start_charging_session,
     stop_charging_session,
 )
@@ -232,3 +233,96 @@ class TestSessionLifecycle:
             meter_stop_kwh=Decimal("10.00"),
         )
         assert stopped_2.total_amount == amt_1
+
+    def test_remote_stop_session_success(self, db_session, session_env):
+        """S-23 / T-49: Vận hành viên dừng phiên từ xa thành công (stop_reason='Remote', status='COMPLETED')."""
+        driver = session_env["driver_normal"]
+        cpo = session_env["cpo"]
+        conn = session_env["conn2"]
+
+        session = start_charging_session(
+            db=db_session, user=driver, connector_id=conn.id
+        )
+        assert session.status == "ACTIVE"
+
+        # Vận hành viên gửi lệnh dừng từ xa
+        remote_stopped = remote_stop_charging_session(
+            db=db_session,
+            user=cpo,
+            session_id=session.id,
+        )
+
+        assert remote_stopped.status == "COMPLETED"
+        assert remote_stopped.stop_reason == "Remote"
+        assert remote_stopped.total_kwh > Decimal("0.00")
+        assert remote_stopped.total_amount > Decimal("0.00")
+
+        # Cổng sạc được giải phóng về AVAILABLE
+        db_session.refresh(conn)
+        assert conn.status == "AVAILABLE"
+
+    def test_remote_stop_session_3_error_cases(self, db_session, session_env):
+        """S-23 / T-49: Ba ca lỗi của S-23 hiển thị đúng 3 thông báo lỗi khác nhau."""
+        driver = session_env["driver_normal"]
+        cpo = session_env["cpo"]
+        conn = session_env["conn2"]
+
+        session = start_charging_session(
+            db=db_session, user=driver, connector_id=conn.id
+        )
+
+        # Ca 1: Trụ ngoại tuyến (Offline)
+        with pytest.raises(HTTPException) as exc_offline:
+            remote_stop_charging_session(
+                db=db_session,
+                user=cpo,
+                session_id=session.id,
+                simulate_condition="OFFLINE",
+            )
+        assert exc_offline.value.status_code == 400
+        assert "ngoại tuyến" in exc_offline.value.detail.lower()
+
+        # Ca 2: Trụ từ chối (Rejected)
+        with pytest.raises(HTTPException) as exc_rejected:
+            remote_stop_charging_session(
+                db=db_session,
+                user=cpo,
+                session_id=session.id,
+                simulate_condition="REJECTED",
+            )
+        assert exc_rejected.value.status_code == 409
+        assert "từ chối" in exc_rejected.value.detail.lower()
+
+        # Ca 3: Hết thời gian chờ (Timeout)
+        with pytest.raises(HTTPException) as exc_timeout:
+            remote_stop_charging_session(
+                db=db_session,
+                user=cpo,
+                session_id=session.id,
+                simulate_condition="TIMEOUT",
+            )
+        assert exc_timeout.value.status_code == 504
+        assert "hết thời gian" in exc_timeout.value.detail.lower() or "timeout" in exc_timeout.value.detail.lower()
+
+        # Phiên sạc vẫn giữ nguyên trạng thái ACTIVE
+        db_session.refresh(session)
+        assert session.status == "ACTIVE"
+
+    def test_remote_stop_session_nfr_rbac(self, db_session, session_env):
+        """S-23 / T-49 NFR: Chỉ vai trò vận hành viên và quản trị mới được gửi lệnh dừng từ xa."""
+        driver = session_env["driver_normal"]
+        conn = session_env["conn2"]
+
+        session = start_charging_session(
+            db=db_session, user=driver, connector_id=conn.id
+        )
+
+        # Tài xế (CUSTOMER) bị từ chối 403 Forbidden
+        with pytest.raises(HTTPException) as exc_customer:
+            remote_stop_charging_session(
+                db=db_session,
+                user=driver,
+                session_id=session.id,
+            )
+        assert exc_customer.value.status_code == 403
+        assert "vận hành viên và quản trị" in exc_customer.value.detail.lower()

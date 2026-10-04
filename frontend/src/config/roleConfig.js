@@ -22,7 +22,7 @@ export const getRoleLabel = (role) => {
 export const DEMO_USERS = {
   ADMIN: {
     username: 'admin',
-    password: 'AdminPass123',
+    password: '12345678a',
     role: 'ADMIN',
     label: 'Admin',
     fullName: 'Quản Trị Viên Hệ Thống',

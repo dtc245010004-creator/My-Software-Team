@@ -121,10 +121,7 @@ def test_second_boot_notification_updates_same_charging_point(
 
     db_session.refresh(charging_point)
     assert charging_point.id == original_id
-    assert (
-        db_session.query(ChargingPoint).filter_by(code="CP-BOOT-REPEAT").count()
-        == 1
-    )
+    assert db_session.query(ChargingPoint).filter_by(code="CP-BOOT-REPEAT").count() == 1
     assert charging_point.charge_point_vendor == "Vendor B"
     assert charging_point.charge_point_model_name == "Model B"
     assert charging_point.firmware_version == "2.0.0"
@@ -165,9 +162,7 @@ def test_unknown_charge_point_closes_before_accepting(
     client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
     with pytest.raises(WebSocketDisconnect) as disconnect:
-        with client.websocket_connect(
-            "/ocpp/CP-UNKNOWN", subprotocols=["ocpp1.6"]
-        ):
+        with client.websocket_connect("/ocpp/CP-UNKNOWN", subprotocols=["ocpp1.6"]):
             pass
 
     assert disconnect.value.code == 4001

@@ -222,9 +222,11 @@ class StationDistanceResponse(StationResponse):
 
     distance_km: Optional[float] = None
 
+
 # ==========================================
 # 4. CÂY TRẠM - TRỤ - CỔNG (STATION TREE SCHEMAS)
 # ==========================================
+
 
 class ConnectorTreeItem(BaseModel):
     id: int
@@ -269,6 +271,7 @@ class StationTreeItem(BaseModel):
 # 5. MÀN HÌNH THEO DÕI DẠNG LƯỚI (STATION GRID SCHEMAS - T-24)
 # ==========================================
 
+
 class ConnectorStatusCount(BaseModel):
     """Thống kê số lượng đầu nối theo từng trạng thái thực tế."""
 
@@ -296,9 +299,7 @@ class ChargerGridItem(BaseModel):
     faulted_connectors: int = 0
     unavailable_connectors: int = 0
     total_connectors: int = 0
-    connector_counts: ConnectorStatusCount = Field(
-        default_factory=ConnectorStatusCount
-    )
+    connector_counts: ConnectorStatusCount = Field(default_factory=ConnectorStatusCount)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -320,10 +321,7 @@ class StationGridItem(BaseModel):
     faulted_connectors: int = 0
     unavailable_connectors: int = 0
     total_connectors: int = 0
-    connector_counts: ConnectorStatusCount = Field(
-        default_factory=ConnectorStatusCount
-    )
+    connector_counts: ConnectorStatusCount = Field(default_factory=ConnectorStatusCount)
     chargers: List[ChargerGridItem] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
-

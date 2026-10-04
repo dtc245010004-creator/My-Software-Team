@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Zap, Cpu, MapPin, ChevronRight, ChevronDown, CheckCircle, AlertCircle, X, Edit2, Map as MapIcon, List as ListIcon } from 'lucide-react';
+import { Plus, Zap, Cpu, MapPin, ChevronRight, ChevronDown, CheckCircle, AlertCircle, X, Edit2, Map as MapIcon, List as ListIcon, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRestartChargePoint } from '../hooks/useRestartChargePoint';
 import StationLocationPicker from '../components/StationLocationPicker';
 import StationsMapView from '../components/StationsMapView';
 
 export default function Stations() {
   const { role } = useAuth();
+  const { loading: restartLoading, result: restartResult, restart, resetResult } = useRestartChargePoint();
+  const [restartingCharger, setRestartingCharger] = useState(null); // { id, status, mockState }
+  
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedStationId, setExpandedStationId] = useState(null);
@@ -661,8 +665,65 @@ export default function Stations() {
                                   {ch.status === 'AVAILABLE' ? 'Bảo trì' : 'Mở lại'}
                                 </button>
                               )}
+                              {canManageChargers && (
+                                <button
+                                  type="button"
+                                  title="Khởi động lại trụ sạc (Restart)"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRestartingCharger({ id: ch.id, code: ch.code, status: ch.status });
+                                    resetResult();
+                                  }}
+                                  className="text-[10px] font-mono flex items-center space-x-1 px-1.5 py-0.5 rounded border border-blue-500/40 text-blue-500 hover:bg-blue-500/20 transition-colors"
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  <span>Khởi động lại</span>
+                                </button>
+                              )}
                             </div>
                           </div>
+
+                          {/* Khu vực thông báo trạng thái restart */}
+                          {(restartLoading || restartResult?.chargerId === ch.id) && (
+                            <div 
+                              className={`mb-3 text-xs p-2 rounded border font-mono ${
+                                restartLoading 
+                                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
+                                  : restartResult?.type === 'success'
+                                  ? 'bg-grid-green/10 border-grid-green/30 text-grid-green'
+                                  : restartResult?.type === 'offline'
+                                  ? 'bg-caution-amber/10 border-caution-amber/30 text-caution-amber'
+                                  : 'bg-critical-red/10 border-critical-red/30 text-critical-red'
+                              }`}
+                              aria-live="polite"
+                            >
+                              {restartLoading ? (
+                                <span className="flex items-center space-x-2">
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                  <span>Đang gửi lệnh khởi động lại...</span>
+                                </span>
+                              ) : (
+                                <div className="flex flex-col">
+                                  <span className="flex items-center space-x-2">
+                                    {restartResult.type === 'success' ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                                    <span>{restartResult.message}</span>
+                                  </span>
+                                  {/* Hiển thị nút "Thử lại" nếu bị lỗi offline hoặc timeout */}
+                                  {(restartResult.type === 'offline' || restartResult.type === 'timeout') && (
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        restart(ch.id, restartResult.type); // Giữ nguyên mock status nếu đang test, hoặc mặc định
+                                      }}
+                                      className="mt-1 self-start text-[10px] underline hover:text-white"
+                                    >
+                                      Thử lại
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           <div className="text-xs text-steel-gray font-mono mb-2">
                             Hãng: {ch.vendor} • Định mức: <span className="text-tech-white font-bold">{ch.max_power_kw} kW</span>
@@ -1331,6 +1392,66 @@ export default function Stations() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xác nhận Khởi động lại */}
+      {restartingCharger && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-panel border border-hairline p-6 rounded-sm max-w-sm w-full shadow-2xl">
+            <h2 className="text-lg font-bold text-tech-white mb-2 flex items-center">
+              <RefreshCw className="w-5 h-5 mr-2 text-blue-500" />
+              Xác nhận khởi động lại
+            </h2>
+            
+            <p className="text-sm text-steel-gray mb-4">
+              Bạn có chắc chắn muốn gửi lệnh khởi động lại tới trụ sạc <strong className="text-white">{restartingCharger.code}</strong> không?
+            </p>
+
+            {restartingCharger.status === 'CHARGING' && (
+              <div className="mb-4 p-3 bg-critical-red/10 border border-critical-red/40 rounded text-critical-red text-xs">
+                <p className="font-bold flex items-center mb-1">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  CẢNH BÁO NGUY HIỂM:
+                </p>
+                <p>Trụ sạc này hiện đang trong quá trình sạc (CHARGING). Việc khởi động lại có thể gây ngắt điện đột ngột và ảnh hưởng tới phiên sạc đang diễn ra.</p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-xs mb-4 p-2 bg-obsidian rounded border border-hairline">
+              <span className="text-steel-gray">Chế độ Test (Mock):</span>
+              <select 
+                value={restartingCharger.mockState || 'success'} 
+                onChange={(e) => setRestartingCharger({ ...restartingCharger, mockState: e.target.value })}
+                className="bg-panel border-hairline rounded px-1 py-0.5 text-tech-white outline-none"
+              >
+                <option value="success">Thành công (200)</option>
+                <option value="offline">Offline (409)</option>
+                <option value="timeout">Timeout (504)</option>
+                <option value="401">Lỗi quyền (403)</option>
+                <option value="500">Lỗi Server (500)</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setRestartingCharger(null)}
+                className="px-4 py-2 rounded bg-hairline text-steel-gray hover:text-tech-white text-sm font-bold"
+              >
+                HỦY
+              </button>
+              <button
+                onClick={() => {
+                  restart(restartingCharger.id, restartingCharger.mockState || 'success');
+                  setRestartingCharger(null);
+                }}
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold flex items-center"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                ĐỒNG Ý
+              </button>
+            </div>
           </div>
         </div>
       )}

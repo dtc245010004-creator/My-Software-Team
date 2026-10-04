@@ -84,7 +84,9 @@ def test_reset_online_forwards_callresult_and_processes_other_calls(
 
             # Lệnh do trụ chủ động gửi vẫn được xử lý trong lúc CSMS chờ Reset.
             websocket.send_text(
-                build_call("authorize-during-reset", "Authorize", {"idTag": "MISS-1234"})
+                build_call(
+                    "authorize-during-reset", "Authorize", {"idTag": "MISS-1234"}
+                )
             )
             authorize_result = _read_frame(websocket)
             assert authorize_result == [
@@ -108,9 +110,7 @@ def test_reset_offline_returns_conflict_without_dispatching(
 ) -> None:
     headers = _operator_headers(db_session)
     send_call = AsyncMock()
-    monkeypatch.setattr(
-        "app.api.v1.endpoints.chargers.send_call_and_wait", send_call
-    )
+    monkeypatch.setattr("app.api.v1.endpoints.chargers.send_call_and_wait", send_call)
 
     response = client.post(
         "/api/v1/chargers/CP-RESET-OFFLINE/reset",
@@ -140,9 +140,7 @@ def test_reset_no_response_returns_gateway_timeout(
         payload: dict,
         timeout_seconds: float | None = None,
     ) -> dict:
-        return await send_call(
-            charge_point_code, action, payload, timeout_seconds=0.5
-        )
+        return await send_call(charge_point_code, action, payload, timeout_seconds=0.5)
 
     monkeypatch.setattr(chargers, "send_call_and_wait", short_timeout)
 
@@ -206,9 +204,7 @@ def test_reset_rejects_customer_role(
 ) -> None:
     headers = _operator_headers(db_session, role="CUSTOMER")
     send_call = AsyncMock()
-    monkeypatch.setattr(
-        "app.api.v1.endpoints.chargers.send_call_and_wait", send_call
-    )
+    monkeypatch.setattr("app.api.v1.endpoints.chargers.send_call_and_wait", send_call)
 
     response = client.post(
         "/api/v1/chargers/CP-RESET-FORBIDDEN/reset",

@@ -172,7 +172,7 @@ Khi một module bị sửa đổi:
 1. Xác định phạm vi ảnh hưởng trực tiếp (Direct Impact) và gián tiếp (Indirect Impact).
 2. Tra cứu [Bản đồ ma trận hồi quy trong INVENTORY.md](INVENTORY.md#8-regression-reference).
 3. Thực thi tối thiểu toàn bộ các test suites liên quan trực tiếp.
-4. Nếu sửa đổi thuộc tầng cấu hình lõi (`config.py`, `database.py`), bắt buộc kích hoạt `FULL_REGRESSION` (chạy toàn bộ 84 tests).
+4. Nếu sửa đổi thuộc tầng cấu hình lõi (`config.py`, `database.py`), bắt buộc kích hoạt `FULL_REGRESSION` (lần chạy ngày 01/10/2026 gồm 148 tests; chạy toàn bộ suite hiện có).
 
 ---
 

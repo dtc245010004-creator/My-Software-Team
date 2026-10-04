@@ -112,9 +112,9 @@ def test_t26_job_marks_expired_charge_points_offline(
     )
 
     assert cp_exp.id in modified_ids, "Trụ hết hạn phải nằm trong danh sách cập nhật"
-    assert (
-        cp_act.id not in modified_ids
-    ), "Trụ còn hoạt động không được chuyển sang Offline"
+    assert cp_act.id not in modified_ids, (
+        "Trụ còn hoạt động không được chuyển sang Offline"
+    )
 
     db_session.refresh(cp_exp)
     db_session.refresh(conn_1)
@@ -130,9 +130,9 @@ def test_t26_job_marks_expired_charge_points_offline(
     second_run_modified = scan_and_mark_offline_charge_points(
         db=db_session, heartbeat_interval=60
     )
-    assert (
-        second_run_modified == []
-    ), "Chạy lại lần 2 không được phát sinh thay đổi thừa"
+    assert second_run_modified == [], (
+        "Chạy lại lần 2 không được phát sinh thay đổi thừa"
+    )
 
 
 @pytest.mark.asyncio
@@ -156,7 +156,9 @@ async def test_t27_two_way_status_transition(db_session: Session, t26_t27_seed_d
     db_session.refresh(cp)
 
     assert "currentTime" in hb_response
-    assert cp.status == "Online", "Trụ phải tự động phục hồi sang Online khi gửi Heartbeat"
+    assert cp.status == "Online", (
+        "Trụ phải tự động phục hồi sang Online khi gửi Heartbeat"
+    )
     assert cp.last_seen_at > old_last_seen
 
     # --- Chiều 1 lần nữa: Chuyển lại về Offline để test StatusNotification ---
@@ -175,9 +177,9 @@ async def test_t27_two_way_status_transition(db_session: Session, t26_t27_seed_d
         charge_point_id=cp.id,
     )
     db_session.refresh(cp)
-    assert (
-        cp.status == "Online"
-    ), "Trụ phải tự động phục hồi sang Online khi nhận StatusNotification"
+    assert cp.status == "Online", (
+        "Trụ phải tự động phục hồi sang Online khi nhận StatusNotification"
+    )
 
 
 def test_active_charge_points_not_affected(db_session: Session, t26_t27_seed_data):
@@ -217,9 +219,7 @@ def test_t27_gateway_heartbeat_websocket_integration(
     db_session.add(cp)
     db_session.commit()
 
-    with client.websocket_connect(
-        f"/ocpp/{cp.code}", subprotocols=["ocpp1.6"]
-    ) as ws:
+    with client.websocket_connect(f"/ocpp/{cp.code}", subprotocols=["ocpp1.6"]) as ws:
         # Bước 1: BootNotification để xác thực phiên kết nối
         ws.send_text(
             build_call(
@@ -249,4 +249,3 @@ def test_t27_gateway_heartbeat_websocket_integration(
 
     db_session.refresh(cp)
     assert cp.status == "Online", "Heartbeat qua WebSocket phải đưa trụ trở lại Online"
-
