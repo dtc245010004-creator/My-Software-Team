@@ -12,6 +12,8 @@ Giao diện người dùng hiện tại được xây dựng trên nền tảng 
 1. **Màn hình Đăng nhập & Xác thực (`Login.jsx`)**: Hỗ trợ đăng nhập bằng tài khoản, đăng ký tài khoản khách hàng mới, hiển thị lỗi tài khoản khóa nợ (`HTTP 403`), và tích hợp hàng nút chuyển nhanh vai trò 1-click cho buổi demo (`Admin`, `Operator`, `Driver Debt`, `Guest`).
 2. **Trung tâm Điều hành Vận hành (`Dashboard.jsx`)**: Hiển thị các thẻ chỉ số KPI tổng quan (Tổng trạm, tổng trụ sạc, công suất tức thời, doanh thu trong ngày, biểu đồ phụ tải lưới điện).
 3. **Quản lý Mạng lưới Trạm & Trụ (`StationsManagement.jsx`)**: Cho phép CPO tạo trạm mới, cập nhật tọa độ GPS, thêm trụ sạc với mã trụ duy nhất và cấu hình danh mục đầu nối.
+   * Cập nhật 03/10/2026 (chưa commit): trong chi tiết trạm đã có form **Thêm trụ sạc** (báo lỗi trùng mã trực tiếp tại ô "Mã trụ") và form **Thêm đầu nối** cho từng trụ (báo lỗi trùng số thứ tự tại ô nhập); hiển thị cho `ADMIN` và `OPERATOR`.
+   * [CẦN XÁC NHẬN: tài liệu này ghi tên file `StationsManagement.jsx`, nhưng mã nguồn thực tế chỉ có `frontend/src/pages/Stations.jsx`]
 4. **Theo dõi Phiên sạc Trực tiếp (`LiveSessions.jsx`)**: Kết nối kênh WebSocket `ws://localhost:8000/ws/telemetry` để cập nhật trạng thái sạc theo thời gian thực (SoC %, công suất kW, nhiệt độ, tiền điện tạm tính).
 5. **Cổng Khách hàng / Tài xế sạc (`DriverPortal.jsx`)**: Cho phép tài xế chọn đầu nối, nhập % pin ban đầu, cấu hình dung lượng pin xe (kWh), theo dõi quá trình sạc và dừng sạc.
 6. **Trợ lý AI & Khuyến nghị (`AIAdvisor.jsx`)**: Màn hình cố vấn điều hành thông minh, hiển thị cảnh báo bảo trì dự đoán, gợi ý phân bổ phụ tải và khuyến nghị giá bán điện TOU.
@@ -36,6 +38,11 @@ Trong quá trình hiện thực hóa Giai đoạn 1, đội ngũ phát triển �
 * **Đặc tả ban đầu**: Nhúng bản đồ tương tác dạng bản đồ nhiệt (Heatmap / Live Map) sử dụng Mapbox GL hoặc Google Maps SDK.
 * **Quyết định điều chỉnh**: Giai đoạn 1 sử dụng danh sách trạm sắp xếp theo khoảng cách tính toán bằng công thức Haversine phía backend và thẻ hiển thị tọa độ GPS.
 * **Lý do**: Tránh phát sinh chi phí bản quyền API Mapbox/Google Maps và loại bỏ phụ thuộc mạng bên ngoài khi nghiệm thu môi trường offline.
+
+### 4. Báo lỗi trùng mã trụ / số đầu nối ngay tại ô nhập (03/10/2026 - chưa commit)
+* **Đặc tả**: Ticket "[FE] (UI Quản lý Trụ & Đầu nối)" yêu cầu hiển thị thông báo lỗi trực tiếp tại vị trí nhập "Mã trụ" khi bị trùng.
+* **Hiện thực**: `Stations.jsx` kiểm tra trùng ngay khi gõ dựa trên danh sách trụ đã tải về, đồng thời nhận diện lỗi trùng từ backend qua HTTP 400 có chuỗi `"Mã trụ"` (trụ) hoặc `"đã tồn tại"` (đầu nối) để đưa về đúng ô nhập.
+* **Lý do / giới hạn**: Backend trả `400` thay vì `409` (đã ghi nhận trong `docs/audit-report.md`), nên client phải dựa vào nội dung thông báo. OPERATOR chỉ tải được trạm của mình, nên trùng mã với trạm của chủ khác chỉ được phát hiện sau khi bấm lưu.
 
 ---
 

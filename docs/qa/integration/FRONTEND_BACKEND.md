@@ -10,6 +10,8 @@
 
 Tài liệu này xác nhận tính toàn vẹn và mức độ tương thích giao tiếp dữ liệu giữa tầng Giao diện người dùng (Client SPA) và Máy chủ dịch vụ (Server API) đối với toàn bộ các tính năng cốt lõi của Giai đoạn 1.
 
+Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa trụ sạc và CSMS, không thuộc hợp đồng trình duyệt `/ws/telemetry`; BootNotification được ghi nhận tại [hồ sơ S-08](../stories/S-08.md), ủy quyền `Authorize` bằng `idTag` tại [hồ sơ S-15](../stories/S-15.md), và lệnh Reset do Admin/Operator gửi xuống tại [hồ sơ S-16](../stories/S-16.md).
+
 ---
 
 ## Test Environment
@@ -63,7 +65,8 @@ Tài liệu này xác nhận tính toàn vẹn và mức độ tương thích gi
 ## TC-FB-06: Thêm đầu nối sạc & Hiển thị Badge trạng thái
 * **Luồng tích hợp**: `POST /api/v1/chargers/{charger_id}/connectors` với chuẩn cắm (CCS2, Type 2, CHAdeMO) và công suất (kW).
 * **Xác thực Client**: Lưới hiển thị `ConnectorBadge` hiển thị đúng màu (Xanh lá `AVAILABLE`, Xanh dương `CHARGING`).
-* **Kết quả**: **PASS**.
+* **Cập nhật 03/10/2026 (chưa commit)**: `Stations.jsx` bổ sung nút `+ ĐẦU NỐI` trên từng thẻ trụ (ADMIN/OPERATOR) mở Modal "Thêm đầu nối" gồm số thứ tự (tự gợi ý số kế tiếp), chuẩn `CCS2`/`TYPE_2`/`CHADEMO` và công suất tối đa. Số thứ tự trùng trên cùng trụ được báo lỗi ngay tại ô nhập (kiểm tra client + thông báo HTTP 400 `"Cổng sạc #n đã tồn tại trên trụ sạc này."` từ backend).
+* **Kết quả**: **PASS**. Phần cập nhật 03/10/2026: đã qua `npm --prefix frontend run build`; [THIẾU: chưa kiểm thử tay trên trình duyệt].
 
 ---
 
@@ -120,7 +123,8 @@ Tài liệu này xác nhận tính toàn vẹn và mức độ tương thích gi
   * Nhập mã trụ, hãng, model, công suất, số súng sạc và chuẩn cổng.
   * Bấm lưu: Gửi request lên backend thành công (HTTP 201), modal tự đóng và danh sách trụ trong trạm tự động nạp lại không cần refresh trang.
   * Nếu mã trụ trùng: Bắt lỗi HTTP 400 và hiển thị banner cảnh báo đỏ trong modal.
-* **Kết quả**: **PASS** (chưa commit).
+  * **Cập nhật 03/10/2026 (chưa commit)**: Lỗi trùng mã trụ được hiển thị trực tiếp dưới ô nhập "Mã trụ" (viền đỏ + thông báo) thay cho banner chung. Client kiểm tra trùng ngay khi gõ dựa trên danh sách trụ đã tải (`GET /api/v1/stations`); nếu backend vẫn trả HTTP 400 có chuỗi `"Mã trụ"` (trường hợp OPERATOR không thấy trạm của chủ khác) thì thông báo của backend cũng được đưa về đúng ô "Mã trụ". Nút gắn trụ hiển thị cho cả `ADMIN` và `OPERATOR`.
+* **Kết quả**: **PASS** (chưa commit). Phần cập nhật 03/10/2026: đã qua `npm --prefix frontend run build`; [THIẾU: chưa kiểm thử tay trên trình duyệt].
 
 ---
 

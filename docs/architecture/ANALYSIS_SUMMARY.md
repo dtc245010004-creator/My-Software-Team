@@ -41,7 +41,7 @@ flowchart TD
 
 ## 2. KHẢO SÁT KẾT CẤU CÁC MỤC CHÍNH ## CỦA CÁC FILE .md
 
-Hệ thống tài liệu sau tái cấu trúc bao gồm 24 file Markdown chuyên biệt:
+Danh mục dưới đây mô tả các file Markdown chuyên biệt được khảo sát:
 
 ### 2.1. Nhóm tài liệu quy ước dự án và đóng góp (Root & .github)
 * [`README.md`](../../README.md): Hướng dẫn khởi động nhanh 1 lệnh, danh sách tài khoản demo có sẵn, khắc phục sự cố và tài liệu liên quan.
@@ -60,15 +60,18 @@ Hệ thống tài liệu sau tái cấu trúc bao gồm 24 file Markdown chuyên
 
 ### 2.4. Nhóm tài liệu quy chuẩn & thực thi kiểm thử (docs/testing/, docs/TESTER_STANDARD.md, docs/TEST_INVENTORY.md)
 * [`docs/qa/STANDARD.md`](../qa/STANDARD.md): Hiến chương kiểm định chất lượng, 19 điều cấm, 11 enum chuẩn, luật bằng chứng thực tế.
-* [`docs/qa/INVENTORY.md`](../qa/INVENTORY.md): Sổ cái kiểm kê 84 test cases từ 9 test suites đang hoạt động.
+* [`docs/qa/INVENTORY.md`](../qa/INVENTORY.md): Sổ cái kiểm kê suite; full backend lần gần nhất đạt 163 passed, 1 warning, gồm 43 ca OCPP.
 * [`docs/qa/plans/TEST_PLAN.md`](../qa/plans/TEST_PLAN.md): Kế hoạch kiểm thử chiến lược kim tự tháp 5 tầng.
-* [`docs/qa/reports/TEST_REPORT.md`](../qa/reports/TEST_REPORT.md): Báo cáo kết quả thực thi kiểm thử thực tế (84/84 passed).
-* [`docs/qa/reports/REGRESSION_REPORT.md`](../qa/reports/REGRESSION_REPORT.md): Báo cáo kiểm soát hồi quy (84/84 test cũ passed).
+* [`docs/qa/reports/TEST_REPORT.md`](../qa/reports/TEST_REPORT.md): Báo cáo kết quả thực thi; full backend đạt 163 passed, 1 warning ngày 01/10/2026.
+* [`docs/qa/reports/REGRESSION_REPORT.md`](../qa/reports/REGRESSION_REPORT.md): Báo cáo kết quả hồi quy lịch sử và kiểm thử chọn lọc.
 * [`docs/qa/reports/BUG_REPORT.md`](../qa/reports/BUG_REPORT.md): Sổ ghi nhận 5 khuyết tật và rào cản môi trường.
 
-### 2.5. Nhóm tài liệu đặc tả User Stories (docs/stories/)
+### 2.5. Nhóm tài liệu đặc tả User Stories (docs/qa/stories/)
 * [`docs/qa/stories/README.md`](../qa/stories/README.md): Danh mục hồ sơ nghiệm thu User Stories.
 * [`S-01.md`](../qa/stories/S-01.md) đến [`S-05.md`](../qa/stories/S-05.md): Hồ sơ nghiệm thu chi tiết 5 Stories của Giai đoạn 1.
+* [`S-07.md`](../qa/stories/S-07.md): Hồ sơ S-07 Sprint 2; T-14/T-15 hoàn thành trong phạm vi bộ đọc/ghi khung và test, các tiêu chí tầng kết nối còn lại chưa nghiệm thu.
+* [`S-15.md`](../qa/stories/S-15.md): Hồ sơ nghiệm thu model `IdTag` và handler `Authorize` cho Story S-15.
+* [`S-16.md`](../qa/stories/S-16.md): Hồ sơ nghiệm thu dispatcher gửi Reset từ CSMS và ghép phản hồi theo message ID.
 
 ### 2.6. Nhóm tài liệu Thiết kế UI & Nghiên cứu kỹ thuật (Design & Spikes)
 * [`docs/design/OPERATOR_DASHBOARD_UX.md`](../design/OPERATOR_DASHBOARD_UX.md): 26 mục đặc tả UX Level 3 cho Dashboard Điều hành.
@@ -126,8 +129,9 @@ Bảng quyết định chính thức về các file kỹ thuật cấp root (đ�
 | :--- | :---: | :--- | :--- |
 | **Backend REST API** | **HOẠT ĐỘNG** | 8 router modules, FastAPI docs Swagger | Đã hoàn thành 5/5 Stories Giai đoạn 1 |
 | **Kênh WebSocket Telemetry** | **HOẠT ĐỘNG** | Endpoint `/ws/telemetry` gửi dữ liệu mỗi 2s | Phục vụ demo giám sát thời gian thực |
+| **Gateway OCPP 1.6J** | **ĐÃ KIỂM THỬ** | `/ocpp/{charge_point_code}`, BootNotification, Authorize và dispatcher Reset; 43 test OCPP | Tầng kết nối trụ tách biệt với telemetry; chưa kiểm chứng bằng thiết bị vật lý |
 | **CSDL & Giao dịch ACID** | **HOẠT ĐỘNG** | SQLite `ev_csms.db`, ràng buộc nợ `-500k` | Giao dịch ví bảo toàn toàn vẹn |
-| **Bộ kiểm thử tự động** | **HOẠT ĐỘNG** | 84/84 ca kiểm thử passed | Bảo toàn 84/84 tests, 0 failed |
+| **Bộ kiểm thử tự động** | **ĐÃ KIỂM THỬ** | 163 passed, 1 warning ngày 01/10/2026 | Full backend suite bao gồm 43 test OCPP |
 | **Giao diện Client React** | **HOẠT ĐỘNG** | 6 màn hình chức năng, build thành công | Hoạt động đầy đủ (có UI drift có chủ đích) |
 | **Kết nối Trạm thật qua OCPP** | **CHƯA ĐẠT** | Thiếu phần cứng, dùng simulator thay thế | Hoãn sang Sprint 2 (Đã báo cáo PO) |
 | **Cấu hình Docker & CI/CD** | **ĐỂ SAU (ĐÃ DUYỆT)** | Đã có pull_request_template.md | Đóng gói khi cần demo trên máy khác hoặc đưa lên GitHub |

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, LayoutGrid, BatteryCharging, Gauge, Wallet, History, Cpu, MapPin, Shield } from 'lucide-react';
+import { LayoutDashboard, BatteryCharging, Gauge, Wallet, History, Cpu, MapPin, Shield, ScrollText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navigation() {
@@ -10,10 +10,10 @@ export default function Navigation() {
     { to: '/', label: 'Bảng Điều Khiển', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/map', label: 'Bản Đồ', icon: MapPin, roles: ['CUSTOMER'] },
     { to: '/stations', label: 'Hạ Tầng Trạm Sạc', icon: BatteryCharging, roles: ['ADMIN', 'OPERATOR'] },
-    { to: '/charger-grid', label: 'Lưới Trụ Sạc (Grid)', icon: LayoutGrid, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/simulator', label: 'Bảng Giả Lập Sạc (Console)', icon: Gauge, roles: ['CUSTOMER'] },
     { to: '/wallet', label: 'Ví Cá Nhân', icon: Wallet, roles: ['CUSTOMER'] },
     { to: '/sessions', label: 'Nhật Ký Phiên Sạc', icon: History, roles: ['ADMIN', 'OPERATOR', 'CUSTOMER'] },
+    { to: '/audit-logs', label: 'Tra Cứu Nhật Ký', icon: ScrollText, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/ai-advisor', label: 'AI Cố Vấn & Bảo Trì', icon: Cpu, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/admin', label: 'Quản Trị Hệ Thống', icon: Shield, roles: ['ADMIN'] },
   ];

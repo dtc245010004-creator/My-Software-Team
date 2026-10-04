@@ -51,7 +51,6 @@ def grid_test_data(db_session):
     db_session.commit()
 
     # Tạo 4 trụ cho st1 và 2 trụ cho st2
-    chargers = []
     for i in range(1, 5):
         cp = ChargingPoint(
             station_id=st1.id,

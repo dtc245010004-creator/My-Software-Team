@@ -19,6 +19,8 @@
 * **Cơ cấu tổ chức tài liệu**: Phân tách thành 6 phân khu chuyên trách trong `docs/` (`architecture/`, `devops/`, `planning/`, `qa/`, `design/`, `research/`) gồm 24 file chuẩn mực.
 
 ### 0.2. Đã thay đổi
+* **Giao diện Quản lý Trụ & Đầu nối - S-05 (03/10/2026 - chưa commit)**:
+  * `frontend/src/pages/Stations.jsx`: thêm form Thêm đầu nối, báo lỗi trùng mã trụ tại ô "Mã trụ", báo lỗi trùng số thứ tự đầu nối tại ô nhập, mở nút gắn trụ cho `OPERATOR`. Không đổi cấu trúc thư mục, không thêm file.
 * **Bộ chạy Local Dev ở thư mục gốc (30/09/2026 - chưa commit)**:
   * Thêm `run.py` để mở Uvicorn và Vite cùng lúc, kiểm tra dependencies cần thiết, và dừng cả hai tiến trình khi nhấn `Ctrl+C`.
 * **Hợp nhất cây migration Alembic (30/09/2026, commit `d7acaf4`)**:

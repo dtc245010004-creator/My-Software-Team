@@ -1,6 +1,7 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,8 @@ from app.api.deps import get_optional_current_user, require_roles
 from app.core.database import get_db
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
+from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
+from app.ocpp.gateway import active_ocpp_connections
 from app.schemas.station import (
     ChargingPointCreate,
     ChargingPointResponse,
@@ -26,6 +29,57 @@ from app.services.station_service import (
 )
 
 router = APIRouter(tags=["Quản lý Trụ sạc & Cổng sạc (Chargers & Connectors)"])
+
+
+class ResetRequest(BaseModel):
+    """Payload lệnh Reset theo OCPP 1.6J."""
+
+    type: Literal["Soft", "Hard"]
+
+
+@router.post(
+    "/chargers/{code}/reset",
+    summary="Gửi lệnh Reset OCPP tới trụ sạc đang kết nối",
+)
+async def reset_charging_point(
+    code: str,
+    reset_in: ResetRequest,
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+):
+    """Chỉ Admin/Operator được gửi lệnh Reset tới trụ đang online."""
+
+    if code not in active_ocpp_connections:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Trụ sạc đang ngoại tuyến.",
+        )
+
+    try:
+        return await send_call_and_wait(
+            code,
+            "Reset",
+            {"type": reset_in.type},
+            timeout_seconds=30,
+        )
+    except ConnectionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Trụ sạc đang ngoại tuyến.",
+        ) from exc
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Trụ sạc không phản hồi lệnh Reset kịp thời.",
+        ) from exc
+    except OcppCallError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "error_code": exc.error_code,
+                "description": exc.description,
+                "details": exc.details,
+            },
+        ) from exc
 
 
 @router.get(
