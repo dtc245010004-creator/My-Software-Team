@@ -9,6 +9,7 @@ import Stations from './pages/Stations';
 import Simulator from './pages/Simulator';
 import Wallet from './pages/Wallet';
 import Sessions from './pages/Sessions';
+import ActiveSession from './pages/ActiveSession';
 import AIAdvisor from './pages/AIAdvisor';
 import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
@@ -66,6 +67,7 @@ function AppLayout() {
           />
           {/* Nhật ký phiên sạc: Mọi vai trò đều được xem (phân vùng dữ liệu tại backend) */}
           <Route path="/sessions" element={<Sessions />} />
+          <Route path="/session/:id" element={<ActiveSession />} />
           {/* Tra cứu nhật ký vận hành (T-58): Chỉ ADMIN và OPERATOR */}
           <Route
             path="/audit-logs"
