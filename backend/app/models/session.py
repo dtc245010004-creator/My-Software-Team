@@ -1,15 +1,19 @@
+"""Mô hình Phiên sạc xe điện (Quản lý vòng đời và chốt hóa đơn tiền điện)."""
+
 from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     func,
+    text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 
 from app.core.database import Base
 
@@ -19,23 +23,40 @@ class ChargingSession(Base):
 
     __tablename__ = "charging_sessions"
     __table_args__ = (
-        CheckConstraint("total_kwh >= 0", name="ck_session_total_kwh_non_negative"),
         CheckConstraint(
-            "total_amount >= 0", name="ck_session_total_amount_non_negative"
+            "total_kwh >= 0 OR total_kwh IS NULL",
+            name="ck_session_total_kwh_non_negative",
         ),
         CheckConstraint(
-            "status IN ('ACTIVE', 'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED')",
+            "total_amount >= 0 OR total_amount IS NULL",
+            name="ck_session_total_amount_non_negative",
+        ),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED', 'CHARGING', 'ABNORMAL', 'NEEDS_REVIEW')",
             name="ck_session_status_valid",
+        ),
+        Index(
+            "uq_active_session_per_connector",
+            "connector_id",
+            unique=True,
+            sqlite_where=text("status = 'CHARGING'"),
         ),
     )
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(
+    transaction_id = Column("id", Integer, primary_key=True, index=True, autoincrement=True)
+    id = synonym("transaction_id")
+
+    id_tag = Column(String(100), nullable=True, index=True)
+
+    driver_id = Column(
+        "user_id",
         Integer,
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
+    user_id = synonym("driver_id")
+
     connector_id = Column(
         Integer,
         ForeignKey("connectors.id", ondelete="RESTRICT"),
@@ -45,27 +66,32 @@ class ChargingSession(Base):
     tariff_id = Column(
         Integer,
         ForeignKey("tariffs.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
     # Đơn giá điện chốt tại thời điểm bắt đầu phiên sạc (VND/kWh)
-    applied_price_per_kwh = Column(Numeric(10, 2), nullable=False)
+    applied_price_per_kwh = Column(Numeric(10, 2), nullable=True, default=0.00)
 
     start_time = Column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
-    end_time = Column(DateTime(timezone=True), nullable=True)
+    stop_time = Column("end_time", DateTime(timezone=True), nullable=True)
+    end_time = synonym("stop_time")
+
+    # Số điện Wh (chuẩn OCPP)
+    meter_start = Column(Integer, default=0, nullable=False)
+    meter_stop = Column(Integer, nullable=True)
 
     # Đo đếm điện năng (Decimal)
-    meter_start_kwh = Column(Numeric(10, 2), default=0.00, nullable=False)
+    meter_start_kwh = Column(Numeric(10, 2), default=0.00, nullable=True)
     meter_stop_kwh = Column(Numeric(10, 2), nullable=True)
-    total_kwh = Column(Numeric(10, 2), default=0.00, nullable=False)
+    total_kwh = Column(Numeric(10, 3), nullable=True, default=0.000)
 
     # Tổng tiền thanh toán (VND)
-    total_amount = Column(Numeric(12, 2), default=0.00, nullable=False)
+    total_amount = Column(Numeric(12, 2), default=0.00, nullable=True)
 
     # Checkpoint phục hồi khi server crash & trạng thái sạc tức thời
     current_soc = Column(Float, default=0.0, nullable=False)
@@ -73,11 +99,11 @@ class ChargingSession(Base):
 
     # Trạng thái riêng biệt của phiên sạc
     status = Column(
-        String(20), default="ACTIVE", nullable=False
-    )  # ACTIVE, COMPLETED, FAILED, CANCELLED, INTERRUPTED
+        String(20), default="CHARGING", nullable=False
+    )  # CHARGING, COMPLETED, ABNORMAL, NEEDS_REVIEW, ACTIVE, FAILED, CANCELLED, INTERRUPTED
     stop_reason = Column(
         String(100), nullable=True
-    )  # USER_STOPPED, EMERGENCY, BATTERY_FULL, DEBT_LIMIT_REACHED...
+    )  # USER_STOPPED, EMERGENCY, BATTERY_FULL, DEBT_LIMIT_REACHED, EmergencyStop, CounterRollback, Local...
 
     created_at = Column(
         DateTime(timezone=True),
@@ -86,9 +112,19 @@ class ChargingSession(Base):
     )
 
     # Quan hệ
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[driver_id])
+    driver = synonym("user")
     connector = relationship("Connector")
     tariff = relationship("Tariff")
+
+    def __init__(self, **kwargs):
+        if "id" in kwargs and "transaction_id" not in kwargs:
+            kwargs["transaction_id"] = kwargs.pop("id")
+        if "user_id" in kwargs and "driver_id" not in kwargs:
+            kwargs["driver_id"] = kwargs.pop("user_id")
+        if "end_time" in kwargs and "stop_time" not in kwargs:
+            kwargs["stop_time"] = kwargs.pop("end_time")
+        super().__init__(**kwargs)
 
     @property
     def station_id(self) -> int | None:
@@ -113,4 +149,4 @@ class ChargingSession(Base):
         return None
 
     def __repr__(self) -> str:
-        return f"<ChargingSession(id={self.id}, user_id={self.user_id}, status='{self.status}', kwh={self.total_kwh}, amount={self.total_amount})>"
+        return f"<ChargingSession(transaction_id={self.transaction_id}, driver_id={self.driver_id}, status='{self.status}', kwh={self.total_kwh}, amount={self.total_amount})>"
