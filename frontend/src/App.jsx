@@ -13,7 +13,7 @@ import AIAdvisor from './pages/AIAdvisor';
 import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import DriverMap from './pages/DriverMap';
-import ChargerGridMonitor from './pages/ChargerGridMonitor';
+import AuditLogs from './pages/AuditLogs';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -51,13 +51,6 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <Stations />
             }
           />
-          {/* Màn hình lưới theo dõi trạng thái trụ sạc: ADMIN và OPERATOR */}
-          <Route
-            path="/charger-grid"
-            element={
-              role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <ChargerGridMonitor />
-            }
-          />
           {/* Giả lập sạc & Ví: Chỉ mở cho CUSTOMER; ADMIN & OPERATOR bị chặn URL */}
           <Route
             path="/simulator"
@@ -73,6 +66,13 @@ function AppLayout() {
           />
           {/* Nhật ký phiên sạc: Mọi vai trò đều được xem (phân vùng dữ liệu tại backend) */}
           <Route path="/sessions" element={<Sessions />} />
+          {/* Tra cứu nhật ký vận hành (T-58): Chỉ ADMIN và OPERATOR */}
+          <Route
+            path="/audit-logs"
+            element={
+              role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <AuditLogs />
+            }
+          />
           {/* AI Cố Vấn: ADMIN và OPERATOR */}
           <Route
             path="/ai-advisor"
