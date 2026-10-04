@@ -219,4 +219,3 @@ def handle_start_transaction(
         "transactionId": new_session.transaction_id,
         "idTagInfo": id_tag_info,
     }
-

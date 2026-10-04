@@ -22,7 +22,12 @@ def parse_timestamp_safe(ts_val):
         return None
 
 
-async def handle(db: Session, payload: Dict[str, Any], charge_point: ChargingPoint, charge_point_id: Any) -> Dict[str, Any]:
+async def handle(
+    db: Session,
+    payload: Dict[str, Any],
+    charge_point: ChargingPoint,
+    charge_point_id: Any,
+) -> Dict[str, Any]:
     connector_id = payload.get("connectorId", 0)
     raw_status = payload.get("status", "Available")
     error_code = payload.get("errorCode", "NoError")

@@ -208,11 +208,7 @@ def start_charging_session(
     try:
         from app.simulator.charging_simulator import simulator_manager
 
-        power = (
-            connector.max_power_kw
-            if connector and connector.max_power_kw
-            else 60.0
-        )
+        power = connector.max_power_kw if connector and connector.max_power_kw else 60.0
         station_id = (
             connector.charging_point.station_id
             if connector and connector.charging_point

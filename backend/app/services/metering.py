@@ -16,4 +16,3 @@ def calculate_kwh(
     if meter_stop_wh < meter_start_wh:
         return None
     return (float(meter_stop_wh) - float(meter_start_wh)) / 1000.0
-

@@ -521,9 +521,7 @@ def test_ocpp_websocket_start_and_stop_transaction_flow(
     fx = _create_test_fixture(db_session)
     cp_code = fx["cp"].code
 
-    with client.websocket_connect(
-        f"/ocpp/{cp_code}", subprotocols=["ocpp1.6"]
-    ) as ws:
+    with client.websocket_connect(f"/ocpp/{cp_code}", subprotocols=["ocpp1.6"]) as ws:
         # 1. BootNotification
         ws.send_text(
             build_call(

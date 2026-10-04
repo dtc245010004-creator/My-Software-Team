@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -18,12 +18,18 @@ from app.core.database import Base
 class Connector(Base):
     __tablename__ = "connectors"
     __table_args__ = (
-        UniqueConstraint("charge_point_id", "connector_number", name="uq_connector_charge_point_number"),
+        UniqueConstraint(
+            "charge_point_id",
+            "connector_number",
+            name="uq_connector_charge_point_number",
+        ),
         {"extend_existing": True},
     )
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    charge_point_id = Column(Integer, ForeignKey("charging_points.id"), nullable=True, index=True)
+    charge_point_id = Column(
+        Integer, ForeignKey("charging_points.id"), nullable=True, index=True
+    )
     charging_point_id = Column(Integer, nullable=True)
     connector_number = Column(Integer, nullable=True)
     connector_id = Column(Integer, nullable=True)
@@ -32,10 +38,19 @@ class Connector(Base):
     status = Column(String, default="Available")
     ocpp_status = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
-    charging_point = relationship("ChargePoint", back_populates="connectors", foreign_keys=[charge_point_id])
+    charging_point = relationship(
+        "ChargePoint", back_populates="connectors", foreign_keys=[charge_point_id]
+    )
 
     @property
     def charge_point(self):

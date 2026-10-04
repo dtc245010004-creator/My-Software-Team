@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 
 import pytest
 from sqlalchemy import create_engine
@@ -16,6 +16,7 @@ def db_session():
     session = Session()
     yield session
     session.close()
+
 
 @pytest.mark.asyncio
 async def test_t22_unregistered_connector_ignored_and_logged(db_session, caplog):

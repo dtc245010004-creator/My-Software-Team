@@ -40,8 +40,8 @@ def t24_seed_data(db_session):
     for i in range(3):
         st = Station(
             operator_id=op_a.id,
-            name=f"Trạm Grid A{i+1}",
-            address=f"Địa chỉ Grid A{i+1}, Hà Nội",
+            name=f"Trạm Grid A{i + 1}",
+            address=f"Địa chỉ Grid A{i + 1}, Hà Nội",
             latitude=21.02 + i * 0.01,
             longitude=105.83 + i * 0.01,
             total_grid_capacity_kw=120.0 + i * 10,
@@ -57,8 +57,8 @@ def t24_seed_data(db_session):
     for i in range(2):
         st = Station(
             operator_id=op_b.id,
-            name=f"Trạm Grid B{i+1}",
-            address=f"Địa chỉ Grid B{i+1}, TP.HCM",
+            name=f"Trạm Grid B{i + 1}",
+            address=f"Địa chỉ Grid B{i + 1}, TP.HCM",
             latitude=10.78 + i * 0.01,
             longitude=106.69 + i * 0.01,
             total_grid_capacity_kw=90.0 + i * 5,
@@ -78,7 +78,7 @@ def t24_seed_data(db_session):
         for _ in range(count):
             cp = ChargingPoint(
                 station_id=st.id,
-                code=f"GRID-A{st_idx+1}-{charger_idx:03d}",
+                code=f"GRID-A{st_idx + 1}-{charger_idx:03d}",
                 vendor="ABB",
                 model="Terra 54",
                 status="AVAILABLE",
@@ -95,7 +95,7 @@ def t24_seed_data(db_session):
         for c_idx in range(2):
             cp = ChargingPoint(
                 station_id=st.id,
-                code=f"GRID-B{st_idx+1}-{c_idx+1:03d}",
+                code=f"GRID-B{st_idx + 1}-{c_idx + 1:03d}",
                 vendor="Schneider",
                 model="EVlink",
                 status="AVAILABLE",
@@ -287,7 +287,7 @@ def test_t24_grid_performance(client, db_session, t24_seed_data):
     )
     elapsed = time.perf_counter() - start_time
     assert res.status_code == 200
-    assert elapsed < 0.2, f"Thời gian truy vấn {elapsed*1000:.1f}ms vượt ngưỡng 200ms"
+    assert elapsed < 0.2, f"Thời gian truy vấn {elapsed * 1000:.1f}ms vượt ngưỡng 200ms"
 
     data = res.json()
     assert len(data) == 3
@@ -306,4 +306,3 @@ def test_t24_grid_performance(client, db_session, t24_seed_data):
     assert total_charg == 50, "Số lượng đầu nối Charging phải đúng 50"
     assert total_fault == 50, "Số lượng đầu nối Faulted phải đúng 50"
     assert total_unavail == 50, "Số lượng đầu nối Unavailable phải đúng 50"
-

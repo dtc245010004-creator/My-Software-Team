@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -36,11 +36,7 @@ def list_users(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    users = (
-        db.query(User)
-        .order_by(User.id)
-        .all()
-    )
+    users = db.query(User).order_by(User.id).all()
 
     now = datetime.now(timezone.utc)
 
@@ -52,10 +48,7 @@ def list_users(
         if locked_until is not None and locked_until.tzinfo is None:
             locked_until = locked_until.replace(tzinfo=timezone.utc)
 
-        is_locked = (
-            locked_until is not None
-            and locked_until > now
-        )
+        is_locked = locked_until is not None and locked_until > now
 
         result.append(
             {
@@ -97,11 +90,7 @@ def update_user_role(
             detail="Vai trò không hợp lệ.",
         )
 
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if user is None:
         raise HTTPException(
@@ -142,11 +131,7 @@ def disable_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
@@ -185,11 +170,7 @@ def enable_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
@@ -214,11 +195,7 @@ def lock_login(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
@@ -260,11 +237,7 @@ def unlock_login(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
+    user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(

@@ -13,4 +13,3 @@ __all__ = [
     "handle_start_transaction",
     "handle_stop_transaction",
 ]
-

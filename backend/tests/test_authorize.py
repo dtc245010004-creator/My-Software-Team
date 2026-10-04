@@ -54,9 +54,7 @@ def _create_charging_point(
         pytest.param(False, None, None, True, "Invalid", id="unknown-tag"),
         pytest.param(True, "blocked", None, True, "Blocked", id="blocked-tag"),
         pytest.param(True, "active", -1, True, "Expired", id="expired-tag"),
-        pytest.param(
-            True, "active", None, False, "Blocked", id="inactive-station"
-        ),
+        pytest.param(True, "active", None, False, "Blocked", id="inactive-station"),
         pytest.param(True, "active", None, True, "Accepted", id="valid-tag"),
     ],
 )
@@ -110,9 +108,7 @@ def test_id_tag_code_must_be_unique(
 ) -> None:
     first_user = _create_user(db_session, "authorize_duplicate_first")
     second_user = _create_user(db_session, "authorize_duplicate_second")
-    db_session.add(
-        IdTag(code="DUPLICATE-CARD", user_id=first_user.id, status="active")
-    )
+    db_session.add(IdTag(code="DUPLICATE-CARD", user_id=first_user.id, status="active"))
     db_session.commit()
     db_session.add(
         IdTag(code="DUPLICATE-CARD", user_id=second_user.id, status="active")

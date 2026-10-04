@@ -9,7 +9,7 @@ from app.models.station import Station
 
 def validate_coordinates(latitude: Any, longitude: Any) -> None:
     """Kiểm tra tính hợp lệ của tọa độ vĩ độ và kinh độ.
-    
+
     AC 2: Latitude trong [-90, 90], Longitude trong [-180, 180].
     """
     if latitude is not None:
@@ -43,7 +43,7 @@ def get_stations(session: Session, user: Any) -> list[Station]:
 
 def create_station(session: Session, station_data: dict | Any, user: Any) -> Station:
     """Xử lý nghiệp vụ tạo trạm sạc mới gắn với chủ trạm (owner_id).
-    
+
     - AC 1: Khởi tạo is_active = False, gắn với tài khoản user.id.
     - AC 2: Báo lỗi nếu toạ độ nằm ngoài dải hợp lệ.
     - AC 4: Chống trùng lặp trạm cùng tên của cùng một chủ trạm.
@@ -96,7 +96,7 @@ def update_station(
     session: Session, station_id: int, station_data: dict | Any, user: Any
 ) -> Station:
     """Xử lý nghiệp vụ cập nhật thông tin trạm sạc.
-    
+
     - AC 3: Sửa tên/địa chỉ, kiểm tra quyền sở hữu của user.
     """
     station = (
@@ -105,7 +105,9 @@ def update_station(
         .first()
     )
     if not station:
-        raise ValueError("Không tìm thấy trạm hoặc bạn không có quyền chỉnh sửa trạm này")
+        raise ValueError(
+            "Không tìm thấy trạm hoặc bạn không có quyền chỉnh sửa trạm này"
+        )
 
     data = (
         station_data

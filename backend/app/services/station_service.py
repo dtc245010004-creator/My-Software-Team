@@ -290,16 +290,15 @@ def get_station_tree(db: Session, user: User) -> list[StationTreeItem]:
     if role_names is None and hasattr(user, "roles"):
         role_names = [role.name for role in (user.roles or [])]
 
-    is_admin_or_global_operator = (
-        user.role == "ADMIN"
-        or (role_names and any(r in ("admin", "operator", "van_hanh_vien") for r in role_names))
+    is_admin_or_global_operator = user.role == "ADMIN" or (
+        role_names
+        and any(r in ("admin", "operator", "van_hanh_vien") for r in role_names)
     )
 
     stmt = (
         db.query(Station)
         .options(
-            joinedload(Station.charging_points)
-            .joinedload(ChargingPoint.connectors)
+            joinedload(Station.charging_points).joinedload(ChargingPoint.connectors)
         )
         .filter(Station.is_active.is_(True))
         .filter(Station.deleted_at.is_(None))
@@ -393,12 +392,9 @@ def get_station_grid(db: Session, user: User) -> list[StationGridItem]:
     if role_names is None and hasattr(user, "roles"):
         role_names = [role.name for role in (user.roles or [])]
 
-    is_admin_or_global_operator = (
-        user.role == "ADMIN"
-        or (
-            role_names
-            and any(r in ("admin", "operator", "van_hanh_vien") for r in role_names)
-        )
+    is_admin_or_global_operator = user.role == "ADMIN" or (
+        role_names
+        and any(r in ("admin", "operator", "van_hanh_vien") for r in role_names)
     )
 
     stmt = (
@@ -507,4 +503,3 @@ def get_station_grid(db: Session, user: User) -> list[StationGridItem]:
         )
 
     return results
-

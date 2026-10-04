@@ -43,4 +43,3 @@ def test_metering_floating_precision(start, stop, expected):
     """Kiểm tra độ chính xác dấu phẩy động và không làm tròn."""
     result = calculate_kwh(start, stop)
     assert result == pytest.approx(expected)
-

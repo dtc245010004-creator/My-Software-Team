@@ -43,7 +43,9 @@ class ChargingSession(Base):
         ),
     )
 
-    transaction_id = Column("id", Integer, primary_key=True, index=True, autoincrement=True)
+    transaction_id = Column(
+        "id", Integer, primary_key=True, index=True, autoincrement=True
+    )
     id = synonym("transaction_id")
 
     id_tag = Column(String(100), nullable=True, index=True)
