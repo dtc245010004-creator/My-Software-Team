@@ -44,5 +44,25 @@ class SessionResponse(BaseModel):
     status: str
     stop_reason: str | None = None
     created_at: UTCDateTime
+    station_id: int | None = None
+    station_name: str | None = None
+    charger_code: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SessionSummaryItem(BaseModel):
+    group_key: str
+    station_id: int | None = None
+    station_name: str | None = None
+    date: str | None = None
+    total_sessions: int = 0
+    total_kwh: float = 0.0
+    total_amount: float = 0.0
+    completed_sessions: int = 0
+
+
+class SessionSummaryResponse(BaseModel):
+    group_by: str
+    kpi: dict[str, float | int]
+    items: list[SessionSummaryItem]

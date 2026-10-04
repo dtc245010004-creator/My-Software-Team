@@ -63,7 +63,7 @@ export default function Header() {
             onClick={() => handleRoleChange('ADMIN')}
             disabled={switching}
             title="Quản trị viên toàn hệ thống"
-            className={`px-2 py-1 rounded transition-colors ${
+            className={`px-2.5 py-1 rounded transition-colors ${
               currentDemoKey === 'ADMIN'
                 ? 'bg-critical-red/20 text-critical-red border border-critical-red/40 font-bold'
                 : 'text-steel-gray hover:text-tech-white'
@@ -72,34 +72,22 @@ export default function Header() {
             Admin
           </button>
           <button
-            onClick={() => handleRoleChange('OPERATOR_A')}
+            onClick={() => handleRoleChange('OPERATOR')}
             disabled={switching}
-            title="Chủ trạm A: Sở hữu trạm ST-1, ST-2"
-            className={`px-2 py-1 rounded transition-colors ${
-              currentDemoKey === 'OPERATOR_A'
+            title="Chủ trạm sạc: Quản lý trạm sở hữu"
+            className={`px-2.5 py-1 rounded transition-colors ${
+              currentDemoKey === 'OPERATOR'
                 ? 'bg-caution-amber/20 text-caution-amber border border-caution-amber/40 font-bold'
                 : 'text-steel-gray hover:text-tech-white'
             }`}
           >
-            Chủ A (ST1,2)
-          </button>
-          <button
-            onClick={() => handleRoleChange('OPERATOR_B')}
-            disabled={switching}
-            title="Chủ trạm B: Sở hữu trạm ST-3"
-            className={`px-2 py-1 rounded transition-colors ${
-              currentDemoKey === 'OPERATOR_B'
-                ? 'bg-caution-amber/20 text-caution-amber border border-caution-amber/40 font-bold'
-                : 'text-steel-gray hover:text-tech-white'
-            }`}
-          >
-            Chủ B (ST3)
+            Chủ trạm sạc
           </button>
           <button
             onClick={() => handleRoleChange('CUSTOMER')}
             disabled={switching}
             title="Tài xế khách hàng"
-            className={`px-2 py-1 rounded transition-colors ${
+            className={`px-2.5 py-1 rounded transition-colors ${
               currentDemoKey === 'CUSTOMER'
                 ? 'bg-grid-green/20 text-grid-green border border-grid-green/40 font-bold'
                 : 'text-steel-gray hover:text-tech-white'

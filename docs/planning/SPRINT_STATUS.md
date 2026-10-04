@@ -57,6 +57,9 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
+* **Giao diện Quản lý Trụ & Đầu nối (S-05)**: Ngày **03/10/2026** (chưa commit), thực hiện **theo yêu cầu của người dùng**:
+  * `frontend/src/pages/Stations.jsx`: thêm form **Thêm đầu nối** cho từng trụ; báo lỗi trùng mã trụ ngay tại ô "Mã trụ" (trước đây là banner chung); báo lỗi trùng số thứ tự đầu nối tại ô nhập; nút gắn trụ đổi từ chỉ `ADMIN` sang `ADMIN` + `OPERATOR`.
+  * Không thay đổi backend, CSDL hay test tự động.
 * **Thời điểm thực hiện**: Ngày **30/09/2026** (chưa commit), thực hiện **theo yêu cầu của người dùng**:
   * *Khung Staging & CI/CD*: Bổ sung Dockerfile đa tầng cho Backend/Frontend, cấu hình Reverse Proxy Nginx, file `docker-compose.staging.yml` và pipeline GitHub Actions `.github/workflows/ci-staging.yml` cho Story S-01.
   * *Bảo vệ đăng nhập chống vét cạn*: Thêm 2 cột `failed_login_attempts` và `locked_until` vào bảng `users` qua migration Alembic `149038e71dc9`, cập nhật endpoint `POST /api/v1/auth/login` đếm số lần sai và khóa tạm 15 phút khi sai liên tiếp 5 lần cho Story S-02.

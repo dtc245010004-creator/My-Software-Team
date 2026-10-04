@@ -115,11 +115,32 @@ export default function Dashboard() {
     // Kết nối WebSocket và lắng nghe sự kiện telemetry thời gian thực
     const unsubscribe = telemetryWs.addListener((msg) => {
       if (msg.event === 'GRID_TELEMETRY') {
-        if (typeof msg.active_kw === 'number') {
-          setActiveKw(msg.active_kw);
-        }
-        if (typeof msg.active_chargers_count === 'number') {
-          setChargingCount(msg.active_chargers_count);
+        if (role === 'OPERATOR') {
+          // Chỉ nhận dữ liệu telemetry nếu thuộc trạm mà chủ sở hữu
+          const isOwned = msg.station_id && accessibleStations.some((st) => st.id === msg.station_id);
+          if (!isOwned) return;
+
+          if (selectedStationId !== 'ALL' && msg.station_id !== Number(selectedStationId)) {
+            return;
+          }
+
+          // Cập nhật live metrics theo phạm vi sở hữu để không bị công suất toàn mạng ghi đè
+          fetchLiveMetricsOnly();
+        } else {
+          // ADMIN: nếu đang chọn trạm cụ thể thì lọc theo trạm đó
+          if (selectedStationId !== 'ALL') {
+            if (msg.station_id && msg.station_id !== Number(selectedStationId)) {
+              return;
+            }
+            fetchLiveMetricsOnly();
+          } else {
+            if (typeof msg.active_kw === 'number') {
+              setActiveKw(msg.active_kw);
+            }
+            if (typeof msg.active_chargers_count === 'number') {
+              setChargingCount(msg.active_chargers_count);
+            }
+          }
         }
       } else if (
         msg.event === 'STATUS_CHANGED' ||
@@ -139,7 +160,7 @@ export default function Dashboard() {
       unsubscribe();
       clearInterval(pollInterval);
     };
-  }, [fetchDashboardData, fetchLiveMetricsOnly]);
+  }, [fetchDashboardData, fetchLiveMetricsOnly, role, accessibleStations, selectedStationId]);
 
   // Downsample từ 1440 điểm (1 phút/điểm) về 480 cột (3 phút/cột) phục vụ Equalizer mượt 60 FPS
   const downsampledTimeline = useMemo(() => {

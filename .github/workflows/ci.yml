@@ -53,7 +53,6 @@ jobs:
           app/core/config.py
           app/core/security.py
           app/main.py
-          app/models/auth.py
           app/models/user.py
           app/schemas/station.py
           app/schemas/user.py
@@ -68,7 +67,7 @@ jobs:
       - name: Apply migrations to PostgreSQL
         working-directory: backend
         env:
-          DATABASE_URL: postgresql+psycopg://csms:csms@localhost:5432/csms
+          DATABASE_URL: postgresql+psycopg2://csms:csms@localhost:5432/csms
           AUTO_CREATE_SCHEMA: "false"
           SECRET_KEY: ci-only-not-a-secret
         run: |
@@ -148,4 +147,5 @@ jobs:
           ssh "${ssh_opts[@]}" "$STAGING_USER@$STAGING_HOST" "bash '$STAGING_PATH/deploy-staging.sh' '$STAGING_PATH' '$IMAGE_BASE' '$IMAGE_TAG'"
       - name: Explain that staging secrets are not configured
         if: env.STAGING_HOST == '' || env.STAGING_USER == '' || env.STAGING_PATH == '' || env.STAGING_SSH_KEY == '' || env.STAGING_KNOWN_HOSTS == '' || env.STAGING_REGISTRY_USER == '' || env.STAGING_REGISTRY_TOKEN == ''
-        run: echo "Staging deploy skipped: configure the documented STAGING_* repository secrets to enable it."
+        run: |
+          echo "Staging deploy skipped: configure the documented STAGING_* repository secrets to enable it."
