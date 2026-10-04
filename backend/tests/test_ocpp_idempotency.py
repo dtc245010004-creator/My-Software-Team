@@ -49,7 +49,9 @@ def test_repeated_message_id_reuses_saved_response_five_times(
                 build_call(
                     "boot-idempotent-five",
                     "BootNotification",
-                    _boot_payload("Original Vendor" if attempt == 0 else "Changed Vendor"),
+                    _boot_payload(
+                        "Original Vendor" if attempt == 0 else "Changed Vendor"
+                    ),
                 )
             )
             results.append(json.loads(websocket.receive_text()))

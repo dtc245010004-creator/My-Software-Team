@@ -652,7 +652,9 @@ async def _station_event_generator(user: User, limit: Optional[int] = None):
     summary="Kênh SSE đẩy trạng thái trạm/trụ/đầu nối theo thời gian thực",
 )
 async def get_station_events(
-    limit: Optional[int] = Query(None, description="Giới hạn số message rồi ngắt (dùng cho test)"),
+    limit: Optional[int] = Query(
+        None, description="Giới hạn số message rồi ngắt (dùng cho test)"
+    ),
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
 ):
     return StreamingResponse(
@@ -671,7 +673,9 @@ async def get_station_events(
     summary="Alias của kênh SSE /events",
 )
 async def get_station_stream(
-    limit: Optional[int] = Query(None, description="Giới hạn số message rồi ngắt (dùng cho test)"),
+    limit: Optional[int] = Query(
+        None, description="Giới hạn số message rồi ngắt (dùng cho test)"
+    ),
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
 ):
     return StreamingResponse(
@@ -768,15 +772,17 @@ def update_station(
         # Chặn thay đổi công suất lưới nếu không phải ADMIN
         if (
             "total_grid_capacity_kw" in update_data
-            and update_data["total_grid_capacity_kw"]
-            != station.total_grid_capacity_kw
+            and update_data["total_grid_capacity_kw"] != station.total_grid_capacity_kw
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Chỉ Quản trị viên (Admin) mới có quyền thay đổi công suất nguồn lưới (total_grid_capacity_kw).",
             )
         # Chặn thay đổi chủ trạm nếu không phải ADMIN
-        if "operator_id" in update_data and update_data["operator_id"] != station.operator_id:
+        if (
+            "operator_id" in update_data
+            and update_data["operator_id"] != station.operator_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Chỉ Quản trị viên (Admin) mới có quyền gán hoặc thay đổi Chủ trạm.",

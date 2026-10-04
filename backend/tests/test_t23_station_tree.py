@@ -1,4 +1,4 @@
-﻿import time
+import time
 
 import pytest
 
@@ -40,8 +40,8 @@ def t23_seed_data(db_session):
     for i in range(3):
         st = Station(
             operator_id=op_a.id,
-            name=f"Trạm A{i+1}",
-            address=f"Địa chỉ A{i+1}, Hà Nội",
+            name=f"Trạm A{i + 1}",
+            address=f"Địa chỉ A{i + 1}, Hà Nội",
             latitude=21.0 + i * 0.01,
             longitude=105.8 + i * 0.01,
             total_grid_capacity_kw=100.0 + i * 10,
@@ -57,8 +57,8 @@ def t23_seed_data(db_session):
     for i in range(2):
         st = Station(
             operator_id=op_b.id,
-            name=f"Trạm B{i+1}",
-            address=f"Địa chỉ B{i+1}, TP.HCM",
+            name=f"Trạm B{i + 1}",
+            address=f"Địa chỉ B{i + 1}, TP.HCM",
             latitude=10.7 + i * 0.01,
             longitude=106.7 + i * 0.01,
             total_grid_capacity_kw=80.0 + i * 5,
@@ -78,7 +78,7 @@ def t23_seed_data(db_session):
         for _ in range(count):
             cp = ChargingPoint(
                 station_id=st.id,
-                code=f"CP-A{st_idx+1}-{charger_idx:03d}",
+                code=f"CP-A{st_idx + 1}-{charger_idx:03d}",
                 vendor="ABB",
                 model="Terra 54",
                 status="AVAILABLE",
@@ -94,7 +94,7 @@ def t23_seed_data(db_session):
         for c_idx in range(2):
             cp = ChargingPoint(
                 station_id=st.id,
-                code=f"CP-B{st_idx+1}-{c_idx+1:03d}",
+                code=f"CP-B{st_idx + 1}-{c_idx + 1:03d}",
                 vendor="Schneider",
                 model="EVlink",
                 status="AVAILABLE",
@@ -242,7 +242,9 @@ def test_t23_tree_performance(client, db_session, t23_seed_data):
     )
     elapsed = time.perf_counter() - start_time
     assert res.status_code == 200
-    assert elapsed < 0.2, f"Thời gian truy vấn {elapsed*1000:.1f}ms vượt quá ngưỡng 200ms"
+    assert elapsed < 0.2, (
+        f"Thời gian truy vấn {elapsed * 1000:.1f}ms vượt quá ngưỡng 200ms"
+    )
     data = res.json()
     assert isinstance(data, list)
     assert len(data) == 3, "Dữ liệu trả về cho Operator A phải có đúng 3 trạm"

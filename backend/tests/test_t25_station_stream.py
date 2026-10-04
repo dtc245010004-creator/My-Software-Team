@@ -199,7 +199,9 @@ async def test_t25_stream_rbac_isolation(t25_seed_data):
         assert event_a["status"] == "Charging"
 
         # Operator B KHÔNG nhận được bất kỳ sự kiện nào từ Trạm A
-        assert q_b.empty(), "Operator B không được nhận sự kiện thuộc trạm của Operator A"
+        assert q_b.empty(), (
+            "Operator B không được nhận sự kiện thuộc trạm của Operator A"
+        )
 
         # Kịch bản 2: Phát sự kiện từ Trạm B (thuộc Operator B)
         delivered_b = await sse_broadcaster.broadcast_connector_status_change(
@@ -224,7 +226,9 @@ async def test_t25_stream_rbac_isolation(t25_seed_data):
         assert event_b["status"] == "Faulted"
 
         # Operator A KHÔNG nhận được bất kỳ sự kiện nào từ Trạm B
-        assert q_a.empty(), "Operator A không được nhận sự kiện thuộc trạm của Operator B"
+        assert q_a.empty(), (
+            "Operator A không được nhận sự kiện thuộc trạm của Operator B"
+        )
 
     finally:
         await sse_broadcaster.unsubscribe(q_admin)
@@ -252,4 +256,3 @@ async def test_t25_stream_disconnect_cleanup(client, t25_seed_data):
 
     await sse_broadcaster.unsubscribe(q_test)
     assert sse_broadcaster.get_subscriber_count() == initial_count
-
