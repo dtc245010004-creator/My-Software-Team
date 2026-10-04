@@ -26,7 +26,8 @@ def handle_boot_notification(
     charging_point.charge_point_model_name = payload.get("chargePointModel")
     charging_point.firmware_version = payload.get("firmwareVersion")
 
-    status = "Rejected" if not charging_point.station.is_active else "Accepted"
+    is_active = bool(charging_point.is_active and charging_point.station.is_active)
+    status = "Accepted" if is_active else "Rejected"
     if status == "Accepted":
         charging_point.status = "online"
 
