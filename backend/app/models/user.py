@@ -1,11 +1,11 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, func
+﻿from sqlalchemy import Boolean, Column, DateTime, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
 
 class User(Base):
-    """Mô hình người dùng hệ thống EV CSMS (Admin, Operator, Customer)."""
+    """MÃ´ hÃ¬nh ngÆ°á»i dÃ¹ng há»‡ thá»‘ng EV CSMS (Admin, Operator, Customer)."""
 
     __tablename__ = "users"
 
@@ -30,7 +30,7 @@ class User(Base):
         nullable=False,
     )
 
-    # Quan hệ 1-1 với Ví điện tử: mỗi user có đúng 1 ví
+    # Quan há»‡ 1-1 vá»›i VÃ­ Ä‘iá»‡n tá»­: má»—i user cÃ³ Ä‘Ãºng 1 vÃ­
     wallet = relationship(
         "Wallet",
         back_populates="user",
@@ -40,3 +40,5 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}', role='{self.role}')>"
+
+

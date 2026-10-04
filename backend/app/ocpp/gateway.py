@@ -21,6 +21,7 @@ from app.ocpp.frames import (
 )
 from app.ocpp.handlers.authorize import handle_authorize
 from app.ocpp.handlers.boot_notification import handle_boot_notification
+from app.ocpp.handlers.heartbeat import handle_heartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ active_ocpp_connections: dict[str, WebSocket] = {}
 call_handlers = {
     "BootNotification": handle_boot_notification,
     "Authorize": handle_authorize,
+    "Heartbeat": handle_heartbeat,
 }
 
 

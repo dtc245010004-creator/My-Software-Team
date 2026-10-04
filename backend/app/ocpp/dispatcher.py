@@ -18,23 +18,6 @@ class OcppCallError(Exception):
         self.details = details
 
 
-class ChargePointOfflineError(ConnectionError):
-    """Lỗi khi trụ không có kết nối OCPP đang hoạt động."""
-
-    def __init__(self, charge_point_code: str) -> None:
-        super().__init__(f"Trụ {charge_point_code} đang ngoại tuyến.")
-
-
-class OcppCallTimeoutError(TimeoutError):
-    """Lỗi khi trụ không phản hồi CALL trong thời gian chờ."""
-
-    def __init__(self, charge_point_code: str, action: str, timeout: float) -> None:
-        super().__init__(
-            f"Trụ {charge_point_code} không phản hồi action {action} "
-            f"trong {timeout} giây."
-        )
-
-
 pending_responses: dict[str, asyncio.Future[dict[str, Any]]] = {}
 
 
@@ -54,7 +37,7 @@ async def send_call_and_wait(
 
     websocket = active_ocpp_connections.get(charge_point_code)
     if websocket is None:
-        raise ChargePointOfflineError(charge_point_code)
+        raise ConnectionError(f"Trụ {charge_point_code} đang ngoại tuyến.")
 
     timeout = (
         settings.OCPP_CALL_TIMEOUT_SECONDS
@@ -69,7 +52,9 @@ async def send_call_and_wait(
         await websocket.send_text(build_call(message_id, action, payload))
         return await asyncio.wait_for(future, timeout=timeout)
     except asyncio.TimeoutError as exc:
-        raise OcppCallTimeoutError(charge_point_code, action, timeout) from exc
+        raise TimeoutError(
+            f"Trụ {charge_point_code} không phản hồi action {action} trong {timeout} giây."
+        ) from exc
     finally:
         if pending_responses.get(message_id) is future:
             del pending_responses[message_id]

@@ -49,13 +49,6 @@ class CallErrorFrame:
 Frame: TypeAlias = CallFrame | CallResultFrame | CallErrorFrame
 
 
-class NonFiniteJsonValueError(ValueError):
-    """Lỗi khi JSON chứa giá trị số không hữu hạn."""
-
-    def __init__(self, value: str) -> None:
-        super().__init__(f"Giá trị JSON không hợp lệ: {value}")
-
-
 class OcppFrameError(ValueError):
     """Lỗi khung kèm mã CALLERROR để tầng giao tiếp có thể phản hồi."""
 
@@ -69,7 +62,7 @@ class OcppFrameError(ValueError):
 
 
 def _reject_non_finite(value: str) -> None:
-    raise NonFiniteJsonValueError(value)
+    raise ValueError(f"Giá trị JSON không hợp lệ: {value}")
 
 
 def _error(

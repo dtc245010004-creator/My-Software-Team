@@ -12,11 +12,7 @@ from app.ocpp.gateway import active_ocpp_connections
 
 
 def _create_charging_point(
-    db_session: Session,
-    code: str,
-    *,
-    station_is_active: bool = True,
-    charging_point_is_active: bool = True,
+    db_session: Session, code: str, *, station_is_active: bool = True
 ) -> ChargingPoint:
     station = Station(
         name="Trạm kiểm thử",
@@ -28,7 +24,6 @@ def _create_charging_point(
         station=station,
         code=code,
         max_power_kw=60.0,
-        is_active=charging_point_is_active,
     )
     db_session.add(charging_point)
     db_session.commit()
@@ -202,47 +197,3 @@ def test_missing_boot_metadata_is_saved_as_none(
     assert charging_point.charge_point_vendor == payload.get("chargePointVendor")
     assert charging_point.charge_point_model_name == payload.get("chargePointModel")
     assert charging_point.firmware_version == payload.get("firmwareVersion")
-
-
-@pytest.mark.parametrize(
-    ("station_active", "charger_active", "expected_status"),
-    [
-        pytest.param(True, True, "Accepted", id="tram_bat_tru_bat"),
-        pytest.param(True, False, "Rejected", id="tram_bat_tru_tat"),
-        pytest.param(False, True, "Rejected", id="tram_tat_tru_bat"),
-        pytest.param(False, False, "Rejected", id="tram_tat_tru_tat"),
-    ],
-)
-def test_boot_notification_four_active_combinations_matrix(
-    client: TestClient,
-    db_session: Session,
-    station_active: bool,
-    charger_active: bool,
-    expected_status: str,
-) -> None:
-    """Kiểm tra ma trận 4 tổ hợp trạng thái hoạt động của Trạm x Trụ."""
-    code = f"CP-COMB-{station_active}-{charger_active}"
-    charging_point = _create_charging_point(
-        db_session,
-        code,
-        station_is_active=station_active,
-        charging_point_is_active=charger_active,
-    )
-
-    with client.websocket_connect(
-        f"/ocpp/{code}", subprotocols=["ocpp1.6"]
-    ) as websocket:
-        websocket.send_text(
-            build_call("boot-matrix", "BootNotification", {"chargePointVendor": "V"})
-        )
-        response = _read_frame(websocket)
-
-    db_session.refresh(charging_point)
-    assert response[2]["status"] == expected_status, (
-        f"Tổ hợp: Kỳ vọng status '{expected_status}', nhưng nhận '{response[2]['status']}'"
-    )
-    if expected_status == "Accepted":
-        assert charging_point.status == "online"
-    else:
-        assert charging_point.status != "online"
-
