@@ -106,14 +106,3 @@ Thực thi backend suite bằng `pytest` trong môi trường ảo backend. Lầ
 cd backend
 pytest -v
 ```
-### OCPP live connection registry
-
-Gateway OCPP lưu kết nối đang hoạt động trong
-`active_ocpp_connections` bằng bộ nhớ trong của tiến trình.
-
-Cách triển khai này phù hợp với mô hình single-process.
-
-Khi triển khai nhiều worker hoặc nhiều instance backend,
-cần có cơ chế phối hợp/chia sẻ trạng thái kết nối phù hợp
-(ví dụ sticky routing hoặc shared connection registry)
-để bảo đảm mỗi charge point chỉ có một kết nối live.

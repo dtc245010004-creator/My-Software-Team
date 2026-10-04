@@ -10,6 +10,12 @@ from app.models.station import ChargingPoint
 
 def handle_heartbeat(
     db: Session, charging_point: ChargingPoint, payload: dict[str, Any]
-) -> dict[str, str]:
-    """Trả về thời gian hiện tại của máy chủ cho Heartbeat."""
-    return {"currentTime": datetime.now(timezone.utc).isoformat()}
+) -> dict[str, Any]:
+    """Cập nhật last_seen_at và tự động phục hồi trạng thái Online nếu đang Offline (T-27)."""
+    now = datetime.now(timezone.utc)
+    charging_point.last_seen_at = now
+    charging_point.status = "Online"
+
+    return {
+        "currentTime": now.isoformat(),
+    }

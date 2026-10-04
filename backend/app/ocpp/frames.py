@@ -62,7 +62,7 @@ class OcppFrameError(ValueError):
 
 
 def _reject_non_finite(value: str) -> None:
-    raise ValueError(f"Giá trị JSON không hợp lệ: {value}")  # noqa: TRY003
+    raise ValueError(f"Giá trị JSON không hợp lệ: {value}")
 
 
 def _error(
