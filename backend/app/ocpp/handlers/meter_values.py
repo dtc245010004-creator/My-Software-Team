@@ -88,15 +88,16 @@ def handle_meter_values(
 
     session = None
     if connector is not None:
-        session = (
-            db.query(ChargingSession)
-            .filter(
-                ChargingSession.connector_id == connector.id,
-                ChargingSession.status == "CHARGING",
-            )
-            .with_for_update()
-            .first()
+        session_query = db.query(ChargingSession).filter(
+            ChargingSession.connector_id == connector.id,
+            ChargingSession.status == "CHARGING",
         )
+        transaction_id = payload.get("transactionId")
+        if transaction_id is not None:
+            session_query = session_query.filter(
+                ChargingSession.transaction_id == transaction_id
+            )
+        session = session_query.with_for_update().first()
 
     if session is None:
         logger.warning(

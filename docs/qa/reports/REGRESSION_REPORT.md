@@ -90,6 +90,12 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 * Full backend suite: **263 passed, 1 skipped, 181 warnings trong 138.62 giây**; Ruff backend sạch.
 * Migration `339c5001fe7a` nâng/hạ/nâng thành công trên DB tạm. DB dự án không được dùng để chạy test hoặc migration; SHA-256 kiểm tra vẫn là `65C50528BD176262A1438E98DDF44F77620F751D351769CD5751AEAFDE2639BC`.
 
+## 14. Hồi quy sau khôi phục phiên OCPP (05/10/2026)
+
+* Kịch bản `backend/tests/integration/test_reconnect_scenario.py` đạt ba lượt mô phỏng liên tiếp với cấu hình 5 trụ và 20 trụ; số phiên đúng, không nhân đôi, kWh và timestamp StopTransaction khớp payload.
+* Full backend suite: **264 passed, 1 skipped, 298 warnings trong 222.40 giây**; Ruff các file đổi sạch.
+* Các lượt chạy đầy đủ dùng CSDL tạm. Lượt thử ban đầu chạy nhầm từ thư mục dự án và đã mở `ev_csms.db`/tái tạo `test_ev_csms.db`; không có snapshot trước lượt chạy. `backend/ev_csms.db` không đổi hash.
+
 ## 10. Kiểm chứng sau dispatcher và API Reset OCPP (01/10/2026)
 
 * **Kiểm thử chọn lọc**: `test_ocpp_reset.py` đạt 5 passed; kiểm tra CALLRESULT/CALLERROR theo ID, CALL khác vẫn xử lý trong khi chờ, offline, timeout và RBAC.

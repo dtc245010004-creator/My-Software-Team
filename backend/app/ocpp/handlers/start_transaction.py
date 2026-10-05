@@ -153,6 +153,28 @@ def handle_start_transaction(
         .first()
     )
     if active_session:
+        try:
+            repeated_meter_start = int(meter_start) if meter_start is not None else 0
+        except (TypeError, ValueError):
+            repeated_meter_start = None
+
+        if (
+            active_session.id_tag == id_tag_code
+            and active_session.meter_start == repeated_meter_start
+        ):
+            logger.info(
+                "Tiếp tục phiên sạc đang lưu transactionId=%s connector=%s",
+                active_session.transaction_id,
+                connector.id,
+            )
+            id_tag_info = {"status": "Accepted"}
+            if expiry_date:
+                id_tag_info["expiryDate"] = expiry_date.isoformat()
+            return {
+                "transactionId": active_session.transaction_id,
+                "idTagInfo": id_tag_info,
+            }
+
         logger.warning(
             "Phát hiện phiên đang sạc chưa đóng (id=%s) trên cổng %s, thực hiện đóng bất thường ABNORMAL",
             active_session.transaction_id,

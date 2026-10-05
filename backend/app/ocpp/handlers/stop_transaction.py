@@ -10,16 +10,16 @@ from sqlalchemy.orm import Session
 
 from app.models.orphan_message import OrphanMessage
 from app.models.session import ChargingSession
-from app.models.station import ChargingPoint
+from app.models.station import ChargingPoint, Connector
 from app.services.metering import calculate_kwh
 
 logger = logging.getLogger(__name__)
 
 
-def parse_timestamp_safe(ts_val: Any) -> datetime:
-    """Chuyển đổi an toàn chuỗi timestamp sang datetime có timezone UTC."""
+def parse_timestamp_safe(ts_val: Any) -> datetime | None:
+    """Đọc timestamp OCPP; không thay timestamp thiếu/sai bằng giờ nhận tin."""
     if not ts_val:
-        return datetime.now(timezone.utc)
+        return None
     if isinstance(ts_val, datetime):
         if ts_val.tzinfo is None:
             return ts_val.replace(tzinfo=timezone.utc)
@@ -31,7 +31,7 @@ def parse_timestamp_safe(ts_val: Any) -> datetime:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
     except (ValueError, TypeError):
-        return datetime.now(timezone.utc)
+        return None
 
 
 def handle_stop_transaction(
@@ -60,7 +60,11 @@ def handle_stop_transaction(
     if transaction_id is not None:
         session = (
             db.query(ChargingSession)
-            .filter(ChargingSession.transaction_id == transaction_id)
+            .join(Connector, ChargingSession.connector_id == Connector.id)
+            .filter(
+                ChargingSession.transaction_id == transaction_id,
+                Connector.charge_point_id == charging_point.id,
+            )
             .first()
         )
 

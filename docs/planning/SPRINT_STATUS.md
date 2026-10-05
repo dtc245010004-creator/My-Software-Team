@@ -12,8 +12,8 @@
 * **Mục tiêu sản phẩm (Product Goal)**: Đơn vị vận hành mạng lưới trạm sạc nắm được mọi phiên sạc theo thời gian thực qua giao thức OCPP, tính đúng tiền theo biểu giá nhiều khung, không để trạm vượt công suất, và đối soát được doanh thu khớp với số kWh đã cấp `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Mô hình Scrum**: Sprint 1 tuần (5 ngày làm việc / sprint). Đơn vị ước lượng: Story Point (Fibonacci) `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Khung theo dõi 4 chiều**:
-  1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi; backend full suite gần nhất có 263 passed, 1 skipped, 181 warnings (05/10/2026), gồm 53 ca OCPP.
-  2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84; chuẩn hóa migration về `backend/alembic/`; đồng bộ nút Admin demo 1-Click với tài khoản `admin / 12345678a`; thêm MeterValues T-40/T-41 và lọc số đo lùi/trùng T-42/T-43 (05/10/2026, chưa commit).
+  1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi; backend full suite gần nhất có 264 passed, 1 skipped, 298 warnings (05/10/2026). Kịch bản khôi phục phiên đạt ba vòng liên tiếp với 5 và 20 trụ.
+  2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84; chuẩn hóa migration về `backend/alembic/`; đồng bộ nút Admin demo 1-Click với tài khoản `admin / 12345678a`; thêm MeterValues T-40/T-41, lọc số đo lùi/trùng T-42/T-43 và phục hồi phiên khi reconnect T-44/T-45/T-46 (05/10/2026, chưa commit).
   3. *Sắp thay đổi*: Kế hoạch Sprint 2 (20 SP) xử lý tin nhắn giao thức OCPP 1.6J và màn hình theo dõi trụ sạc.
   4. *Cần thay đổi / Tồn đọng*: Kết nối phần cứng trạm thật (S-05 AC3), cổng thanh toán thật (R-02), cấu hình Docker môi trường (R-06).
 
@@ -55,7 +55,7 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Timeout lệnh OCPP**: `OCPP_CALL_TIMEOUT_SECONDS = 30.0`; endpoint Reset ghi đè 30 giây theo hợp đồng API.
 * **Frontend SPA**: 6 màn hình chức năng tại `frontend/src/pages/`.
 * **Đăng nhập demo Admin**: Nút 1-Click đọc username/mật khẩu từ `DEMO_USERS.ADMIN`; cấu hình mã nguồn hiện tại là `admin / 12345678a`. Frontend Docker đã build lại; đăng nhập API xác nhận HTTP 200, user `admin`, role `ADMIN` sau khi gỡ khóa tạm.
-* **Kiểm thử tự động**: Full backend suite đạt 263 passed, 1 skipped, 181 warnings ngày 05/10/2026. Số lịch sử 90 ca ở tài liệu này mâu thuẫn với 84/89 ca trong README và QA Inventory `[CẦN XÁC NHẬN]`.
+* **Kiểm thử tự động**: Full backend suite đạt 264 passed, 1 skipped, 298 warnings ngày 05/10/2026. Kịch bản reconnect đạt ba vòng với 5 trụ mặc định và với 20 trụ. Số lịch sử 90 ca ở tài liệu này mâu thuẫn với 84/89 ca trong README và QA Inventory `[CẦN XÁC NHẬN]`.
 * **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; revision mới nhất trong cây là `339c5001fe7a`. Hai migration MeterValues đã kiểm chứng tiến/lùi trên DB tạm ở head hiện tại, chưa áp dụng lên CSDL dự án. Nâng cấp từ DB trống còn lỗi lịch sử do tạo trùng `charging_points.last_seen_at` ở `5ba0e05433d7`.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
@@ -68,6 +68,7 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Hồi quy sau S-16**: Full suite đạt 163 passed, 1 warning trong 122.08 giây; tổng 43 ca OCPP.
 * **T-40/T-41 thuộc S-19 (05/10/2026 - chưa commit)**: Thêm model/migration MeterValue và handler MeterValues; lưu riêng `Energy.Active.Import.Register`, ghi orphan vào bảng sẵn có khi không có phiên đang sạc, ACK trước thao tác DB. 5 test mới; Ruff sạch; full suite đạt 258 passed, 1 skipped, 181 warnings. Không thay đổi DB dự án. Docker daemon không khả dụng; chuỗi migration trống có lỗi trùng cột lịch sử `charging_points.last_seen_at`.
 * **T-42/T-43 thuộc S-20 (05/10/2026 - chưa commit)**: Handler lấy khóa transaction trước khi đọc số đo; timestamp cũ bị bỏ qua/cảnh báo, bản trùng timestamp+value bỏ qua im lặng, giá trị giảm ở timestamp mới vẫn lưu và bật `needs_review`. Cùng timestamp nhưng value khác được lưu làm bản hiệu chỉnh theo xác nhận của người dùng. Migration `339c5001fe7a`; 5 test dedup/concurrency; full suite đạt 263 passed, 1 skipped, 181 warnings; Ruff sạch.
+* **T-44/T-45/T-46 thuộc S-21 (05/10/2026 - chưa commit)**: Phục hồi phiên theo transactionId đã lưu trong DB; StartTransaction gửi lại với cùng thẻ/meterStart nhận lại phiên cũ; StopTransaction sau offline đóng phiên theo timestamp payload. Kịch bản ba vòng liên tiếp đạt với 5 và 20 trụ; full suite đạt 264 passed, 1 skipped, 298 warnings; Ruff các file thay đổi sạch.
 * **Sửa lỗi Admin Demo 1-Click (01/10/2026, mã nguồn commit `7f764ea`)**: Đồng bộ credential `admin / 12345678a` giữa `frontend/src/config/roleConfig.js`, `frontend/src/context/AuthContext.jsx` và `backend/seed_data.py`; build trực tiếp trên host thiếu `vite`, Docker build thành công và container frontend đã được cập nhật. Đã gỡ khóa tạm sau 5 lần thử sai; login API trả HTTP 200 với role `ADMIN`.
 * **Thời điểm thực hiện bổ sung**: Ngày **01/10/2026** (chưa commit), theo yêu cầu của người dùng:
   * Xóa `backend/migrations/` vì không được cấu hình trong `backend/alembic.ini`; giữ `backend/alembic/` làm nguồn duy nhất. Không chạy migration lên database.

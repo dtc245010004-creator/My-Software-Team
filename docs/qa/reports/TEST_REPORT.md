@@ -192,3 +192,9 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_wh
 * `backend/tests/test_meter_values_dedup.py`: **5 passed** — timestamp lùi được bỏ qua với một warning; bản trùng timestamp/value bỏ qua im lặng; counter giảm ở timestamp mới vẫn lưu và đặt `needs_review`; cùng timestamp khác value được giữ làm bản hiệu chỉnh; hai request giống nhau đồng thời chỉ lưu một dòng.
 * Hai suite MeterValues: **10 passed**. Full backend suite: **263 passed, 1 skipped, 181 warnings trong 138.62 giây**. Ruff backend: `All checks passed!`.
 * Migration `339c5001fe7a` thêm `charging_sessions.needs_review` với mặc định false; đã kiểm tra nâng cấp/hạ cấp/nâng cấp lại trên DB tạm. DB dự án giữ nguyên SHA-256 trước/sau.
+
+## Kiểm thử khôi phục phiên OCPP — T-44/T-45/T-46 (05/10/2026)
+
+* `backend/tests/integration/test_reconnect_scenario.py`: 1 ca tích hợp chạy ba vòng; đạt với 5 trụ mặc định và với 20 trụ qua `OCPP_RECONNECT_CHARGE_POINTS`. Kiểm tra reconnect WebSocket, giữ transactionId, không nhân đôi phiên, StopTransaction khi offline, timestamp kết thúc từ payload và 5 kWh mỗi phiên.
+* Full backend suite: **264 passed, 1 skipped, 298 warnings trong 222.40 giây**. Ruff trên các file mã nguồn và test thay đổi: `All checks passed!`.
+* Các lượt chạy hoàn tất được cô lập trong thư mục tạm. Lượt khởi chạy đầu tiên do lỗi thiết lập thư mục đã mở `ev_csms.db` ở thư mục gốc; lifespan gọi `create_all` và `reconcile_interrupted_sessions`. Pytest cũng đã xóa/tạo lại file kiểm thử gốc `test_ev_csms.db` theo quy tắc trong `conftest.py`. Không có bản sao/hash trước lượt chạy để xác minh hoặc phục hồi trạng thái cũ của hai file này. SHA-256 hiện tại của `ev_csms.db` là `5BE76BEFB761DC75F8A2F986B9B35113E4A28935366E9343EAE32D73954F4D58`. `backend/ev_csms.db` vẫn giữ SHA-256 `65C50528BD176262A1438E98DDF44F77620F751D351769CD5751AEAFDE2639BC`.

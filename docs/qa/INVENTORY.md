@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lần full suite mới nhất ngày 05/10/2026 đạt 263 passed, 1 skipped, 181 warnings; trong đó bảy suite OCPP có 53 ca.
+Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lần full suite mới nhất ngày 05/10/2026 đạt 264 passed, 1 skipped, 298 warnings; kịch bản OCPP reconnect chạy ba vòng với 5 trụ và 20 trụ.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -48,7 +48,7 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **OCPP MeterValues** | `backend/tests/test_meter_values.py` | 5 | 100% PASS | Lưu measurand năng lượng, bỏ qua measurand khác, ghi orphan, ACK trước DB, thời gian xử lý 20 lần gửi |
 | **OCPP MeterValues Dedup** | `backend/tests/test_meter_values_dedup.py` | 5 | 100% PASS | Timestamp lùi, bản tin trùng, counter giảm, cùng timestamp hiệu chỉnh và đồng thời |
 
-**Bổ sung kiểm chứng ngày 05/10/2026**: `test_ocpp_frames.py` có 20 ca, `test_boot_notification.py` có 8 ca, `test_ocpp_idempotency.py` có 4 ca, `test_authorize.py` có 6 ca, `test_ocpp_reset.py` có 5 ca, `test_meter_values.py` có 5 ca và `test_meter_values_dedup.py` có 5 ca; tổng 53 ca OCPP. Full backend suite đạt 263 passed, 1 skipped, 181 warnings trong môi trường tạm.
+**Bổ sung kiểm chứng ngày 05/10/2026**: Các suite giao thức OCPP liệt kê trong bảng có 53 ca; kịch bản tích hợp reconnect thêm 1 ca. Full backend suite mới nhất đạt 264 passed, 1 skipped, 298 warnings trong thư mục tạm.
 
 ---
 
@@ -219,6 +219,11 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 5. `test_concurrent_exact_meter_values_are_serialized_and_saved_once`: gửi đồng thời hai mẫu giống nhau và chỉ giữ một dòng.
 
 **Kết quả kiểm thử ngày 05/10/2026**: Suite MeterValues S-19 và dedup S-20 đạt 10 passed; full backend suite đạt 263 passed, 1 skipped, 181 warnings.
+
+### 4.17. Suite tích hợp reconnect OCPP — `integration/test_reconnect_scenario.py` (1 ca)
+1. `test_reconnect_scenario_keeps_one_session_and_expected_energy`: chạy ba vòng liên tiếp; mỗi trụ bắt đầu phiên, gửi MeterValues, ngắt WebSocket ngẫu nhiên, kết nối lại, gửi StatusNotification/StartTransaction lặp và StopTransaction. Kiểm tra số phiên không nhân đôi, kWh đúng số mô phỏng và thời điểm kết thúc theo payload. Mặc định 5 trụ; biến `OCPP_RECONNECT_CHARGE_POINTS` cho phép chạy 20 trụ.
+
+**Kết quả kiểm thử ngày 05/10/2026**: Kịch bản đạt với 5 và 20 trụ; full backend suite đạt 264 passed, 1 skipped, 298 warnings.
 
 ---
 

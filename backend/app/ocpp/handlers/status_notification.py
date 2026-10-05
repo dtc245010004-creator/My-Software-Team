@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from sqlalchemy.orm import Session
 
+from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, ConnectorError
 from app.ocpp.status_mapping import map_ocpp_to_internal
 
@@ -105,6 +106,25 @@ def handle_status_notification(
 
         connector.status = OCPP_TO_CONNECTOR_STATUS[status]
         connector.ocpp_status = status
+
+        if status == "Charging":
+            active_session = (
+                db.query(ChargingSession)
+                .filter(
+                    ChargingSession.connector_id == connector.id,
+                    ChargingSession.status == "CHARGING",
+                )
+                .with_for_update(read=True)
+                .first()
+            )
+            if active_session is not None:
+                logger.info(
+                    "Khôi phục trạng thái Charging từ phiên lưu trong DB "
+                    "code=%s connector_id=%s transactionId=%s",
+                    charging_point.code,
+                    connector_id,
+                    active_session.transaction_id,
+                )
 
         if error_code and error_code != "NoError":
             db.add(

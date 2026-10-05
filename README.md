@@ -9,7 +9,7 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Full backend suite đạt **263 passed, 1 skipped, 181 warnings** ngày 05/10/2026; bảy suite OCPP có 53 ca. Số liệu lịch sử 84/89/90 còn mâu thuẫn `[CẦN XÁC NHẬN]`.
+- **Kiểm thử tự động**: Full backend suite đạt **264 passed, 1 skipped, 298 warnings** ngày 05/10/2026. Kịch bản reconnect OCPP chạy đạt ba vòng liên tiếp với 5 trụ mặc định và 20 trụ khi cấu hình.
 - **Kiến trúc dữ liệu**: Các bảng kỹ thuật OCPP gồm `ocpp_messages` (idempotency), `id_tags` (ủy quyền thẻ) và `meter_values` (số đo điện năng theo phiên). *(Nguồn: `backend/app/models/`)*
 - **Migration Alembic**: `backend/alembic.ini` trỏ tới nguồn duy nhất `backend/alembic/`; revision mới nhất trong cây là `339c5001fe7a`. DB dự án chưa được migrate.
 - **Khung Staging & CI/CD**: Hỗ trợ chạy đồng thời qua `docker-compose.staging.yml` và pipeline kiểm thử tự động `.github/workflows/ci-staging.yml`.
@@ -180,7 +180,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Baseline trước OCPP:** các tài liệu ghi tổng khác nhau (84 ca ở danh sách suite này, 89 trong README/QA Inventory, 90 trong Sprint Status) `[CẦN XÁC NHẬN]`. Các checkpoint sau S-16 đạt 163 passed, 1 warning với 43 test OCPP (01/10/2026); full backend gần nhất sau T-42/T-43 đạt 263 passed, 1 skipped, 181 warnings với 53 test OCPP (05/10/2026).
+**Baseline trước OCPP:** các tài liệu ghi tổng khác nhau (84 ca ở danh sách suite này, 89 trong README/QA Inventory, 90 trong Sprint Status) `[CẦN XÁC NHẬN]`. Các checkpoint sau S-16 đạt 163 passed, 1 warning với 43 test OCPP (01/10/2026); full backend mới nhất sau T-44/T-45/T-46 đạt 264 passed, 1 skipped, 298 warnings (05/10/2026).
 
 ---
 
@@ -237,6 +237,7 @@ Hệ thống cung cấp 8 nhóm router REST API tại tiền tố `/api/v1`:
 * `Authorize` tra `id_tags`: kiểm tra trạng thái thẻ, thời hạn và trạng thái hoạt động của trạm trước khi trả `Accepted`, `Blocked`, `Expired` hoặc `Invalid`.
 * `MeterValues` chỉ lưu `Energy.Active.Import.Register` theo phiên `CHARGING`, giữ nguyên đơn vị OCPP; nếu không tìm thấy phiên thì ghi payload vào `orphan_messages`. Gateway gửi CALLRESULT trước thao tác DB.
 * MeterValues bỏ qua mẫu có timestamp cũ và ghi cảnh báo, bỏ qua mẫu trùng timestamp+value im lặng. Counter thấp hơn tại timestamp mới vẫn được lưu và bật `charging_sessions.needs_review`; cùng timestamp nhưng value khác được lưu để đối soát.
+* Sau reconnect, `StatusNotification(Charging)` giữ phiên CHARGING đã lưu; StartTransaction gửi lại với cùng thẻ và meterStart nhận lại transactionId cũ. MeterValues gắn theo transactionId DB; StopTransaction đóng phiên ngay cả khi trụ đã offline và dùng timestamp trong tin nhắn.
 * Admin/Operator gọi `POST /api/v1/chargers/{code}/reset` với `Soft` hoặc `Hard`; offline trả 409, hết thời gian chờ trả 504. Dispatcher ghép phản hồi CALLRESULT/CALLERROR theo message ID và dùng lại được cho các action máy chủ gửi xuống sau này.
 * Seed demo tạo mã thẻ active `DEMO-<USERNAME>` cho mỗi tài khoản tài xế role `CUSTOMER`.
 * CALL lặp được nhận diện bằng khóa trong bảng `ocpp_messages`; cùng message ID phát lại phản hồi đã lưu, kể cả khi kết nối/session CSDL được tạo mới. Bản ghi cũ hơn 7 ngày được scheduler hiện có dọn mỗi ngày.
