@@ -9,9 +9,9 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Full backend suite đạt **163 passed, 1 warning** ngày 01/10/2026; năm suite OCPP có 43 ca. Số liệu lịch sử 84/89/90 còn mâu thuẫn `[CẦN XÁC NHẬN]`.
-- **Kiến trúc dữ liệu**: Các bảng kỹ thuật OCPP gồm `ocpp_messages` (idempotency) và `id_tags` (ủy quyền thẻ). *(Nguồn: `backend/app/models/`)*
-- **Migration Alembic**: `backend/alembic.ini` trỏ tới nguồn duy nhất `backend/alembic/`; revision mới nhất trong cây là `45ab6640633a`.
+- **Kiểm thử tự động**: Full backend suite đạt **258 passed, 1 skipped, 181 warnings** ngày 05/10/2026; sáu suite OCPP có 48 ca. Số liệu lịch sử 84/89/90 còn mâu thuẫn `[CẦN XÁC NHẬN]`.
+- **Kiến trúc dữ liệu**: Các bảng kỹ thuật OCPP gồm `ocpp_messages` (idempotency), `id_tags` (ủy quyền thẻ) và `meter_values` (số đo điện năng theo phiên). *(Nguồn: `backend/app/models/`)*
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới nguồn duy nhất `backend/alembic/`; revision mới nhất trong cây là `4a0a1107f87d`. DB dự án chưa được migrate.
 - **Khung Staging & CI/CD**: Hỗ trợ chạy đồng thời qua `docker-compose.staging.yml` và pipeline kiểm thử tự động `.github/workflows/ci-staging.yml`.
 
 ---
@@ -180,7 +180,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Baseline trước OCPP:** các tài liệu ghi tổng khác nhau (84 ca ở danh sách suite này, 89 trong README/QA Inventory, 90 trong Sprint Status) `[CẦN XÁC NHẬN]`. Checkpoint sau T-16/T-17 đạt 148 passed với 28 test OCPP; sau T-30/T-31 đạt 152 passed với 32 test OCPP; sau S-15 đạt 158 passed với 38 test OCPP; lần full backend mới nhất sau S-16 đạt 163 passed, 1 warning với 43 test OCPP (01/10/2026).
+**Baseline trước OCPP:** các tài liệu ghi tổng khác nhau (84 ca ở danh sách suite này, 89 trong README/QA Inventory, 90 trong Sprint Status) `[CẦN XÁC NHẬN]`. Các checkpoint sau S-16 đạt 163 passed, 1 warning với 43 test OCPP (01/10/2026); full backend gần nhất sau T-40/T-41 đạt 258 passed, 1 skipped, 181 warnings với 48 test OCPP (05/10/2026).
 
 ---
 
@@ -235,6 +235,7 @@ Hệ thống cung cấp 8 nhóm router REST API tại tiền tố `/api/v1`:
 * Trụ đã đăng ký kết nối qua WebSocket `/ocpp/{charge_point_code}` và thương lượng subprotocol `ocpp1.6`.
 * `BootNotification` lưu thông tin trụ; trạm không hoạt động nhận `Rejected`, trạm hoạt động nhận `Accepted` cùng heartbeat interval từ `HEARTBEAT_INTERVAL_SECONDS`.
 * `Authorize` tra `id_tags`: kiểm tra trạng thái thẻ, thời hạn và trạng thái hoạt động của trạm trước khi trả `Accepted`, `Blocked`, `Expired` hoặc `Invalid`.
+* `MeterValues` chỉ lưu `Energy.Active.Import.Register` theo phiên `CHARGING`, giữ nguyên đơn vị OCPP; nếu không tìm thấy phiên thì ghi payload vào `orphan_messages`. Gateway gửi CALLRESULT trước thao tác DB.
 * Admin/Operator gọi `POST /api/v1/chargers/{code}/reset` với `Soft` hoặc `Hard`; offline trả 409, hết thời gian chờ trả 504. Dispatcher ghép phản hồi CALLRESULT/CALLERROR theo message ID và dùng lại được cho các action máy chủ gửi xuống sau này.
 * Seed demo tạo mã thẻ active `DEMO-<USERNAME>` cho mỗi tài khoản tài xế role `CUSTOMER`.
 * CALL lặp được nhận diện bằng khóa trong bảng `ocpp_messages`; cùng message ID phát lại phản hồi đã lưu, kể cả khi kết nối/session CSDL được tạo mới. Bản ghi cũ hơn 7 ngày được scheduler hiện có dọn mỗi ngày.

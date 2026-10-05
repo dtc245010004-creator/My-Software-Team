@@ -179,3 +179,10 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_wh
 * `backend/tests/test_ocpp_reset.py`: **5 passed** — CALLRESULT online, xử lý CALL xen kẽ trong lúc chờ, offline 409 không dispatch, timeout 504 với hạn 0.5 giây trong test, CALLERROR và chặn role CUSTOMER.
 * Full backend suite: **163 passed, 1 warning trong 122.08 giây**; có 43 ca OCPP.
 * Warning hiện có là `FutureWarning` từ `google.generativeai`; không phát sinh lỗi test.
+
+## Kiểm thử MeterValues OCPP — T-40/T-41 (05/10/2026)
+
+* `backend/tests/test_meter_values.py`: **5 passed** — lưu số đo vào phiên đang sạc, bỏ qua đại lượng khác và giữ nguyên đơn vị, ghi orphan khi không có phiên, xác nhận CALLRESULT trước DB, và đo 20 lượt xử lý dưới 200 ms/lượt.
+* Full backend suite: **258 passed, 1 skipped, 181 warnings trong 137.81 giây**. Ruff trên backend: `All checks passed!`.
+* Migration `4a0a1107f87d` đã được kiểm tra upgrade/downgrade/upgrade trên DB SQLite tạm đã stamp ở head trước đó. Upgrade toàn chuỗi từ DB trống không qua được migration lịch sử `5ba0e05433d7` do tạo trùng cột `charging_points.last_seen_at`; Docker daemon không khả dụng nên không chạy được lệnh Compose được yêu cầu.
+* DB dự án không bị thay đổi; kiểm tra SHA-256 trước/sau cho file DB chính trùng khớp.

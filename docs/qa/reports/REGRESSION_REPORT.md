@@ -77,6 +77,13 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 * **Hồi quy toàn bộ**: 158 passed, 1 warning trong 117.08 giây; có 38 ca OCPP. Suite chạy trong thư mục cô lập dưới `backend/.venv`.
 * **Warning**: `FutureWarning` có sẵn từ `google.generativeai` trong `app/services/ai_service.py`.
 
+## 12. Hồi quy sau MeterValues OCPP (05/10/2026)
+
+* Suite MeterValues: **5 passed**; hồi quy OCPP cùng các luồng phiên sạc: **45 passed, 1 skipped, 79 warnings**.
+* Full backend suite: **258 passed, 1 skipped, 181 warnings trong 137.81 giây**; Ruff backend: sạch.
+* Test chạy trên DB tạm. SHA-256 của `backend/ev_csms.db` trước và sau kiểm tra giống nhau; không chạy migration trên DB dự án.
+* Migration mới kiểm chứng được tiến/lùi ở head hiện tại trên DB tạm. Chuỗi migration từ DB trống bị chặn bởi lỗi lịch sử tạo trùng cột `charging_points.last_seen_at` trong `5ba0e05433d7`.
+
 ## 10. Kiểm chứng sau dispatcher và API Reset OCPP (01/10/2026)
 
 * **Kiểm thử chọn lọc**: `test_ocpp_reset.py` đạt 5 passed; kiểm tra CALLRESULT/CALLERROR theo ID, CALL khác vẫn xử lý trong khi chờ, offline, timeout và RBAC.

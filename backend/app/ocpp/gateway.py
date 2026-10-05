@@ -24,6 +24,7 @@ from app.ocpp.frames import (
 from app.ocpp.handlers.authorize import handle_authorize
 from app.ocpp.handlers.boot_notification import handle_boot_notification
 from app.ocpp.handlers.heartbeat import handle_heartbeat
+from app.ocpp.handlers.meter_values import handle_meter_values
 from app.ocpp.handlers.start_transaction import handle_start_transaction
 from app.ocpp.handlers.status_notification import handle_status_notification
 from app.ocpp.handlers.stop_transaction import handle_stop_transaction
@@ -39,6 +40,7 @@ call_handlers = {
     "BootNotification": handle_boot_notification,
     "Authorize": handle_authorize,
     "Heartbeat": handle_heartbeat,
+    "MeterValues": handle_meter_values,
     "StatusNotification": handle_status_notification,
     "StartTransaction": handle_start_transaction,
     "StopTransaction": handle_stop_transaction,
@@ -126,12 +128,11 @@ async def ocpp_endpoint(
         while True:
             raw_frame = await websocket.receive_text()
 
-            # T-18: mọi message OCPP đi vào đều cập nhật last_seen_at.
-            touch_last_seen(db, charging_point.id)
-
             try:
                 frame = parse_frame(raw_frame)
             except OcppFrameError as exc:
+                # T-18: kể cả khung không hợp lệ vẫn ghi nhận lần kết nối cuối.
+                touch_last_seen(db, charging_point.id)
                 if exc.message_id is None:
                     await websocket.close(code=1002)
                     return
@@ -149,6 +150,11 @@ async def ocpp_endpoint(
                     )
                 )
                 continue
+
+            # MeterValues cần được xác nhận trước mọi thao tác ghi CSDL.
+            if not isinstance(frame, CallFrame) or frame.action != "MeterValues":
+                # T-18: mọi message OCPP đi vào đều cập nhật last_seen_at.
+                touch_last_seen(db, charging_point.id)
 
             if isinstance(frame, (CallResultFrame, CallErrorFrame)):
                 pending_response = pending_responses.get(frame.message_id)
@@ -175,6 +181,73 @@ async def ocpp_endpoint(
                 continue
 
             if not isinstance(frame, CallFrame):
+                continue
+
+            if frame.action == "MeterValues":
+                if not is_booted:
+                    await websocket.send_text(
+                        build_call_error(
+                            frame.message_id,
+                            "SecurityError",
+                            "Trụ phải được chấp nhận qua BootNotification trước.",
+                            {},
+                        )
+                    )
+                    try:
+                        touch_last_seen(db, charging_point.id)
+                    except Exception:
+                        db.rollback()
+                        logger.exception(
+                            "Không cập nhật được last_seen_at sau MeterValues bị từ chối "
+                            "code=%s message_id=%s",
+                            charge_point_code,
+                            frame.message_id,
+                        )
+                    continue
+
+                response = build_call_result(frame.message_id, {})
+                await websocket.send_text(response)
+                try:
+                    # Xác nhận trước mọi truy vấn/ghi CSDL để không chờ persistence.
+                    touch_last_seen(db, charging_point.id)
+                    saved_message = (
+                        db.query(OcppMessage)
+                        .filter(
+                            OcppMessage.charge_point_code == charge_point_code,
+                            OcppMessage.message_id == frame.message_id,
+                        )
+                        .first()
+                    )
+                    if saved_message is not None:
+                        if saved_message.action != frame.action:
+                            logger.warning(
+                                "OCPP message ID được dùng lại với action khác "
+                                "code=%s message_id=%s saved_action=%s received_action=%s",
+                                charge_point_code,
+                                frame.message_id,
+                                saved_message.action,
+                                frame.action,
+                            )
+                        continue
+
+                    handler = call_handlers[frame.action]
+                    handler(db, charging_point, frame.payload)
+                    db.add(
+                        OcppMessage(
+                            charge_point_code=charge_point_code,
+                            message_id=frame.message_id,
+                            action=frame.action,
+                            response_payload=response,
+                        )
+                    )
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    logger.exception(
+                        "Không lưu được MeterValues sau CALLRESULT code=%s message_id=%s",
+                        charge_point_code,
+                        frame.message_id,
+                    )
                 continue
 
             # Khóa chống lặp nằm trong CSDL để tồn tại qua kết nối mới hoặc
