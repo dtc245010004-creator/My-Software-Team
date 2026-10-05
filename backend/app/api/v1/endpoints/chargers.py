@@ -90,7 +90,9 @@ async def reset_charging_point(
 def list_chargers(
     station_id: Optional[int] = Query(None, description="Lọc theo ID trạm sạc"),
     status: Optional[str] = Query(None, description="Lọc theo trạng thái vận hành"),
-    search: Optional[str] = Query(None, description="Tìm theo mã EVSE ID, hãng hoặc model"),
+    search: Optional[str] = Query(
+        None, description="Tìm theo mã EVSE ID, hãng hoặc model"
+    ),
     skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
     limit: int = Query(100, ge=1, le=500, description="Số bản ghi tối đa"),
     current_user: Optional[User] = Depends(get_optional_current_user),
