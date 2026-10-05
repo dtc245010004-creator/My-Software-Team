@@ -12,8 +12,8 @@
 * **Mục tiêu sản phẩm (Product Goal)**: Đơn vị vận hành mạng lưới trạm sạc nắm được mọi phiên sạc theo thời gian thực qua giao thức OCPP, tính đúng tiền theo biểu giá nhiều khung, không để trạm vượt công suất, và đối soát được doanh thu khớp với số kWh đã cấp `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Mô hình Scrum**: Sprint 1 tuần (5 ngày làm việc / sprint). Đơn vị ước lượng: Story Point (Fibonacci) `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Khung theo dõi 4 chiều**:
-  1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi; backend full suite gần nhất có 267 passed, 1 skipped, 298 warnings (05/10/2026). Job phát hiện phiên bất thường dùng ngưỡng cấu hình 500 giây.
-  2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84; chuẩn hóa migration về `backend/alembic/`; đồng bộ nút Admin demo 1-Click với tài khoản `admin / 12345678a`; thêm MeterValues T-40/T-41, lọc số đo lùi/trùng T-42/T-43, phục hồi phiên khi reconnect T-44/T-45/T-46 và đánh dấu phiên bất thường T-53 (commit `7af7b19` trên nhánh `Duong`).
+  1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi; backend full suite gần nhất có 268 passed, 299 warnings (05/10/2026, Python 3.12 trong container). Job phát hiện phiên bất thường dùng ngưỡng cấu hình 500 giây.
+  2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84; chuẩn hóa migration về `backend/alembic/`; đồng bộ nút Admin demo 1-Click với tài khoản `admin / 12345678a`; thêm MeterValues T-40/T-41, lọc số đo lùi/trùng T-42/T-43, phục hồi phiên khi reconnect T-44/T-45/T-46 và đánh dấu phiên bất thường T-53 (commit `7af7b19`); hoàn thành hạ tầng T-55/T-56 cho 20 trụ OCPP ảo và kiểm thử ba vòng reconnect (commit `bfefab8` trên nhánh `Duong`).
   3. *Sắp thay đổi*: Kế hoạch Sprint 2 (20 SP) xử lý tin nhắn giao thức OCPP 1.6J và màn hình theo dõi trụ sạc.
   4. *Cần thay đổi / Tồn đọng*: Kết nối phần cứng trạm thật (S-05 AC3), cổng thanh toán thật (R-02), cấu hình Docker môi trường (R-06).
 
@@ -55,7 +55,7 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Timeout lệnh OCPP**: `OCPP_CALL_TIMEOUT_SECONDS = 30.0`; endpoint Reset ghi đè 30 giây theo hợp đồng API.
 * **Frontend SPA**: 6 màn hình chức năng tại `frontend/src/pages/`.
 * **Đăng nhập demo Admin**: Nút 1-Click đọc username/mật khẩu từ `DEMO_USERS.ADMIN`; cấu hình mã nguồn hiện tại là `admin / 12345678a`. Frontend Docker đã build lại; đăng nhập API xác nhận HTTP 200, user `admin`, role `ADMIN` sau khi gỡ khóa tạm.
-* **Kiểm thử tự động**: Full backend suite đạt 267 passed, 1 skipped, 298 warnings ngày 05/10/2026. Ba test job phiên bất thường đạt. Số lịch sử 90 ca ở tài liệu này mâu thuẫn với 84/89 ca trong README và QA Inventory `[CẦN XÁC NHẬN]`.
+* **Kiểm thử tự động**: Full backend suite gần nhất đạt 268 passed, 299 warnings ngày 05/10/2026 trong container Python 3.12. Kịch bản OCPP reconnect qua Compose/PostgreSQL đạt ba vòng liên tiếp. Số lịch sử 90 ca ở tài liệu này mâu thuẫn với 84/89 ca trong README và QA Inventory `[CẦN XÁC NHẬN]`.
 * **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; revision mới nhất là `c4ab19f2d7e1`. Migration T-53 đã kiểm chứng tiến/lùi/tiến trên DB tạm, chưa áp dụng lên CSDL dự án. Nâng cấp từ DB trống còn lỗi lịch sử do tạo trùng `charging_points.last_seen_at` ở `5ba0e05433d7`.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 

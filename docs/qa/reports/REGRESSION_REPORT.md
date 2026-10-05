@@ -100,6 +100,7 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 
 * `backend/tests/test_abnormal_session_job.py`: **3 passed**; xác nhận stale heartbeat được gắn cờ, heartbeat mới được giữ nguyên và lịch APScheduler là mỗi phút. Phiên vẫn ở trạng thái `CHARGING`.
 * Full backend suite: **267 passed, 1 skipped, 298 warnings trong 155.32 giây**; Ruff các file thay đổi sạch.
+* T-55/T-56: full backend suite trong container Python 3.12 đạt **268 passed, 299 warnings**; reconnect qua WebSocket/PostgreSQL thật đạt 3/3 vòng, 5 kWh mỗi phiên; 20/20 trụ SIM hiển thị Online trước khi dọn stack cô lập.
 * Migration `c4ab19f2d7e1` đã nâng/hạ/nâng trên SQLite tạm; không áp dụng lên DB dự án.
 
 ## 10. Kiểm chứng sau dispatcher và API Reset OCPP (01/10/2026)

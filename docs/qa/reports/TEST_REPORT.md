@@ -203,4 +203,5 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_wh
 
 * `backend/tests/test_abnormal_session_job.py`: **3 passed** — phiên có heartbeat quá ngưỡng nhận cờ/lý do đúng và vẫn `CHARGING`; heartbeat mới không bị đánh dấu; job được đăng ký chạy mỗi phút.
 * Full backend suite: **267 passed, 1 skipped, 298 warnings trong 155.32 giây**. Ruff trên file cấu hình, model, scheduler, migration và test: `All checks passed!`.
+* T-55/T-56: full backend suite trong container Python 3.12 đạt **268 passed, 299 warnings**; kịch bản reconnect Compose/PostgreSQL đạt **3/3 vòng** với 5 trụ, 5 kWh mỗi phiên; simulator ghi nhận **20/20 trụ Online**.
 * Migration `c4ab19f2d7e1` nâng/hạ/nâng thành công trên SQLite tạm đã stamp ở revision `339c5001fe7a`; không chạy migration lên DB dự án.

@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lần full suite mới nhất ngày 05/10/2026 đạt 264 passed, 1 skipped, 298 warnings; kịch bản OCPP reconnect chạy ba vòng với 5 trụ và 20 trụ.
+Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lần full suite mới nhất ngày 05/10/2026 đạt 268 passed, 299 warnings trong container Python 3.12; kịch bản OCPP reconnect chạy ba vòng với 5 trụ qua backend/PostgreSQL thật.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -49,7 +49,7 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **OCPP MeterValues Dedup** | `backend/tests/test_meter_values_dedup.py` | 5 | 100% PASS | Timestamp lùi, bản tin trùng, counter giảm, cùng timestamp hiệu chỉnh và đồng thời |
 | **Abnormal Charging Session Job** | `backend/tests/test_abnormal_session_job.py` | 3 | 100% PASS | Đánh dấu heartbeat quá ngưỡng, bỏ qua heartbeat mới, xác minh job mỗi phút chỉ gắn cờ và không đóng phiên |
 
-**Bổ sung kiểm chứng ngày 05/10/2026**: Các suite giao thức OCPP liệt kê trong bảng có 53 ca; kịch bản tích hợp reconnect thêm 1 ca; suite phát hiện phiên bất thường thêm 3 ca. Full backend suite mới nhất đạt 267 passed, 1 skipped, 298 warnings trong thư mục tạm.
+**Bổ sung kiểm chứng ngày 05/10/2026**: Các suite giao thức OCPP liệt kê trong bảng có 53 ca; kịch bản tích hợp reconnect và suite phát hiện phiên bất thường được chạy riêng. Full backend suite mới nhất đạt 268 passed, 299 warnings; kịch bản T-55/T-56 đạt 3/3 vòng với 5 trụ trên PostgreSQL.
 
 ---
 
