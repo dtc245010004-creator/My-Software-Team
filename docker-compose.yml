@@ -8,10 +8,15 @@ services:
       POSTGRES_PASSWORD: secretpassword
       POSTGRES_DB: ev_csms_db
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d ev_csms_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
     networks:
       - ev_net
@@ -19,12 +24,37 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: ev_csms_backend
     environment:
-      - DATABASE_URL=sqlite:////app/data/ev_csms.db
+      - DATABASE_URL=${COMPOSE_DATABASE_URL:-sqlite:////app/data/ev_csms.db}
       - BACKEND_CORS_ORIGINS=["http://localhost", "http://localhost:5173", "http://127.0.0.1:5173"]
     ports:
-      - "8000:8000"
+      - "${BACKEND_HOST_PORT:-8000}:8000"
+    volumes:
+      - sqlite_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/docs', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 18
+    restart: unless-stopped
+    networks:
+      - ev_net
+
+  ocpp-simulator:
+    build:
+      context: .
+      dockerfile: tools/ocpp-spike/Dockerfile
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-sqlite:////app/data/ev_csms.db}
+      SIMULATOR_CHARGE_POINT_COUNT: ${SIMULATOR_CHARGE_POINT_COUNT:-20}
+      SIMULATOR_WS_URL: ws://backend:8000/ocpp
+      SIMULATOR_HEARTBEAT_SECONDS: ${SIMULATOR_HEARTBEAT_SECONDS:-15}
+    depends_on:
+      backend:
+        condition: service_healthy
     volumes:
       - sqlite_data:/app/data
     restart: unless-stopped

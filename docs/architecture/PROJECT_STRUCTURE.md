@@ -17,6 +17,7 @@
 * **Đăng nhập demo Admin**: `frontend/src/config/roleConfig.js` khai báo `admin / 12345678a`; `frontend/src/context/AuthContext.jsx` dùng lại cấu hình này cho nút 1-Click. Frontend Docker đã được build lại; login API trả HTTP 200 cho `admin`/`ADMIN` sau khi gỡ khóa tạm do 5 lần thử sai.
 * **Số lượng kiểm thử tự động**: Full suite gần nhất có 267 passed, 1 skipped, 298 warnings (05/10/2026); ba test riêng của job bất thường đều đạt. Các tổng lịch sử 84, 89 và 90 ca mâu thuẫn `[CẦN XÁC NHẬN]`.
 * **Khung triển khai Staging & CI/CD**: Đóng gói container hóa qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và quy trình kiểm thử tự động `.github/workflows/ci-staging.yml`.
+* **Hạ tầng trụ ảo T-55/T-56**: `docker-compose.yml` có service `ocpp-simulator`, mặc định seed và kết nối 20 mã `SIM-001`…`SIM-020`; seeder OCPP riêng trong `tools/ocpp-spike/` không gọi `backend/seed_data.py`. Stack cô lập đã xác nhận 20/20 trụ Online trên SQLite và PostgreSQL. Kịch bản reconnect qua backend/Postgres thật đạt ba vòng; full backend suite đạt 268 passed, 299 warnings. Workflow `.github/workflows/main.yml` chạy tích hợp sau unit tests và luôn dọn Compose stack.
 * **Bộ chạy Local Dev**: `run.py` khởi chạy Backend FastAPI và Frontend Vite đồng thời trong một terminal; `Ctrl+C` dừng cả hai.
 * **Cơ cấu tổ chức tài liệu**: Phân tách thành 6 phân khu chuyên trách trong `docs/` (`architecture/`, `devops/`, `planning/`, `qa/`, `design/`, `research/`); hiện có 33 file Markdown theo lần đếm ngày 01/10/2026 (chưa commit).
 
@@ -32,6 +33,7 @@
 * **Loại bỏ số đo lùi/trùng — T-42/T-43 thuộc S-20 (05/10/2026 - chưa commit)**: Khóa transaction trước khi đọc số đo mới nhất theo session/measurand; mẫu lùi bị bỏ qua kèm cảnh báo, mẫu trùng hoàn toàn bỏ qua im lặng, mẫu mới có giá trị giảm vẫn lưu và bật `ChargingSession.needs_review`. Cùng timestamp nhưng khác value được giữ như bản hiệu chỉnh. Thêm migration `339c5001fe7a` và 5 test dedup/concurrency; full suite đạt 263 passed, 1 skipped, 181 warnings; Ruff sạch.
 * **Khôi phục phiên sau mất kết nối — T-44/T-45/T-46 thuộc S-21 (05/10/2026 - chưa commit)**: Trạng thái Charging đọc phiên CHARGING đã lưu; lần gửi lại StartTransaction với cùng thẻ/meterStart trả transactionId hiện có; MeterValues được gắn theo transactionId DB. StopTransaction tra cứu trong phạm vi đúng trụ, đóng phiên khi trụ offline và lấy ended_at từ timestamp tin nhắn. Kịch bản tích hợp trong `backend/tests/integration/test_reconnect_scenario.py` chạy ba vòng liên tiếp với 5 và 20 trụ; full suite đạt 264 passed, 1 skipped, 298 warnings; Ruff trên file đổi sạch.
 * **Phát hiện phiên bất thường — T-53 thuộc S-25 (05/10/2026, commit `7af7b19`)**: Thêm `ChargingSession.is_abnormal` và `abnormal_reason`; job APScheduler chạy mỗi phút so sánh heartbeat của trụ với cấu hình `ABNORMAL_SESSION_THRESHOLD_SECONDS=500`. Job chỉ gắn cờ/lý do, giữ nguyên status phiên. Migration `c4ab19f2d7e1`, ba test mới; full suite đạt 267 passed, 1 skipped, 298 warnings; Ruff sạch.
+* **Hạ tầng test 20 trụ ảo — T-55/T-56 thuộc S-26 (05/10/2026 - chưa commit)**: Thêm Docker service dùng lại luồng WebSocket/OCPP Spike K-01 và mã SIM riêng, seeder độc lập, Heartbeat định kỳ; workflow main chạy sau unit tests với Postgres/backend/simulator thật, kiểm tra ba vòng reconnect 5 trụ và dọn container/volume bằng trap. Bài test so sánh từng phiên với 5 kWh, ghi mã trụ/session khi sai. Kiểm chứng stack cô lập đạt 20/20 Online trên SQLite/PostgreSQL; kịch bản reconnect đạt 3/3; full backend suite đạt 268 passed, 299 warnings. CI chưa được kích hoạt từ nhánh này.
 * **Admin Demo 1-Click (01/10/2026, mã nguồn commit `7f764ea`)**: Credential trong `DEMO_USERS.ADMIN` được đổi từ `admin / AdminPass123` sang `admin / 12345678a`; `AuthContext.quickSwitch()` dùng cấu hình tập trung và `Login.jsx` hiển thị detail 403 từ API. Build trực tiếp trên host bị chặn do thiếu `vite`, nhưng Docker build và cập nhật container frontend thành công. Tài khoản đã được gỡ khóa tạm; login API trả HTTP 200 với role `ADMIN`.
 * **Chuẩn hóa thư mục migration (01/10/2026 - chưa commit)**: Xóa cây revision cũ `backend/migrations/`; giữ `backend/alembic/` làm nguồn migration duy nhất theo cấu hình `backend/alembic.ini`.
 * **Giao diện Quản lý Trụ & Đầu nối - S-05 (03/10/2026 - chưa commit)**:
@@ -192,6 +194,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 3. **`backend/app/models/wallet.py`**: Thực thể ví tiền điện tử với ràng buộc CSDL cứng `CheckConstraint("balance >= -500000")`.
 4. **`backend/app/simulator/charging_simulator.py`**: Tiến trình mô phỏng chu kỳ sạc pin xe điện theo đường cong CC/CV, bảo vệ quá nhiệt và ngắt sạc tự động.
 5. **`frontend/src/context/AuthContext.jsx`**: Quản trị phiên làm việc và phân quyền RBAC phía client.
+6. **`tools/ocpp-spike/run_simulator.py`**: Giữ các client OCPP 1.6J trực tuyến và gửi Heartbeat; số lượng do `SIMULATOR_CHARGE_POINT_COUNT` điều khiển.
 
 ---
 
@@ -228,6 +231,7 @@ Ma trận truy vết ánh xạ các Story đã triển khai:
 | **S-16** | Máy chủ gửi lệnh Reset OCPP có tương quan phản hồi | T-34, T-35 | `backend/app/ocpp/dispatcher.py`, `backend/app/ocpp/gateway.py`, `backend/app/api/v1/endpoints/chargers.py` | `backend/tests/test_ocpp_reset.py` (5 ca); `docs/qa/stories/S-16.md` |
 | **S-19** | Ghi số đo điện năng MeterValues | T-40, T-41 | `backend/app/models/meter_value.py`, `backend/app/ocpp/handlers/meter_values.py`, `backend/app/ocpp/gateway.py` | `backend/tests/test_meter_values.py` (5 ca); migration `4a0a1107f87d` |
 | **S-20** | Loại bỏ số đo lùi/trùng và đánh dấu bộ đếm cần xem xét | T-42, T-43 | `backend/app/ocpp/handlers/meter_values.py`, `backend/app/models/session.py` | `backend/tests/test_meter_values_dedup.py` (5 ca); migration `339c5001fe7a` |
+| **S-26** | Hạ tầng kiểm thử tích hợp 20 trụ OCPP ảo | T-55, T-56 | `docker-compose.yml`, `tools/ocpp-spike/`, `.github/workflows/main.yml` | `tools/ocpp-spike/test_reconnect_scenario.py` chạy qua backend/Postgres thật; 3 vòng reconnect; Compose cleanup qua trap |
 
 ---
 

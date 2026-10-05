@@ -42,6 +42,7 @@ class ChargingSession(Base):
             "connector_id",
             unique=True,
             sqlite_where=text("status = 'CHARGING'"),
+            postgresql_where=text("status = 'CHARGING'"),
         ),
     )
 
