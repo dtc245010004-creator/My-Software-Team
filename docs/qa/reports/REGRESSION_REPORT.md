@@ -84,6 +84,12 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 * Test chạy trên DB tạm. SHA-256 của `backend/ev_csms.db` trước và sau kiểm tra giống nhau; không chạy migration trên DB dự án.
 * Migration mới kiểm chứng được tiến/lùi ở head hiện tại trên DB tạm. Chuỗi migration từ DB trống bị chặn bởi lỗi lịch sử tạo trùng cột `charging_points.last_seen_at` trong `5ba0e05433d7`.
 
+## 13. Hồi quy sau lọc số đo lùi/trùng MeterValues (05/10/2026)
+
+* `test_meter_values.py` và `test_meter_values_dedup.py`: **10 passed**, gồm kiểm thử concurrency hai bản tin trùng.
+* Full backend suite: **263 passed, 1 skipped, 181 warnings trong 138.62 giây**; Ruff backend sạch.
+* Migration `339c5001fe7a` nâng/hạ/nâng thành công trên DB tạm. DB dự án không được dùng để chạy test hoặc migration; SHA-256 kiểm tra vẫn là `65C50528BD176262A1438E98DDF44F77620F751D351769CD5751AEAFDE2639BC`.
+
 ## 10. Kiểm chứng sau dispatcher và API Reset OCPP (01/10/2026)
 
 * **Kiểm thử chọn lọc**: `test_ocpp_reset.py` đạt 5 passed; kiểm tra CALLRESULT/CALLERROR theo ID, CALL khác vẫn xử lý trong khi chờ, offline, timeout và RBAC.

@@ -24,7 +24,10 @@ from app.ocpp.frames import (
 from app.ocpp.handlers.authorize import handle_authorize
 from app.ocpp.handlers.boot_notification import handle_boot_notification
 from app.ocpp.handlers.heartbeat import handle_heartbeat
-from app.ocpp.handlers.meter_values import handle_meter_values
+from app.ocpp.handlers.meter_values import (
+    begin_meter_values_transaction,
+    handle_meter_values,
+)
 from app.ocpp.handlers.start_transaction import handle_start_transaction
 from app.ocpp.handlers.status_notification import handle_status_notification
 from app.ocpp.handlers.stop_transaction import handle_stop_transaction
@@ -210,6 +213,7 @@ async def ocpp_endpoint(
                 try:
                     # Xác nhận trước mọi truy vấn/ghi CSDL để không chờ persistence.
                     touch_last_seen(db, charging_point.id)
+                    begin_meter_values_transaction(db)
                     saved_message = (
                         db.query(OcppMessage)
                         .filter(
@@ -228,6 +232,7 @@ async def ocpp_endpoint(
                                 saved_message.action,
                                 frame.action,
                             )
+                        db.rollback()
                         continue
 
                     handler = call_handlers[frame.action]

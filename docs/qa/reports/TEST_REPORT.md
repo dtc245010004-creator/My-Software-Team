@@ -186,3 +186,9 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_wh
 * Full backend suite: **258 passed, 1 skipped, 181 warnings trong 137.81 giây**. Ruff trên backend: `All checks passed!`.
 * Migration `4a0a1107f87d` đã được kiểm tra upgrade/downgrade/upgrade trên DB SQLite tạm đã stamp ở head trước đó. Upgrade toàn chuỗi từ DB trống không qua được migration lịch sử `5ba0e05433d7` do tạo trùng cột `charging_points.last_seen_at`; Docker daemon không khả dụng nên không chạy được lệnh Compose được yêu cầu.
 * DB dự án không bị thay đổi; kiểm tra SHA-256 trước/sau cho file DB chính trùng khớp.
+
+## Kiểm thử loại bỏ số đo lùi/trùng — T-42/T-43 (05/10/2026)
+
+* `backend/tests/test_meter_values_dedup.py`: **5 passed** — timestamp lùi được bỏ qua với một warning; bản trùng timestamp/value bỏ qua im lặng; counter giảm ở timestamp mới vẫn lưu và đặt `needs_review`; cùng timestamp khác value được giữ làm bản hiệu chỉnh; hai request giống nhau đồng thời chỉ lưu một dòng.
+* Hai suite MeterValues: **10 passed**. Full backend suite: **263 passed, 1 skipped, 181 warnings trong 138.62 giây**. Ruff backend: `All checks passed!`.
+* Migration `339c5001fe7a` thêm `charging_sessions.needs_review` với mặc định false; đã kiểm tra nâng cấp/hạ cấp/nâng cấp lại trên DB tạm. DB dự án giữ nguyên SHA-256 trước/sau.

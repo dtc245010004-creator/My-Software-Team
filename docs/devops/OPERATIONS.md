@@ -109,7 +109,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-  `backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`. Revision mới nhất trong cây là `4a0a1107f87d`, tạo bảng `meter_values`; các revision trước tạo `id_tags` và `ocpp_messages`. Migration MeterValues đã kiểm tra tiến/lùi trên DB tạm ở head hiện tại, chưa áp dụng lên DB dự án. Lưu ý: upgrade từ DB trống hiện lỗi tại migration lịch sử `5ba0e05433d7` vì cột `charging_points.last_seen_at` đã tồn tại; Docker daemon cũng không khả dụng trong lần kiểm tra 05/10/2026. Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
+  `backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`. Revision mới nhất trong cây là `339c5001fe7a`, thêm cờ `charging_sessions.needs_review`; migration `4a0a1107f87d` tạo bảng `meter_values`. Cả hai đã kiểm tra tiến/lùi trên DB tạm ở head hiện tại, chưa áp dụng lên DB dự án. Lưu ý: upgrade từ DB trống hiện lỗi tại migration lịch sử `5ba0e05433d7` vì cột `charging_points.last_seen_at` đã tồn tại. Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
 
 ---
 
@@ -121,7 +121,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
 Căn cứ theo `backend/pytest.ini`, `backend/tests/` và `frontend/package.json:9`:
 
 ### Kiểm thử Backend (Pytest)
-Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Tổng lịch sử cũ 84/89/90 vẫn mâu thuẫn `[CẦN XÁC NHẬN]`; lần chạy mới nhất ngày 05/10/2026 đạt 258 passed, 1 skipped, 181 warnings (đã gồm 48 ca OCPP):
+Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Tổng lịch sử cũ 84/89/90 vẫn mâu thuẫn `[CẦN XÁC NHẬN]`; lần chạy mới nhất ngày 05/10/2026 đạt 263 passed, 1 skipped, 181 warnings (đã gồm 53 ca OCPP):
 ```powershell
 cd backend
 pytest

@@ -1,6 +1,7 @@
 """Mô hình Phiên sạc xe điện (Quản lý vòng đời và chốt hóa đơn tiền điện)."""
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    false,
     func,
     text,
 )
@@ -103,6 +105,9 @@ class ChargingSession(Base):
     status = Column(
         String(20), default="CHARGING", nullable=False
     )  # CHARGING, COMPLETED, ABNORMAL, NEEDS_REVIEW, ACTIVE, FAILED, CANCELLED, INTERRUPTED
+    needs_review = Column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     stop_reason = Column(
         String(100), nullable=True
     )  # USER_STOPPED, EMERGENCY, BATTERY_FULL, DEBT_LIMIT_REACHED, EmergencyStop, CounterRollback, Local...

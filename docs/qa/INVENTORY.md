@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lần full suite mới nhất ngày 05/10/2026 đạt 258 passed, 1 skipped, 181 warnings; trong đó sáu suite OCPP có 48 ca.
+Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lần full suite mới nhất ngày 05/10/2026 đạt 263 passed, 1 skipped, 181 warnings; trong đó bảy suite OCPP có 53 ca.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -46,8 +46,9 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **OCPP Authorize** | `backend/tests/test_authorize.py` | 6 | 100% PASS | Thẻ không tồn tại, blocked, expired, trạm inactive, accepted và mã thẻ duy nhất |
 | **OCPP Server Reset** | `backend/tests/test_ocpp_reset.py` | 5 | 100% PASS | CALLRESULT, CALLERROR, CALL xen kẽ, offline, timeout và RBAC |
 | **OCPP MeterValues** | `backend/tests/test_meter_values.py` | 5 | 100% PASS | Lưu measurand năng lượng, bỏ qua measurand khác, ghi orphan, ACK trước DB, thời gian xử lý 20 lần gửi |
+| **OCPP MeterValues Dedup** | `backend/tests/test_meter_values_dedup.py` | 5 | 100% PASS | Timestamp lùi, bản tin trùng, counter giảm, cùng timestamp hiệu chỉnh và đồng thời |
 
-**Bổ sung kiểm chứng ngày 05/10/2026**: `test_ocpp_frames.py` có 20 ca, `test_boot_notification.py` có 8 ca, `test_ocpp_idempotency.py` có 4 ca, `test_authorize.py` có 6 ca, `test_ocpp_reset.py` có 5 ca và `test_meter_values.py` có 5 ca; tổng 48 ca OCPP. Full backend suite đạt 258 passed, 1 skipped, 181 warnings trong môi trường tạm.
+**Bổ sung kiểm chứng ngày 05/10/2026**: `test_ocpp_frames.py` có 20 ca, `test_boot_notification.py` có 8 ca, `test_ocpp_idempotency.py` có 4 ca, `test_authorize.py` có 6 ca, `test_ocpp_reset.py` có 5 ca, `test_meter_values.py` có 5 ca và `test_meter_values_dedup.py` có 5 ca; tổng 53 ca OCPP. Full backend suite đạt 263 passed, 1 skipped, 181 warnings trong môi trường tạm.
 
 ---
 
@@ -209,6 +210,15 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 5. `test_meter_values_handles_twenty_messages_under_200ms_each`: đo 20 lần gửi liên tiếp, mỗi lần dưới 200 ms.
 
 **Kết quả kiểm thử ngày 05/10/2026**: Suite MeterValues đạt 5 passed; full backend suite đạt 258 passed, 1 skipped, 181 warnings.
+
+### 4.16. Suite: `test_meter_values_dedup.py` (5 ca)
+1. `test_meter_values_ignores_older_timestamp_and_logs_once`: bỏ qua mẫu có thời gian cũ, không thêm dòng và ghi đúng một cảnh báo kèm session/mốc thời gian.
+2. `test_meter_values_ignores_exact_duplicate_without_warning`: bỏ qua cùng timestamp + value mà không ghi cảnh báo.
+3. `test_meter_values_records_lower_value_at_newer_timestamp_and_marks_session`: vẫn lưu counter giảm ở thời gian mới và bật `needs_review`.
+4. `test_meter_values_keeps_same_timestamp_value_correction`: giữ mẫu hiệu chỉnh cùng timestamp nhưng value khác theo xác nhận nghiệp vụ.
+5. `test_concurrent_exact_meter_values_are_serialized_and_saved_once`: gửi đồng thời hai mẫu giống nhau và chỉ giữ một dòng.
+
+**Kết quả kiểm thử ngày 05/10/2026**: Suite MeterValues S-19 và dedup S-20 đạt 10 passed; full backend suite đạt 263 passed, 1 skipped, 181 warnings.
 
 ---
 
