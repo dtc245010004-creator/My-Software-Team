@@ -43,16 +43,16 @@ export default function SimulatorPage() {
       onStatusChange: ({ status }) => setStatus(status),
       onMessage: (payload) => {
         if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-          if (payload.type === 'pong' || payload.type === 'ping') return
-          if (payload.soc !== undefined || payload.power_kw !== undefined || payload.kwh !== undefined) {
+          if (payload.event === 'PONG' || payload.event === 'PING') return
+          if (payload.event === 'TELEMETRY' && (payload.soc !== undefined || payload.power_kw !== undefined || payload.energy_kwh !== undefined)) {
             lastFrame.current = payload
             setTelemetry({
-              soc: payload.soc ?? payload.soc_percent ?? 0,
-              powerKw: payload.power_kw ?? payload.powerKw ?? 0,
-              kwh: payload.kwh ?? payload.energy_kwh ?? 0,
-              temperatureC: payload.temperature_c ?? payload.temperature ?? 25,
-              voltage: payload.voltage ?? payload.voltage_v ?? 0,
-              current: payload.current ?? payload.current_a ?? 0,
+              soc: payload.soc ?? 0,
+              powerKw: payload.power_kw ?? 0,
+              kwh: payload.energy_kwh ?? 0,
+              temperatureC: payload.temp_c ?? 25,
+              voltage: payload.voltage_v ?? 0,
+              current: payload.current_a ?? 0,
             })
           }
         }

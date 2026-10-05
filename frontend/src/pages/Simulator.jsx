@@ -69,8 +69,11 @@ export default function Simulator() {
           const next = [...prev, { time: timeLabel, powerKw: msg.power_kw, soc: msg.soc, tempC: msg.temp_c }];
           return next.slice(-25); // Giữ lại 25 mẫu gần nhất
         });
-      } else if (msg.event === 'SESSION_STOPPED' && msg.session_id === activeSession.id) {
-        setStatusMessage(`Phiên sạc đã kết thúc: ${msg.stop_reason || 'Hoàn tất'}`);
+      } else if (
+        (msg.event === 'STOPPED' || msg.event === 'SESSION_STOPPED') &&
+        msg.session_id === activeSession.id
+      ) {
+        setStatusMessage(`Phiên sạc đã kết thúc: ${msg.stop_reason || msg.reason || 'Hoàn tất'}`);
         setActiveSession(null);
         telemetryWs.unsubscribeSession(activeSession.id);
       }
