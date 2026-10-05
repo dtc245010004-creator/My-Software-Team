@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { telemetryWs } from '../services/websocket';
 
 import { DEMO_USERS } from '../config/roleConfig';
 import { telemetryWs } from '../services/websocket';
