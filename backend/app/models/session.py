@@ -108,6 +108,8 @@ class ChargingSession(Base):
     needs_review = Column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    is_abnormal = Column(Boolean, nullable=False, default=False, server_default=false())
+    abnormal_reason = Column(String(255), nullable=True)
     stop_reason = Column(
         String(100), nullable=True
     )  # USER_STOPPED, EMERGENCY, BATTERY_FULL, DEBT_LIMIT_REACHED, EmergencyStop, CounterRollback, Local...

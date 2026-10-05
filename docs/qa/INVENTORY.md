@@ -47,8 +47,9 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **OCPP Server Reset** | `backend/tests/test_ocpp_reset.py` | 5 | 100% PASS | CALLRESULT, CALLERROR, CALL xen kẽ, offline, timeout và RBAC |
 | **OCPP MeterValues** | `backend/tests/test_meter_values.py` | 5 | 100% PASS | Lưu measurand năng lượng, bỏ qua measurand khác, ghi orphan, ACK trước DB, thời gian xử lý 20 lần gửi |
 | **OCPP MeterValues Dedup** | `backend/tests/test_meter_values_dedup.py` | 5 | 100% PASS | Timestamp lùi, bản tin trùng, counter giảm, cùng timestamp hiệu chỉnh và đồng thời |
+| **Abnormal Charging Session Job** | `backend/tests/test_abnormal_session_job.py` | 3 | 100% PASS | Đánh dấu heartbeat quá ngưỡng, bỏ qua heartbeat mới, xác minh job mỗi phút chỉ gắn cờ và không đóng phiên |
 
-**Bổ sung kiểm chứng ngày 05/10/2026**: Các suite giao thức OCPP liệt kê trong bảng có 53 ca; kịch bản tích hợp reconnect thêm 1 ca. Full backend suite mới nhất đạt 264 passed, 1 skipped, 298 warnings trong thư mục tạm.
+**Bổ sung kiểm chứng ngày 05/10/2026**: Các suite giao thức OCPP liệt kê trong bảng có 53 ca; kịch bản tích hợp reconnect thêm 1 ca; suite phát hiện phiên bất thường thêm 3 ca. Full backend suite mới nhất đạt 267 passed, 1 skipped, 298 warnings trong thư mục tạm.
 
 ---
 
@@ -224,6 +225,13 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 1. `test_reconnect_scenario_keeps_one_session_and_expected_energy`: chạy ba vòng liên tiếp; mỗi trụ bắt đầu phiên, gửi MeterValues, ngắt WebSocket ngẫu nhiên, kết nối lại, gửi StatusNotification/StartTransaction lặp và StopTransaction. Kiểm tra số phiên không nhân đôi, kWh đúng số mô phỏng và thời điểm kết thúc theo payload. Mặc định 5 trụ; biến `OCPP_RECONNECT_CHARGE_POINTS` cho phép chạy 20 trụ.
 
 **Kết quả kiểm thử ngày 05/10/2026**: Kịch bản đạt với 5 và 20 trụ; full backend suite đạt 264 passed, 1 skipped, 298 warnings.
+
+### 4.18. Suite `test_abnormal_session_job.py` (3 ca)
+1. `test_abnormal_session_job_flags_stale_point_without_closing_session`: trụ quá ngưỡng được đánh dấu với lý do chứa đúng số giây cấu hình; phiên vẫn `CHARGING`.
+2. `test_abnormal_session_job_ignores_recently_seen_point`: heartbeat mới không bị đánh dấu, trạng thái phiên vẫn `CHARGING`.
+3. `test_abnormal_session_job_is_registered_once_per_minute`: job được đăng ký vào APScheduler theo chu kỳ một phút.
+
+**Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
 ---
 

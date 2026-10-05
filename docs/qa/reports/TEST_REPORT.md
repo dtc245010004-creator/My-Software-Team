@@ -198,3 +198,9 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_wh
 * `backend/tests/integration/test_reconnect_scenario.py`: 1 ca tích hợp chạy ba vòng; đạt với 5 trụ mặc định và với 20 trụ qua `OCPP_RECONNECT_CHARGE_POINTS`. Kiểm tra reconnect WebSocket, giữ transactionId, không nhân đôi phiên, StopTransaction khi offline, timestamp kết thúc từ payload và 5 kWh mỗi phiên.
 * Full backend suite: **264 passed, 1 skipped, 298 warnings trong 222.40 giây**. Ruff trên các file mã nguồn và test thay đổi: `All checks passed!`.
 * Các lượt chạy hoàn tất được cô lập trong thư mục tạm. Lượt khởi chạy đầu tiên do lỗi thiết lập thư mục đã mở `ev_csms.db` ở thư mục gốc; lifespan gọi `create_all` và `reconcile_interrupted_sessions`. Pytest cũng đã xóa/tạo lại file kiểm thử gốc `test_ev_csms.db` theo quy tắc trong `conftest.py`. Không có bản sao/hash trước lượt chạy để xác minh hoặc phục hồi trạng thái cũ của hai file này. SHA-256 hiện tại của `ev_csms.db` là `5BE76BEFB761DC75F8A2F986B9B35113E4A28935366E9343EAE32D73954F4D58`. `backend/ev_csms.db` vẫn giữ SHA-256 `65C50528BD176262A1438E98DDF44F77620F751D351769CD5751AEAFDE2639BC`.
+
+## Kiểm thử phát hiện phiên sạc bất thường — T-53 (05/10/2026)
+
+* `backend/tests/test_abnormal_session_job.py`: **3 passed** — phiên có heartbeat quá ngưỡng nhận cờ/lý do đúng và vẫn `CHARGING`; heartbeat mới không bị đánh dấu; job được đăng ký chạy mỗi phút.
+* Full backend suite: **267 passed, 1 skipped, 298 warnings trong 155.32 giây**. Ruff trên file cấu hình, model, scheduler, migration và test: `All checks passed!`.
+* Migration `c4ab19f2d7e1` nâng/hạ/nâng thành công trên SQLite tạm đã stamp ở revision `339c5001fe7a`; không chạy migration lên DB dự án.

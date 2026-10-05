@@ -109,7 +109,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-  `backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`. Revision mới nhất trong cây là `339c5001fe7a`, thêm cờ `charging_sessions.needs_review`; migration `4a0a1107f87d` tạo bảng `meter_values`. Cả hai đã kiểm tra tiến/lùi trên DB tạm ở head hiện tại, chưa áp dụng lên DB dự án. Lưu ý: upgrade từ DB trống hiện lỗi tại migration lịch sử `5ba0e05433d7` vì cột `charging_points.last_seen_at` đã tồn tại. Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
+  `backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`. Revision mới nhất là `c4ab19f2d7e1`, thêm cờ bất thường vào `charging_sessions`; migration đã kiểm tra tiến/lùi/tiến trên DB tạm, chưa áp dụng lên DB dự án. Lưu ý: upgrade từ DB trống hiện lỗi tại migration lịch sử `5ba0e05433d7` vì cột `charging_points.last_seen_at` đã tồn tại. Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
 
 ---
 
@@ -183,6 +183,7 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `AI_MODEL_NAME` | String | `gemini-1.5-flash` | Định danh mô hình AI phân tích tải trạm |
 | `HEARTBEAT_INTERVAL_SECONDS` | Integer | `300` | Chu kỳ heartbeat trả trong BootNotification OCPP 1.6J (giây) |
 | `OCPP_CALL_TIMEOUT_SECONDS` | Float | `30.0` | Thời gian chờ CALL do CSMS gửi xuống trụ khi không truyền timeout riêng (giây) |
+| `ABNORMAL_SESSION_THRESHOLD_SECONDS` | Integer | `500` | Ngưỡng thời gian không nhận liên lạc trước khi job gắn cờ phiên đang sạc bất thường (giây); job không tự đóng phiên |
 
 ---
 
