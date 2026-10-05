@@ -652,9 +652,7 @@ async def _station_event_generator(user: User, limit: Optional[int] = None):
     summary="Kênh SSE đẩy trạng thái trạm/trụ/đầu nối theo thời gian thực",
 )
 async def get_station_events(
-    limit: Optional[int] = Query(
-        None, description="Giới hạn số message rồi ngắt (dùng cho test)"
-    ),
+    limit: Optional[int] = Query(None, description="Giới hạn số message rồi ngắt (dùng cho test)"),
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
 ):
     return StreamingResponse(
@@ -673,9 +671,7 @@ async def get_station_events(
     summary="Alias của kênh SSE /events",
 )
 async def get_station_stream(
-    limit: Optional[int] = Query(
-        None, description="Giới hạn số message rồi ngắt (dùng cho test)"
-    ),
+    limit: Optional[int] = Query(None, description="Giới hạn số message rồi ngắt (dùng cho test)"),
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
 ):
     return StreamingResponse(

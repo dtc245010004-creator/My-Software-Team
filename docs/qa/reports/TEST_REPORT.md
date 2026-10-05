@@ -179,3 +179,29 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_wh
 * `backend/tests/test_ocpp_reset.py`: **5 passed** — CALLRESULT online, xử lý CALL xen kẽ trong lúc chờ, offline 409 không dispatch, timeout 504 với hạn 0.5 giây trong test, CALLERROR và chặn role CUSTOMER.
 * Full backend suite: **163 passed, 1 warning trong 122.08 giây**; có 43 ca OCPP.
 * Warning hiện có là `FutureWarning` từ `google.generativeai`; không phát sinh lỗi test.
+
+## Kiểm thử MeterValues OCPP — T-40/T-41 (05/10/2026)
+
+* `backend/tests/test_meter_values.py`: **5 passed** — lưu số đo vào phiên đang sạc, bỏ qua đại lượng khác và giữ nguyên đơn vị, ghi orphan khi không có phiên, xác nhận CALLRESULT trước DB, và đo 20 lượt xử lý dưới 200 ms/lượt.
+* Full backend suite: **258 passed, 1 skipped, 181 warnings trong 137.81 giây**. Ruff trên backend: `All checks passed!`.
+* Migration `4a0a1107f87d` đã được kiểm tra upgrade/downgrade/upgrade trên DB SQLite tạm đã stamp ở head trước đó. Upgrade toàn chuỗi từ DB trống không qua được migration lịch sử `5ba0e05433d7` do tạo trùng cột `charging_points.last_seen_at`; Docker daemon không khả dụng nên không chạy được lệnh Compose được yêu cầu.
+* DB dự án không bị thay đổi; kiểm tra SHA-256 trước/sau cho file DB chính trùng khớp.
+
+## Kiểm thử loại bỏ số đo lùi/trùng — T-42/T-43 (05/10/2026)
+
+* `backend/tests/test_meter_values_dedup.py`: **5 passed** — timestamp lùi được bỏ qua với một warning; bản trùng timestamp/value bỏ qua im lặng; counter giảm ở timestamp mới vẫn lưu và đặt `needs_review`; cùng timestamp khác value được giữ làm bản hiệu chỉnh; hai request giống nhau đồng thời chỉ lưu một dòng.
+* Hai suite MeterValues: **10 passed**. Full backend suite: **263 passed, 1 skipped, 181 warnings trong 138.62 giây**. Ruff backend: `All checks passed!`.
+* Migration `339c5001fe7a` thêm `charging_sessions.needs_review` với mặc định false; đã kiểm tra nâng cấp/hạ cấp/nâng cấp lại trên DB tạm. DB dự án giữ nguyên SHA-256 trước/sau.
+
+## Kiểm thử khôi phục phiên OCPP — T-44/T-45/T-46 (05/10/2026)
+
+* `backend/tests/integration/test_reconnect_scenario.py`: 1 ca tích hợp chạy ba vòng; đạt với 5 trụ mặc định và với 20 trụ qua `OCPP_RECONNECT_CHARGE_POINTS`. Kiểm tra reconnect WebSocket, giữ transactionId, không nhân đôi phiên, StopTransaction khi offline, timestamp kết thúc từ payload và 5 kWh mỗi phiên.
+* Full backend suite: **264 passed, 1 skipped, 298 warnings trong 222.40 giây**. Ruff trên các file mã nguồn và test thay đổi: `All checks passed!`.
+* Các lượt chạy hoàn tất được cô lập trong thư mục tạm. Lượt khởi chạy đầu tiên do lỗi thiết lập thư mục đã mở `ev_csms.db` ở thư mục gốc; lifespan gọi `create_all` và `reconcile_interrupted_sessions`. Pytest cũng đã xóa/tạo lại file kiểm thử gốc `test_ev_csms.db` theo quy tắc trong `conftest.py`. Không có bản sao/hash trước lượt chạy để xác minh hoặc phục hồi trạng thái cũ của hai file này. SHA-256 hiện tại của `ev_csms.db` là `5BE76BEFB761DC75F8A2F986B9B35113E4A28935366E9343EAE32D73954F4D58`. `backend/ev_csms.db` vẫn giữ SHA-256 `65C50528BD176262A1438E98DDF44F77620F751D351769CD5751AEAFDE2639BC`.
+
+## Kiểm thử phát hiện phiên sạc bất thường — T-53 (05/10/2026)
+
+* `backend/tests/test_abnormal_session_job.py`: **3 passed** — phiên có heartbeat quá ngưỡng nhận cờ/lý do đúng và vẫn `CHARGING`; heartbeat mới không bị đánh dấu; job được đăng ký chạy mỗi phút.
+* Full backend suite: **267 passed, 1 skipped, 298 warnings trong 155.32 giây**. Ruff trên file cấu hình, model, scheduler, migration và test: `All checks passed!`.
+* T-55/T-56: full backend suite trong container Python 3.12 đạt **268 passed, 299 warnings**; kịch bản reconnect Compose/PostgreSQL đạt **3/3 vòng** với 5 trụ, 5 kWh mỗi phiên; simulator ghi nhận **20/20 trụ Online**.
+* Migration `c4ab19f2d7e1` nâng/hạ/nâng thành công trên SQLite tạm đã stamp ở revision `339c5001fe7a`; không chạy migration lên DB dự án.
