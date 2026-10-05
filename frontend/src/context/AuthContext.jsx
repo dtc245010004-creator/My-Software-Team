@@ -1,10 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
-<<<<<<< HEAD
+
 import { DEMO_USERS } from '../config/roleConfig';
-=======
 import { telemetryWs } from '../services/websocket';
->>>>>>> 17c2585 (Cập nhật tính năng WebSocket/SSE và tự động kết nối lại)
 
 const AuthContext = createContext(null);
 
