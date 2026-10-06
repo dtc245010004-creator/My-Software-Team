@@ -1,5 +1,7 @@
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+
 from app.core.database import Base
+
 
 class RemoteStartRequest(Base):
     __tablename__ = "remote_start_requests"

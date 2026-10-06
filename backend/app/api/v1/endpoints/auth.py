@@ -10,8 +10,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.datetime_utils import ensure_utc, get_utc_now
 from app.core.security import create_access_token, get_password_hash, verify_password
-from app.models.user import User
 from app.models.id_tag import IdTag
+from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.user import TokenResponse, UserLogin, UserRegister, UserResponse
 

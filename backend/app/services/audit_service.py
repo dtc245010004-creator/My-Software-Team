@@ -1,7 +1,10 @@
 """Hàm ghi audit dùng chung. Audit log chỉ được tạo thêm/đọc."""
 from typing import Any
+
 from sqlalchemy.orm import Session
+
 from app.models.audit_log import AuditLog
+
 
 def ghi_nhat_ky(
     db: Session,

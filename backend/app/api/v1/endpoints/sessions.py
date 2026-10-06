@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -6,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_current_user_or_driver_guest
 from app.core.database import get_db
+from app.models.meter_value import MeterValue
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
-from app.models.meter_value import MeterValue
 from app.models.user import User
 from app.schemas.session import (
     CurrentSessionResponse,
@@ -241,6 +242,7 @@ def remote_start_status(
     db: Session = Depends(get_db),
 ):
     from datetime import datetime, timezone
+
     from app.models.remote_start_request import RemoteStartRequest
     req = db.query(RemoteStartRequest).filter(RemoteStartRequest.id == request_id).first()
     if req is None:

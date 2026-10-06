@@ -9,13 +9,14 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.datetime_utils import to_vn_time
+from app.models.remote_start_request import RemoteStartRequest
 from app.models.session import ChargingSession
 from app.models.station import Connector
 from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
-from app.services.wallet_service import deduct_charging_fee
 from app.services.audit_service import ghi_nhat_ky
+from app.services.wallet_service import deduct_charging_fee
 
 logger = logging.getLogger("ev_csms.session_service")
 
@@ -665,6 +666,7 @@ async def remote_start_charging_session(
 ) -> "RemoteStartRequest":
     """S-24/T-51: kiểm tra cổng rảnh rồi gửi RemoteStartTransaction và lưu request chờ 60 giây."""
     from datetime import timedelta
+
     from app.models.id_tag import IdTag
     from app.models.remote_start_request import RemoteStartRequest
     from app.ocpp.dispatcher import OcppCallError, send_call_and_wait

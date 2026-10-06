@@ -1,6 +1,8 @@
 """Nhật ký bất biến cho các lệnh điều khiển từ xa."""
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, JSON, String, func
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer, String, func
+
 from app.core.database import Base
+
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
