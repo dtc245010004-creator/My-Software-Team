@@ -228,10 +228,7 @@ class ConnectorError(Base):
     )
     error_code = Column(String(100), nullable=False)
     vendor_error_code = Column(String(255), nullable=True)
-    info = Column(String(255), nullable=True)
-    created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=True
-    )
+    created_at = Column(DateTime(timezone=True), nullable=True)
 
     connector = relationship("Connector", back_populates="errors")
 
