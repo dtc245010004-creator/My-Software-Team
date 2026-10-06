@@ -296,7 +296,21 @@ async def update_charger_status(
 
     verify_charger_ownership(charger, current_user)
 
-    charger.status = status_in.status
+    new_status = status_in.status
+    charger.status = new_status
+
+    # Đồng bộ trạng thái cascade cho các cổng sạc (Connectors) trực thuộc
+    if new_status in ("UNAVAILABLE", "FAULTED"):
+        # Chuyển các connector không đang sạc sang cùng trạng thái bảo trì/lỗi
+        for conn in charger.connectors:
+            if conn.status != "CHARGING":
+                conn.status = new_status
+    elif new_status == "AVAILABLE":
+        # Khi đưa trụ về AVAILABLE, mở lại các cổng đang UNAVAILABLE
+        for conn in charger.connectors:
+            if conn.status == "UNAVAILABLE":
+                conn.status = "AVAILABLE"
+
     db.commit()
     db.refresh(charger)
 

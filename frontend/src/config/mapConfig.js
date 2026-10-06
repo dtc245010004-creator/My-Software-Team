@@ -4,12 +4,19 @@
  * không bị lỗi chặn DNS mạng nội bộ như OpenStreetMap và không có watermark như Carto.
  */
 export const MAP_CONFIG = {
-  // 1. Bản đồ sáng: Esri World Street Map - Tên đường, địa danh Việt Nam cực kỳ sắc nét & chi tiết
+  // 1. Bản đồ đường phố (Street Map / Light): Esri World Street Map - Tên đường, địa danh Việt Nam cực kỳ sắc nét & chi tiết
+  street: {
+    name: 'Đường phố',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    maxZoom: 19,
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, TomTom',
+    className: '',
+  },
   light: {
     name: 'Bản đồ Sáng',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
     maxZoom: 19,
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, TomTom',
     className: '',
   },
 

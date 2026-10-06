@@ -153,6 +153,43 @@ def start_charging_session(
             detail="Bạn đang có một phiên sạc chưa kết thúc. Không thể bắt đầu phiên mới.",
         )
 
+    # 2.5. Kiểm tra tính khả dụng của Cổng sạc, Trụ sạc và Trạm sạc
+    connector = db.query(Connector).filter(Connector.id == connector_id).first()
+    if not connector or not connector.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy cổng sạc hoặc cổng sạc đã bị vô hiệu hóa.",
+        )
+
+    charger = connector.charging_point
+    if not charger or not charger.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy trụ sạc hoặc trụ sạc đã bị vô hiệu hóa.",
+        )
+
+    # Chặn nếu trụ sạc đang trong trạng thái bảo trì hoặc gặp sự cố
+    if charger.status in ("UNAVAILABLE", "FAULTED", "MAINTENANCE"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Trụ sạc '{charger.code}' hiện đang trong trạng thái {charger.status} (bảo trì/sự cố), không thể bắt đầu phiên sạc.",
+        )
+
+    # Chặn nếu trạm sạc cha đang tạm ngừng hoạt động hoặc bảo trì
+    station = charger.station
+    if station and (not station.is_active or station.status == "MAINTENANCE"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Trạm sạc '{station.name}' hiện đang tạm ngừng hoạt động hoặc bảo trì, không thể bắt đầu phiên sạc.",
+        )
+
+    # Chặn nếu cổng sạc không ở trạng thái AVAILABLE
+    if connector.status != "AVAILABLE":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cổng sạc hiện không khả dụng, đang được sử dụng hoặc đang bảo trì (Trạng thái: {connector.status}).",
+        )
+
     # 3. Khóa cổng sạc độc quyền bằng Atomic Conditional Update
     stmt = text(
         "UPDATE connectors SET status = 'CHARGING' "
@@ -166,18 +203,12 @@ def start_charging_session(
             detail="Cổng sạc hiện không khả dụng, đang được sử dụng hoặc đang bảo trì.",
         )
 
-    # 4. Xác định trạm sạc và biểu giá TOU
-    connector = db.query(Connector).filter(Connector.id == connector_id).first()
-    if connector and connector.charging_point_id:
-        db.execute(
-            text("UPDATE charging_points SET status = 'CHARGING' WHERE id = :cpid;"),
-            {"cpid": connector.charging_point_id},
-        )
-    station_id = (
-        connector.charging_point.station_id
-        if connector and connector.charging_point
-        else None
+    # 4. Cập nhật trụ sạc cha sang CHARGING và xác định biểu giá TOU
+    db.execute(
+        text("UPDATE charging_points SET status = 'CHARGING' WHERE id = :cpid;"),
+        {"cpid": charger.id},
     )
+    station_id = station.id if station else None
     tariff = get_or_create_default_tariff(db, station_id=station_id)
 
     # 5. Chốt đơn giá điện TOU tại thời điểm bắt đầu phiên sạc theo giờ Việt Nam
@@ -306,21 +337,27 @@ def stop_charging_session(
         session.status = "COMPLETED"
         session.stop_reason = stop_reason
 
-        # 6. Mở khóa cổng sạc về AVAILABLE
-        db.execute(
-            text("UPDATE connectors SET status = 'AVAILABLE' WHERE id = :cid;"),
-            {"cid": session.connector_id},
-        )
-
-        # Đồng bộ trạng thái trụ sạc cha về AVAILABLE nếu không còn cổng nào khác đang CHARGING
+        # 6. Mở khóa cổng sạc (bảo toàn trạng thái bảo trì nếu trụ cha đang bảo trì/lỗi)
         connector = (
             db.query(Connector).filter(Connector.id == session.connector_id).first()
         )
-        if connector and connector.charging_point_id:
+        charger = connector.charging_point if connector else None
+
+        target_conn_status = "AVAILABLE"
+        if charger and charger.status in ("UNAVAILABLE", "FAULTED", "MAINTENANCE"):
+            target_conn_status = charger.status
+
+        db.execute(
+            text("UPDATE connectors SET status = :target_status WHERE id = :cid;"),
+            {"target_status": target_conn_status, "cid": session.connector_id},
+        )
+
+        # Đồng bộ trạng thái trụ sạc cha về AVAILABLE chỉ khi không còn cổng nào khác đang CHARGING VÀ trụ không ở trạng thái bảo trì/lỗi
+        if charger and charger.status == "CHARGING":
             other_active = (
                 db.query(Connector)
                 .filter(
-                    Connector.charging_point_id == connector.charging_point_id,
+                    Connector.charging_point_id == charger.id,
                     Connector.status == "CHARGING",
                     Connector.id != session.connector_id,
                     Connector.is_active.is_(True),
@@ -332,7 +369,7 @@ def stop_charging_session(
                     text(
                         "UPDATE charging_points SET status = 'AVAILABLE' WHERE id = :cpid AND status = 'CHARGING';"
                     ),
-                    {"cpid": connector.charging_point_id},
+                    {"cpid": charger.id},
                 )
 
         db.commit()

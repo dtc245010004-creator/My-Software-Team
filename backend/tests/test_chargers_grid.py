@@ -170,3 +170,47 @@ def test_list_chargers_operator_rbac(client, grid_test_data):
     data2 = res2.json()
     assert len(data2) == 2
     assert all(c["station_name"] == "Trạm Lưới Sài Gòn" for c in data2)
+
+
+def test_patch_charger_status_cascades_to_connectors(client, grid_test_data, db_session):
+    """Admin chuyển trạng thái trụ sang UNAVAILABLE -> các connector con phải tự động đồng bộ sang UNAVAILABLE."""
+    admin_token = grid_test_data["token_admin"]
+    st1 = grid_test_data["st1"]
+    charger = (
+        db_session.query(ChargingPoint)
+        .filter(ChargingPoint.station_id == st1.id, ChargingPoint.status == "AVAILABLE")
+        .first()
+    )
+    assert charger is not None
+
+    # 1. Admin đưa trụ sạc vào bảo trì (UNAVAILABLE)
+    res = client.patch(
+        f"/api/v1/chargers/{charger.id}/status",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"status": "UNAVAILABLE"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "UNAVAILABLE"
+
+    # Kiểm tra connectors con trong database đã chuyển sang UNAVAILABLE
+    db_session.refresh(charger)
+    assert charger.status == "UNAVAILABLE"
+    for conn in charger.connectors:
+        db_session.refresh(conn)
+        assert conn.status == "UNAVAILABLE"
+
+    # 2. Admin đưa trụ sạc trở lại hoạt động (AVAILABLE)
+    res_avail = client.patch(
+        f"/api/v1/chargers/{charger.id}/status",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"status": "AVAILABLE"},
+    )
+    assert res_avail.status_code == 200
+    assert res_avail.json()["status"] == "AVAILABLE"
+
+    db_session.refresh(charger)
+    assert charger.status == "AVAILABLE"
+    for conn in charger.connectors:
+        db_session.refresh(conn)
+        assert conn.status == "AVAILABLE"
+
