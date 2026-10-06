@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import L from 'leaflet';
-import { MapPin, Navigation, Layers, Search, AlertCircle, CheckCircle2, Crosshair } from 'lucide-react';
+import { MapPin, Navigation, Layers, Search, AlertCircle, CheckCircle2, Crosshair, Maximize2 } from 'lucide-react';
 import provincesData from '../data/provinces.json';
 import { geocode, reverseGeocode } from '../services/geocoding';
 import { MAP_CONFIG } from '../config/mapConfig';
@@ -9,17 +9,17 @@ import { MAP_CONFIG } from '../config/mapConfig';
 const customPinIcon = L.divIcon({
   className: 'custom-ev-pin',
   html: `
-    <div style="position: relative; width: 32px; height: 38px; display: flex; align-items: center; justify-content: center; cursor: grab;">
-      <svg width="32" height="38" viewBox="0 0 24 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 2px 8px rgba(0, 242, 254, 0.7));">
-        <path d="M12 0C5.37258 0 0 5.37258 0 12C0 19.5 12 28 12 28C12 28 24 19.5 24 12C24 5.37258 18.6274 0 12 0Z" fill="#00F2FE"/>
-        <circle cx="12" cy="11" r="6" fill="#0A0F1D"/>
-        <path d="M12.5 6.5L9.5 11.5H12L11.5 15.5L14.5 10.5H12L12.5 6.5Z" fill="#00F2FE"/>
+    <div style="position: relative; width: 34px; height: 42px; display: flex; align-items: center; justify-content: center; cursor: grab;">
+      <svg width="34" height="42" viewBox="0 0 24 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 10px rgba(0, 242, 254, 0.8));">
+        <path d="M12 0C5.37258 0 0 5.37258 0 12C0 19.5 12 28 12 28C12 28 24 19.5 24 12C24 5.37258 18.6274 0 12 0Z" fill="#00F2FE" stroke="#FFFFFF" stroke-width="1.5"/>
+        <circle cx="12" cy="11" r="6.5" fill="#0A0F1D"/>
+        <path d="M12.5 6L9.5 11.5H12L11.5 16L14.5 10.5H12L12.5 6Z" fill="#00F2FE"/>
       </svg>
     </div>
   `,
-  iconSize: [32, 38],
-  iconAnchor: [16, 38],
-  popupAnchor: [0, -38],
+  iconSize: [34, 42],
+  iconAnchor: [17, 42],
+  popupAnchor: [0, -42],
 });
 
 // Giới hạn tọa độ lãnh thổ Việt Nam
@@ -47,8 +47,8 @@ export default function StationLocationPicker({
   const [lng, setLng] = useState(initialLng != null ? parseFloat(initialLng) : null);
   const [hasPin, setHasPin] = useState(initialLat != null && initialLng != null);
 
-  // Lớp bản đồ: 'dark' (OpenStreetMap tối) | 'satellite' (Esri World Imagery)
-  const [layerMode, setLayerMode] = useState('dark');
+  // Lớp bản đồ: 'street' (Đường phố rõ ràng) | 'dark' (Tối) | 'satellite' (Vệ tinh)
+  const [layerMode, setLayerMode] = useState('street');
 
   // Các trường địa chỉ phân cấp
   const [province, setProvince] = useState('');
@@ -91,22 +91,26 @@ export default function StationLocationPicker({
         touchZoom: true,
       });
 
-      // Lớp bản đồ tối: OpenStreetMap kết hợp CSS filter .map-tiles-dark
+      // 1. Lớp đường phố: Esri World Street Map (mặc định sắc nét, rõ tên đường phố)
+      const streetLayer = L.tileLayer(MAP_CONFIG.street.url, {
+        attribution: MAP_CONFIG.street.attribution,
+        maxZoom: MAP_CONFIG.street.maxZoom,
+      });
+
+      // 2. Lớp bản đồ tối: Esri Dark Gray Canvas
       const darkLayer = L.tileLayer(MAP_CONFIG.dark.url, {
         attribution: MAP_CONFIG.dark.attribution,
         maxZoom: MAP_CONFIG.dark.maxZoom,
-        className: MAP_CONFIG.dark.className,
       });
 
-      // Lớp ảnh vệ tinh: Esri World Imagery (không filter tối)
+      // 3. Lớp ảnh vệ tinh: Esri World Imagery
       const esriSatellite = L.tileLayer(MAP_CONFIG.satellite.url, {
         attribution: MAP_CONFIG.satellite.attribution,
         maxZoom: MAP_CONFIG.satellite.maxZoom,
-        className: MAP_CONFIG.satellite.className,
       });
 
-      darkLayer.addTo(map);
-      baseLayersRef.current = { dark: darkLayer, satellite: esriSatellite };
+      streetLayer.addTo(map);
+      baseLayersRef.current = { street: streetLayer, dark: darkLayer, satellite: esriSatellite };
       mapInstanceRef.current = map;
 
       // Nếu đã có tọa độ ban đầu -> cắm ghim ngay
@@ -140,15 +144,16 @@ export default function StationLocationPicker({
   // Xử lý đổi lớp nền bản đồ
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !baseLayersRef.current.dark) return;
+    if (!map || !baseLayersRef.current.street) return;
 
-    if (layerMode === 'dark') {
-      map.removeLayer(baseLayersRef.current.satellite);
-      baseLayersRef.current.dark.addTo(map);
-    } else {
-      map.removeLayer(baseLayersRef.current.dark);
-      baseLayersRef.current.satellite.addTo(map);
-    }
+    Object.values(baseLayersRef.current).forEach((layer) => {
+      if (map.hasLayer(layer)) {
+        map.removeLayer(layer);
+      }
+    });
+
+    const activeLayer = baseLayersRef.current[layerMode] || baseLayersRef.current.street;
+    activeLayer.addTo(map);
   }, [layerMode]);
 
   // Cố gắng geocode từ initialAddress khi mở trạm cũ chưa có tọa độ
@@ -238,7 +243,7 @@ export default function StationLocationPicker({
     }
 
     // Ghép địa chỉ hiện tại
-    const assembledAddr = assembleFullAddress();
+    let assembledAddr = assembleFullAddress();
 
     // Reverse geocode gợi ý địa chỉ nếu địa chỉ đang để trống
     if (!detailAddress && !province && !district && !commune) {
@@ -254,6 +259,17 @@ export default function StationLocationPicker({
       }
     }
 
+    // Đảm bảo assembledAddr không bao giờ rỗng hoặc dưới 5 ký tự để tránh lỗi 422
+    if (!assembledAddr || assembledAddr.trim().length < 5) {
+      const provName = provinceSearch?.trim() || province?.trim() || '';
+      assembledAddr = provName
+        ? `${provName} (Tọa độ: ${roundedLat.toFixed(5)}, ${roundedLng.toFixed(5)})`
+        : `Vị trí tọa độ: ${roundedLat.toFixed(5)}, ${roundedLng.toFixed(5)}`;
+      if (!detailAddress) {
+        setDetailAddress(assembledAddr);
+      }
+    }
+
     notifyParent(roundedLat, roundedLng, assembledAddr);
   };
 
@@ -263,9 +279,20 @@ export default function StationLocationPicker({
       detailAddress?.trim(),
       commune?.trim(),
       district?.trim(),
-      province?.trim(),
+      (provinceSearch || province)?.trim(),
     ].filter(Boolean);
     return parts.join(', ');
+  };
+
+  // Căn chỉnh toàn bộ bản đồ
+  const handleFitAll = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    if (lat != null && lng != null) {
+      map.flyTo([lat, lng], 16, { duration: 0.8 });
+    } else {
+      map.flyTo(MAP_CONFIG.defaultCenter, MAP_CONFIG.defaultZoom, { duration: 0.8 });
+    }
   };
 
   // Xử lý tìm kiếm & bay tới vị trí theo địa chỉ nhập
@@ -417,20 +444,55 @@ export default function StationLocationPicker({
           </span>
         </div>
 
-        {/* Nút đổi lớp bản đồ */}
-        <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
+        {/* Điều khiển lớp bản đồ & Căn chỉnh */}
+        <div className="flex items-center space-x-1.5 flex-shrink-0 ml-2">
+          {/* Nút Xem tất cả */}
           <button
             type="button"
-            onClick={() => setLayerMode(layerMode === 'dark' ? 'satellite' : 'dark')}
-            className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors flex items-center space-x-1 ${
-              layerMode === 'satellite'
-                ? 'bg-electric-cyan text-obsidian border-electric-cyan'
-                : 'bg-panel text-steel-gray border-hairline hover:text-tech-white'
-            }`}
+            onClick={handleFitAll}
+            title="Căn chỉnh toàn bộ bản đồ"
+            className="px-2 py-1 rounded text-[10px] font-bold border border-cyan-500/40 text-cyan-400 bg-cyan-950/30 hover:bg-cyan-900/40 transition-colors flex items-center space-x-1"
           >
-            <Layers className="w-3 h-3" />
-            <span>{layerMode === 'satellite' ? 'ẢNH VỆ TINH' : 'BẢN ĐỒ TỐI'}</span>
+            <Maximize2 className="w-3 h-3" />
+            <span>XEM TẤT CẢ</span>
           </button>
+
+          {/* Bộ 3 lớp bản đồ */}
+          <div className="flex items-center bg-obsidian rounded border border-hairline p-0.5 text-[10px]">
+            <button
+              type="button"
+              onClick={() => setLayerMode('street')}
+              className={`px-2 py-0.5 rounded transition-colors ${
+                layerMode === 'street'
+                  ? 'bg-electric-cyan text-obsidian font-bold'
+                  : 'text-steel-gray hover:text-tech-white'
+              }`}
+            >
+              Đường phố
+            </button>
+            <button
+              type="button"
+              onClick={() => setLayerMode('dark')}
+              className={`px-2 py-0.5 rounded transition-colors ${
+                layerMode === 'dark'
+                  ? 'bg-electric-cyan text-obsidian font-bold'
+                  : 'text-steel-gray hover:text-tech-white'
+              }`}
+            >
+              Bản đồ tối
+            </button>
+            <button
+              type="button"
+              onClick={() => setLayerMode('satellite')}
+              className={`px-2 py-0.5 rounded transition-colors ${
+                layerMode === 'satellite'
+                  ? 'bg-electric-cyan text-obsidian font-bold'
+                  : 'text-steel-gray hover:text-tech-white'
+              }`}
+            >
+              Vệ tinh
+            </button>
+          </div>
         </div>
       </div>
 

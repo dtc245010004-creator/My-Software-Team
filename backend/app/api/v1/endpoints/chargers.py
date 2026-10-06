@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,8 @@ from app.api.deps import get_optional_current_user, require_roles
 from app.core.database import get_db
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
+from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
+from app.ocpp.gateway import active_ocpp_connections
 from app.schemas.station import (
     ChargingPointCreate,
     ChargingPointResponse,
@@ -26,6 +29,112 @@ from app.services.station_service import (
 )
 
 router = APIRouter(tags=["Quản lý Trụ sạc & Cổng sạc (Chargers & Connectors)"])
+
+
+class ResetRequest(BaseModel):
+    """Payload lệnh Reset theo OCPP 1.6J."""
+
+    type: Literal["Soft", "Hard"]
+
+
+@router.post(
+    "/chargers/{code}/reset",
+    summary="Gửi lệnh Reset OCPP tới trụ sạc đang kết nối",
+)
+async def reset_charging_point(
+    code: str,
+    reset_in: ResetRequest,
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+):
+    """Chỉ Admin/Operator được gửi lệnh Reset tới trụ đang online."""
+
+    if code not in active_ocpp_connections:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Trụ sạc đang ngoại tuyến.",
+        )
+
+    try:
+        return await send_call_and_wait(
+            code,
+            "Reset",
+            {"type": reset_in.type},
+            timeout_seconds=30,
+        )
+    except ConnectionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Trụ sạc đang ngoại tuyến.",
+        ) from exc
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Trụ sạc không phản hồi lệnh Reset kịp thời.",
+        ) from exc
+    except OcppCallError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "error_code": exc.error_code,
+                "description": exc.description,
+                "details": exc.details,
+            },
+        ) from exc
+
+
+@router.get(
+    "/chargers",
+    response_model=List[ChargingPointResponse],
+    summary="Lấy danh sách tất cả trụ sạc toàn hệ thống hoặc theo bộ lọc (Màn hình lưới theo dõi)",
+)
+def list_chargers(
+    station_id: Optional[int] = Query(None, description="Lọc theo ID trạm sạc"),
+    status: Optional[str] = Query(None, description="Lọc theo trạng thái vận hành"),
+    search: Optional[str] = Query(
+        None, description="Tìm theo mã EVSE ID, hãng hoặc model"
+    ),
+    skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+    limit: int = Query(100, ge=1, le=500, description="Số bản ghi tối đa"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lấy danh sách trụ sạc phục vụ màn hình lưới theo dõi trạng thái:
+    - ADMIN: Xem tất cả trụ sạc trong toàn hệ thống.
+    - OPERATOR: Xem các trụ sạc thuộc các trạm do mình sở hữu/quản lý.
+    - CUSTOMER / Khách vãng lai: Xem các trụ sạc đang hoạt động (is_active=True).
+    """
+    query = db.query(ChargingPoint)
+
+    if current_user and current_user.role == "OPERATOR":
+        query = query.join(Station).filter(Station.operator_id == current_user.id)
+    elif current_user and current_user.role == "ADMIN":
+        pass
+    else:
+        query = query.filter(ChargingPoint.is_active.is_(True))
+
+    if station_id is not None:
+        query = query.filter(ChargingPoint.station_id == station_id)
+
+    if status:
+        query = query.filter(ChargingPoint.status == status.upper())
+
+    if search:
+        search_term = f"%{search.strip()}%"
+        query = query.filter(
+            ChargingPoint.code.ilike(search_term)
+            | ChargingPoint.vendor.ilike(search_term)
+            | ChargingPoint.model.ilike(search_term)
+        )
+
+    chargers = (
+        query.order_by(ChargingPoint.station_id.asc(), ChargingPoint.id.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return [enrich_charger_response(c) for c in chargers]
 
 
 @router.post(
@@ -187,7 +296,21 @@ async def update_charger_status(
 
     verify_charger_ownership(charger, current_user)
 
-    charger.status = status_in.status
+    new_status = status_in.status
+    charger.status = new_status
+
+    # Đồng bộ trạng thái cascade cho các cổng sạc (Connectors) trực thuộc
+    if new_status in ("UNAVAILABLE", "FAULTED"):
+        # Chuyển các connector không đang sạc sang cùng trạng thái bảo trì/lỗi
+        for conn in charger.connectors:
+            if conn.status != "CHARGING":
+                conn.status = new_status
+    elif new_status == "AVAILABLE":
+        # Khi đưa trụ về AVAILABLE, mở lại các cổng đang UNAVAILABLE
+        for conn in charger.connectors:
+            if conn.status == "UNAVAILABLE":
+                conn.status = "AVAILABLE"
+
     db.commit()
     db.refresh(charger)
 

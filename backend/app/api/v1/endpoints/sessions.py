@@ -10,6 +10,7 @@ from app.models.station import ChargingPoint, Connector
 from app.models.user import User
 from app.schemas.session import (
     ForceCloseSessionRequest,
+    RemoteStopRequest,
     SessionResponse,
     SessionStartRequest,
     SessionStopRequest,
@@ -18,6 +19,7 @@ from app.schemas.session import (
 )
 from app.services.session_service import (
     force_close_abnormal_session,
+    remote_stop_charging_session,
     start_charging_session,
     stop_charging_session,
 )
@@ -268,6 +270,35 @@ def stop_session_endpoint(
         session_id=session_id,
         meter_stop_kwh=stop_in.meter_stop_kwh,
         stop_reason=stop_in.stop_reason or "USER_STOPPED",
+    )
+
+
+@router.post(
+    "/{session_id}/remote-stop",
+    response_model=SessionResponse,
+    summary="Dừng phiên sạc từ xa bằng RemoteStopTransaction (S-23 / T-49: Vận hành viên & Quản trị)",
+)
+def remote_stop_session_endpoint(
+    session_id: int,
+    payload: Optional[RemoteStopRequest] = None,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    S-23 / T-49: Vận hành viên dừng phiên sạc từ xa bằng RemoteStopTransaction.
+    - Ràng buộc kỹ thuật (NFR): Chỉ vai trò Vận hành viên (OPERATOR) và Quản trị viên (ADMIN) mới được gọi.
+    - Xử lý 3 ca lỗi của S-23:
+      * Trụ ngoại tuyến (Offline) -> 400 CHARGER_OFFLINE
+      * Trụ từ chối (Rejected) -> 409 CHARGER_REJECTED
+      * Hết thời gian chờ (Timeout) -> 504 CHARGER_TIMEOUT
+    - Ca thành công: Chốt số kWh với stop_reason='Remote', chuyển status='COMPLETED' không cần tải lại.
+    """
+    simulate_cond = payload.simulate_condition if payload else None
+    return remote_stop_charging_session(
+        db=db,
+        user=current_user,
+        session_id=session_id,
+        simulate_condition=simulate_cond,
     )
 
 

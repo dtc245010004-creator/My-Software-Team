@@ -8,6 +8,15 @@ import {
   Zap,
   Layers,
   ArrowRight,
+  StopCircle,
+  Clock,
+  AlertTriangle,
+  WifiOff,
+  CheckCircle2,
+  XCircle,
+  AlertOctagon,
+  RotateCcw,
+  Loader2,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +30,21 @@ export default function Sessions() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedSession, setSelectedSession] = useState(null);
+
+  // S-23 / SCRUM-146: NFR RBAC — Chỉ vai trò Vận hành viên (OPERATOR) và Quản trị viên (ADMIN) mới thấy nút dừng
+  const canRemoteStop = role === 'ADMIN' || role === 'OPERATOR';
+  const [stoppingSessionId, setStoppingSessionId] = useState(null);
+  const [stopElapsedSeconds, setStopElapsedSeconds] = useState(0);
+  const [selectedSimCondition, setSelectedSimCondition] = useState('NORMAL');
+  const [remoteStopModalSession, setRemoteStopModalSession] = useState(null);
+  const [alertNotification, setAlertNotification] = useState(null);
+  const timerIntervalRef = React.useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, []);
 
   // Chế độ xem: 'DETAIL' | 'GROUP_DATE' | 'GROUP_STATION' | 'GROUP_MONTH'
   const [viewMode, setViewMode] = useState('DETAIL');
@@ -125,6 +149,128 @@ export default function Sessions() {
     }
   };
 
+  // Lấy danh sách các phiên đang hoạt động (ACTIVE)
+  const activeSessions = useMemo(() => {
+    return sessions.filter((s) => s.status === 'ACTIVE');
+  }, [sessions]);
+
+  // S-23 / SCRUM-146: Hàm dừng phiên từ xa (RemoteStopTransaction)
+  const handleRemoteStop = async (sessionToStop, condition = selectedSimCondition) => {
+    if (!sessionToStop) return;
+    const sessionId = sessionToStop.id;
+    setStoppingSessionId(sessionId);
+    setStopElapsedSeconds(0);
+    setAlertNotification(null);
+    setRemoteStopModalSession(null);
+
+    // Khởi động đồng hồ đếm thời gian thực
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    timerIntervalRef.current = setInterval(() => {
+      setStopElapsedSeconds((s) => s + 1);
+    }, 1000);
+
+    try {
+      const payload = {};
+      if (condition && condition !== 'NORMAL') {
+        payload.simulate_condition = condition;
+      }
+
+      let res;
+      if (condition === 'TIMEOUT') {
+        // Mô phỏng chờ đồng hồ hiển thị 2.5 giây rồi ném lỗi Timeout
+        await new Promise((r) => setTimeout(r, 2500));
+        res = await api.post(`/sessions/${sessionId}/remote-stop`, { simulate_condition: 'TIMEOUT' });
+      } else {
+        const [apiRes] = await Promise.all([
+          api.post(`/sessions/${sessionId}/remote-stop`, payload),
+          new Promise((r) => setTimeout(r, 800)), // Đảm bảo đồng hồ chạy ít nhất 1 nhịp
+        ]);
+        res = apiRes;
+      }
+
+      // Ca thành công:
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+      setStoppingSessionId(null);
+
+      const updated = res.data;
+      // Cập nhật phiên chuyển sang đã kết thúc KHÔNG CẦN TẢI LẠI TRANG
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId
+            ? {
+                ...s,
+                ...updated,
+                status: 'COMPLETED',
+                stop_reason: updated.stop_reason || 'Remote',
+              }
+            : s
+        )
+      );
+
+      setAlertNotification({
+        type: 'success',
+        title: 'DỪNG PHIÊN THÀNH CÔNG (REMOTE)',
+        message: `Phiên sạc #${sessionId} đã dừng từ xa thành công với lý do "Remote" và chuyển sang trạng thái ĐÃ KẾT THÚC.`,
+      });
+    } catch (err) {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+      setStoppingSessionId(null);
+
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail || err.message;
+
+      // Ba ca lỗi của S-23 hiển thị đúng 3 thông báo khác nhau:
+      if (
+        condition === 'REJECTED' ||
+        status === 409 ||
+        detail.includes('từ chối') ||
+        detail.includes('Rejected')
+      ) {
+        // Ca 1: Trụ từ chối
+        setAlertNotification({
+          type: 'warning',
+          title: 'TRỤ SẠC TỪ CHỐI LỆNH DỪNG (REJECTED)',
+          message: 'Trụ sạc từ chối lệnh dừng (Rejected). Phiên sạc vẫn đang tiếp tục hoạt động.',
+          code: 'REJECTED',
+        });
+      } else if (
+        condition === 'OFFLINE' ||
+        (status === 400 && detail.includes('ngoại tuyến')) ||
+        detail.includes('Offline')
+      ) {
+        // Ca 2: Trụ ngoại tuyến
+        setAlertNotification({
+          type: 'error',
+          title: 'TRỤ SẠC NGOẠI TUYẾN (OFFLINE)',
+          message: 'Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa, vui lòng kiểm tra kết nối mạng của trụ.',
+          code: 'OFFLINE',
+        });
+      } else if (
+        condition === 'TIMEOUT' ||
+        status === 504 ||
+        status === 408 ||
+        detail.includes('hết thời gian') ||
+        detail.includes('Timeout')
+      ) {
+        // Ca 3: Hết thời gian chờ
+        setAlertNotification({
+          type: 'error',
+          title: 'HẾT THỜI GIAN CHỜ PHẢN HỒI (TIMEOUT)',
+          message: 'Hết thời gian chờ phản hồi từ trụ sạc (Timeout). Phiên sạc đã được đánh dấu cần xem xét kỹ thuật.',
+          code: 'TIMEOUT',
+        });
+      } else {
+        setAlertNotification({
+          type: 'error',
+          title: 'LỖI GỬI LỆNH DỪNG',
+          message: detail,
+        });
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Tiêu đề & Thông số tổng quan */}
@@ -223,6 +369,149 @@ export default function Sessions() {
           </div>
         </div>
       </div>
+
+      {/* Thông báo kết quả dừng từ xa (S-23 / SCRUM-146) */}
+      {alertNotification && (
+        <div
+          id="remote-stop-alert-banner"
+          className={`p-4 rounded-sm border font-mono text-xs flex items-start justify-between shadow-lg transition-all ${
+            alertNotification.type === 'success'
+              ? 'bg-grid-green/10 border-grid-green/40 text-grid-green'
+              : alertNotification.type === 'warning'
+              ? 'bg-caution-amber/10 border-caution-amber/40 text-caution-amber'
+              : 'bg-critical-red/10 border-critical-red/40 text-critical-red'
+          }`}
+        >
+          <div className="flex items-start space-x-3">
+            <div className="mt-0.5">
+              {alertNotification.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-grid-green shrink-0" />
+              ) : alertNotification.code === 'OFFLINE' ? (
+                <WifiOff className="w-5 h-5 text-critical-red shrink-0" />
+              ) : alertNotification.code === 'TIMEOUT' ? (
+                <Clock className="w-5 h-5 text-critical-red shrink-0" />
+              ) : (
+                <AlertOctagon className="w-5 h-5 text-caution-amber shrink-0" />
+              )}
+            </div>
+            <div>
+              <div className="font-bold text-sm tracking-wide mb-1">
+                {alertNotification.title}
+              </div>
+              <p className="text-tech-white leading-relaxed">{alertNotification.message}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setAlertNotification(null)}
+            className="p-1 hover:bg-white/10 rounded text-steel-gray hover:text-tech-white transition-colors ml-3"
+            title="Đóng thông báo"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Màn hình giám sát phiên đang chạy & Nút dừng từ xa (S-23 / T-48 / T-50) */}
+      {canRemoteStop && activeSessions.length > 0 && (
+        <div className="bg-panel border border-electric-cyan/40 p-4 rounded-sm space-y-3 font-mono">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-hairline pb-2.5">
+            <div className="flex items-center space-x-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-electric-cyan opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-electric-cyan"></span>
+              </span>
+              <span className="font-bold text-xs text-tech-white tracking-wider uppercase">
+                Giám Sát Phiên Đang Sạc & Lệnh Dừng Từ Xa (RemoteStopTransaction)
+              </span>
+              <span className="text-[10px] bg-electric-cyan/20 text-electric-cyan px-2 py-0.5 rounded font-bold">
+                {activeSessions.length} phiên đang chạy
+              </span>
+            </div>
+
+            {/* Điều khiển kịch bản kiểm thử mô phỏng */}
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="text-steel-gray text-[11px]">Chế độ thử nghiệm:</span>
+              <select
+                id="sim-condition-select"
+                value={selectedSimCondition}
+                onChange={(e) => setSelectedSimCondition(e.target.value)}
+                className="bg-obsidian border border-hairline text-tech-white rounded px-2 py-1 text-xs focus:outline-none focus:border-electric-cyan font-mono"
+              >
+                <option value="NORMAL">✅ Bình thường (Thành công)</option>
+                <option value="REJECTED">⚠️ Ca 1: Trụ từ chối (Rejected)</option>
+                <option value="OFFLINE">🚫 Ca 2: Trụ ngoại tuyến (Offline)</option>
+                <option value="TIMEOUT">⏱️ Ca 3: Hết thời gian chờ (Timeout)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {activeSessions.map((actSess) => {
+              const isStoppingThis = stoppingSessionId === actSess.id;
+
+              return (
+                <div
+                  key={actSess.id}
+                  className="bg-obsidian border border-hairline p-3.5 rounded flex flex-col justify-between space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-tech-white text-sm">#SES-{actSess.id}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-electric-cyan/20 text-electric-cyan animate-pulse">
+                          CHARGING
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-steel-gray mt-1">
+                        Trụ: <span className="text-tech-white font-bold">{actSess.charger_code || 'EVSE-1'}</span> (Cổng #{actSess.connector_id})
+                        {actSess.station_name && <span> — {actSess.station_name}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[11px] text-steel-gray">Điện năng nạp:</div>
+                      <div className="text-base font-bold text-electric-cyan tabular-nums">
+                        {Number(actSess.total_kwh || 0).toFixed(2)} kWh
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Nút dừng từ xa có đồng hồ đếm */}
+                  <div className="flex items-center justify-between border-t border-hairline pt-2.5">
+                    <div className="text-[11px] text-steel-gray">
+                      Bắt đầu: {formatVNDateTime(actSess.start_time)}
+                    </div>
+
+                    <button
+                      id={`live-remote-stop-btn-${actSess.id}`}
+                      onClick={() => handleRemoteStop(actSess)}
+                      disabled={isStoppingThis}
+                      className={`px-3 py-1.5 rounded text-xs font-bold border transition-all inline-flex items-center space-x-2 shadow-sm ${
+                        isStoppingThis
+                          ? 'bg-critical-red/25 border-critical-red text-critical-red cursor-wait'
+                          : 'bg-critical-red/20 border-critical-red/60 hover:bg-critical-red hover:text-white text-critical-red'
+                      }`}
+                    >
+                      {isStoppingThis ? (
+                        <>
+                          <Clock className="w-3.5 h-3.5 animate-spin text-critical-red" />
+                          <span className="font-mono">
+                            Đang dừng... ({String(Math.floor(stopElapsedSeconds / 60)).padStart(2, '0')}:{String(stopElapsedSeconds % 60).padStart(2, '0')} / 02:00)
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <StopCircle className="w-3.5 h-3.5" />
+                          <span>Dừng phiên từ xa</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* View Mode Switcher for Admin & Operator */}
       {(role === 'ADMIN' || role === 'OPERATOR') && (
@@ -436,12 +725,41 @@ export default function Sessions() {
                           {formatVNDateTime(sess.start_time)}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => setSelectedSession(sess)}
-                            className="px-2 py-1 rounded bg-obsidian border border-hairline hover:bg-hairline text-steel-gray hover:text-tech-white text-[11px]"
-                          >
-                            Hóa đơn
-                          </button>
+                          <div className="flex items-center justify-end space-x-1.5">
+                            {isActive && canRemoteStop && (
+                              <button
+                                id={`remote-stop-btn-${sess.id}`}
+                                onClick={() => handleRemoteStop(sess)}
+                                disabled={stoppingSessionId === sess.id}
+                                className={`px-2.5 py-1 rounded text-[11px] font-bold border transition-all inline-flex items-center space-x-1 ${
+                                  stoppingSessionId === sess.id
+                                    ? 'bg-critical-red/25 border-critical-red text-critical-red cursor-wait'
+                                    : 'bg-critical-red/15 border-critical-red/40 hover:bg-critical-red hover:text-white text-critical-red'
+                                }`}
+                                title="Dừng phiên sạc từ xa (RemoteStopTransaction)"
+                              >
+                                {stoppingSessionId === sess.id ? (
+                                  <>
+                                    <Clock className="w-3 h-3 animate-spin text-critical-red" />
+                                    <span className="font-mono">
+                                      {String(Math.floor(stopElapsedSeconds / 60)).padStart(2, '0')}:{String(stopElapsedSeconds % 60).padStart(2, '0')}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <StopCircle className="w-3 h-3" />
+                                    <span>Dừng từ xa</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSelectedSession(sess)}
+                              className="px-2 py-1 rounded bg-obsidian border border-hairline hover:bg-hairline text-steel-gray hover:text-tech-white text-[11px]"
+                            >
+                              Hóa đơn
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

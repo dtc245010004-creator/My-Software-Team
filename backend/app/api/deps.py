@@ -147,3 +147,10 @@ def get_optional_current_user(
     except (jwt.PyJWTError, TypeError, ValueError) as exc:
         logger.debug("Token tùy chọn không hợp lệ; xem như chưa đăng nhập: %s", exc)
     return None
+
+
+# Compatibility alias for tests
+get_current_active_user = get_current_user
+
+
+get_current_active_user = get_current_user

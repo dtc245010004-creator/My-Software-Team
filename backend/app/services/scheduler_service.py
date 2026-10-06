@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import func
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.core.websocket import ws_manager
+from app.models.ocpp_message import OcppMessage
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.services.ai_service import AIService, latest_smart_charging_cache
@@ -293,6 +295,33 @@ async def record_station_power_metrics_minute_job(db: Session = None):
             db.close()
 
 
+def cleanup_old_ocpp_messages_job(db: Session = None) -> int:
+    """Xóa các phản hồi OCPP đã lưu quá 7 ngày."""
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        deleted_count = (
+            db.query(OcppMessage)
+            .filter(OcppMessage.created_at < cutoff)
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+        if deleted_count:
+            logger.info("Đã xóa %s bản ghi OCPP quá 7 ngày", deleted_count)
+        return deleted_count
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Lỗi dọn dẹp bản ghi OCPP cũ")
+        return 0
+    finally:
+        if should_close:
+            db.close()
+
+
 def start_scheduler():
     """Khởi động bộ lập lịch APScheduler."""
     if not scheduler.running:
@@ -310,6 +339,14 @@ def start_scheduler():
             "interval",
             minutes=1,
             id="record_station_power_metrics_minute",
+            replace_existing=True,
+        )
+        # Job 3: Dọn phản hồi OCPP cũ hằng ngày, giữ khóa trong 7 ngày.
+        scheduler.add_job(
+            cleanup_old_ocpp_messages_job,
+            "interval",
+            hours=24,
+            id="cleanup_old_ocpp_messages",
             replace_existing=True,
         )
         scheduler.start()

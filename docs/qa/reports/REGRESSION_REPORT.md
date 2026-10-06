@@ -53,5 +53,38 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 
 ## 5. Trạng thái Hồi quy Tổng thể (Regression Status)
 
-* **Trạng thái**: **PASSED (Xanh toàn bộ)**.
-* **Kết luận**: Bản build hiện tại hoàn toàn ổn định về mặt logic hồi quy. Các thay đổi về hạn mức tài chính, bảo vệ chống vét cạn tài khoản và khung staging đã được tích hợp trọn vẹn vào hệ thống mà không làm phương hại đến bất kỳ tính năng sẵn có nào.
+* **Trạng thái lần chạy gần nhất (30/09/2026)**: **PASSED**.
+* **Kết luận lần chạy đó**: Các thay đổi về hạn mức tài chính, bảo vệ đăng nhập và khung staging không gây lỗi hồi quy trong phạm vi bộ test đã chạy. Kết quả này không bao gồm thay đổi OCPP ngày 01/10/2026.
+
+## 6. Kiểm chứng sau thay đổi khung OCPP (01/10/2026)
+
+* **Kiểm thử chọn lọc**: `backend/tests/test_ocpp_frames.py` đạt 20 passed khi chạy độc lập.
+* **Hồi quy toàn bộ cho lần thay đổi này**: 140 passed, 1 warning; kết quả bao gồm các test OCPP mới. Test chạy trong `backend/.venv` từ thư mục tạm để không ghi đè các file test DB có sẵn.
+
+## 7. Kiểm chứng sau gateway OCPP và BootNotification (01/10/2026)
+
+* **Kiểm thử chọn lọc**: `backend/tests/test_boot_notification.py` có 8 ca WebSocket cho Boot, trạm inactive, Boot lặp, SecurityError, heartbeat cấu hình được, mã trụ lạ và trường tùy chọn thiếu.
+* **Hồi quy toàn bộ**: 148 passed, 1 warning trong 110.56 giây; kết quả bao gồm 20 ca frame và 8 ca gateway OCPP. Chạy trong thư mục tạm dưới `backend/.venv` để giữ nguyên các DB test có sẵn.
+
+## 8. Kiểm chứng sau idempotency OCPP (01/10/2026)
+
+* **Kiểm thử chọn lọc**: `backend/tests/test_ocpp_idempotency.py` đạt 4 passed; xác minh phát lại response từ CSDL, session mới, cảnh báo action không khớp và cleanup quá 7 ngày.
+* **Hồi quy toàn bộ**: 152 passed, 1 warning trong 116.35 giây; có 32 ca OCPP. Suite chạy trong thư mục cô lập dưới `backend/.venv` để tránh ảnh hưởng các DB test có sẵn.
+
+## 9. Kiểm chứng sau Authorize OCPP và idTag (01/10/2026)
+
+* **Kiểm thử chọn lọc**: `test_authorize.py` đạt 6 passed; các suite Authorize, BootNotification và idempotency đạt 18 passed.
+* **Hồi quy toàn bộ**: 158 passed, 1 warning trong 117.08 giây; có 38 ca OCPP. Suite chạy trong thư mục cô lập dưới `backend/.venv`.
+* **Warning**: `FutureWarning` có sẵn từ `google.generativeai` trong `app/services/ai_service.py`.
+
+## 10. Kiểm chứng sau dispatcher và API Reset OCPP (01/10/2026)
+
+* **Kiểm thử chọn lọc**: `test_ocpp_reset.py` đạt 5 passed; kiểm tra CALLRESULT/CALLERROR theo ID, CALL khác vẫn xử lý trong khi chờ, offline, timeout và RBAC.
+* **Hồi quy toàn bộ**: 163 passed, 1 warning trong 122.08 giây; có 43 ca OCPP.
+* **Warning**: `FutureWarning` có sẵn từ `google.generativeai` trong `app/services/ai_service.py`.
+
+## 11. Sửa lỗi Admin Demo 1-Click (01/10/2026)
+
+* **Thay đổi**: `DEMO_USERS.ADMIN` và `AuthContext.quickSwitch()` dùng chung credential `admin / 12345678a`, trùng với tài khoản admin trong `backend/seed_data.py`.
+* **Kiểm chứng build**: `npm --prefix frontend run build` trên host bị chặn do `'vite' is not recognized`; `docker compose -f docker-compose.staging.yml build frontend` thành công và container frontend được cập nhật.
+* **Điều tra / xác minh đăng nhập**: Các POST login trong log trả 403; DB cho thấy `failed_login_attempts = 5` và `locked_until` còn hiệu lực. Đã xóa khóa tạm cho `admin`. Gửi một lần đăng nhập API với `admin / 12345678a` nhận HTTP 200, username `admin`, role `ADMIN` (không ghi token ra output).
