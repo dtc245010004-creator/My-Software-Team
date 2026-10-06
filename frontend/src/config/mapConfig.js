@@ -1,27 +1,28 @@
 /**
  * Cấu hình tập trung cho các lớp bản đồ (Tile Layers) trong hệ thống EV CSMS
- * Sử dụng OpenStreetMap chuẩn cộng đồng 100% miễn phí, không bao giờ yêu cầu API Key.
+ * Sử dụng dịch vụ Esri ArcGIS toàn cầu: 100% miễn phí, tốc độ cao, không bao giờ cần API Key,
+ * không bị lỗi chặn DNS mạng nội bộ như OpenStreetMap và không có watermark như Carto.
  */
 export const MAP_CONFIG = {
-  // 1. Bản đồ sáng: OpenStreetMap tiêu chuẩn - sắc nét, miễn phí, không cần API Key
+  // 1. Bản đồ sáng: Esri World Street Map - Tên đường, địa danh Việt Nam cực kỳ sắc nét & chi tiết
   light: {
     name: 'Bản đồ Sáng',
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
     maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom',
     className: '',
   },
 
-  // 2. Bản đồ tối: OpenStreetMap kết hợp bộ lọc Dark CSS Filter - đồng bộ với dark theme
+  // 2. Bản đồ tối: Esri Dark Gray Canvas - Bản đồ nền tối công nghệ chính thức của ArcGIS
   dark: {
     name: 'Bản đồ Tối',
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
-    className: 'map-tiles-dark',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    maxZoom: 16,
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+    className: '',
   },
 
-  // 3. Ảnh vệ tinh: Esri World Imagery (miễn phí)
+  // 3. Ảnh vệ tinh: Esri World Imagery (độ phân giải cao)
   satellite: {
     name: 'Ảnh Vệ Tinh',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
