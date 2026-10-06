@@ -14,9 +14,17 @@ import {
   AlertTriangle,
   Clock,
   Layers,
+  X,
+  MapPinOff,
 } from 'lucide-react';
 import api from '../services/api';
 import { MAP_CONFIG } from '../config/mapConfig';
+import { useTheme } from '../context/ThemeContext';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
+import Skeleton from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 
 // Danh sách thành phố chọn nhanh khi không có GPS
 const QUICK_CITIES = [
@@ -25,61 +33,64 @@ const QUICK_CITIES = [
   { name: 'TP. Hồ Chí Minh', lat: 10.7769, lon: 106.7009 },
 ];
 
-// Tạo marker vị trí người dùng
+// Tạo marker vị trí người dùng với hiệu ứng sóng radar 3D
 function createUserLocationIcon() {
   const html = `
-    <div style="position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-      <div style="position: absolute; width: 26px; height: 26px; border-radius: 50%; background: rgba(14, 165, 233, 0.3); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-      <div style="width: 14px; height: 14px; border-radius: 50%; background: #0EA5E9; border: 2.5px solid #FFFFFF; box-shadow: 0 0 10px #0EA5E9;"></div>
+    <div style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+      <div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; background: rgba(2, 132, 199, 0.25); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+      <div style="position: absolute; width: 22px; height: 22px; border-radius: 50%; background: rgba(2, 132, 199, 0.4);"></div>
+      <div style="width: 14px; height: 14px; border-radius: 50%; background: #0284C7; border: 3px solid #FFFFFF; box-shadow: 0 2px 8px rgba(2, 132, 199, 0.8);"></div>
     </div>
   `;
   return L.divIcon({
     className: 'user-gps-marker',
     html: html,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
   });
 }
 
-// Tạo marker trạm sạc
+// Tạo marker trạm sạc với bóng đổ 3D và màu sắc theo trạng thái
 function createStationMarkerIcon(st, isSelected) {
   const hasAvailable = (st.charging_points || []).some(
     (cp) => cp.status === 'AVAILABLE' && (cp.connectors || []).some((c) => c.status === 'AVAILABLE')
   );
   const isMaintenance = st.status === 'MAINTENANCE';
 
-  let color = '#10B981'; // Xanh lá: có trụ sẵn sàng
+  let color = '#10B981'; // Xanh ngọc: có trụ sẵn sàng
   if (isMaintenance) {
-    color = '#F59E0B'; // Vàng: đang bảo trì
+    color = '#F59E0B'; // Vàng hổ phách: đang bảo trì
   } else if (!hasAvailable) {
-    color = '#0EA5E9'; // Xanh dương / đang bận
+    color = '#0284C7'; // Xanh dương: đang kín tải
   }
 
-  const borderStroke = isSelected ? '#FFFFFF' : '#0B0F17';
-  const size = isSelected ? 42 : 34;
+  const borderStroke = isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.85)';
+  const size = isSelected ? 44 : 36;
+  const shadowSpread = isSelected ? '0 8px 16px' : '0 4px 10px';
 
   const html = `
-    <div style="position: relative; width: ${size}px; height: ${size + 6}px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s;">
-      <svg width="${size}" height="${size + 6}" viewBox="0 0 24 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 6px ${color}88);">
-        <path d="M12 0C5.37258 0 0 5.37258 0 12C0 19.5 12 28 12 28C12 28 24 19.5 24 12C24 5.37258 18.6274 0 12 0Z" fill="${color}" stroke="${borderStroke}" stroke-width="${isSelected ? '2.5' : '1.2'}"/>
-        <circle cx="12" cy="11" r="5.5" fill="#0B0F17"/>
-        <path d="M12.5 6.5L9.5 11.5H12L11.5 15.5L14.5 10.5H12L12.5 6.5Z" fill="${color}"/>
+    <div style="position: relative; width: ${size}px; height: ${size + 8}px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s cubic-bezier(0.2,0,0,1);">
+      <svg width="${size}" height="${size + 8}" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(${shadowSpread} ${color}77);">
+        <path d="M12 0C5.37258 0 0 5.37258 0 12C0 20 12 30 12 30C12 30 24 20 24 12C24 5.37258 18.6274 0 12 0Z" fill="${color}" stroke="${borderStroke}" stroke-width="${isSelected ? '2.5' : '1.5'}"/>
+        <circle cx="12" cy="11.5" r="6" fill="#FFFFFF"/>
+        <path d="M12.5 7L9.5 12H12L11.5 16L14.5 11H12L12.5 7Z" fill="${color}"/>
       </svg>
-      ${isSelected ? `<div style="position: absolute; bottom: -4px; width: 6px; height: 6px; border-radius: 50%; background: #0EA5E9; box-shadow: 0 0 6px #0EA5E9;"></div>` : ''}
+      ${isSelected ? `<div style="position: absolute; bottom: -2px; width: 8px; height: 8px; border-radius: 50%; background: #0284C7; box-shadow: 0 0 8px #0284C7;"></div>` : ''}
     </div>
   `;
 
   return L.divIcon({
     className: `station-marker ${isSelected ? 'selected' : ''}`,
     html: html,
-    iconSize: [size, size + 6],
-    iconAnchor: [size / 2, size + 6],
-    popupAnchor: [0, -(size + 4)],
+    iconSize: [size, size + 8],
+    iconAnchor: [size / 2, size + 8],
+    popupAnchor: [0, -(size + 6)],
   });
 }
 
 export default function DriverMap() {
   const navigate = useNavigate();
+  const { isDark } = useTheme();
 
   // Tọa độ người dùng và trạng thái định vị
   const [userCoords, setUserCoords] = useState(null);
@@ -97,6 +108,7 @@ export default function DriverMap() {
   // Tham chiếu Leaflet Map
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const tileLayerRef = useRef(null);
   const markersRef = useRef({});
   const userMarkerRef = useRef(null);
 
@@ -126,7 +138,6 @@ export default function DriverMap() {
       (error) => {
         console.warn('Lỗi định vị GPS:', error.message);
         setGpsStatus('denied');
-        // Fallback về TP. Hồ Chí Minh
         const fallback = QUICK_CITIES[2];
         setUserCoords({ lat: fallback.lat, lon: fallback.lon });
         setLocationName(fallback.name + ' (Vị trí tạm)');
@@ -184,11 +195,12 @@ export default function DriverMap() {
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // Thêm TileLayer từ config
-      L.tileLayer(MAP_CONFIG.dark.url, {
-        maxZoom: MAP_CONFIG.dark.maxZoom,
-        attribution: MAP_CONFIG.dark.attribution,
-        className: MAP_CONFIG.dark.className,
+      // Thiết lập Tile Layer ban đầu theo theme
+      const tileConfig = isDark ? MAP_CONFIG.dark : MAP_CONFIG.light;
+      tileLayerRef.current = L.tileLayer(tileConfig.url, {
+        subdomains: tileConfig.subdomains || 'abc',
+        maxZoom: tileConfig.maxZoom,
+        attribution: tileConfig.attribution,
       }).addTo(map);
 
       mapInstanceRef.current = map;
@@ -198,6 +210,23 @@ export default function DriverMap() {
       // Giữ nguyên instance
     };
   }, []);
+
+  // Đổi Tile Layer khi chuyển chế độ Sáng / Tối
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current);
+    }
+
+    const tileConfig = isDark ? MAP_CONFIG.dark : MAP_CONFIG.light;
+    tileLayerRef.current = L.tileLayer(tileConfig.url, {
+      subdomains: tileConfig.subdomains || 'abc',
+      maxZoom: tileConfig.maxZoom,
+      attribution: tileConfig.attribution,
+    }).addTo(map);
+  }, [isDark]);
 
   // Cập nhật marker vị trí người dùng trên bản đồ
   useEffect(() => {
@@ -209,11 +238,11 @@ export default function DriverMap() {
         icon: createUserLocationIcon(),
         zIndexOffset: 1000,
       }).addTo(map);
-      marker.bindPopup(`<div style="font-family: monospace; font-size: 11px;"><b>${locationName}</b></div>`);
+      marker.bindPopup(`<div style="font-size: 13px; font-weight: 600; padding: 2px;">📍 ${locationName}</div>`);
       userMarkerRef.current = marker;
     } else {
       userMarkerRef.current.setLatLng([userCoords.lat, userCoords.lon]);
-      userMarkerRef.current.setPopupContent(`<div style="font-family: monospace; font-size: 11px;"><b>${locationName}</b></div>`);
+      userMarkerRef.current.setPopupContent(`<div style="font-size: 13px; font-weight: 600; padding: 2px;">📍 ${locationName}</div>`);
     }
 
     // Bay bản đồ đến vị trí người dùng
@@ -240,7 +269,7 @@ export default function DriverMap() {
         zIndexOffset: isSelected ? 500 : 100,
       }).addTo(map);
 
-      // Nội dung popup trạm
+      // Nội dung popup trạm hiện đại
       const availableChargers = (st.charging_points || []).filter(
         (cp) => cp.status === 'AVAILABLE'
       ).length;
@@ -248,20 +277,26 @@ export default function DriverMap() {
       const distText = st.distance_km != null ? `${st.distance_km.toFixed(1)} km` : '';
 
       const popupContent = `
-        <div style="font-family: monospace; font-size: 11px; min-width: 180px; color: #0B0F17;">
-          <div style="font-weight: bold; font-size: 12px; margin-bottom: 2px;">${st.name}</div>
-          <div style="color: #475569; font-size: 10px; margin-bottom: 6px;">${st.address}</div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-            <span>Khoảng cách:</span>
-            <span style="font-weight: bold; color: #0EA5E9;">${distText || 'N/A'}</span>
+        <div style="min-width: 210px; font-family: 'Inter', sans-serif;">
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 2px; color: ${isDark ? '#F1F5F9' : '#0F172A'};">
+            ${st.name}
           </div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-            <span>Trụ khả dụng:</span>
-            <span style="font-weight: bold; color: ${availableChargers > 0 ? '#10B981' : '#F59E0B'};">${availableChargers}/${totalChargers} trụ</span>
+          <div style="color: ${isDark ? '#94A3B8' : '#64748B'}; font-size: 12px; margin-bottom: 8px; line-height: 1.3;">
+            ${st.address || 'Không có địa chỉ chi tiết'}
           </div>
-          <div style="display: flex; gap: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px;">
+            <span style="color: ${isDark ? '#94A3B8' : '#64748B'};">Khoảng cách:</span>
+            <span style="font-weight: 700; color: #0284C7; font-family: 'JetBrains Mono', monospace;">${distText || 'N/A'}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 12px;">
+            <span style="color: ${isDark ? '#94A3B8' : '#64748B'};">Trụ sẵn sàng:</span>
+            <span style="font-weight: 700; color: ${availableChargers > 0 ? '#10B981' : '#F59E0B'};">
+              ${availableChargers}/${totalChargers} trụ
+            </span>
+          </div>
+          <div style="display: flex; gap: 6px;">
             <a href="https://www.google.com/maps/dir/?api=1&destination=${st.latitude},${st.longitude}" target="_blank" rel="noreferrer"
-               style="flex: 1; text-align: center; background: #0EA5E9; color: white; padding: 4px 6px; border-radius: 3px; text-decoration: none; font-weight: bold;">
+               style="flex: 1; text-align: center; background: #0284C7; color: white; padding: 6px 10px; border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-block;">
               Chỉ đường
             </a>
           </div>
@@ -280,9 +315,9 @@ export default function DriverMap() {
 
       markersRef.current[st.id] = marker;
     });
-  }, [stations, selectedStationId]);
+  }, [stations, selectedStationId, isDark]);
 
-  // Chọn thành phố thủ công khi GPS từ chối
+  // Chọn thành phố thủ công khi GPS từ chối hoặc người dùng muốn đổi khu vực
   const handleSelectCity = (city) => {
     setUserCoords({ lat: city.lat, lon: city.lon });
     setLocationName(`Khu vực: ${city.name}`);
@@ -326,158 +361,190 @@ export default function DriverMap() {
 
   return (
     <div className="space-y-4">
+      
       {/* Top Banner: Định vị & Chọn thành phố */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-panel border border-hairline p-3.5 rounded-sm font-mono text-xs">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 rounded bg-electric-cyan/10 border border-electric-cyan/30 text-electric-cyan">
+      <Card padding="p-4" className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 shadow-inner">
             <Compass className={`w-5 h-5 ${gpsStatus === 'locating' ? 'animate-spin' : ''}`} />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-tech-white">VỊ TRÍ TÌM KIẾM:</span>
-              <span className="text-electric-cyan font-semibold">{locationName}</span>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Vị trí tìm kiếm:
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                {locationName}
+              </span>
               {gpsStatus === 'granted' && (
-                <span className="px-1.5 py-0.2 rounded bg-grid-green/20 text-grid-green text-[10px] font-bold">
+                <Badge variant="success" dot pulse size="sm">
                   GPS LIVE
-                </span>
+                </Badge>
               )}
             </div>
-            <div className="text-[11px] text-steel-gray mt-0.5">
-              Hệ thống tự động sắp xếp các trạm sạc công cộng theo khoảng cách thực tế gần nhất
-            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Tự động sắp xếp các trạm sạc công cộng theo khoảng cách thực tế gần bạn nhất
+            </p>
           </div>
         </div>
 
-        {/* Nút chọn nhanh thành phố khi GPS bị chặn hoặc muốn đổi vị trí */}
-        <div className="flex items-center flex-wrap gap-1.5">
-          <span className="text-steel-gray text-[11px]">Khu vực:</span>
+        {/* Nút chọn nhanh khu vực & định vị lại */}
+        <div className="flex items-center flex-wrap gap-2">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Khu vực:</span>
           {QUICK_CITIES.map((city) => (
             <button
               key={city.name}
               type="button"
               onClick={() => handleSelectCity(city)}
-              className="px-2.5 py-1 rounded bg-obsidian border border-hairline hover:border-electric-cyan text-steel-gray hover:text-tech-white text-xs transition-colors"
+              className="px-3 py-1.5 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-sky-500 dark:hover:border-sky-400 hover:text-sky-600 dark:hover:text-sky-400 transition-all duration-150 shadow-sm"
             >
               {city.name}
             </button>
           ))}
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
+            icon={RotateCcw}
             onClick={detectUserLocation}
             title="Định vị lại GPS của bạn"
-            className="flex items-center space-x-1 px-2.5 py-1 rounded bg-electric-cyan/10 border border-electric-cyan/30 hover:bg-electric-cyan/20 text-electric-cyan text-xs transition-colors"
+            className="rounded-full"
           >
-            <RotateCcw className="w-3 h-3" />
-            <span>Định vị lại</span>
-          </button>
+            Định vị lại
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {/* Cảnh báo khi GPS bị từ chối */}
       {gpsStatus === 'denied' && (
-        <div className="bg-caution-amber/10 border border-caution-amber/30 p-2.5 rounded text-xs font-mono text-caution-amber flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 p-3 rounded-2xl text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <span>
-              Trình duyệt chưa cho phép truy cập vị trí GPS. Đang hiển thị trạm sạc khu vực TP. Hồ Chí Minh mặc định. Hãy chọn nhanh thành phố phía trên hoặc bấm "Định vị lại".
+              Trình duyệt chưa cho phép truy cập GPS. Đang hiển thị trạm sạc khu vực TP. Hồ Chí Minh mặc định. Bạn có thể chọn nhanh thành phố phía trên hoặc bấm "Định vị lại".
             </span>
           </div>
         </div>
       )}
 
       {/* Layout Split: Trái là Bản đồ, Phải là Danh sách trạm gần nhất */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-220px)] min-h-[580px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-220px)] min-h-[580px]">
+        
         {/* Bản đồ Leaflet tương tác */}
-        <div className="lg:col-span-7 xl:col-span-8 bg-panel border border-hairline rounded-sm overflow-hidden flex flex-col relative">
+        <div className="lg:col-span-7 xl:col-span-8 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-soft dark:shadow-soft-dark flex flex-col relative bg-slate-100 dark:bg-slate-900">
           <div
             ref={mapContainerRef}
             className="w-full h-full relative z-0"
-            style={{ background: '#0B0F17' }}
           />
 
-          {/* Map floating legend */}
-          <div className="absolute bottom-3 left-3 z-[400] bg-obsidian/90 backdrop-blur-sm border border-hairline p-2 rounded text-[11px] font-mono text-steel-gray space-y-1 shadow-lg">
-            <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-grid-green inline-block"></span>
-              <span className="text-tech-white">Có trụ sẵn sàng</span>
+          {/* Map floating legend (Glassmorphism) */}
+          <div className="absolute bottom-4 left-4 z-[400] glass-panel border border-slate-200/80 dark:border-slate-800/80 p-3 rounded-2xl text-xs text-slate-700 dark:text-slate-300 space-y-1.5 shadow-lg">
+            <div className="font-semibold text-xs text-slate-900 dark:text-white mb-1">
+              Trạng thái trạm sạc
             </div>
             <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-electric-cyan inline-block"></span>
-              <span className="text-tech-white">Đang phục vụ sạc</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+              <span>Có trụ sẵn sàng</span>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-caution-amber inline-block"></span>
-              <span className="text-tech-white">Bảo trì</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block"></span>
+              <span>Đang phục vụ sạc</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+              <span>Bảo trì kỹ thuật</span>
             </div>
           </div>
         </div>
 
         {/* Danh sách trạm sạc gần nhất */}
-        <div className="lg:col-span-5 xl:col-span-4 bg-panel border border-hairline rounded-sm flex flex-col overflow-hidden">
+        <div className="lg:col-span-5 xl:col-span-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151D2A] shadow-soft dark:shadow-soft-dark flex flex-col overflow-hidden">
+          
           {/* Header & Bộ lọc tìm kiếm */}
-          <div className="p-3 border-b border-hairline bg-obsidian space-y-2">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <NavigationIcon className="w-4 h-4 text-electric-cyan" />
-                <span className="font-bold text-xs font-mono text-tech-white uppercase">
-                  TRẠM SẠC GẦN BẠN ({filteredStations.length})
-                </span>
+                <NavigationIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                <h2 className="font-bold text-sm text-slate-900 dark:text-white">
+                  Trạm Sạc Gần Bạn ({filteredStations.length})
+                </h2>
               </div>
-              <span className="text-[10px] font-mono text-steel-gray">
-                SẮP XẾP THEO KHOẢNG CÁCH
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Sắp xếp theo khoảng cách
               </span>
             </div>
 
             {/* Input tìm kiếm */}
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-steel-gray" />
+              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
               <input
                 type="text"
                 placeholder="Tìm theo tên trạm hoặc địa chỉ..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-panel border border-hairline pl-8 pr-3 py-1.5 rounded text-xs text-tech-white focus:outline-none focus:border-electric-cyan font-mono placeholder:text-steel-gray"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 pl-9 pr-9 py-2 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 placeholder:text-slate-400 transition-all"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
-            {/* Bộ lọc chuẩn sạc & trạng thái */}
-            <div className="flex items-center justify-between gap-1 pt-1 text-[11px] font-mono">
-              <div className="flex items-center space-x-1">
-                <span className="text-steel-gray">Cổng:</span>
-                <select
-                  value={connectorFilter}
-                  onChange={(e) => setConnectorFilter(e.target.value)}
-                  className="bg-panel border border-hairline text-tech-white rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-electric-cyan font-mono"
-                >
-                  <option value="ALL">Tất cả</option>
-                  <option value="CCS2">CCS2</option>
-                  <option value="TYPE_2">Type 2</option>
-                  <option value="CHADEMO">CHAdeMO</option>
-                </select>
+            {/* Bộ lọc chuẩn sạc dạng Chips & Trạng thái */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar">
+                {['ALL', 'CCS2', 'TYPE_2', 'CHADEMO'].map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setConnectorFilter(type)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                      connectorFilter === type
+                        ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/30'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {type === 'ALL' ? 'Tất cả' : type.replace('_', ' ')}
+                  </button>
+                ))}
               </div>
 
-              <label className="flex items-center space-x-1.5 cursor-pointer text-steel-gray hover:text-tech-white select-none">
+              <label className="flex items-center space-x-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300 select-none shrink-0">
                 <input
                   type="checkbox"
                   checked={availableOnly}
                   onChange={(e) => setAvailableOnly(e.target.checked)}
-                  className="rounded bg-obsidian border-hairline text-electric-cyan focus:ring-0 w-3 h-3"
+                  className="rounded text-sky-600 focus:ring-sky-500 w-4 h-4 border-slate-300 dark:border-slate-700 dark:bg-slate-900"
                 />
-                <span>Còn trụ trống</span>
+                <span>Còn trụ</span>
               </label>
             </div>
           </div>
 
           {/* Danh sách cuộn trạm sạc */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 font-mono">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
             {loading ? (
-              <div className="text-xs text-steel-gray text-center py-12">
-                Đang tìm các trạm sạc gần vị trí của bạn...
+              <div className="space-y-3">
+                <Skeleton variant="card" />
+                <Skeleton variant="card" />
+                <Skeleton variant="card" />
               </div>
             ) : filteredStations.length === 0 ? (
-              <div className="text-xs text-steel-gray text-center py-12">
-                Không tìm thấy trạm sạc nào phù hợp với bộ lọc hiện tại.
-              </div>
+              <EmptyState
+                icon={MapPinOff}
+                title="Không tìm thấy trạm sạc phù hợp"
+                description="Hãy thử đổi từ khóa tìm kiếm hoặc bỏ chọn các điều kiện lọc để xem thêm trạm sạc khác."
+                actionLabel="Đặt lại bộ lọc"
+                onAction={() => {
+                  setSearchQuery('');
+                  setConnectorFilter('ALL');
+                  setAvailableOnly(false);
+                }}
+              />
             ) : (
               filteredStations.map((st) => {
                 const isSelected = selectedStationId === st.id;
@@ -491,29 +558,29 @@ export default function DriverMap() {
                     key={st.id}
                     id={`driver-station-${st.id}`}
                     onClick={() => handleSelectStation(st)}
-                    className={`p-3 rounded border transition-all cursor-pointer ${
+                    className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
                       isSelected
-                        ? 'bg-electric-cyan/5 border-electric-cyan shadow-md'
-                        : 'bg-obsidian border-hairline hover:border-steel-gray'
+                        ? 'bg-sky-50/70 dark:bg-sky-950/30 border-sky-500 shadow-md ring-1 ring-sky-500/50'
+                        : 'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm'
                     }`}
                   >
                     {/* Header trạm: Tên & Khoảng cách */}
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
-                        <div className="font-bold text-xs text-tech-white flex items-center space-x-1.5">
+                        <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center space-x-2">
                           <span>{st.name}</span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-panel text-steel-gray border border-hairline">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
                             ST-{st.id}
                           </span>
                         </div>
-                        <div className="text-[11px] text-steel-gray mt-0.5 line-clamp-1" title={st.address}>
-                          {st.address}
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1" title={st.address}>
+                          {st.address || 'Địa chỉ đang cập nhật'}
                         </div>
                       </div>
 
                       {st.distance_km != null && (
                         <div className="shrink-0 text-right">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-electric-cyan/15 text-electric-cyan border border-electric-cyan/30 tabular-nums">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 font-mono tabular-nums">
                             {st.distance_km.toFixed(1)} km
                           </span>
                         </div>
@@ -521,65 +588,66 @@ export default function DriverMap() {
                     </div>
 
                     {/* Thông số kỹ thuật: Trụ khả dụng & Công suất */}
-                    <div className="grid grid-cols-2 gap-2 my-2.5 p-2 rounded bg-panel/70 border border-hairline/60 text-[11px]">
+                    <div className="grid grid-cols-2 gap-2.5 my-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs">
                       <div>
-                        <div className="text-steel-gray text-[10px]">TRỤ KHẢ DỤNG</div>
-                        <div className="font-bold flex items-center space-x-1 mt-0.5">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">TRỤ KHẢ DỤNG</div>
+                        <div className="font-semibold flex items-center space-x-1.5 mt-0.5">
                           <span
                             className={`w-2 h-2 rounded-full ${
-                              availableCount > 0 ? 'bg-grid-green' : 'bg-critical-red'
+                              availableCount > 0 ? 'bg-emerald-500' : 'bg-rose-500'
                             }`}
-                          ></span>
-                          <span className={availableCount > 0 ? 'text-grid-green' : 'text-critical-red'}>
+                          />
+                          <span className={availableCount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
                             {availableCount}/{totalCount} trụ sẵn sàng
                           </span>
                         </div>
                       </div>
 
                       <div>
-                        <div className="text-steel-gray text-[10px]">CÔNG SUẤT TỐI ĐA</div>
-                        <div className="font-bold text-tech-white mt-0.5 flex items-center space-x-1">
-                          <Zap className="w-3 h-3 text-electric-cyan" />
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">CÔNG SUẤT TỐI ĐA</div>
+                        <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 flex items-center space-x-1 font-mono">
+                          <Zap className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                           <span>{maxKw || st.total_grid_capacity_kw} kW</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Đơn giá & Giờ hoạt động */}
-                    <div className="flex items-center justify-between text-[11px] text-steel-gray mb-3">
-                      <span className="flex items-center space-x-1">
-                        <Clock className="w-3 h-3" />
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-3.5">
+                      <span className="flex items-center space-x-1.5">
+                        <Clock className="w-3.5 h-3.5" />
                         <span>{st.operating_hours || '24/7'}</span>
                       </span>
-                      <span className="text-tech-white">
-                        Đơn giá: <span className="text-caution-amber font-semibold">~3.858 đ/kWh</span>
+                      <span className="text-slate-700 dark:text-slate-300">
+                        Đơn giá: <strong className="text-amber-600 dark:text-amber-400 font-mono">~3.858 đ/kWh</strong>
                       </span>
                     </div>
 
                     {/* Nút hành động: Chỉ đường & Sạc tại trạm này */}
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-hairline/60">
+                    <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
                       <a
                         href={`https://www.google.com/maps/dir/?api=1&destination=${st.latitude},${st.longitude}`}
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="flex items-center justify-center space-x-1.5 py-1.5 rounded bg-panel hover:bg-hairline border border-hairline text-steel-gray hover:text-tech-white text-xs transition-colors"
+                        className="inline-flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all shadow-sm"
                       >
-                        <ExternalLink className="w-3.5 h-3.5 text-electric-cyan" />
+                        <ExternalLink className="w-3.5 h-3.5 text-sky-500" />
                         <span>Chỉ đường</span>
                       </a>
 
-                      <button
-                        type="button"
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={BatteryCharging}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleChargeAtStation(st);
                         }}
-                        className="flex items-center justify-center space-x-1.5 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white text-xs font-bold transition-colors shadow-sm"
+                        className="py-2 text-xs"
                       >
-                        <BatteryCharging className="w-3.5 h-3.5" />
-                        <span>Sạc tại trạm này</span>
-                      </button>
+                        Sạc tại trạm này
+                      </Button>
                     </div>
                   </div>
                 );
@@ -591,3 +659,4 @@ export default function DriverMap() {
     </div>
   );
 }
+
