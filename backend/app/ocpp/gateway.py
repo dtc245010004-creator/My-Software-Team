@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.models.ocpp_message import OcppMessage
 from app.models.station import ChargingPoint
-from app.ocpp.dispatcher import OcppCallError, pending_responses
+from app.ocpp.dispatcher import OcppCallError, pending_responses, pending_stop_transactions
 from app.ocpp.frames import (
     CallErrorFrame,
     CallFrame,
@@ -318,6 +318,11 @@ async def ocpp_endpoint(
                 )
             )
             db.commit()
+            if frame.action == "StopTransaction":
+                transaction_id = frame.payload.get("transactionId")
+                future = pending_stop_transactions.get(transaction_id)
+                if future is not None and not future.done():
+                    future.set_result(result)
             await websocket.send_text(response)
             if frame.action == "BootNotification" and result.get("status") == "Accepted":
                 is_booted = True

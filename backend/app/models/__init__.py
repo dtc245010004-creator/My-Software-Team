@@ -22,4 +22,8 @@ __all__ = [
     "User",
     "Wallet",
     "WalletTransaction",
+    "AuditLog",
+    "RemoteStartRequest",
 ]
+from app.models.audit_log import AuditLog  # noqa: F401,E402
+from app.models.remote_start_request import RemoteStartRequest  # noqa: F401,E402

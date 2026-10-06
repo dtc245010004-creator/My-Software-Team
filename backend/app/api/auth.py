@@ -11,6 +11,7 @@ from app.core.rbac import roles
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.role import Role
 from app.models.user import User
+from app.models.id_tag import IdTag
 from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -61,6 +62,8 @@ def register(
     )
     user.roles.append(role)
     db.add(user)
+    db.flush()
+    db.add(IdTag(code=f"REMOTE-{user.id}", user_id=user.id, status="active"))
     db.commit()
     db.refresh(user)
     return user
