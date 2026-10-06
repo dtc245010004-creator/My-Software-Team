@@ -47,6 +47,12 @@
 * **Biện pháp xử lý**: Đồng bộ `DEMO_USERS.ADMIN.password` với mật khẩu seed và để `quickSwitch()` đọc username/mật khẩu từ cấu hình này. Sau 5 lần thử sai, tài khoản demo bị khóa tạm; đã xóa bộ đếm và thời điểm khóa cho tài khoản `admin`. Thông báo frontend nay hiển thị chi tiết lỗi API.
 * **Trạng thái**: **FIXED IN SOURCE / FRONTEND DOCKER REBUILT / LOGIN API VERIFIED (200, ADMIN)**.
 
+### BUG-07: Migration lịch sử tạo trùng cột `charging_points.last_seen_at` khi nâng cấp DB trống
+* **Mức độ nghiêm trọng**: Severity 2 (Major / Migration Blocker).
+* **Mô tả**: Chạy Alembic upgrade toàn chuỗi trên SQLite DB trống thất bại ở revision `5ba0e05433d7` với `sqlite3.OperationalError: duplicate column name: last_seen_at`; cột đã được thêm trước đó trong chuỗi migration. Do đó chưa thể xác nhận nâng cấp mới từ DB trống bằng đường chạy chuẩn.
+* **Bằng chứng / phạm vi**: Tái hiện trên DB tạm ngày 05/10/2026; không chạy trên DB dự án. Migration MeterValues `4a0a1107f87d` đã xác nhận upgrade/downgrade trên DB tạm được stamp tại head hiện tại.
+* **Trạng thái**: **OPEN / REPRODUCED**.
+
 ---
 
 ## 2. Rào cản kỹ thuật & môi trường (Environment Blockers)

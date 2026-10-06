@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.id_tag import IdTag
+from app.models.remote_start_request import RemoteStartRequest
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
 from app.models.tariff import Tariff
@@ -153,6 +154,28 @@ def handle_start_transaction(
         .first()
     )
     if active_session:
+        try:
+            repeated_meter_start = int(meter_start) if meter_start is not None else 0
+        except (TypeError, ValueError):
+            repeated_meter_start = None
+
+        if (
+            active_session.id_tag == id_tag_code
+            and active_session.meter_start == repeated_meter_start
+        ):
+            logger.info(
+                "Tiếp tục phiên sạc đang lưu transactionId=%s connector=%s",
+                active_session.transaction_id,
+                connector.id,
+            )
+            id_tag_info = {"status": "Accepted"}
+            if expiry_date:
+                id_tag_info["expiryDate"] = expiry_date.isoformat()
+            return {
+                "transactionId": active_session.transaction_id,
+                "idTagInfo": id_tag_info,
+            }
+
         logger.warning(
             "Phát hiện phiên đang sạc chưa đóng (id=%s) trên cổng %s, thực hiện đóng bất thường ABNORMAL",
             active_session.transaction_id,
@@ -201,6 +224,22 @@ def handle_start_transaction(
 
     connector.status = "CHARGING"
     connector.ocpp_status = "Charging"
+
+    # Nếu phiên được mở từ RemoteStartTransaction, chuyển yêu cầu chờ sang STARTED.
+    pending = (
+        db.query(RemoteStartRequest)
+        .filter(
+            RemoteStartRequest.connector_id == connector.id,
+            RemoteStartRequest.id_tag == id_tag_code,
+            RemoteStartRequest.status == "PENDING",
+            RemoteStartRequest.expires_at >= datetime.now(timezone.utc),
+        )
+        .order_by(RemoteStartRequest.id.desc())
+        .first()
+    )
+    if pending is not None:
+        pending.status = "STARTED"
+        pending.transaction_id = new_session.transaction_id
 
     db.commit()
     db.refresh(new_session)
