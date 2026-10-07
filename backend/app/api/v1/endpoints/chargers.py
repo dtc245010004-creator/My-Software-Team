@@ -248,11 +248,19 @@ def create_charger_for_station(
     summary="Xem chi tiết trụ sạc và các cổng sạc trực thuộc",
 )
 def get_charger(
-    charger_id: int,
+    charger_id: str,
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
-    charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
+    query = db.query(ChargingPoint)
+    if charger_id.isdigit():
+        charger = query.filter(ChargingPoint.id == int(charger_id)).first()
+    else:
+        charger = query.filter(ChargingPoint.code == charger_id).first()
+
+    if not charger and charger_id.isdigit():
+        charger = query.filter(ChargingPoint.code == charger_id).first()
+
     if not charger:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."

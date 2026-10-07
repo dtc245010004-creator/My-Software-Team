@@ -9,6 +9,7 @@ from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.session_service import (
+    remote_start_charging_session,
     remote_stop_charging_session,
     start_charging_session,
     stop_charging_session,
@@ -387,3 +388,68 @@ class TestSessionLifecycle:
         db_session.refresh(conn)
         assert charger.status == "UNAVAILABLE"
         assert conn.status == "UNAVAILABLE"
+
+    @pytest.mark.asyncio
+    async def test_remote_start_session_4_cases_s24(self, db_session, session_env):
+        """S-24 / T-51 / T-52: Bốn ca của S-24 xử lý trên trụ ảo và RemoteStartTransaction:
+        Ca 1: Thành công (Accepted -> PENDING)
+        Ca 2: Trụ từ chối (Rejected -> 409)
+        Ca 3: Đầu nối bận (BUSY -> 409)
+        Ca 4: Hết thời gian chờ (TIMEOUT -> 504 & EXPIRED)
+        """
+        driver = session_env["driver_normal"]
+        conn = session_env["conn1"]
+
+        # Ca 3: Đầu nối bận (BUSY)
+        with pytest.raises(HTTPException) as exc_busy:
+            await remote_start_charging_session(
+                db=db_session,
+                user=driver,
+                connector_id=conn.id,
+                simulate_condition="BUSY",
+            )
+        assert exc_busy.value.status_code == 409
+        assert "bận" in exc_busy.value.detail.lower()
+
+        # Ca 2: Trụ từ chối (Rejected)
+        with pytest.raises(HTTPException) as exc_rejected:
+            await remote_start_charging_session(
+                db=db_session,
+                user=driver,
+                connector_id=conn.id,
+                simulate_condition="REJECTED",
+            )
+        assert exc_rejected.value.status_code == 409
+        assert "từ chối" in exc_rejected.value.detail.lower()
+
+        # Ca 4a: Timeout chờ phản hồi từ trụ (TIMEOUT -> 504)
+        with pytest.raises(HTTPException) as exc_timeout:
+            await remote_start_charging_session(
+                db=db_session,
+                user=driver,
+                connector_id=conn.id,
+                simulate_condition="TIMEOUT",
+            )
+        assert exc_timeout.value.status_code == 504
+        assert "thời gian chờ" in exc_timeout.value.detail.lower()
+
+        # Ca 4b: Yêu cầu hết hạn sau 60 giây mà trụ không gửi StartTransaction (EXPIRED)
+        req_expired = await remote_start_charging_session(
+            db=db_session,
+            user=driver,
+            connector_id=conn.id,
+            simulate_condition="EXPIRED",
+        )
+        assert req_expired.status == "EXPIRED"
+
+        # Ca 1: Thành công (Accepted -> STARTED/PENDING)
+        req_success = await remote_start_charging_session(
+            db=db_session,
+            user=driver,
+            connector_id=conn.id,
+            simulate_condition="SUCCESS",
+        )
+        assert req_success.status in ("PENDING", "STARTED")
+        assert req_success.connector_id == conn.id
+        assert req_success.user_id == driver.id
+        assert req_success.id_tag == f"REMOTE-{driver.id}"

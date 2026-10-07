@@ -337,9 +337,15 @@ export default function DriverMap() {
     }
   };
 
-  // Điều hướng sang trang Giả lập sạc cho trạm này
+  // Điều hướng sang màn hình trụ sạc của trạm này (S-24 / T-52)
   const handleChargeAtStation = (st) => {
-    navigate(`/simulator?station_id=${st.id}`);
+    const chargers = st.charging_points || [];
+    const availableCharger = chargers.find((c) => c.status === 'AVAILABLE') || chargers[0];
+    if (availableCharger) {
+      navigate(`/chargers/${availableCharger.id}`);
+    } else {
+      navigate(`/simulator?station_id=${st.id}`);
+    }
   };
 
   // Lọc danh sách trạm theo tìm kiếm & trạng thái

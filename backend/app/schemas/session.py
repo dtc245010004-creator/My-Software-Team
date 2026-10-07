@@ -7,6 +7,10 @@ from app.core.datetime_utils import UTCDateTime
 
 class RemoteStartSessionRequest(BaseModel):
     connector_id: int = Field(..., gt=0, description="ID đầu nối cần bắt đầu sạc")
+    simulate_condition: str | None = Field(
+        default=None,
+        description="Mô phỏng 4 ca S-24 cho kiểm thử: REJECTED, BUSY, TIMEOUT, EXPIRED, SUCCESS",
+    )
 
 
 class SessionStartRequest(BaseModel):

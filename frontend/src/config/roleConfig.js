@@ -4,6 +4,7 @@
 export const ROLE_LABELS = {
   ADMIN: 'Quản trị viên',
   OPERATOR: 'Chủ trạm',
+  ACCOUNTANT: 'Kế toán',
   CUSTOMER: 'Tài xế',
 };
 
@@ -35,6 +36,14 @@ export const DEMO_USERS = {
     label: 'Chủ trạm sạc',
     fullName: 'Chủ Trạm Sạc Mẫu',
     description: 'Quản lý trạm sạc thuộc quyền sở hữu',
+  },
+  ACCOUNTANT: {
+    username: 'accountant',
+    password: 'AccPass123',
+    role: 'ACCOUNTANT',
+    label: 'Kế toán',
+    fullName: 'Kế Toán Viên Hệ Thống',
+    description: 'Đối soát doanh thu & tra cứu kiểm toán',
   },
   CUSTOMER: {
     username: 'driver_user',
