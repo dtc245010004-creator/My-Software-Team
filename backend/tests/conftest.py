@@ -20,7 +20,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
 import app.models  # noqa: F401
-from app.core.database import Base, engine as test_engine, get_db
+from app.core.database import Base, get_db
+from app.core.database import engine as test_engine
 from app.main import app as fastapi_app
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
