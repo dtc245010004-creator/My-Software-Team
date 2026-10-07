@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ vào kết quả chạy kiểm thử tự động thực tế ngày **29/09/2026** (84 ca kiểm thử passed 100%):
+Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lần full suite mới nhất ngày 05/10/2026 đạt 268 passed, 299 warnings trong container Python 3.12; kịch bản OCPP reconnect chạy ba vòng với 5 trụ qua backend/PostgreSQL thật.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -41,13 +41,21 @@ Căn cứ vào kết quả chạy kiểm thử tự động thực tế ngày **
 | **Mô phỏng sạc (Simulator & Telemetry)** | `backend/tests/test_simulator.py` | 10 | 100% PASS | Đường cong CC/CV, ngắt khi đầy/quá nhiệt/nợ, phục hồi crash |
 | **Trí tuệ nhân tạo (AI Fallback & Scheduler)** | `backend/tests/test_ai_fallback.py` | 18 | 100% PASS | Heuristic fallback, phân tích nhiệt độ, biểu giá động, lập lịch định kỳ |
 | **Kiểm tra sức khỏe dịch vụ** | `backend/tests/test_health.py` | 1 | 100% PASS | Endpoint `/health`, kết nối CSDL |
-| **TỔNG CỘNG** | **9 Test Suites** | **89** | **100% PASS** | **Độ phủ toàn diện các chức năng đã triển khai của Giai đoạn 1** |
+| **BASELINE TỔNG CỘNG** | **9 Test Suites** | **89** | **100% PASS trong lần chạy baseline** | **Kết quả cũ, không bao gồm suite OCPP mới** |
+| **OCPP Idempotency** | `backend/tests/test_ocpp_idempotency.py` | 4 | 100% PASS | Gửi lặp năm lần, session CSDL mới, cùng message ID khác action, cleanup 7 ngày |
+| **OCPP Authorize** | `backend/tests/test_authorize.py` | 6 | 100% PASS | Thẻ không tồn tại, blocked, expired, trạm inactive, accepted và mã thẻ duy nhất |
+| **OCPP Server Reset** | `backend/tests/test_ocpp_reset.py` | 5 | 100% PASS | CALLRESULT, CALLERROR, CALL xen kẽ, offline, timeout và RBAC |
+| **OCPP MeterValues** | `backend/tests/test_meter_values.py` | 5 | 100% PASS | Lưu measurand năng lượng, bỏ qua measurand khác, ghi orphan, ACK trước DB, thời gian xử lý 20 lần gửi |
+| **OCPP MeterValues Dedup** | `backend/tests/test_meter_values_dedup.py` | 5 | 100% PASS | Timestamp lùi, bản tin trùng, counter giảm, cùng timestamp hiệu chỉnh và đồng thời |
+| **Abnormal Charging Session Job** | `backend/tests/test_abnormal_session_job.py` | 3 | 100% PASS | Đánh dấu heartbeat quá ngưỡng, bỏ qua heartbeat mới, xác minh job mỗi phút chỉ gắn cờ và không đóng phiên |
+
+**Bổ sung kiểm chứng ngày 05/10/2026**: Các suite giao thức OCPP liệt kê trong bảng có 53 ca; kịch bản tích hợp reconnect và suite phát hiện phiên bất thường được chạy riêng. Full backend suite mới nhất đạt 268 passed, 299 warnings; kịch bản T-55/T-56 đạt 3/3 vòng với 5 trụ trên PostgreSQL.
 
 ---
 
 ## 4. Test Case Inventory
 
-Bảng danh mục chi tiết 89 ca kiểm thử đang hoạt động:
+Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm suite OCPP:
 
 ### 4.1. Suite: `test_auth.py` (18 tests)
 1. `test_register_success_creates_wallet_atomically`: Đăng ký tài khoản thành công đồng thời tạo ví tiền nguyên tử.
@@ -155,6 +163,76 @@ Bảng danh mục chi tiết 89 ca kiểm thử đang hoạt động:
 81. `test_health_check`: Kiểm tra endpoint `/api/v1/health` trả về kết quả healthy và kết nối CSDL tốt.
 *(Ghi chú: 3 test cases còn lại phát sinh từ các bộ kiểm thử có tham số hóa `@pytest.mark.parametrize` trong bộ test suites)*.
 
+### 4.10. Suite: `test_ocpp_frames.py` (20 ca)
+1. `test_parse_and_build_round_trip_preserves_frame_value` (15 ca tham số hóa): Round-trip toàn bộ 14 khung từ log Spike K-01 thật và một CALLERROR mẫu tự tạo do thiếu log Spike thật cho loại khung này.
+2. `test_parse_invalid_frame_raises_with_ocpp_error_code` (5 ca tham số hóa): Không phải mảng, thiếu phần tử, loại khung lạ, payload không phải object và action chưa hỗ trợ.
+
+**Kết quả tại checkpoint T-14/T-15 ngày 01/10/2026**: Suite khung OCPP đạt 20 passed với `--noconftest`; full backend suite tại checkpoint đó đạt 140 passed, 1 warning. Kết quả mới sau T-16/T-17 được ghi trong mục 4.11.
+
+### 4.11. Suite: `test_boot_notification.py` (8 ca)
+1. `test_boot_notification_persists_metadata_and_accepts`: Lưu metadata từ log thật K-01, trả `Accepted`, thời gian UTC, interval cấu hình và trạng thái `online`.
+2. `test_inactive_station_rejects_boot_without_marking_charging_point_online`: Trạm inactive nhận `Rejected`, không chuyển trụ sang online.
+3. `test_second_boot_notification_updates_same_charging_point`: Boot lặp cập nhật cùng bản ghi trụ.
+4. `test_other_action_before_boot_acceptance_returns_security_error`: Action trước khi boot được chấp nhận nhận `SecurityError`.
+5. `test_boot_notification_uses_configured_heartbeat_interval`: Phản hồi đọc chu kỳ từ settings.
+6. `test_unknown_charge_point_closes_before_accepting`: Mã trụ không tồn tại đóng bằng mã 4001 và được ghi log cùng IP.
+7. `test_missing_boot_metadata_is_saved_as_none` (2 ca tham số hóa): Trường metadata tùy chọn thiếu được lưu `None` mà không từ chối Boot.
+
+**Kết quả kiểm thử cập nhật ngày 01/10/2026**: Ba suite OCPP có 32 ca; full backend suite đạt 152 passed, 1 warning. Test được chạy trong thư mục tạm dưới `.venv` để giữ nguyên các DB test có sẵn.
+
+### 4.12. Suite: `test_ocpp_idempotency.py` (4 ca)
+1. `test_repeated_message_id_reuses_saved_response_five_times`: Gửi cùng CALL năm lần; response giữ nguyên, handler không ghi đè metadata ban đầu và chỉ có một bản ghi chống lặp.
+2. `test_duplicate_is_recognized_by_a_new_database_session`: Kết nối lại tạo session CSDL mới; phản hồi và dữ liệu ban đầu vẫn được phát lại.
+3. `test_reused_message_id_with_different_action_replays_and_warns`: Khi cùng message ID được gửi với action khác, gateway phát response cũ và ghi cảnh báo.
+4. `test_cleanup_job_removes_only_messages_older_than_seven_days`: Job dọn bản ghi quá 7 ngày, giữ lại bản ghi 6 ngày tuổi.
+
+**Kết quả kiểm thử cập nhật ngày 01/10/2026**: Ba suite OCPP có 32 ca; full backend suite đạt 152 passed, 1 warning trong 116.35 giây.
+
+### 4.13. Suite: `test_authorize.py` (6 ca)
+1. `test_authorize_returns_expected_id_tag_info_and_masks_unknown_code` (5 ca tham số hóa): Thẻ không tồn tại, thẻ blocked, thẻ expired, trạm inactive và thẻ hợp lệ; kiểm tra `idTagInfo` và log không chứa mã thẻ đầy đủ.
+2. `test_id_tag_code_must_be_unique`: CSDL từ chối hai thẻ có cùng `code` bằng `IntegrityError`.
+
+**Kết quả kiểm thử cập nhật ngày 01/10/2026**: Full backend suite đạt 158 passed, 1 warning trong 117.08 giây; bốn suite OCPP có tổng 38 ca.
+
+### 4.14. Suite: `test_ocpp_reset.py` (5 ca)
+1. `test_reset_online_forwards_callresult_and_processes_other_calls`: Trụ online nhận CALL Reset, gateway vẫn xử lý Authorize do trụ gửi trong lúc chờ, rồi ghép CALLRESULT theo message ID.
+2. `test_reset_offline_returns_conflict_without_dispatching`: Trụ offline trả HTTP 409 và không gọi dispatcher.
+3. `test_reset_no_response_returns_gateway_timeout`: Không có phản hồi trong 0.5 giây test trả HTTP 504.
+4. `test_reset_returns_bad_gateway_for_ocpp_callerror`: CALLERROR được chuyển thành lỗi gateway với mã, mô tả và details.
+5. `test_reset_rejects_customer_role`: Tài khoản CUSTOMER nhận HTTP 403.
+
+**Kết quả kiểm thử cập nhật ngày 01/10/2026**: Full backend suite đạt 163 passed, 1 warning trong 122.08 giây; năm suite OCPP có tổng 43 ca.
+
+### 4.15. Suite: `test_meter_values.py` (5 ca)
+1. `test_meter_values_persists_energy_sample_for_active_session`: lưu mẫu năng lượng gắn với phiên sạc đang chạy và giữ timestamp từ payload.
+2. `test_meter_values_ignores_other_measurands_and_preserves_unit`: bỏ qua đại lượng không phải năng lượng, giữ nguyên đơn vị Wh/kWh.
+3. `test_meter_values_without_active_session_is_saved_as_orphan`: lưu payload vào bảng `orphan_messages` khi không có phiên `CHARGING` phù hợp.
+4. `test_meter_values_acknowledges_before_database_write`: xác nhận CALLRESULT trước khi handler/ghi DB.
+5. `test_meter_values_handles_twenty_messages_under_200ms_each`: đo 20 lần gửi liên tiếp, mỗi lần dưới 200 ms.
+
+**Kết quả kiểm thử ngày 05/10/2026**: Suite MeterValues đạt 5 passed; full backend suite đạt 258 passed, 1 skipped, 181 warnings.
+
+### 4.16. Suite: `test_meter_values_dedup.py` (5 ca)
+1. `test_meter_values_ignores_older_timestamp_and_logs_once`: bỏ qua mẫu có thời gian cũ, không thêm dòng và ghi đúng một cảnh báo kèm session/mốc thời gian.
+2. `test_meter_values_ignores_exact_duplicate_without_warning`: bỏ qua cùng timestamp + value mà không ghi cảnh báo.
+3. `test_meter_values_records_lower_value_at_newer_timestamp_and_marks_session`: vẫn lưu counter giảm ở thời gian mới và bật `needs_review`.
+4. `test_meter_values_keeps_same_timestamp_value_correction`: giữ mẫu hiệu chỉnh cùng timestamp nhưng value khác theo xác nhận nghiệp vụ.
+5. `test_concurrent_exact_meter_values_are_serialized_and_saved_once`: gửi đồng thời hai mẫu giống nhau và chỉ giữ một dòng.
+
+**Kết quả kiểm thử ngày 05/10/2026**: Suite MeterValues S-19 và dedup S-20 đạt 10 passed; full backend suite đạt 263 passed, 1 skipped, 181 warnings.
+
+### 4.17. Suite tích hợp reconnect OCPP — `integration/test_reconnect_scenario.py` (1 ca)
+1. `test_reconnect_scenario_keeps_one_session_and_expected_energy`: chạy ba vòng liên tiếp; mỗi trụ bắt đầu phiên, gửi MeterValues, ngắt WebSocket ngẫu nhiên, kết nối lại, gửi StatusNotification/StartTransaction lặp và StopTransaction. Kiểm tra số phiên không nhân đôi, kWh đúng số mô phỏng và thời điểm kết thúc theo payload. Mặc định 5 trụ; biến `OCPP_RECONNECT_CHARGE_POINTS` cho phép chạy 20 trụ.
+
+**Kết quả kiểm thử ngày 05/10/2026**: Kịch bản đạt với 5 và 20 trụ; full backend suite đạt 264 passed, 1 skipped, 298 warnings.
+
+### 4.18. Suite `test_abnormal_session_job.py` (3 ca)
+1. `test_abnormal_session_job_flags_stale_point_without_closing_session`: trụ quá ngưỡng được đánh dấu với lý do chứa đúng số giây cấu hình; phiên vẫn `CHARGING`.
+2. `test_abnormal_session_job_ignores_recently_seen_point`: heartbeat mới không bị đánh dấu, trạng thái phiên vẫn `CHARGING`.
+3. `test_abnormal_session_job_is_registered_once_per_minute`: job được đăng ký vào APScheduler theo chu kỳ một phút.
+
+**Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
+
 ---
 
 ## 5. Historical Tests
@@ -190,6 +268,7 @@ Các thành phần hiện tại chưa thể kiểm thử tự động do thiếu
 | **`app/api/v1/endpoints/auth.py`** | `test_auth.py`, `test_driver_unauthenticated.py` |
 | **`app/models/station.py` hoặc `station_service.py`** | `test_stations.py`, `test_ai_fallback.py` |
 | **`app/simulator/charging_simulator.py`** | `test_simulator.py`, `test_sessions.py` |
+| **`app/ocpp/frames.py`** | `test_ocpp_frames.py` |
 
 ### 8.2. Danh mục ứng viên kiểm thử theo thành phần dùng chung
 
@@ -201,5 +280,5 @@ Khi sửa các file cấu hình nền tảng (`app/core/config.py`, `app/core/da
 
 * **Ngày kiểm chứng**: 30/09/2026.
 * **Môi trường thực thi**: Python 3.14 / pytest 8.x, SQLite 3.
-* **Tổng số ca kiểm thử**: 89 passed (100% pass).
+* **Kết quả lịch sử 30/09/2026**: 89 passed; không bao gồm suite OCPP bổ sung ngày 01/10/2026.
 * **Người xác thực**: AI Assistant phối hợp cùng Tech Lead dự án.

@@ -69,8 +69,11 @@ export default function Simulator() {
           const next = [...prev, { time: timeLabel, powerKw: msg.power_kw, soc: msg.soc, tempC: msg.temp_c }];
           return next.slice(-25); // Giữ lại 25 mẫu gần nhất
         });
-      } else if (msg.event === 'SESSION_STOPPED' && msg.session_id === activeSession.id) {
-        setStatusMessage(`Phiên sạc đã kết thúc: ${msg.stop_reason || 'Hoàn tất'}`);
+      } else if (
+        (msg.event === 'STOPPED' || msg.event === 'SESSION_STOPPED') &&
+        msg.session_id === activeSession.id
+      ) {
+        setStatusMessage(`Phiên sạc đã kết thúc: ${msg.stop_reason || msg.reason || 'Hoàn tất'}`);
         setActiveSession(null);
         telemetryWs.unsubscribeSession(activeSession.id);
       }
@@ -123,6 +126,7 @@ export default function Simulator() {
         availableConnectors.push({
           ...conn,
           chargerCode: cp.code,
+          chargerStatus: cp.status,
           chargerMaxPower: cp.max_power_kw,
         });
       });
@@ -134,6 +138,19 @@ export default function Simulator() {
     if (!selectedConnectorId) {
       alert('Vui lòng chọn một cổng sạc trước khi bắt đầu.');
       return;
+    }
+
+    // Kiểm tra tính khả dụng của cổng và trụ sạc được chọn
+    const targetConn = availableConnectors.find((c) => String(c.id) === String(selectedConnectorId));
+    if (targetConn) {
+      if (targetConn.chargerStatus === 'UNAVAILABLE' || targetConn.chargerStatus === 'FAULTED' || targetConn.chargerStatus === 'MAINTENANCE') {
+        alert(`Trụ sạc [${targetConn.chargerCode}] hiện đang trong trạng thái bảo trì/sự cố. Không thể bắt đầu phiên sạc!`);
+        return;
+      }
+      if (targetConn.status !== 'AVAILABLE') {
+        alert(`Cổng sạc hiện không khả dụng (Trạng thái: ${targetConn.status}). Vui lòng chọn cổng sạc khác.`);
+        return;
+      }
     }
 
     const finalCapacity = batteryCapacity === 'CUSTOM' ? parseFloat(customCapacity) : parseFloat(batteryCapacity);
@@ -277,12 +294,29 @@ export default function Simulator() {
                   className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
                 >
                   <option value="">-- Chọn cổng sạc sẵn sàng --</option>
-                  {availableConnectors.map((c) => (
-                    <option key={c.id} value={c.id} disabled={c.status === 'CHARGING'}>
-                      [{c.chargerCode}] Súng #{c.connector_number} - {c.connector_type} ({c.max_power_kw}kW) [
-                      {c.status}]
-                    </option>
-                  ))}
+                  {availableConnectors.map((c) => {
+                    const isChargerMaintenance = c.chargerStatus === 'UNAVAILABLE' || c.chargerStatus === 'FAULTED' || c.chargerStatus === 'MAINTENANCE';
+                    const isCharging = c.status === 'CHARGING';
+                    const isConnUnavailable = c.status === 'UNAVAILABLE' || c.status === 'FAULTED';
+                    const isDisabled = isChargerMaintenance || isCharging || isConnUnavailable;
+
+                    let statusTag = `[${c.status}]`;
+                    if (isChargerMaintenance) {
+                      statusTag = '[TRỤ BẢO TRÌ]';
+                    } else if (isCharging) {
+                      statusTag = '[ĐANG CÓ XE SẠC]';
+                    } else if (isConnUnavailable) {
+                      statusTag = '[CỔNG KHÔNG KHẢ DỤNG]';
+                    } else if (c.status === 'AVAILABLE') {
+                      statusTag = '[SẴN SÀNG]';
+                    }
+
+                    return (
+                      <option key={c.id} value={c.id} disabled={isDisabled}>
+                        {statusTag} [{c.chargerCode}] Súng #{c.connector_number} - {c.connector_type} ({c.max_power_kw}kW)
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

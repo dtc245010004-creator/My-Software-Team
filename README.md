@@ -9,9 +9,9 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: **89/89 test cases passed**, 0 lỗi hồi quy (Zero regression). *(Nguồn: Kết quả thực thi `pytest backend/tests`)*
-- **Kiến trúc dữ liệu**: 9 bảng CSDL quan hệ (`users`, `wallets`, `wallet_transactions`, `stations`, `charging_points`, `connectors`, `station_power_metrics`, `tariffs`, `charging_sessions`). *(Nguồn: `backend/app/models/`)*
-- **Migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo bảng lõi; cây revision hiện quy về một head (`f2c9a6d81b40`).
+- **Kiểm thử tự động**: Full backend suite gần nhất đạt **268 passed, 299 warnings** ngày 05/10/2026 (Python 3.12 trong container); kịch bản OCPP reconnect/PostgreSQL đạt 3/3 vòng.
+- **Kiến trúc dữ liệu**: Các bảng kỹ thuật OCPP gồm `ocpp_messages` (idempotency), `id_tags` (ủy quyền thẻ) và `meter_values` (số đo điện năng theo phiên). *(Nguồn: `backend/app/models/`)*
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới nguồn duy nhất `backend/alembic/`; revision mới nhất trong cây là `c4ab19f2d7e1`. DB dự án chưa được migrate.
 - **Khung Staging & CI/CD**: Hỗ trợ chạy đồng thời qua `docker-compose.staging.yml` và pipeline kiểm thử tự động `.github/workflows/ci-staging.yml`.
 
 ---
@@ -124,6 +124,8 @@ Khởi chạy cả Backend và Frontend trong cùng terminal:
 | **Tài xế VIP (CUSTOMER)** | `driver_vip` | `driver_vip@gmail.com` | `DriverPass123` | Tài xế số dư lớn, sạc xe VF9 |
 | **Tài xế nợ (CUSTOMER)** | `driver_debt` | `driver_debt@gmail.com` | `DriverPass123` | Tài khoản mô phỏng trường hợp nợ âm ví quá hạn mức |
 
+Seed tạo một thẻ OCPP active cho mỗi tài khoản tài xế role `CUSTOMER`, theo mẫu `DEMO-<USERNAME>`.
+
 ### Đăng ký công khai — luôn ra tài khoản Tài xế, không gửi "role"
 *(Nguồn: `backend/app/api/v1/endpoints/auth.py:28-32`)*
 - Endpoint `POST /api/v1/auth/register` bắt buộc gán cứng `role = "CUSTOMER"` để ngăn chặn tấn công leo thang đặc quyền (Privilege Escalation).
@@ -161,7 +163,14 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
 cd backend
 pytest -v
 ```
-Kết quả đo kiểm thực tế:
+
+Chạy riêng kiểm thử bộ khung OCPP 1.6J:
+
+```bash
+py -m pytest --noconftest -p no:cacheprovider tests/test_ocpp_frames.py
+```
+
+Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trước khi thêm suite OCPP, không đại diện cho lần hồi quy hiện tại:
 - `test_ai_fallback.py`: 21 passed (Kiểm thử Heuristic Fallback, Mock Gemini, Scheduler)
 - `test_auth.py`: 13 passed (Kiểm thử JWT, Bcrypt rounds=12, RBAC, Đăng ký atomic, Khóa nợ đăng nhập)
 - `test_driver_unauthenticated.py`: 4 passed (Kiểm thử tài xế cắm sạc không cần login)
@@ -171,7 +180,7 @@ Kết quả đo kiểm thực tế:
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Tổng số: 84/84 test cases passed (0 failed).**
+**Baseline trước OCPP:** các tài liệu ghi tổng khác nhau (84 ca ở danh sách suite này, 89 trong README/QA Inventory, 90 trong Sprint Status) `[CẦN XÁC NHẬN]`. Các checkpoint sau S-16 đạt 163 passed, 1 warning với 43 test OCPP (01/10/2026); full backend mới nhất sau T-55/T-56 đạt 268 passed, 299 warnings (05/10/2026).
 
 ---
 
@@ -221,6 +230,20 @@ Hệ thống cung cấp 8 nhóm router REST API tại tiền tố `/api/v1`:
 7. `/api/v1/simulator`: Điều khiển bộ giả lập và đo đếm Telemetry.
 8. `/api/v1/ai`: Điều phối công suất sạc thông minh và tư vấn vận hành.
 
+### Giao tiếp trụ sạc OCPP 1.6J
+
+* Trụ đã đăng ký kết nối qua WebSocket `/ocpp/{charge_point_code}` và thương lượng subprotocol `ocpp1.6`.
+* `BootNotification` lưu thông tin trụ; trạm không hoạt động nhận `Rejected`, trạm hoạt động nhận `Accepted` cùng heartbeat interval từ `HEARTBEAT_INTERVAL_SECONDS`.
+* `Authorize` tra `id_tags`: kiểm tra trạng thái thẻ, thời hạn và trạng thái hoạt động của trạm trước khi trả `Accepted`, `Blocked`, `Expired` hoặc `Invalid`.
+* `MeterValues` chỉ lưu `Energy.Active.Import.Register` theo phiên `CHARGING`, giữ nguyên đơn vị OCPP; nếu không tìm thấy phiên thì ghi payload vào `orphan_messages`. Gateway gửi CALLRESULT trước thao tác DB.
+* MeterValues bỏ qua mẫu có timestamp cũ và ghi cảnh báo, bỏ qua mẫu trùng timestamp+value im lặng. Counter thấp hơn tại timestamp mới vẫn được lưu và bật `charging_sessions.needs_review`; cùng timestamp nhưng value khác được lưu để đối soát.
+* Sau reconnect, `StatusNotification(Charging)` giữ phiên CHARGING đã lưu; StartTransaction gửi lại với cùng thẻ và meterStart nhận lại transactionId cũ. MeterValues gắn theo transactionId DB; StopTransaction đóng phiên ngay cả khi trụ đã offline và dùng timestamp trong tin nhắn.
+* Job APScheduler kiểm tra phiên CHARGING mỗi phút. Nếu `last_seen_at` quá `ABNORMAL_SESSION_THRESHOLD_SECONDS` (mặc định 500 giây), job gắn cờ `is_abnormal` và ghi lý do; không tự đóng phiên.
+* Admin/Operator gọi `POST /api/v1/chargers/{code}/reset` với `Soft` hoặc `Hard`; offline trả 409, hết thời gian chờ trả 504. Dispatcher ghép phản hồi CALLRESULT/CALLERROR theo message ID và dùng lại được cho các action máy chủ gửi xuống sau này.
+* Seed demo tạo mã thẻ active `DEMO-<USERNAME>` cho mỗi tài khoản tài xế role `CUSTOMER`.
+* CALL lặp được nhận diện bằng khóa trong bảng `ocpp_messages`; cùng message ID phát lại phản hồi đã lưu, kể cả khi kết nối/session CSDL được tạo mới. Bản ghi cũ hơn 7 ngày được scheduler hiện có dọn mỗi ngày.
+* Kênh OCPP trụ sạc ↔ CSMS độc lập với `/ws/telemetry`, vốn phục vụ dashboard.
+
 ---
 
 ## 6. Cấu trúc thư mục
@@ -247,3 +270,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 - Bản đồ cấu trúc và ma trận truy vết: [`docs/architecture/PROJECT_STRUCTURE.md`](docs/architecture/PROJECT_STRUCTURE.md)
 - Sổ tay vận hành kỹ thuật: [`docs/devops/OPERATIONS.md`](docs/devops/OPERATIONS.md)
 - Hiến chương và sổ cái kiểm thử: [`docs/qa/STANDARD.md`](docs/qa/STANDARD.md), [`docs/qa/INVENTORY.md`](docs/qa/INVENTORY.md)
+- Hồ sơ nghiệm thu OCPP S-07: [`docs/qa/stories/S-07.md`](docs/qa/stories/S-07.md)
+- Hồ sơ nghiệm thu BootNotification S-08: [`docs/qa/stories/S-08.md`](docs/qa/stories/S-08.md)
+- Hồ sơ nghiệm thu Authorize/idTag S-15: [`docs/qa/stories/S-15.md`](docs/qa/stories/S-15.md)
+- Hồ sơ nghiệm thu dispatcher/Reset OCPP S-16: [`docs/qa/stories/S-16.md`](docs/qa/stories/S-16.md)

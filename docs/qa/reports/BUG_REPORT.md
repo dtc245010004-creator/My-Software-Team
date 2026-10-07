@@ -41,6 +41,18 @@
 * **Biện pháp xử lý**: Đã kiểm tra chặn IDOR ở các endpoint nhạy cảm (CPO A không thể sửa trạm của CPO B); tiếp tục theo dõi và siết chặt ở Giai đoạn 2.
 * **Trạng thái**: **MONITORING / MITIGATED VIA RBAC TESTS**.
 
+### BUG-06: Nút Admin Demo 1-Click dùng mật khẩu không khớp dữ liệu seed
+* **Mức độ nghiêm trọng**: Severity 3 (Moderate).
+* **Mô tả**: `AuthContext.quickSwitch()` gửi mật khẩu `AdminPass123`, trong khi tài khoản `admin` trong cấu hình seed đang dùng `12345678a`, khiến nút Admin báo tài khoản demo chưa khởi tạo.
+* **Biện pháp xử lý**: Đồng bộ `DEMO_USERS.ADMIN.password` với mật khẩu seed và để `quickSwitch()` đọc username/mật khẩu từ cấu hình này. Sau 5 lần thử sai, tài khoản demo bị khóa tạm; đã xóa bộ đếm và thời điểm khóa cho tài khoản `admin`. Thông báo frontend nay hiển thị chi tiết lỗi API.
+* **Trạng thái**: **FIXED IN SOURCE / FRONTEND DOCKER REBUILT / LOGIN API VERIFIED (200, ADMIN)**.
+
+### BUG-07: Migration lịch sử tạo trùng cột `charging_points.last_seen_at` khi nâng cấp DB trống
+* **Mức độ nghiêm trọng**: Severity 2 (Major / Migration Blocker).
+* **Mô tả**: Chạy Alembic upgrade toàn chuỗi trên SQLite DB trống thất bại ở revision `5ba0e05433d7` với `sqlite3.OperationalError: duplicate column name: last_seen_at`; cột đã được thêm trước đó trong chuỗi migration. Do đó chưa thể xác nhận nâng cấp mới từ DB trống bằng đường chạy chuẩn.
+* **Bằng chứng / phạm vi**: Tái hiện trên DB tạm ngày 05/10/2026; không chạy trên DB dự án. Migration MeterValues `4a0a1107f87d` đã xác nhận upgrade/downgrade trên DB tạm được stamp tại head hiện tại.
+* **Trạng thái**: **OPEN / REPRODUCED**.
+
 ---
 
 ## 2. Rào cản kỹ thuật & môi trường (Environment Blockers)
@@ -55,4 +67,4 @@
 
 1. **Ưu tiên 1 (DevOps)**: Soạn thảo script `start.bat` / `run.ps1` và bộ cấu hình Docker để giảm thiểu thao tác thủ công khi chạy dự án.
 2. **Ưu tiên 2 (Architecture)**: Nghiên cứu phương án triển khai máy chủ OCPP WebSocket độc lập (hoặc tích hợp qua thư viện Python `ocpp`) cho Giai đoạn tiếp theo.
-3. **Ưu tiên 3 (QA)**: Tiếp tục duy trì tỷ lệ 100% PASS cho toàn bộ 84 test cases hiện tại trong suốt quá trình tái cấu trúc tài liệu.
+3. **Ưu tiên 3 (QA)**: Duy trì kiểm thử dựa trên bằng chứng; tổng lịch sử 84/89/90 ca còn mâu thuẫn `[CẦN XÁC NHẬN]`. Full backend suite hiện đạt 158 passed, 1 warning ngày 01/10/2026.

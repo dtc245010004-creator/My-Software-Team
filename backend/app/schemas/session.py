@@ -5,6 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.datetime_utils import UTCDateTime
 
 
+class RemoteStartSessionRequest(BaseModel):
+    connector_id: int = Field(..., gt=0, description="ID đầu nối cần bắt đầu sạc")
+
+
 class SessionStartRequest(BaseModel):
     connector_id: int = Field(..., description="ID cổng/súng sạc kết nối")
     battery_capacity_kwh: float | None = Field(
@@ -25,6 +29,13 @@ class SessionStopRequest(BaseModel):
         description="Chỉ số công tơ điện khi kết thúc (kWh) - nếu bỏ trống sẽ lấy từ Simulator",
     )
     stop_reason: str | None = Field(default="USER_STOPPED", max_length=100)
+
+
+class RemoteStopRequest(BaseModel):
+    simulate_condition: str | None = Field(
+        default=None,
+        description="Điều kiện mô phỏng kiểm thử: REJECTED | OFFLINE | TIMEOUT | NORMAL",
+    )
 
 
 class SessionResponse(BaseModel):
@@ -49,6 +60,11 @@ class SessionResponse(BaseModel):
     charger_code: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CurrentSessionResponse(SessionResponse):
+    latest_kwh: Decimal
+    latest_meter_at: UTCDateTime | None = None
 
 
 class SessionSummaryItem(BaseModel):

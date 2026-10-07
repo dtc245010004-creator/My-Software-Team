@@ -649,3 +649,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+.role-select {
+  min-width: 120px;
+  padding: 6px 8px;
+  border: 1px solid #d8dee9;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.role-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

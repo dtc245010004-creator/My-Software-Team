@@ -12,13 +12,32 @@
 * **Hạn mức ví điện tử & Bảo mật xác thực**:
   * Tầng cơ sở dữ liệu: `backend/app/models/wallet.py` dòng 11 có ràng buộc cứng `CheckConstraint("balance >= -500000", name="check_min_balance")`. Bảng `users` trang bị 2 cột `failed_login_attempts` và `locked_until`.
   * Tầng ứng dụng: `backend/app/core/config.py` quy định `NEGATIVE_BALANCE_LIMIT = -300000` (ngưỡng khóa nợ), `MAX_SAFE_DEBT_LIMIT = -500000` (chặn thấu chi tối đa), `MAX_FAILED_LOGIN_ATTEMPTS = 5` và `LOCKOUT_DURATION_MINUTES = 15` (khóa tạm 15 phút khi sai mật khẩu 5 lần).
-* **Cây migration Alembic**: Revision nền `a1b2c3d4e5f6` tạo các bảng lõi trước `03906fa596ea`; cây hiện quy về một head `f2c9a6d81b40`, nối merge revision `795931a69149` với migration `e4b6f9a2c1d3`.
-* **Số lượng kiểm thử tự động**: Đạt **89 ca kiểm thử** tự động được xác thực thực tế (toàn bộ 89/89 PASS khi chạy `pytest`).
+* **Cấu hình migration duy nhất**: `backend/alembic.ini` trỏ tới `backend/alembic/`; revision mới nhất là `c4ab19f2d7e1`, thêm cờ bất thường cho `charging_sessions`. Migration T-53 đã kiểm chứng nâng/hạ/nâng trên DB tạm, chưa áp dụng lên DB dự án. Nâng cấp toàn chuỗi từ DB trống đang vướng lỗi cột `charging_points.last_seen_at` bị tạo trùng ở migration lịch sử `5ba0e05433d7`.
+* **Giao thức OCPP 1.6J**: `backend/app/ocpp/frames.py` là bộ đọc/ghi thuần; gateway `/ocpp/{charge_point_code}` xử lý BootNotification, Authorize, MeterValues, CALLRESULT/CALLERROR chờ lệnh và idempotency CSDL. `dispatcher.py` ghép phản hồi theo message ID bằng `asyncio.Future`; API Reset gọi lại dispatcher dùng chung. MeterValues gửi CALLRESULT trước thao tác DB; kiểm tra lùi/trùng và lưu số đo trong transaction có khóa. Khi reconnect, phiên đang chạy được khôi phục từ DB. Job `flag_abnormal_charging_sessions_job` chạy mỗi phút, chỉ gắn cờ khi `last_seen_at` quá `ABNORMAL_SESSION_THRESHOLD_SECONDS` (mặc định 500 giây), không tự đóng phiên.
+* **Đăng nhập demo Admin**: `frontend/src/config/roleConfig.js` khai báo `admin / 12345678a`; `frontend/src/context/AuthContext.jsx` dùng lại cấu hình này cho nút 1-Click. Frontend Docker đã được build lại; login API trả HTTP 200 cho `admin`/`ADMIN` sau khi gỡ khóa tạm do 5 lần thử sai.
+* **Số lượng kiểm thử tự động**: Full suite gần nhất có 268 passed, 299 warnings (05/10/2026, Python 3.12 trong container); ba test riêng của job bất thường đều đạt. Các tổng lịch sử 84, 89 và 90 ca mâu thuẫn `[CẦN XÁC NHẬN]`.
 * **Khung triển khai Staging & CI/CD**: Đóng gói container hóa qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và quy trình kiểm thử tự động `.github/workflows/ci-staging.yml`.
+* **Hạ tầng trụ ảo T-55/T-56**: `docker-compose.yml` có service `ocpp-simulator`, mặc định seed và kết nối 20 mã `SIM-001`…`SIM-020`; seeder OCPP riêng trong `tools/ocpp-spike/` không gọi `backend/seed_data.py`. Stack cô lập đã xác nhận 20/20 trụ Online trên SQLite và PostgreSQL. Kịch bản reconnect qua backend/Postgres thật đạt ba vòng; full backend suite đạt 268 passed, 299 warnings. Workflow `.github/workflows/main.yml` chạy tích hợp sau unit tests và luôn dọn Compose stack.
 * **Bộ chạy Local Dev**: `run.py` khởi chạy Backend FastAPI và Frontend Vite đồng thời trong một terminal; `Ctrl+C` dừng cả hai.
-* **Cơ cấu tổ chức tài liệu**: Phân tách thành 6 phân khu chuyên trách trong `docs/` (`architecture/`, `devops/`, `planning/`, `qa/`, `design/`, `research/`) gồm 24 file chuẩn mực.
+* **Cơ cấu tổ chức tài liệu**: Phân tách thành 6 phân khu chuyên trách trong `docs/` (`architecture/`, `devops/`, `planning/`, `qa/`, `design/`, `research/`); hiện có 33 file Markdown theo lần đếm ngày 01/10/2026 (chưa commit).
 
 ### 0.2. Đã thay đổi
+* **Khung tin nhắn OCPP 1.6J — T-14/T-15 (01/10/2026 - chưa commit)**: Tạo `backend/app/ocpp/` với parser/builder ba loại khung và `backend/tests/test_ocpp_frames.py`; 20 ca OCPP passed riêng, full suite đạt 140 passed và 1 cảnh báo thư viện.
+* **BootNotification và gateway OCPP — T-16/T-17 thuộc S-08 (01/10/2026 - chưa commit)**: Thêm `/ocpp/{charge_point_code}`, handler BootNotification, trường metadata trụ, heartbeat interval cấu hình được và migration `5e76bf9b9e5a`; 8 ca WebSocket mới passed, full suite đạt 148 passed và 1 warning.
+* **Idempotency OCPP — T-30/T-31 thuộc S-14 (01/10/2026 - chưa commit)**: Thêm model `OcppMessage`, migration `057c4ed34525`, phát lại phản hồi từ CSDL khi CALL trùng, và job dọn bản ghi quá 7 ngày trong scheduler hiện có; 4 test mới, full suite đạt 152 passed và 1 warning.
+* **Ủy quyền thẻ OCPP — T-32/T-33 thuộc S-15 (01/10/2026 - chưa commit)**: Thêm `IdTag`, migration `45ab6640633a`, seed thẻ mẫu cho tài khoản tài xế (`CUSTOMER` trong RBAC hiện tại), handler `Authorize` và 6 test; migration kiểm chứng upgrade/downgrade trên DB tạm.
+* **Hồi quy sau S-15 (01/10/2026 - chưa commit)**: Full backend suite đạt 158 passed, 1 warning trong 117.08 giây; tổng 38 ca OCPP.
+* **Lệnh Reset OCPP từ máy chủ — T-34/T-35 thuộc S-16 (01/10/2026 - chưa commit)**: Thêm dispatcher có timeout cấu hình, ghép phản hồi CALLRESULT/CALLERROR theo message ID và API `POST /api/v1/chargers/{code}/reset` giới hạn Admin/Operator; test bao phủ lệnh online, offline, timeout, CALLERROR và role tài xế.
+* **Hồi quy sau S-16 (01/10/2026 - chưa commit)**: Full backend suite đạt 163 passed, 1 warning trong 122.08 giây; năm suite OCPP có tổng 43 ca.
+* **MeterValues — T-40/T-41 thuộc S-19 (05/10/2026 - chưa commit)**: Thêm model và migration `meter_values` với chỉ mục `(session_id, recorded_at)`, chỉ lưu `Energy.Active.Import.Register`, chuyển giá trị không có phiên đang sạc vào bảng `orphan_messages` hiện có và xác nhận CALLRESULT trước thao tác DB. Thêm 5 test; Ruff sạch; full backend suite đạt 258 passed, 1 skipped, 181 warnings. DB dự án không đổi. Docker không khả dụng; full upgrade từ DB trống bị chặn bởi migration lịch sử tạo lặp `charging_points.last_seen_at`.
+* **Loại bỏ số đo lùi/trùng — T-42/T-43 thuộc S-20 (05/10/2026 - chưa commit)**: Khóa transaction trước khi đọc số đo mới nhất theo session/measurand; mẫu lùi bị bỏ qua kèm cảnh báo, mẫu trùng hoàn toàn bỏ qua im lặng, mẫu mới có giá trị giảm vẫn lưu và bật `ChargingSession.needs_review`. Cùng timestamp nhưng khác value được giữ như bản hiệu chỉnh. Thêm migration `339c5001fe7a` và 5 test dedup/concurrency; full suite đạt 263 passed, 1 skipped, 181 warnings; Ruff sạch.
+* **Khôi phục phiên sau mất kết nối — T-44/T-45/T-46 thuộc S-21 (05/10/2026 - chưa commit)**: Trạng thái Charging đọc phiên CHARGING đã lưu; lần gửi lại StartTransaction với cùng thẻ/meterStart trả transactionId hiện có; MeterValues được gắn theo transactionId DB. StopTransaction tra cứu trong phạm vi đúng trụ, đóng phiên khi trụ offline và lấy ended_at từ timestamp tin nhắn. Kịch bản tích hợp trong `backend/tests/integration/test_reconnect_scenario.py` chạy ba vòng liên tiếp với 5 và 20 trụ; full suite đạt 264 passed, 1 skipped, 298 warnings; Ruff trên file đổi sạch.
+* **Phát hiện phiên bất thường — T-53 thuộc S-25 (05/10/2026, commit `7af7b19`)**: Thêm `ChargingSession.is_abnormal` và `abnormal_reason`; job APScheduler chạy mỗi phút so sánh heartbeat của trụ với cấu hình `ABNORMAL_SESSION_THRESHOLD_SECONDS=500`. Job chỉ gắn cờ/lý do, giữ nguyên status phiên. Migration `c4ab19f2d7e1`, ba test mới; full suite đạt 267 passed, 1 skipped, 298 warnings; Ruff sạch.
+* **Hạ tầng test 20 trụ ảo — T-55/T-56 thuộc S-26 (05/10/2026, commit `bfefab8`)**: Thêm Docker service dùng lại luồng WebSocket/OCPP Spike K-01 và mã SIM riêng, seeder độc lập, Heartbeat định kỳ; workflow main chạy sau unit tests với Postgres/backend/simulator thật, kiểm tra ba vòng reconnect 5 trụ và dọn container/volume bằng trap. Bài test so sánh từng phiên với 5 kWh, ghi mã trụ/session khi sai. Kiểm chứng stack cô lập đạt 20/20 Online trên SQLite/PostgreSQL; kịch bản reconnect đạt 3/3; full backend suite đạt 268 passed, 299 warnings. CI chưa được kích hoạt từ nhánh này.
+* **Admin Demo 1-Click (01/10/2026, mã nguồn commit `7f764ea`)**: Credential trong `DEMO_USERS.ADMIN` được đổi từ `admin / AdminPass123` sang `admin / 12345678a`; `AuthContext.quickSwitch()` dùng cấu hình tập trung và `Login.jsx` hiển thị detail 403 từ API. Build trực tiếp trên host bị chặn do thiếu `vite`, nhưng Docker build và cập nhật container frontend thành công. Tài khoản đã được gỡ khóa tạm; login API trả HTTP 200 với role `ADMIN`.
+* **Chuẩn hóa thư mục migration (01/10/2026 - chưa commit)**: Xóa cây revision cũ `backend/migrations/`; giữ `backend/alembic/` làm nguồn migration duy nhất theo cấu hình `backend/alembic.ini`.
+* **Giao diện Quản lý Trụ & Đầu nối - S-05 (03/10/2026 - chưa commit)**:
+  * `frontend/src/pages/Stations.jsx`: thêm form Thêm đầu nối, báo lỗi trùng mã trụ tại ô "Mã trụ", báo lỗi trùng số thứ tự đầu nối tại ô nhập, mở nút gắn trụ cho `OPERATOR`. Không đổi cấu trúc thư mục, không thêm file.
 * **Bộ chạy Local Dev ở thư mục gốc (30/09/2026 - chưa commit)**:
   * Thêm `run.py` để mở Uvicorn và Vite cùng lúc, kiểm tra dependencies cần thiết, và dừng cả hai tiến trình khi nhấn `Ctrl+C`.
 * **Hợp nhất cây migration Alembic (30/09/2026, commit `d7acaf4`)**:
@@ -46,7 +65,6 @@
 
 ### 0.3. Sắp thay đổi
 * **Khởi tạo thư mục và handlers OCPP**: Chuẩn bị cấu trúc `backend/app/ocpp/handlers/` theo kế hoạch Sprint 2 (`S-06` đến `S-16`) theo `[nguồn tạm: nentangtramsac_bandaydu.md]`.
-* **Kênh kết nối WebSocket chuẩn hóa**: Bổ sung endpoint `/ws/ocpp/{charger_id}` tiếp nhận kết nối trạm sạc thực tế.
 
 ### 0.4. Cần thay đổi
 * **Kịch bản vận hành root**: Cần bổ sung các script tự động hóa khởi chạy ở thư mục gốc (`start.bat` / `run.ps1`) thay cho việc phải mở thủ công 2 terminal riêng biệt.
@@ -95,9 +113,23 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   │   ├── api/                       # Định nghĩa router và dependency injection (RBAC)
 │   │   ├── core/                      # Cấu hình ứng dụng, bảo mật và kết nối CSDL
 │   │   ├── models/                    # Lớp thực thể SQLAlchemy (User, Station, Wallet...)
+│   │   │   ├── id_tag.py               # Thẻ OCPP gắn với tài khoản người dùng
+│   │   │   ├── meter_value.py           # Số đo điện năng gắn với phiên sạc
+│   │   │   ├── ocpp_message.py         # Kết quả CALL OCPP đã lưu để chống xử lý lặp
+│   │   │   └── session.py              # Phiên sạc, gồm cờ needs_review
 │   │   ├── schemas/                   # Lớp xác thực Pydantic (In/Out DTOs)
 │   │   ├── services/                  # Xử lý nghiệp vụ lõi (Ví ACID, Tính cước TOU...)
 │   │   ├── simulator/                 # Bộ mô phỏng sạc nội bộ CC/CV
+│   │   ├── ocpp/                      # Bộ khung, gateway và handler OCPP 1.6J
+│   │   │   ├── __init__.py
+│   │   │   ├── dispatcher.py           # Gửi CALL CSMS→trụ và chờ phản hồi bất đồng bộ
+│   │   │   ├── frames.py               # Parser/builder thuần, không phụ thuộc WebSocket
+│   │   │   ├── gateway.py              # WebSocket /ocpp/{charge_point_code}
+│   │   │   └── handlers/
+│   │   │       ├── __init__.py
+│   │   │       ├── authorize.py        # Kiểm tra trạng thái và thời hạn idTag
+│   │   │       ├── boot_notification.py
+│   │   │       └── meter_values.py     # Lưu mẫu Energy.Active.Import.Register theo phiên
 │   │   └── main.py                    # Điểm khởi động ứng dụng FastAPI & WebSocket
 │   ├── .dockerignore                  # Danh sách loại trừ đóng gói Docker backend
 │   ├── Dockerfile                     # Đóng gói container hóa FastAPI (Python 3.12)
@@ -106,7 +138,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   ├── README.md                      # Hướng dẫn kỹ thuật phân hệ Backend
 │   ├── requirements.txt               # Danh mục thư viện Python phụ thuộc
 │   ├── seed_data.py                   # Script nạp dữ liệu mẫu cho demo
-│   └── tests/                         # Bộ kiểm thử tự động 90 test cases
+│   └── tests/                         # Bộ kiểm thử tự động: 263 passed gần nhất
 ├── docs/                              # TRUNG TÂM TRI THỨC VÀ TÀI LIỆU DỰ ÁN
 │   ├── README.md                      # Cổng điều hướng toàn hệ thống & FAQ Tester
 │   ├── architecture/                  # Phân khu Kiến trúc & Bản đồ hệ thống
@@ -127,7 +159,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   │   ├── integration/FRONTEND_BACKEND.md
 │   │   ├── plans/TEST_PLAN.md
 │   │   ├── reports/ (TEST_REPORT, REGRESSION_REPORT, BUG_REPORT)
-│   │   └── stories/ (S-01 đến S-05)
+│   │   └── stories/ (S-01 đến S-05, S-07, S-08, S-14)
 │   └── research/                      # Phân khu Nghiên cứu kỹ thuật (Spikes)
 │       ├── K-01-ocpp-simulator.md
 │       └── S-05-AC3-ghi-nhan-cho-PO.md
@@ -162,6 +194,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 3. **`backend/app/models/wallet.py`**: Thực thể ví tiền điện tử với ràng buộc CSDL cứng `CheckConstraint("balance >= -500000")`.
 4. **`backend/app/simulator/charging_simulator.py`**: Tiến trình mô phỏng chu kỳ sạc pin xe điện theo đường cong CC/CV, bảo vệ quá nhiệt và ngắt sạc tự động.
 5. **`frontend/src/context/AuthContext.jsx`**: Quản trị phiên làm việc và phân quyền RBAC phía client.
+6. **`tools/ocpp-spike/run_simulator.py`**: Giữ các client OCPP 1.6J trực tuyến và gửi Heartbeat; số lượng do `SIMULATOR_CHARGE_POINT_COUNT` điều khiển.
 
 ---
 
@@ -182,7 +215,7 @@ flowchart TD
 
 ## 7. Requirement → Task → Source Mapping
 
-Ma trận truy vết ánh xạ các Story của Giai đoạn 1:
+Ma trận truy vết ánh xạ các Story đã triển khai:
 
 | Story | Yêu cầu nghiệp vụ (AC) | Tasks kỹ thuật (T-xx) | Mã nguồn phụ trách | Ca kiểm thử xác minh |
 | :---: | :--- | :--- | :--- | :--- |
@@ -191,6 +224,14 @@ Ma trận truy vết ánh xạ các Story của Giai đoạn 1:
 | **S-03** | Phân quyền 3 vai trò (RBAC), chống IDOR | T-06, T-07 | `backend/app/core/security.py`, `deps.py` | `test_auth.py`, `test_stations.py` |
 | **S-04** | CPO tạo, sửa, xóa mềm trạm sạc | T-08, T-09 | `backend/app/api/v1/endpoints/stations.py` | `test_stations.py` (8 tests) |
 | **S-05** | Thêm trụ và đầu nối, mã trụ duy nhất | T-10, T-11 | `backend/app/api/v1/endpoints/chargers.py` | `test_stations.py` (4 tests) |
+| **S-07** | Đọc/ghi ba loại khung tin nhắn OCPP 1.6J | T-14, T-15 | `backend/app/ocpp/frames.py` | `backend/tests/test_ocpp_frames.py` (20 ca); `docs/qa/stories/S-07.md` |
+| **S-08** | Nhận BootNotification và phản hồi Accepted/Rejected theo trạng thái trạm | T-16, T-17 | `backend/app/ocpp/gateway.py`, `backend/app/ocpp/handlers/boot_notification.py`, `backend/app/models/station.py` | `backend/tests/test_boot_notification.py` (8 ca); `docs/qa/stories/S-08.md` |
+| **S-14** | Chống xử lý lặp CALL OCPP dựa trên CSDL và dọn dữ liệu quá hạn | T-30, T-31 | `backend/app/models/ocpp_message.py`, `backend/app/ocpp/gateway.py`, `backend/app/services/scheduler_service.py` | `backend/tests/test_ocpp_idempotency.py` (4 ca); migration `057c4ed34525`; `docs/qa/stories/S-14.md` |
+| **S-15** | Phân quyền sạc bằng idTag OCPP | T-32, T-33 | `backend/app/models/id_tag.py`, `backend/app/ocpp/handlers/authorize.py`, `backend/app/ocpp/gateway.py`, `backend/seed_data.py` | `backend/tests/test_authorize.py` (6 ca); migration `45ab6640633a`; `docs/qa/stories/S-15.md` |
+| **S-16** | Máy chủ gửi lệnh Reset OCPP có tương quan phản hồi | T-34, T-35 | `backend/app/ocpp/dispatcher.py`, `backend/app/ocpp/gateway.py`, `backend/app/api/v1/endpoints/chargers.py` | `backend/tests/test_ocpp_reset.py` (5 ca); `docs/qa/stories/S-16.md` |
+| **S-19** | Ghi số đo điện năng MeterValues | T-40, T-41 | `backend/app/models/meter_value.py`, `backend/app/ocpp/handlers/meter_values.py`, `backend/app/ocpp/gateway.py` | `backend/tests/test_meter_values.py` (5 ca); migration `4a0a1107f87d` |
+| **S-20** | Loại bỏ số đo lùi/trùng và đánh dấu bộ đếm cần xem xét | T-42, T-43 | `backend/app/ocpp/handlers/meter_values.py`, `backend/app/models/session.py` | `backend/tests/test_meter_values_dedup.py` (5 ca); migration `339c5001fe7a` |
+| **S-26** | Hạ tầng kiểm thử tích hợp 20 trụ OCPP ảo | T-55, T-56 | `docker-compose.yml`, `tools/ocpp-spike/`, `.github/workflows/main.yml` | `tools/ocpp-spike/test_reconnect_scenario.py` chạy qua backend/Postgres thật; 3 vòng reconnect; Compose cleanup qua trap |
 
 ---
 
@@ -233,19 +274,19 @@ Căn cứ theo Sheet: Backlog trong `[nguồn tạm: nentangtramsac_bandaydu.md]
 
 * Khi chỉnh sửa `app/models/wallet.py`: Bắt buộc chạy lại `test_wallet_acid.py`, `test_sessions_acid.py` và `test_auth.py`.
 * Khi chỉnh sửa `app/models/station.py`: Bắt buộc chạy lại `test_stations.py` và `test_ai_fallback.py`.
-* Khi chỉnh sửa `app/core/config.py`: Bắt buộc kích hoạt chạy lại toàn bộ **84 test cases**.
+* Khi chỉnh sửa `app/core/config.py`: Bắt buộc kích hoạt chạy lại toàn bộ backend suite; lần chạy ngày 01/10/2026 có 163 ca.
 
 ---
 
 ## 12. Current Structure Gaps (Các khoảng trống cấu trúc hiện tại)
 
-1. **Thiếu module xử lý giao thức WebSocket OCPP chính thức**: Thư mục `backend/app/ocpp/` chưa được khởi tạo đầy đủ; hiện tại việc sinh dữ liệu đang dùng bộ mô phỏng nội tại `simulator/`.
+1. **OCPP còn thiếu các action khác**: Gateway tra mã trụ, quản lý kết nối và xử lý BootNotification, Authorize; các handler cho Heartbeat, StatusNotification và giao dịch cùng cơ chế tương quan CALL/CALLRESULT vẫn thuộc các task tiếp theo. `/ws/telemetry` tiếp tục phục vụ dashboard riêng.
 2. **Thiếu thư mục chứa script DevOps ở root**: Chưa có file `docker-compose.yml`, `start.bat` hoặc `run.ps1` ở thư mục gốc.
 
 ---
 
 ## 13. Structure Verification Metadata (Thông tin kiểm chứng cấu trúc)
 
-* **Ngày kiểm chứng**: 29/09/2026.
+* **Ngày kiểm chứng**: 01/10/2026.
 * **Người xác thực**: AI Assistant phối hợp cùng Lead Developer.
-* **Trạng thái cấu trúc**: **ACTIVE & VERIFIED (84/84 tests passed)**.
+* **Trạng thái cấu trúc**: **ACTIVE & VERIFIED**; lần kiểm thử toàn backend gần nhất đạt 263 passed, 1 skipped, 181 warnings (05/10/2026, chưa commit).

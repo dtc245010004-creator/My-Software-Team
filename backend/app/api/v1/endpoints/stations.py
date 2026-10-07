@@ -1,8 +1,11 @@
+import asyncio
+import json
 import math
 from datetime import timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_optional_current_user, require_roles
@@ -14,15 +17,20 @@ from app.models.user import User
 from app.schemas.station import (
     StationCreate,
     StationDistanceResponse,
+    StationGridItem,
     StationResponse,
+    StationTreeItem,
     StationUpdate,
 )
+from app.services.event_broadcaster import sse_broadcaster
 from app.services.station_service import (
     atomic_reactivate_station,
     atomic_soft_delete_station,
     calculate_haversine_distance,
     enrich_station_response,
     get_accessible_station_ids,
+    get_station_grid,
+    get_station_tree,
     verify_station_ownership,
 )
 from app.simulator.charging_simulator import simulator_manager
@@ -582,6 +590,102 @@ def get_grid_load_profile_timeline(
 
 
 @router.get(
+    "/tree",
+    response_model=list[StationTreeItem],
+    summary="Lấy cây trạm–trụ–đầu nối đã lọc theo quyền (T-23)",
+    description=(
+        "Trả về danh sách StationTreeItem bao gồm 3 tầng: "
+        "Station -> ChargingPoint -> Connector. "
+        "Admin/Operator tổng thấy toàn bộ trạm chưa xóa mềm; "
+        "Chủ trạm chỉ thấy trạm do chính mình sở hữu (operator_id == current_user.id)."
+    ),
+)
+def list_station_tree(
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    db: Session = Depends(get_db),
+) -> list[StationTreeItem]:
+    """API lấy cây trạm–trụ–đầu nối đã lọc theo quyền sở hữu (RBAC)."""
+    return get_station_tree(db, current_user)
+
+
+@router.get(
+    "/grid",
+    response_model=list[StationGridItem],
+    summary="Lấy danh sách trạm và trụ dạng lưới (Grid View) theo quyền (T-24)",
+    description=(
+        "Trả về danh sách trạm kèm tổng hợp trạng thái các cổng sạc "
+        "(available, charging, faulted, unavailable) và danh sách thẻ trụ. "
+        "Admin thấy toàn bộ hệ thống; Operator chỉ thấy trạm do mình quản lý."
+    ),
+)
+def list_station_grid(
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    db: Session = Depends(get_db),
+) -> list[StationGridItem]:
+    """API lấy dữ liệu giám sát trạm/trụ dạng lưới (Grid View)."""
+    return get_station_grid(db, current_user)
+
+
+async def _station_event_generator(user: User, limit: Optional[int] = None):
+    queue = await sse_broadcaster.subscribe(user)
+    try:
+        # Gửi sự kiện khởi tạo kết nối (phục vụ test và client handshake)
+        yield f"data: {json.dumps({'event': 'connected', 'user_id': user.id})}\n\n"
+        count = 0
+        if limit is not None and limit <= 1:
+            return
+
+        while True:
+            payload = await queue.get()
+            yield f"data: {json.dumps(payload)}\n\n"
+            count += 1
+            if limit is not None and count >= limit:
+                break
+    except (asyncio.CancelledError, GeneratorExit):
+        pass
+    finally:
+        await sse_broadcaster.unsubscribe(queue)
+
+
+@router.get(
+    "/events",
+    summary="Kênh SSE đẩy trạng thái trạm/trụ/đầu nối theo thời gian thực",
+)
+async def get_station_events(
+    limit: Optional[int] = Query(None, description="Giới hạn số message rồi ngắt (dùng cho test)"),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+):
+    return StreamingResponse(
+        _station_event_generator(current_user, limit),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get(
+    "/stream",
+    summary="Alias của kênh SSE /events",
+)
+async def get_station_stream(
+    limit: Optional[int] = Query(None, description="Giới hạn số message rồi ngắt (dùng cho test)"),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+):
+    return StreamingResponse(
+        _station_event_generator(current_user, limit),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get(
     "/{station_id}",
     response_model=StationResponse,
     summary="Xem thông tin chi tiết trạm sạc cùng các trụ và cổng sạc",
@@ -664,15 +768,17 @@ def update_station(
         # Chặn thay đổi công suất lưới nếu không phải ADMIN
         if (
             "total_grid_capacity_kw" in update_data
-            and update_data["total_grid_capacity_kw"]
-            != station.total_grid_capacity_kw
+            and update_data["total_grid_capacity_kw"] != station.total_grid_capacity_kw
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Chỉ Quản trị viên (Admin) mới có quyền thay đổi công suất nguồn lưới (total_grid_capacity_kw).",
             )
         # Chặn thay đổi chủ trạm nếu không phải ADMIN
-        if "operator_id" in update_data and update_data["operator_id"] != station.operator_id:
+        if (
+            "operator_id" in update_data
+            and update_data["operator_id"] != station.operator_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Chỉ Quản trị viên (Admin) mới có quyền gán hoặc thay đổi Chủ trạm.",

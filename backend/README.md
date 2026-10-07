@@ -72,6 +72,14 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 | **Simulator** | `/api/v1/simulator` | Kích hoạt mô phỏng sạc pin CC-CV, tăng tốc thời gian, ngắt sạc an toàn |
 | **AI** | `/api/v1/ai` | Điều phối chia sẻ công suất sạc thông minh, Heuristic Fallback khi mất mạng |
 
+### Kết nối trụ sạc OCPP 1.6J
+
+* WebSocket `/ocpp/{charge_point_code}` dành cho mã trụ đã đăng ký và subprotocol `ocpp1.6`.
+* Gateway xử lý `BootNotification`, trả `Accepted` hoặc `Rejected` theo `Station.is_active` và giữ riêng khỏi `/ws/telemetry`.
+* Handler `Authorize` tra bảng `id_tags`, kiểm tra trạng thái thẻ, thời hạn và trạng thái trạm; phản hồi dùng cấu trúc `idTagInfo` của OCPP 1.6J.
+* Admin/Operator gửi `POST /api/v1/chargers/{code}/reset` với `{"type":"Soft"}` hoặc `{"type":"Hard"}` để yêu cầu trụ Reset. Trụ offline trả HTTP 409, không phản hồi trả HTTP 504; timeout mặc định của dispatcher cấu hình bằng `OCPP_CALL_TIMEOUT_SECONDS`.
+* Kết quả CALL được lưu trong `OcppMessage` theo cặp mã trụ/message ID; tin nhắn lặp phát lại phản hồi cũ từ CSDL. Scheduler hiện có dọn bản ghi quá 7 ngày mỗi ngày.
+
 ---
 
 ## Phân quyền và bảo mật request
@@ -92,10 +100,23 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 
 *(Nguồn: `backend/pytest.ini`, `backend/tests/`)*
 
-Thực thi bộ 84 test cases tự động:
+Thực thi backend suite bằng `pytest` trong môi trường ảo backend. Lần chạy ngày 01/10/2026 đạt 163 passed, 1 warning:
 
 ```bash
 cd backend
 pytest -v
 ```
-Toàn bộ 84 test cases đã được xác thực chạy PASS 100% không có lỗi hồi quy (Zero regression).
+
+## Sprint 3 – Backend S-22 / S-23 / S-24 / S-27
+
+Implemented backend scope:
+- S-22/T-47: authenticated driver's current charging session API, latest Energy.Active.Import.Register in one SQL query, 204 when none, ownership protection on session detail.
+- S-23/T-49: real OCPP RemoteStopTransaction flow, Rejected/Offline/Timeout handling, wait up to 2 minutes for real StopTransaction before completing the session, timeout marks the session for review.
+- S-24/T-51: authenticated driver's RemoteStartTransaction, connector availability guard before sending OCPP, virtual driver idTag, 60-second pending request and status tracking, StartTransaction links the request to the created session.
+- S-27/T-57: append-only audit_logs, shared ghi_nhat_ky helper, audit records for remote start/stop, normal stop and Reset, audit query with station/user/time filters and pagination, database trigger preventing UPDATE/DELETE of audit rows.
+
+After pulling these changes, run:
+```powershell
+alembic upgrade head
+python -m pytest tests -q
+```

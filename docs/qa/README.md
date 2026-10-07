@@ -10,14 +10,14 @@
 
 To toàn bộ tài sản kiểm thử và đảm bảo chất lượng của dự án EV CSMS được quy tụ tập trung trong phân khu `docs/qa/` theo cấu trúc module hóa phân vai trò:
 * [`STANDARD.md`](STANDARD.md): Hiến chương kiểm thử trung tâm, luật bằng chứng và danh mục Enum chuẩn.
-* [`INVENTORY.md`](INVENTORY.md): Sổ cái kiểm kê toàn bộ 84 test cases (hiện có 84 tests passed), ma trận truy vết và độ phủ.
+* [`INVENTORY.md`](INVENTORY.md): Sổ cái suite kiểm thử; lần full backend gần nhất đạt 163 passed, 1 warning, gồm 43 ca OCPP.
 * [`plans/TEST_PLAN.md`](plans/TEST_PLAN.md): Kế hoạch kiểm thử chiến lược đa tầng của dự án.
 * [`reports/`](reports/): Phân khu lưu trữ các báo cáo thực nghiệm:
-  * [`TEST_REPORT.md`](reports/TEST_REPORT.md): Báo cáo thực thi kiểm thử hiện tại (84/84 tests passed, 0 failed).
+  * [`TEST_REPORT.md`](reports/TEST_REPORT.md): Báo cáo các lần chạy; full backend đạt 163 passed, 1 warning ngày 01/10/2026.
   * [`REGRESSION_REPORT.md`](reports/REGRESSION_REPORT.md): Báo cáo kiểm soát hồi quy khi có điều chỉnh mã.
   * [`BUG_REPORT.md`](reports/BUG_REPORT.md): Sổ theo dõi lỗi hệ thống và rào cản môi trường.
 * [`integration/FRONTEND_BACKEND.md`](integration/FRONTEND_BACKEND.md): Hồ sơ kiểm thử tích hợp giao diện client và API server.
-* [`stories/`](stories/): Hồ sơ nghiệm thu chi tiết từng câu chuyện người dùng (S-01 đến S-05).
+* [`stories/`](stories/): Hồ sơ nghiệm thu Stories; gồm S-01 đến S-05, S-07, S-08, S-14, S-15 và S-16.
 
 ---
 

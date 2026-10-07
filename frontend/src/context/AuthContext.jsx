@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
 
+import { DEMO_USERS } from '../config/roleConfig';
+import { telemetryWs } from '../services/websocket';
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -55,6 +58,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('ev_csms_user');
     setUser(null);
     setToken(null);
+    // Đóng WS khi logout để không stream data của user cũ
+    telemetryWs.disconnect();
   };
 
   const updateGuestName = (name) => {
@@ -66,7 +71,7 @@ export const AuthProvider = ({ children }) => {
   const quickSwitch = async (roleKey) => {
     try {
       if (roleKey === 'ADMIN') {
-        await login('admin', 'AdminPass123');
+        await login(DEMO_USERS.ADMIN.username, DEMO_USERS.ADMIN.password);
       } else if (roleKey === 'OPERATOR' || roleKey === 'OPERATOR_A' || roleKey === 'OPERATOR_B') {
         await login('operator_a', 'OpPass123');
       } else {
@@ -74,7 +79,7 @@ export const AuthProvider = ({ children }) => {
         logout();
       }
     } catch (err) {
-      console.warn('Tài khoản demo mặc định chưa tồn tại, vui lòng đăng ký hoặc đăng nhập:', err);
+      console.warn('Đăng nhập nhanh demo thất bại:', err);
       throw err;
     }
   };
