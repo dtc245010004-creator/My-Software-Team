@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.websocket import ws_manager
 from app.models.ocpp_message import OcppMessage
@@ -322,6 +323,62 @@ def cleanup_old_ocpp_messages_job(db: Session = None) -> int:
             db.close()
 
 
+def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
+    """Chỉ đánh dấu phiên CHARGING khi lần liên lạc cuối đã quá ngưỡng."""
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    threshold_seconds = settings.ABNORMAL_SESSION_THRESHOLD_SECONDS
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=threshold_seconds)
+    flagged_count = 0
+    try:
+        rows = (
+            db.query(ChargingSession, ChargingPoint)
+            .join(Connector, ChargingSession.connector_id == Connector.id)
+            .join(ChargingPoint, Connector.charging_point_id == ChargingPoint.id)
+            .filter(
+                ChargingSession.status == "CHARGING",
+                ChargingPoint.last_seen_at.is_not(None),
+            )
+            .with_for_update()
+            .all()
+        )
+
+        reason = f"Mất liên lạc với trụ quá {threshold_seconds} giây"
+        for session, charging_point in rows:
+            last_seen_at = charging_point.last_seen_at
+            if last_seen_at.tzinfo is None:
+                last_seen_at = last_seen_at.replace(tzinfo=timezone.utc)
+            if last_seen_at >= cutoff:
+                continue
+
+            if not session.is_abnormal or session.abnormal_reason != reason:
+                session.is_abnormal = True
+                session.abnormal_reason = reason
+                flagged_count += 1
+                logger.warning(
+                    "Phiên sạc bất thường session_id=%s charge_point=%s last_seen_at=%s reason=%s",
+                    session.transaction_id,
+                    charging_point.code,
+                    charging_point.last_seen_at,
+                    reason,
+                )
+
+        if flagged_count:
+            db.commit()
+        return flagged_count
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Lỗi quét phiên sạc bất thường")
+        return 0
+    finally:
+        if should_close:
+            db.close()
+
+
 def start_scheduler():
     """Khởi động bộ lập lịch APScheduler."""
     if not scheduler.running:
@@ -349,9 +406,17 @@ def start_scheduler():
             id="cleanup_old_ocpp_messages",
             replace_existing=True,
         )
+        # Job chỉ gắn cờ phiên CHARGING mất liên lạc, không tự kết thúc phiên.
+        scheduler.add_job(
+            flag_abnormal_charging_sessions_job,
+            "interval",
+            minutes=1,
+            id="flag_abnormal_charging_sessions",
+            replace_existing=True,
+        )
         scheduler.start()
         logger.info(
-            "Đã khởi động APScheduler cho các tác vụ định kỳ (Smart Charging 3p & Power Metrics 1p)."
+            "Đã khởi động APScheduler cho các tác vụ định kỳ (Smart Charging 3p, Power Metrics 1p và kiểm tra phiên bất thường 1p)."
         )
 
 

@@ -5,6 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.datetime_utils import UTCDateTime
 
 
+class RemoteStartSessionRequest(BaseModel):
+    connector_id: int = Field(..., gt=0, description="ID đầu nối cần bắt đầu sạc")
+
+
 class SessionStartRequest(BaseModel):
     connector_id: int = Field(..., description="ID cổng/súng sạc kết nối")
     battery_capacity_kwh: float | None = Field(
@@ -70,6 +74,11 @@ class SessionResponse(BaseModel):
     charger_code: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CurrentSessionResponse(SessionResponse):
+    latest_kwh: Decimal
+    latest_meter_at: UTCDateTime | None = None
 
 
 class SessionSummaryItem(BaseModel):

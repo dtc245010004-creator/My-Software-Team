@@ -1,6 +1,7 @@
 """Mô hình Phiên sạc xe điện (Quản lý vòng đời và chốt hóa đơn tiền điện)."""
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    false,
     func,
     text,
 )
@@ -40,6 +42,7 @@ class ChargingSession(Base):
             "connector_id",
             unique=True,
             sqlite_where=text("status = 'CHARGING'"),
+            postgresql_where=text("status = 'CHARGING'"),
         ),
     )
 
@@ -103,6 +106,11 @@ class ChargingSession(Base):
     status = Column(
         String(20), default="CHARGING", nullable=False
     )  # CHARGING, COMPLETED, ABNORMAL, NEEDS_REVIEW, ACTIVE, FAILED, CANCELLED, INTERRUPTED
+    needs_review = Column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    is_abnormal = Column(Boolean, nullable=False, default=False, server_default=false())
+    abnormal_reason = Column(String(255), nullable=True)
     stop_reason = Column(
         String(100), nullable=True
     )  # USER_STOPPED, EMERGENCY, BATTERY_FULL, DEBT_LIMIT_REACHED, EmergencyStop, CounterRollback, Local...

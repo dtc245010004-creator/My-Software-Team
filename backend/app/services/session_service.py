@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.datetime_utils import to_vn_time
+from app.models.remote_start_request import RemoteStartRequest
 from app.models.session import ChargingSession
 from app.models.station import Connector
 from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.audit_service import ghi_nhat_ky
 from app.services.wallet_service import deduct_charging_fee
 
 logger = logging.getLogger("ev_csms.session_service")
@@ -372,6 +374,15 @@ def stop_charging_session(
                     {"cpid": charger.id},
                 )
 
+        # S-27/T-57: audit nằm cùng transaction với việc đóng phiên.
+        ghi_nhat_ky(
+            db,
+            user_id=user.id,
+            action="StopTransaction",
+            object_type="charging_session",
+            object_id=session.id,
+            data={"result": "Completed", "stop_reason": stop_reason, "transaction_id": session.transaction_id},
+        )
         db.commit()
         db.refresh(session)
     except HTTPException:
@@ -532,6 +543,8 @@ def remote_stop_charging_session(
         is_offline = True
 
     if is_offline:
+        ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Offline"})
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa, vui lòng kiểm tra kết nối mạng của trụ.",
@@ -539,6 +552,8 @@ def remote_stop_charging_session(
 
     # Ca 2: Trụ sạc từ chối (Rejected)
     if condition == "REJECTED":
+        ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Rejected"})
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Trụ sạc từ chối lệnh dừng (Rejected). Phiên sạc vẫn đang tiếp tục hoạt động.",
@@ -546,6 +561,8 @@ def remote_stop_charging_session(
 
     # Ca 3: Hết thời gian chờ (Timeout)
     if condition == "TIMEOUT":
+        ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Timeout"})
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="Hết thời gian chờ phản hồi từ trụ sạc (Timeout). Phiên sạc đã được đánh dấu cần xem xét kỹ thuật.",
@@ -612,6 +629,14 @@ def remote_stop_charging_session(
                     {"cpid": connector.charging_point_id},
                 )
 
+        ghi_nhat_ky(
+            db,
+            user_id=user.id,
+            action="RemoteStopTransaction",
+            object_type="charging_session",
+            object_id=session.id,
+            data={"transaction_id": session.transaction_id, "result": "Accepted", "stop_reason": "Remote"},
+        )
         db.commit()
         db.refresh(session)
     except HTTPException:
@@ -767,3 +792,166 @@ def force_close_abnormal_session(
         logger.warning("Không thể dừng simulator task cho session #%s", session.id)
 
     return session
+async def remote_start_charging_session(
+    db: Session,
+    user: User,
+    connector_id: int,
+) -> "RemoteStartRequest":
+    """S-24/T-51: kiểm tra cổng rảnh rồi gửi RemoteStartTransaction và lưu request chờ 60 giây."""
+    from datetime import timedelta
+
+    from app.models.id_tag import IdTag
+    from app.models.remote_start_request import RemoteStartRequest
+    from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
+    from app.ocpp.gateway import active_ocpp_connections
+
+    connector = (
+        db.query(Connector)
+        .filter(Connector.id == connector_id, Connector.is_active.is_(True))
+        .first()
+    )
+    if connector is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đầu nối.")
+    station = connector.charging_point.station if connector.charging_point else None
+    if station is None or not station.is_active:
+        raise HTTPException(status_code=409, detail="Trạm sạc hiện không hoạt động.")
+    if connector.status != "AVAILABLE":
+        raise HTTPException(status_code=409, detail="Đầu nối đang bận hoặc không khả dụng.")
+    code = connector.charging_point.code
+    if code not in active_ocpp_connections:
+        raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.")
+
+    # Mỗi tài xế có một idTag ảo để dùng chung luồng xác thực với thẻ vật lý.
+    tag = db.query(IdTag).filter(IdTag.user_id == user.id, IdTag.code.like("REMOTE-%")).first()
+    if tag is None:
+        tag = IdTag(code=f"REMOTE-{user.id}", user_id=user.id, status="active")
+        db.add(tag)
+        db.flush()
+
+    try:
+        result = await send_call_and_wait(
+            code,
+            "RemoteStartTransaction",
+            {"connectorId": connector.connector_id or connector.connector_number, "idTag": tag.code},
+            timeout_seconds=30,
+        )
+    except ConnectionError as exc:
+        raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.") from exc
+    except TimeoutError as exc:
+        ghi_nhat_ky(
+            db, user_id=user.id, action="RemoteStartTransaction",
+            object_type="connector", object_id=connector.id, data={"result": "Timeout"},
+        )
+        db.commit()
+        raise HTTPException(status_code=504, detail="Trụ sạc không phản hồi lệnh bắt đầu trong thời gian chờ.") from exc
+    except OcppCallError as exc:
+        ghi_nhat_ky(
+            db, user_id=user.id, action="RemoteStartTransaction",
+            object_type="connector", object_id=connector.id,
+            data={"result": "Rejected", "error_code": exc.error_code},
+        )
+        db.commit()
+        raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).") from exc
+
+    if str(result.get("status", "")).lower() != "accepted":
+        ghi_nhat_ky(
+            db, user_id=user.id, action="RemoteStartTransaction",
+            object_type="connector", object_id=connector.id, data={"result": "Rejected"},
+        )
+        db.commit()
+        raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).")
+
+    request = RemoteStartRequest(
+        user_id=user.id,
+        connector_id=connector.id,
+        id_tag=tag.code,
+        status="PENDING",
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=60),
+    )
+    db.add(request)
+    db.flush()
+    ghi_nhat_ky(
+        db,
+        user_id=user.id,
+        action="RemoteStartTransaction",
+        object_type="connector",
+        object_id=connector.id,
+        data={"result": "Accepted", "request_id": request.id},
+    )
+    db.commit()
+    db.refresh(request)
+    return request
+
+async def remote_stop_charging_session_ocpp(
+    db: Session,
+    user: User,
+    session_id: int,
+) -> ChargingSession:
+    """S-23/T-49 flow thật: RemoteStopTransaction Accepted -> chờ StopTransaction tối đa 2 phút."""
+    from app.ocpp.dispatcher import (
+        OcppCallError,
+        pending_stop_transactions,
+        register_stop_transaction_waiter,
+        send_call_and_wait,
+    )
+    from app.ocpp.gateway import active_ocpp_connections
+
+    if user.role not in ("ADMIN", "OPERATOR"):
+        raise HTTPException(status_code=403, detail="Chỉ vai trò vận hành viên và quản trị mới có quyền gửi lệnh dừng từ xa.")
+    session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiên sạc.")
+    connector = session.connector
+    station = connector.charging_point.station if connector and connector.charging_point else None
+    if user.role == "OPERATOR" and (not station or station.operator_id != user.id):
+        raise HTTPException(status_code=403, detail="Bạn không có quyền can thiệp vào phiên sạc của trạm sạc khác.")
+    if session.status != "CHARGING":
+        # App-created sessions dùng ACTIVE; vẫn cho phép remote stop nếu simulator chưa chuyển CHARGING.
+        if session.status != "ACTIVE":
+            raise HTTPException(status_code=400, detail=f"Phiên sạc không ở trạng thái đang sạc (trạng thái hiện tại: {session.status}).")
+    code = connector.charging_point.code if connector and connector.charging_point else None
+    if not code or code not in active_ocpp_connections:
+        raise HTTPException(status_code=400, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.")
+
+    waiter = register_stop_transaction_waiter(session.transaction_id)
+    try:
+        try:
+            result = await send_call_and_wait(
+                code, "RemoteStopTransaction", {"transactionId": session.transaction_id}, timeout_seconds=30
+            )
+        except ConnectionError as exc:
+            # Không gửi được lệnh -> không ghi "result từ trụ".
+            raise HTTPException(status_code=400, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.") from exc
+        except TimeoutError as exc:
+            ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Timeout"})
+            db.commit()
+            raise HTTPException(status_code=504, detail="Hết thời gian chờ phản hồi từ trụ sạc (Timeout).") from exc
+        except OcppCallError as exc:
+            ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Rejected", "error_code": exc.error_code})
+            db.commit()
+            raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh dừng (Rejected). Phiên sạc vẫn đang tiếp tục hoạt động.") from exc
+
+        if str(result.get("status", "")).lower() != "accepted":
+            ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Rejected"})
+            db.commit()
+            raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh dừng (Rejected). Phiên sạc vẫn đang tiếp tục hoạt động.")
+
+        ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Accepted", "transaction_id": session.transaction_id})
+        db.commit()
+
+        try:
+            await __import__("asyncio").wait_for(waiter, timeout=120)
+        except __import__("asyncio").TimeoutError as exc:
+            session.needs_review = True
+            session.is_abnormal = True
+            session.abnormal_reason = "RemoteStopAcceptedButNoStopTransaction"
+            db.commit()
+            db.commit()
+            raise HTTPException(status_code=504, detail="Trụ đã chấp nhận lệnh dừng nhưng không gửi StopTransaction trong 2 phút; phiên được đánh dấu cần xem xét.") from exc
+
+        # StopTransaction handler đã chốt phiên và lý do từ OCPP.
+        db.refresh(session)
+        return session
+    finally:
+        if pending_stop_transactions.get(session.transaction_id) is waiter:
+            del pending_stop_transactions[session.transaction_id]
