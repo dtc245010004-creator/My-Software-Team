@@ -12,8 +12,8 @@ from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
 from app.models.user import User
 from app.schemas.session import (
-    ForceCloseSessionRequest,
     CurrentSessionResponse,
+    ForceCloseSessionRequest,
     RemoteStartSessionRequest,
     RemoteStopRequest,
     SessionResponse,
@@ -434,6 +434,8 @@ def force_close_session_endpoint(
         meter_stop_kwh=force_in.meter_stop_kwh,
     )
 
+
+@router.get(
     "/current",
     response_model=CurrentSessionResponse,
     responses={204: {"description": "Tài xế không có phiên đang sạc"}, 403: {"description": "Không có quyền"}},
