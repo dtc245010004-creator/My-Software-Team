@@ -86,3 +86,48 @@ class SessionSummaryResponse(BaseModel):
     group_by: str
     kpi: dict[str, float | int]
     items: list[SessionSummaryItem]
+
+
+class PriceSegmentItem(BaseModel):
+    segment_index: int = Field(..., description="Số thứ tự đoạn giá")
+    rate_type: str = Field(..., description="Loại đơn giá: NORMAL | PEAK | OFFPEAK")
+    rate_name: str = Field(..., description="Tên hiển thị khung giờ: Giờ bình thường, Giờ cao điểm...")
+    time_range: str = Field(..., description="Khoảng thời gian áp dụng (HH:mm - HH:mm)")
+    start_time: str = Field(..., description="Mốc thời gian bắt đầu đoạn")
+    end_time: str = Field(..., description="Mốc thời gian kết thúc đoạn")
+    duration_minutes: int = Field(..., description="Thời lượng của đoạn (phút)")
+    kwh: Decimal = Field(..., description="Sản lượng điện năng tiêu thụ trong đoạn (kWh)")
+    unit_price: Decimal = Field(..., description="Đơn giá điện áp dụng cho đoạn (VNĐ/kWh)")
+    amount: Decimal = Field(..., description="Thành tiền của đoạn (VNĐ)")
+
+
+class SessionInvoiceResponse(BaseModel):
+    session_id: int
+    status: str
+    is_reviewing: bool = Field(default=False, description="Phiên đang ở trạng thái cần xem xét đối soát")
+    review_message: str | None = Field(default=None, description="Thông điệp thông báo đang chờ xử lý")
+    driver_id: int | None = None
+    driver_name: str | None = None
+    station_id: int | None = None
+    station_name: str | None = None
+    charger_code: str | None = None
+    connector_id: int
+    connector_number: int | None = None
+    connector_type: str | None = None
+    start_time: UTCDateTime
+    end_time: UTCDateTime | None = None
+    duration_minutes: int
+    meter_start_kwh: Decimal
+    meter_stop_kwh: Decimal | None = None
+    total_kwh: Decimal
+    applied_price_per_kwh: Decimal
+    tariff_name: str | None = None
+    price_segments: list[PriceSegmentItem] = Field(default_factory=list, description="Danh sách từng đoạn giá")
+    charging_amount: Decimal = Field(..., description="Tổng tiền sạc điện năng (tổng các đoạn giá)")
+    idle_minutes: int = Field(default=0, description="Số phút chiếm trụ sau khi sạc xong")
+    idle_rate_per_min: Decimal = Field(default=Decimal("1000.00"), description="Đơn giá phí chiếm trụ (VNĐ/phút)")
+    idle_fee: Decimal = Field(default=Decimal("0.00"), description="Phí chiếm trụ (VNĐ)")
+    tax_amount: Decimal = Field(default=Decimal("0.00"), description="Thuế GTGT / Phí dịch vụ phụ trợ")
+    total_amount: Decimal = Field(..., description="Tổng cộng tiền thanh toán (VNĐ)")
+    payment_status: str = Field(default="PAID", description="Trạng thái thanh toán: PAID | PENDING | PENDING_REVIEW")
+

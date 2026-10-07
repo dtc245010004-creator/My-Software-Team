@@ -1,12 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Battery, Zap, Thermometer, Activity, DollarSign, Wifi, WifiOff, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { Battery, Zap, Thermometer, Activity, DollarSign, Wifi, WifiOff, CheckCircle2, ChevronLeft, FileText } from 'lucide-react';
 import { useChargingTelemetry } from '../services/telemetryClient';
+import InvoiceModal from '../components/InvoiceModal';
 
 export default function ActiveSession() {
   const { id } = useParams();
   const navigate = useNavigate();
   const sessionId = parseInt(id, 10);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   
   const { data, status, isStale, isStopped } = useChargingTelemetry(sessionId);
 
@@ -152,11 +154,35 @@ export default function ActiveSession() {
         </div>
       </div>
 
+      {/* Khi phiên sạc đã kết thúc: Thông báo và Nút mở Hóa đơn chi tiết từng đoạn giá */}
       {isStopped && (
-        <div className="mt-6 text-center text-sm text-steel-gray font-mono border-t border-hairline pt-6">
-          <p>Phiên sạc đã kết thúc. Bạn có thể tháo súng sạc.</p>
+        <div className="mt-6 bg-panel border border-grid-green/40 p-5 rounded font-mono text-center space-y-3 shadow-lg">
+          <div className="flex items-center justify-center space-x-2 text-grid-green">
+            <CheckCircle2 className="w-5 h-5" />
+            <span className="font-bold text-sm">PHIÊN SẠC ĐÃ KẾT THÚC THÀNH CÔNG</span>
+          </div>
+          <p className="text-xs text-steel-gray">
+            Hệ thống đã chốt chỉ số công tơ điện và quyết toán ví tự động. Bạn có thể tháo súng sạc.
+          </p>
+
+          <button
+            type="button"
+            id="view-invoice-btn"
+            onClick={() => setShowInvoiceModal(true)}
+            className="w-full py-3 px-4 bg-gradient-to-r from-electric-cyan to-blue-600 hover:from-electric-cyan-hover hover:to-blue-700 text-tech-white rounded font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-md transition-all active:scale-[0.99]"
+          >
+            <FileText className="w-4 h-4" />
+            <span>XEM HÓA ĐƠN CHI TIẾT (TỪNG ĐOẠN GIÁ & PHÍ)</span>
+          </button>
         </div>
       )}
+
+      {/* Modal Hóa đơn chi tiết từng đoạn giá (Story S-33 / SCRUM-224) */}
+      <InvoiceModal
+        sessionId={sessionId}
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+      />
     </div>
   );
 }
