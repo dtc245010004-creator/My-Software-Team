@@ -60,3 +60,22 @@ async def send_call_and_wait(
             del pending_responses[message_id]
         if not future.done():
             future.cancel()
+
+# Chờ StopTransaction thật sau khi CSMS nhận Accepted cho RemoteStopTransaction.
+pending_stop_transactions: dict[int, asyncio.Future[dict[str, Any]]] = {}
+
+async def wait_for_stop_transaction(transaction_id: int, timeout_seconds: float = 120) -> dict[str, Any]:
+    future = asyncio.get_running_loop().create_future()
+    pending_stop_transactions[transaction_id] = future
+    try:
+        return await asyncio.wait_for(future, timeout=timeout_seconds)
+    finally:
+        if pending_stop_transactions.get(transaction_id) is future:
+            del pending_stop_transactions[transaction_id]
+
+def register_stop_transaction_waiter(transaction_id: int) -> asyncio.Future[dict[str, Any]]:
+    """Đăng ký waiter trước khi gửi RemoteStop để không lỡ StopTransaction rất nhanh."""
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    pending_stop_transactions[transaction_id] = future
+    return future

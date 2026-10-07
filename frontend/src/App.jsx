@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
 
@@ -22,8 +23,11 @@ function AppLayout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-obsidian flex items-center justify-center font-mono text-xs text-steel-gray">
-        Khởi tạo hệ thống điều phối EV CSMS...
+      <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F17] flex items-center justify-center font-sans text-sm text-slate-500 dark:text-slate-400">
+        <div className="flex items-center space-x-3">
+          <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+          <span>Khởi tạo hệ thống điều phối EV CSMS...</span>
+        </div>
       </div>
     );
   }
@@ -31,10 +35,10 @@ function AppLayout() {
   const homeRoute = getHomeRouteByRole(role);
 
   return (
-    <div className="min-h-screen bg-obsidian text-tech-white flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F17] text-slate-900 dark:text-[#F1F5F9] flex flex-col font-sans transition-colors duration-200">
       <Header />
       <Navigation />
-      <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+      <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">
         <Routes>
           {/* Trang chủ /: Chỉ ADMIN và OPERATOR xem Dashboard; CUSTOMER tự động chuyển sang Bản đồ */}
           <Route
@@ -98,13 +102,15 @@ function AppLayout() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/*" element={<AppLayout />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/*" element={<AppLayout />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

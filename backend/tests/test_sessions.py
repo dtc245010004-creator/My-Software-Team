@@ -326,3 +326,64 @@ class TestSessionLifecycle:
             )
         assert exc_customer.value.status_code == 403
         assert "vận hành viên và quản trị" in exc_customer.value.detail.lower()
+
+    def test_start_session_blocked_when_charger_under_maintenance(
+        self, db_session, session_env
+    ):
+        """Bảo vệ trạng thái bảo trì: Cấm mở phiên sạc khi trụ sạc đang bảo trì (UNAVAILABLE)."""
+        driver = session_env["driver_normal"]
+        conn = session_env["conn1"]
+        charger = conn.charging_point
+
+        # Đưa trụ sạc vào trạng thái bảo trì UNAVAILABLE
+        charger.status = "UNAVAILABLE"
+        db_session.commit()
+
+        # Cố gắng bắt đầu sạc -> phải bị từ chối với HTTP 409 Conflict
+        with pytest.raises(HTTPException) as exc_info:
+            start_charging_session(
+                db=db_session,
+                user=driver,
+                connector_id=conn.id,
+            )
+
+        assert exc_info.value.status_code == 409
+        assert "bảo trì/sự cố" in exc_info.value.detail.lower()
+
+        # Kiểm tra trụ sạc không bị chuyển sang CHARGING
+        db_session.refresh(charger)
+        assert charger.status == "UNAVAILABLE"
+
+    def test_stop_session_preserves_charger_maintenance_state(
+        self, db_session, session_env
+    ):
+        """Khi kết thúc sạc: nếu trụ sạc đã bị đặt bảo trì (UNAVAILABLE), không được tự ý đưa về AVAILABLE."""
+        driver = session_env["driver_normal"]
+        conn = session_env["conn2"]
+        charger = conn.charging_point
+
+        # Bắt đầu sạc thành công khi trụ còn AVAILABLE
+        session = start_charging_session(
+            db=db_session,
+            user=driver,
+            connector_id=conn.id,
+        )
+        assert session.status == "ACTIVE"
+
+        # Vận hành viên/Admin đưa trụ sạc vào bảo trì trong lúc phiên sạc đang chạy
+        charger.status = "UNAVAILABLE"
+        db_session.commit()
+
+        # Kết thúc phiên sạc
+        stop_charging_session(
+            db=db_session,
+            user=driver,
+            session_id=session.id,
+            meter_stop_kwh=Decimal("10.00"),
+        )
+
+        # Trụ sạc và cổng sạc phải giữ nguyên trạng thái UNAVAILABLE, không được biến thành AVAILABLE
+        db_session.refresh(charger)
+        db_session.refresh(conn)
+        assert charger.status == "UNAVAILABLE"
+        assert conn.status == "UNAVAILABLE"

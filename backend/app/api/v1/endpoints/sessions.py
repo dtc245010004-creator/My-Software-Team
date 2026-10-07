@@ -1,14 +1,19 @@
+from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user_or_driver_guest
+from app.api.deps import get_current_user, get_current_user_or_driver_guest
 from app.core.database import get_db
+from app.models.meter_value import MeterValue
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
 from app.models.user import User
 from app.schemas.session import (
+    CurrentSessionResponse,
+    RemoteStartSessionRequest,
     RemoteStopRequest,
     SessionResponse,
     SessionStartRequest,
@@ -17,7 +22,9 @@ from app.schemas.session import (
     SessionSummaryResponse,
 )
 from app.services.session_service import (
+    remote_start_charging_session,
     remote_stop_charging_session,
+    remote_stop_charging_session_ocpp,
     start_charging_session,
     stop_charging_session,
 )
@@ -218,6 +225,36 @@ def get_sessions_summary(
     return SessionSummaryResponse(group_by=group_by, kpi=kpi, items=items)
 
 
+@router.post("/remote-start", status_code=status.HTTP_202_ACCEPTED, summary="Bắt đầu phiên từ ứng dụng bằng RemoteStartTransaction")
+async def remote_start_session_endpoint(
+    payload: RemoteStartSessionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    request = await remote_start_charging_session(db=db, user=current_user, connector_id=payload.connector_id)
+    return {"request_id": request.id, "status": request.status, "expires_at": request.expires_at, "connector_id": request.connector_id}
+
+
+@router.get("/remote-start/{request_id}", summary="Kiểm tra trạng thái yêu cầu bắt đầu từ xa")
+def remote_start_status(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime, timezone
+
+    from app.models.remote_start_request import RemoteStartRequest
+    req = db.query(RemoteStartRequest).filter(RemoteStartRequest.id == request_id).first()
+    if req is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu bắt đầu từ xa.")
+    if req.user_id != current_user.id and current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xem yêu cầu này.")
+    if req.status == "PENDING" and req.expires_at <= datetime.now(timezone.utc):
+        req.status = "EXPIRED"
+        db.commit()
+    return {"request_id": req.id, "status": req.status, "transaction_id": req.transaction_id, "expires_at": req.expires_at, "connector_id": req.connector_id}
+
+
 @router.post(
     "/start",
     response_model=SessionResponse,
@@ -276,7 +313,7 @@ def stop_session_endpoint(
     response_model=SessionResponse,
     summary="Dừng phiên sạc từ xa bằng RemoteStopTransaction (S-23 / T-49: Vận hành viên & Quản trị)",
 )
-def remote_stop_session_endpoint(
+async def remote_stop_session_endpoint(
     session_id: int,
     payload: Optional[RemoteStopRequest] = None,
     current_user: User = Depends(get_current_user_or_driver_guest),
@@ -292,13 +329,83 @@ def remote_stop_session_endpoint(
     - Ca thành công: Chốt số kWh với stop_reason='Remote', chuyển status='COMPLETED' không cần tải lại.
     """
     simulate_cond = payload.simulate_condition if payload else None
-    return remote_stop_charging_session(
-        db=db,
-        user=current_user,
-        session_id=session_id,
-        simulate_condition=simulate_cond,
-    )
+    if simulate_cond:
+        return remote_stop_charging_session(db=db, user=current_user, session_id=session_id, simulate_condition=simulate_cond)
+    from app.ocpp.gateway import active_ocpp_connections
+    session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
+    code = session.connector.charging_point.code if session and session.connector and session.connector.charging_point else None
+    if code in active_ocpp_connections:
+        return await remote_stop_charging_session_ocpp(db=db, user=current_user, session_id=session_id)
+    # Giữ hành vi tương thích cho unit test/simulator chưa mở OCPP socket.
+    return remote_stop_charging_session(db=db, user=current_user, session_id=session_id, simulate_condition=None)
 
+
+@router.get(
+    "/current",
+    response_model=CurrentSessionResponse,
+    responses={204: {"description": "Tài xế không có phiên đang sạc"}, 403: {"description": "Không có quyền"}},
+    summary="API phiên đang sạc hiện tại của tài xế",
+)
+def get_current_session(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Trả phiên đang sạc và số đo Energy.Active.Import.Register mới nhất trong một truy vấn SQL."""
+    latest_value = (
+        select(MeterValue.value)
+        .where(
+            MeterValue.session_id == ChargingSession.id,
+            MeterValue.measurand == "Energy.Active.Import.Register",
+        )
+        .order_by(MeterValue.recorded_at.desc(), MeterValue.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    latest_unit = (
+        select(MeterValue.unit)
+        .where(
+            MeterValue.session_id == ChargingSession.id,
+            MeterValue.measurand == "Energy.Active.Import.Register",
+        )
+        .order_by(MeterValue.recorded_at.desc(), MeterValue.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    latest_at = (
+        select(MeterValue.recorded_at)
+        .where(
+            MeterValue.session_id == ChargingSession.id,
+            MeterValue.measurand == "Energy.Active.Import.Register",
+        )
+        .order_by(MeterValue.recorded_at.desc(), MeterValue.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    row = (
+        db.query(ChargingSession, latest_value.label("latest_value"), latest_unit.label("latest_unit"), latest_at.label("latest_at"))
+        .filter(
+            ChargingSession.user_id == current_user.id,
+            ChargingSession.status.in_(["CHARGING", "ACTIVE"]),
+        )
+        .order_by(ChargingSession.id.desc())
+        .first()
+    )
+    if row is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    session, raw_latest, raw_unit, latest_meter_at = row
+    latest_kwh = Decimal(str(raw_latest if raw_latest is not None else (session.meter_start_kwh or 0)))
+    # T-40 lưu nguyên văn đơn vị OCPP; quy đổi Wh -> kWh chỉ ở lớp API.
+    if raw_latest is not None:
+        if (raw_unit or "").lower() == "wh":
+            latest_kwh /= Decimal("1000")
+    elif session.total_kwh is not None:
+        latest_kwh += Decimal(str(session.total_kwh or 0))
+
+    result = CurrentSessionResponse.model_validate(session)
+    result.latest_kwh = latest_kwh
+    result.latest_meter_at = latest_meter_at
+    return result
 
 @router.get(
     "/me",

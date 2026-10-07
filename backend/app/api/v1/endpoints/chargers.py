@@ -19,6 +19,7 @@ from app.schemas.station import (
     ConnectorCreate,
     ConnectorResponse,
 )
+from app.services.audit_service import ghi_nhat_ky
 from app.services.station_service import (
     atomic_reactivate_charger,
     atomic_soft_delete_charger,
@@ -45,6 +46,7 @@ async def reset_charging_point(
     code: str,
     reset_in: ResetRequest,
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    db: Session = Depends(get_db),
 ):
     """Chỉ Admin/Operator được gửi lệnh Reset tới trụ đang online."""
 
@@ -55,23 +57,46 @@ async def reset_charging_point(
         )
 
     try:
-        return await send_call_and_wait(
+        result = await send_call_and_wait(
             code,
             "Reset",
             {"type": reset_in.type},
             timeout_seconds=30,
         )
+        # Ghi audit ngay khi có kết quả từ trụ; không lưu dữ liệu thẻ/PII.
+        ghi_nhat_ky(
+            db,
+            user_id=current_user.id,
+            action="Reset",
+            object_type="charging_point",
+            object_id=code,
+            data={"command": "Reset", "reset_type": reset_in.type, "result": result},
+        )
+        db.commit()
+        return result
     except ConnectionError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Trụ sạc đang ngoại tuyến.",
         ) from exc
     except TimeoutError as exc:
+        ghi_nhat_ky(
+            db, user_id=current_user.id, action="Reset",
+            object_type="charging_point", object_id=code,
+            data={"command": "Reset", "reset_type": reset_in.type, "result": "Timeout"},
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="Trụ sạc không phản hồi lệnh Reset kịp thời.",
         ) from exc
     except OcppCallError as exc:
+        ghi_nhat_ky(
+            db, user_id=current_user.id, action="Reset",
+            object_type="charging_point", object_id=code,
+            data={"command": "Reset", "reset_type": reset_in.type, "result": "Rejected", "error_code": exc.error_code},
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={
@@ -90,9 +115,7 @@ async def reset_charging_point(
 def list_chargers(
     station_id: Optional[int] = Query(None, description="Lọc theo ID trạm sạc"),
     status: Optional[str] = Query(None, description="Lọc theo trạng thái vận hành"),
-    search: Optional[str] = Query(
-        None, description="Tìm theo mã EVSE ID, hãng hoặc model"
-    ),
+    search: Optional[str] = Query(None, description="Tìm theo mã EVSE ID, hãng hoặc model"),
     skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
     limit: int = Query(100, ge=1, le=500, description="Số bản ghi tối đa"),
     current_user: Optional[User] = Depends(get_optional_current_user),
@@ -296,7 +319,21 @@ async def update_charger_status(
 
     verify_charger_ownership(charger, current_user)
 
-    charger.status = status_in.status
+    new_status = status_in.status
+    charger.status = new_status
+
+    # Đồng bộ trạng thái cascade cho các cổng sạc (Connectors) trực thuộc
+    if new_status in ("UNAVAILABLE", "FAULTED"):
+        # Chuyển các connector không đang sạc sang cùng trạng thái bảo trì/lỗi
+        for conn in charger.connectors:
+            if conn.status != "CHARGING":
+                conn.status = new_status
+    elif new_status == "AVAILABLE":
+        # Khi đưa trụ về AVAILABLE, mở lại các cổng đang UNAVAILABLE
+        for conn in charger.connectors:
+            if conn.status == "UNAVAILABLE":
+                conn.status = "AVAILABLE"
+
     db.commit()
     db.refresh(charger)
 

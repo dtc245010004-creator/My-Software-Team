@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     # OCPP 1.6J
     HEARTBEAT_INTERVAL_SECONDS: int = 300
     OCPP_CALL_TIMEOUT_SECONDS: float = 30.0
+    ABNORMAL_SESSION_THRESHOLD_SECONDS: int = 500
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(
