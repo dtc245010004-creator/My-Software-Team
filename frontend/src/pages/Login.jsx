@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Shield, Key, User, ArrowRight } from 'lucide-react';
+import { Zap, Shield, Key, User, ArrowRight, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggle from '../components/ui/ThemeToggle';
+import Button from '../components/ui/Button';
 
 export default function Login() {
   const { login, register, quickSwitch } = useAuth();
@@ -57,32 +59,48 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-obsidian flex flex-col justify-center items-center px-4 font-mono">
-      <div className="max-w-md w-full bg-panel border border-hairline p-8 rounded-sm space-y-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F17] flex flex-col justify-center items-center px-4 font-sans transition-colors duration-200 relative selection:bg-sky-500 selection:text-white py-12">
+      
+      {/* Top Right Theme Toggle */}
+      <div className="absolute top-5 right-5">
+        <ThemeToggle />
+      </div>
+
+      <div className="max-w-md w-full bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-xl dark:shadow-soft-dark space-y-6">
+        
         {/* Brand */}
         <div className="text-center space-y-2">
-          <div className="inline-flex bg-electric-cyan/20 border border-electric-cyan/40 p-3 rounded">
-            <Zap className="w-8 h-8 text-electric-cyan" />
+          <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-600 to-cyan-400 p-0.5 shadow-lg shadow-sky-500/25 items-center justify-center transform transition-transform hover:scale-105">
+            <div className="w-full h-full bg-slate-900/10 rounded-[14px] flex items-center justify-center">
+              <Zap className="w-7 h-7 text-white fill-white/80" />
+            </div>
           </div>
-          <h1 className="text-xl font-bold text-tech-white tracking-wide">EV CSMS CONSOLE</h1>
-          <p className="text-xs text-steel-gray">Nền tảng Vận hành Trạm sạc Xe điện &amp; Phân phối Lưới điện</p>
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            EV CSMS Console
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            Nền tảng Vận hành Trạm sạc Xe điện &amp; Phân phối Lưới điện
+          </p>
         </div>
 
         {/* 1-Click Fast Login for Demo */}
-        <div className="bg-obsidian border border-hairline p-3 rounded space-y-2 text-xs">
-          <span className="text-steel-gray font-bold block text-[11px]">ĐĂNG NHẬP NHANH BẢO VỆ ĐỒ ÁN (DEMO 1-CLICK):</span>
+        <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3.5 rounded-2xl space-y-2.5 text-xs">
+          <span className="text-slate-500 dark:text-slate-400 font-semibold block text-[11px] uppercase tracking-wider">
+            Đăng nhập nhanh (Demo 1-Click):
+          </span>
           <div className="grid grid-cols-5 gap-1.5">
             <button
               type="button"
               onClick={() => handleQuickDemo('ADMIN')}
-              className="py-1.5 px-1 bg-critical-red/20 text-critical-red border border-critical-red/40 hover:bg-critical-red/30 rounded font-bold text-center transition-colors text-[10px]"
+              className="py-1.5 px-1 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 hover:bg-rose-100 rounded-xl font-bold text-center transition-all text-[11px]"
+              title="Quản trị viên toàn hệ thống"
             >
               Admin
             </button>
             <button
               type="button"
               onClick={() => handleQuickDemo('OPERATOR_A')}
-              className="py-1.5 px-1 bg-caution-amber/20 text-caution-amber border border-caution-amber/40 hover:bg-caution-amber/30 rounded font-bold text-center transition-colors text-[10px]"
+              className="py-1.5 px-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 rounded-xl font-bold text-center transition-all text-[11px]"
               title="Chủ trạm A (VinFast - ST1, ST2)"
             >
               Chủ A
@@ -90,7 +108,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => handleQuickDemo('OPERATOR_B')}
-              className="py-1.5 px-1 bg-caution-amber/20 text-caution-amber border border-caution-amber/40 hover:bg-caution-amber/30 rounded font-bold text-center transition-colors text-[10px]"
+              className="py-1.5 px-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 rounded-xl font-bold text-center transition-all text-[11px]"
               title="Chủ trạm B (Trung Tâm - ST3)"
             >
               Chủ B
@@ -98,14 +116,15 @@ export default function Login() {
             <button
               type="button"
               onClick={() => handleQuickDemo('CUSTOMER')}
-              className="py-1.5 px-1 bg-grid-green/20 text-grid-green border border-grid-green/40 hover:bg-grid-green/30 rounded font-bold text-center transition-colors text-[10px]"
+              className="py-1.5 px-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 rounded-xl font-bold text-center transition-all text-[11px]"
+              title="Tài xế sạc hợp lệ"
             >
               Tài xế
             </button>
             <button
               type="button"
               onClick={() => handleQuickDemo('DEBT')}
-              className="py-1.5 px-1 bg-critical-red/30 text-critical-red border border-critical-red/60 hover:bg-critical-red/40 rounded font-bold text-center transition-colors text-[10px]"
+              className="py-1.5 px-1 bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700 hover:bg-rose-200 rounded-xl font-bold text-center transition-all text-[11px]"
               title="Mô phỏng tài khoản nợ -330.000đ bị khóa"
             >
               Tài xế nợ
@@ -114,77 +133,93 @@ export default function Login() {
         </div>
 
         {error && (
-          <div className="bg-critical-red/20 border border-critical-red/40 p-2 text-xs text-critical-red rounded">
+          <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 p-3 text-xs text-rose-700 dark:text-rose-300 rounded-xl font-medium">
             {error}
           </div>
         )}
 
         {/* Form Login/Register */}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
           <div>
-            <label className="text-steel-gray block mb-1">TÊN ĐĂNG NHẬP / USERNAME</label>
-            <input
-              type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-obsidian border border-hairline p-2.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
-            />
+            <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1.5">
+              Tên đăng nhập
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Nhập tên đăng nhập..."
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition-all"
+              />
+            </div>
           </div>
 
           {isRegisterMode && (
             <>
               <div>
-                <label className="text-steel-gray block mb-1">HỌ VÀ TÊN</label>
+                <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1.5">
+                  Họ và tên
+                </label>
                 <input
                   type="text"
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-obsidian border border-hairline p-2.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                  placeholder="Nhập họ và tên..."
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition-all"
                 />
               </div>
               <div>
-                <label className="text-steel-gray block mb-1">ĐỊA CHỈ EMAIL</label>
+                <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1.5">
+                  Địa chỉ Email
+                </label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-obsidian border border-hairline p-2.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                  placeholder="Nhập địa chỉ email..."
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition-all"
                 />
               </div>
             </>
           )}
 
           <div>
-            <label className="text-steel-gray block mb-1">MẬT KHẨU BẢO MẬT</label>
+            <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1.5">
+              Mật khẩu bảo mật
+            </label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-obsidian border border-hairline p-2.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+              placeholder="Nhập mật khẩu..."
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition-all"
             />
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded bg-electric-cyan hover:bg-electric-cyan-hover disabled:opacity-50 text-white font-bold transition-all"
+            variant="primary"
+            size="lg"
+            loading={loading}
+            className="w-full shadow-lg shadow-sky-600/25 font-bold"
           >
-            {loading ? 'ĐANG XỬ LÝ...' : isRegisterMode ? 'ĐĂNG KÝ TÀI KHOẢN MỚI' : 'ĐĂNG NHẬP HỆ THỐNG'}
-          </button>
+            {isRegisterMode ? 'Đăng ký tài khoản mới' : 'Đăng nhập hệ thống'}
+          </Button>
         </form>
 
-        <div className="text-center pt-2 border-t border-hairline text-xs">
+        <div className="text-center pt-3 border-t border-slate-100 dark:border-slate-800 text-xs sm:text-sm">
           <button
             type="button"
             onClick={() => {
               setIsRegisterMode(!isRegisterMode);
               setError('');
             }}
-            className="text-steel-gray hover:text-tech-white"
+            className="text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 font-medium transition-colors"
           >
             {isRegisterMode ? 'Đã có tài khoản? Đăng nhập ngay' : 'Chưa có tài khoản? Đăng ký mới'}
           </button>
@@ -193,3 +228,4 @@ export default function Login() {
     </div>
   );
 }
+

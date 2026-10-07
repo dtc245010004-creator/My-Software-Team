@@ -236,3 +236,46 @@ def test_operator_cannot_reset_another_operators_charger(client, grid_test_data)
         json={"type": "Soft"},
     )
     assert response.status_code == 403
+
+
+
+
+def test_patch_charger_status_cascades_to_connectors(client, grid_test_data, db_session):
+    admin_token = grid_test_data["token_admin"]
+    charger = (
+        db_session.query(ChargingPoint)
+        .filter(
+            ChargingPoint.station_id == grid_test_data["st1"].id,
+            ChargingPoint.status == "AVAILABLE",
+        )
+        .first()
+    )
+    assert charger is not None
+
+    response = client.patch(
+        f"/api/v1/chargers/{charger.id}/status",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"status": "UNAVAILABLE"},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "UNAVAILABLE"
+
+    db_session.refresh(charger)
+    assert charger.status == "UNAVAILABLE"
+    for connector in charger.connectors:
+        db_session.refresh(connector)
+        assert connector.status == "UNAVAILABLE"
+
+    response = client.patch(
+        f"/api/v1/chargers/{charger.id}/status",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"status": "AVAILABLE"},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "AVAILABLE"
+
+    db_session.refresh(charger)
+    assert charger.status == "AVAILABLE"
+    for connector in charger.connectors:
+        db_session.refresh(connector)
+        assert connector.status == "AVAILABLE"

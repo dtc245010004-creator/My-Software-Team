@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.datetime_utils import ensure_utc, get_utc_now
 from app.core.security import create_access_token, get_password_hash, verify_password
+from app.models.id_tag import IdTag
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.user import TokenResponse, UserLogin, UserRegister, UserResponse
@@ -70,6 +71,16 @@ def register(
             currency="VND",
         )
         db.add(new_wallet)
+
+        # S-24/T-37: tạo thẻ ảo ngay khi tạo tài khoản để RemoteStart dùng
+        # chung luồng xác thực OCPP với thẻ vật lý.
+        db.add(
+            IdTag(
+                code=f"REMOTE-{new_user.id}",
+                user_id=new_user.id,
+                status="active",
+            )
+        )
         db.commit()
         db.refresh(new_user)
     except IntegrityError:

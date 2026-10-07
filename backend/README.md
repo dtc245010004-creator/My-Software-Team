@@ -107,3 +107,17 @@ Thực thi backend suite bằng `pytest` trong môi trường ảo backend. Lầ
 cd backend
 pytest -v
 ```
+
+## Sprint 3 – Backend S-22 / S-23 / S-24 / S-27
+
+Implemented backend scope:
+- S-22/T-47: authenticated driver's current charging session API, latest Energy.Active.Import.Register in one SQL query, 204 when none, ownership protection on session detail.
+- S-23/T-49: real OCPP RemoteStopTransaction flow, Rejected/Offline/Timeout handling, wait up to 2 minutes for real StopTransaction before completing the session, timeout marks the session for review.
+- S-24/T-51: authenticated driver's RemoteStartTransaction, connector availability guard before sending OCPP, virtual driver idTag, 60-second pending request and status tracking, StartTransaction links the request to the created session.
+- S-27/T-57: append-only audit_logs, shared ghi_nhat_ky helper, audit records for remote start/stop, normal stop and Reset, audit query with station/user/time filters and pagination, database trigger preventing UPDATE/DELETE of audit rows.
+
+After pulling these changes, run:
+```powershell
+alembic upgrade head
+python -m pytest tests -q
+```

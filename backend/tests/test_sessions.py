@@ -438,3 +438,50 @@ def test_remote_start_persists_request_before_fast_start_transaction(
 
     assert request.status == "STARTED"
     assert request.transaction_id is not None
+
+
+def test_start_session_blocked_when_charger_under_maintenance(db_session, session_env):
+    driver = session_env["driver_normal"]
+    connector = session_env["conn1"]
+    charger = connector.charging_point
+    charger.status = "UNAVAILABLE"
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        start_charging_session(
+            db=db_session,
+            user=driver,
+            connector_id=connector.id,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "bảo trì/sự cố" in exc_info.value.detail.lower()
+    db_session.refresh(charger)
+    assert charger.status == "UNAVAILABLE"
+
+
+def test_stop_session_preserves_charger_maintenance_state(db_session, session_env):
+    driver = session_env["driver_normal"]
+    connector = session_env["conn2"]
+    charger = connector.charging_point
+    session = start_charging_session(
+        db=db_session,
+        user=driver,
+        connector_id=connector.id,
+    )
+    assert session.status == "ACTIVE"
+
+    charger.status = "UNAVAILABLE"
+    db_session.commit()
+
+    stop_charging_session(
+        db=db_session,
+        user=driver,
+        session_id=session.id,
+        meter_stop_kwh=Decimal("10.00"),
+    )
+
+    db_session.refresh(charger)
+    db_session.refresh(connector)
+    assert charger.status == "UNAVAILABLE"
+    assert connector.status == "UNAVAILABLE"
