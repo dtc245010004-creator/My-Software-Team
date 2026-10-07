@@ -13,9 +13,12 @@ from app.ocpp.frames import build_call, build_call_error, build_call_result
 from app.ocpp.gateway import active_ocpp_connections
 
 
-def _create_charging_point(db_session: Session, code: str) -> ChargingPoint:
+def _create_charging_point(
+    db_session: Session, code: str, operator_id: int | None = None
+) -> ChargingPoint:
     charging_point = ChargingPoint(
         station=Station(
+            operator_id=operator_id,
             name=f"Trạm {code}",
             address="Địa chỉ kiểm thử",
             total_grid_capacity_kw=100.0,
@@ -30,7 +33,9 @@ def _create_charging_point(db_session: Session, code: str) -> ChargingPoint:
     return charging_point
 
 
-def _operator_headers(db_session: Session, role: str = "OPERATOR") -> dict[str, str]:
+def _operator_headers(
+    db_session: Session, role: str = "OPERATOR"
+) -> tuple[dict[str, str], User]:
     user = User(
         username=f"reset_{role.lower()}",
         email=f"reset_{role.lower()}@example.test",
@@ -41,7 +46,7 @@ def _operator_headers(db_session: Session, role: str = "OPERATOR") -> dict[str, 
     db_session.commit()
     db_session.refresh(user)
     token = create_access_token({"sub": str(user.id)})
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}"}, user
 
 
 def _read_frame(websocket) -> list:
@@ -63,8 +68,8 @@ def test_reset_online_forwards_callresult_and_processes_other_calls(
     client: TestClient, db_session: Session
 ) -> None:
     code = "CP-RESET-ONLINE"
-    _create_charging_point(db_session, code)
-    headers = _operator_headers(db_session)
+    headers, operator = _operator_headers(db_session)
+    _create_charging_point(db_session, code, operator.id)
 
     with client.websocket_connect(
         f"/ocpp/{code}", subprotocols=["ocpp1.6"]
@@ -108,7 +113,8 @@ def test_reset_online_forwards_callresult_and_processes_other_calls(
 def test_reset_offline_returns_conflict_without_dispatching(
     client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    headers = _operator_headers(db_session)
+    headers, operator = _operator_headers(db_session)
+    _create_charging_point(db_session, "CP-RESET-OFFLINE", operator.id)
     send_call = AsyncMock()
     monkeypatch.setattr("app.api.v1.endpoints.chargers.send_call_and_wait", send_call)
 
@@ -130,8 +136,8 @@ def test_reset_no_response_returns_gateway_timeout(
     from app.api.v1.endpoints import chargers
 
     code = "CP-RESET-TIMEOUT"
-    _create_charging_point(db_session, code)
-    headers = _operator_headers(db_session)
+    headers, operator = _operator_headers(db_session)
+    _create_charging_point(db_session, code, operator.id)
     send_call = chargers.send_call_and_wait
 
     async def short_timeout(
@@ -167,8 +173,8 @@ def test_reset_returns_bad_gateway_for_ocpp_callerror(
     client: TestClient, db_session: Session
 ) -> None:
     code = "CP-RESET-CALLERROR"
-    _create_charging_point(db_session, code)
-    headers = _operator_headers(db_session)
+    headers, operator = _operator_headers(db_session)
+    _create_charging_point(db_session, code, operator.id)
 
     with client.websocket_connect(
         f"/ocpp/{code}", subprotocols=["ocpp1.6"]
@@ -202,7 +208,7 @@ def test_reset_rejects_customer_role(
     db_session: Session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    headers = _operator_headers(db_session, role="CUSTOMER")
+    headers, _ = _operator_headers(db_session, role="CUSTOMER")
     send_call = AsyncMock()
     monkeypatch.setattr("app.api.v1.endpoints.chargers.send_call_and_wait", send_call)
 

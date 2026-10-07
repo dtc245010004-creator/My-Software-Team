@@ -1,14 +1,19 @@
+import asyncio
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
 
-from app.core.security import get_password_hash
+from app.core.security import create_access_token, get_password_hash
+from app.models.meter_value import MeterValue
+from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.session_service import (
+    remote_start_charging_session,
     remote_stop_charging_session,
     start_charging_session,
     stop_charging_session,
@@ -307,6 +312,7 @@ class TestSessionLifecycle:
         # Phiên sạc vẫn giữ nguyên trạng thái ACTIVE
         db_session.refresh(session)
         assert session.status == "ACTIVE"
+        assert session.needs_review is True
 
     def test_remote_stop_session_nfr_rbac(self, db_session, session_env):
         """S-23 / T-49 NFR: Chỉ vai trò vận hành viên và quản trị mới được gửi lệnh dừng từ xa."""
@@ -326,3 +332,109 @@ class TestSessionLifecycle:
             )
         assert exc_customer.value.status_code == 403
         assert "vận hành viên và quản trị" in exc_customer.value.detail.lower()
+
+
+def test_current_session_returns_only_callers_latest_meter_value(
+    client, db_session, session_env
+):
+    driver = session_env["driver_normal"]
+    other_driver = session_env["driver_normal_2"]
+    first_session = ChargingSession(
+        user_id=driver.id,
+        connector_id=session_env["conn1"].id,
+        tariff_id=session_env["tariff"].id,
+        applied_price_per_kwh=Decimal("3000.00"),
+        meter_start_kwh=Decimal("0.00"),
+        status="CHARGING",
+    )
+    other_session = ChargingSession(
+        user_id=other_driver.id,
+        connector_id=session_env["conn2"].id,
+        tariff_id=session_env["tariff"].id,
+        applied_price_per_kwh=Decimal("3000.00"),
+        meter_start_kwh=Decimal("0.00"),
+        status="CHARGING",
+    )
+    db_session.add_all([first_session, other_session])
+    db_session.flush()
+    recorded_at = datetime.now(timezone.utc)
+    db_session.add(
+        MeterValue(
+            session_id=first_session.id,
+            measurand="Energy.Active.Import.Register",
+            value=Decimal("15000"),
+            unit="Wh",
+            recorded_at=recorded_at,
+        )
+    )
+    db_session.commit()
+
+    token = create_access_token({"sub": str(driver.id), "role": driver.role})
+    response = client.get(
+        "/api/v1/sessions/current",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["id"] == first_session.id
+    assert Decimal(response.json()["latest_kwh"]) == Decimal("15")
+    assert response.json()["latest_meter_at"] is not None
+
+
+def test_remote_start_persists_request_before_fast_start_transaction(
+    db_session, session_env, monkeypatch
+):
+    from sqlalchemy.orm import sessionmaker
+
+    from app.models.id_tag import IdTag
+    from app.models.remote_start_request import RemoteStartRequest
+    from app.ocpp import dispatcher, gateway
+    from app.ocpp.handlers.start_transaction import handle_start_transaction
+
+    connector = session_env["conn1"]
+    charging_point_code = connector.charging_point.code
+    monkeypatch.setattr(
+        gateway, "active_ocpp_connections", {charging_point_code: object()}
+    )
+
+    async def accept_and_start(code, action, payload, timeout_seconds):
+        assert code == charging_point_code
+        assert action == "RemoteStartTransaction"
+        with sessionmaker(bind=db_session.get_bind())() as charger_db:
+            tag = charger_db.query(IdTag).filter_by(code=payload["idTag"]).first()
+            pending = (
+                charger_db.query(RemoteStartRequest)
+                .filter_by(connector_id=connector.id, id_tag=payload["idTag"])
+                .first()
+            )
+            assert tag is not None
+            assert pending is not None
+            assert pending.status == "PENDING"
+            cp = (
+                charger_db.query(ChargingPoint)
+                .filter_by(id=connector.charging_point_id)
+                .first()
+            )
+            start_result = handle_start_transaction(
+                charger_db,
+                cp,
+                {
+                    "connectorId": payload["connectorId"],
+                    "idTag": payload["idTag"],
+                    "meterStart": 0,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            assert start_result["idTagInfo"]["status"] == "Accepted"
+        return {"status": "Accepted"}
+
+    monkeypatch.setattr(dispatcher, "send_call_and_wait", accept_and_start)
+    request = asyncio.run(
+        remote_start_charging_session(
+            db=db_session,
+            user=session_env["driver_normal"],
+            connector_id=connector.id,
+        )
+    )
+
+    assert request.status == "STARTED"
+    assert request.transaction_id is not None

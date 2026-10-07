@@ -170,3 +170,69 @@ def test_list_chargers_operator_rbac(client, grid_test_data):
     data2 = res2.json()
     assert len(data2) == 2
     assert all(c["station_name"] == "Trạm Lưới Sài Gòn" for c in data2)
+
+
+def test_audit_logs_are_scoped_to_operator_stations(client, grid_test_data, db_session):
+    from app.models.audit_log import AuditLog
+
+    owned_point = (
+        db_session.query(ChargingPoint)
+        .filter(ChargingPoint.station_id == grid_test_data["st1"].id)
+        .first()
+    )
+    foreign_point = (
+        db_session.query(ChargingPoint)
+        .filter(ChargingPoint.station_id == grid_test_data["st2"].id)
+        .first()
+    )
+    db_session.add_all(
+        [
+            AuditLog(
+                user_id=grid_test_data["op1"].id,
+                action="Reset",
+                object_type="charging_point",
+                object_id=owned_point.code,
+                data={"result": "Accepted"},
+            ),
+            AuditLog(
+                user_id=grid_test_data["op2"].id,
+                action="RemoteStartTransaction",
+                object_type="connector",
+                object_id=str(foreign_point.connectors[0].id),
+                data={"result": "Accepted"},
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/audit-logs",
+        headers={"Authorization": f"Bearer {grid_test_data['token_op1']}"},
+    )
+    assert response.status_code == 200
+    assert [item["object_id"] for item in response.json()["items"]] == [
+        owned_point.code
+    ]
+
+    filtered = client.get(
+        f"/api/v1/audit-logs?charge_point_id={owned_point.id}",
+        headers={"Authorization": f"Bearer {grid_test_data['token_op1']}"},
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["total"] == 1
+
+    admin_response = client.get(
+        "/api/v1/audit-logs",
+        headers={"Authorization": f"Bearer {grid_test_data['token_admin']}"},
+    )
+    assert admin_response.status_code == 200
+    assert admin_response.json()["total"] == 2
+
+
+def test_operator_cannot_reset_another_operators_charger(client, grid_test_data):
+    response = client.post(
+        "/api/v1/chargers/GRID-SG-01/reset",
+        headers={"Authorization": f"Bearer {grid_test_data['token_op1']}"},
+        json={"type": "Soft"},
+    )
+    assert response.status_code == 403

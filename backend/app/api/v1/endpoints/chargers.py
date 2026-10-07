@@ -19,11 +19,13 @@ from app.schemas.station import (
     ConnectorCreate,
     ConnectorResponse,
 )
+from app.services.audit_service import ghi_nhat_ky
 from app.services.station_service import (
     atomic_reactivate_charger,
     atomic_soft_delete_charger,
     broadcast_status_change,
     enrich_charger_response,
+    filter_station_access,
     verify_charger_ownership,
     verify_station_ownership,
 )
@@ -45,33 +47,84 @@ async def reset_charging_point(
     code: str,
     reset_in: ResetRequest,
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    db: Session = Depends(get_db),
 ):
     """Chỉ Admin/Operator được gửi lệnh Reset tới trụ đang online."""
 
+    charger = db.query(ChargingPoint).filter(ChargingPoint.code == code).first()
+    if charger is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy trụ sạc.",
+        )
+    verify_charger_ownership(charger, current_user)
+
     if code not in active_ocpp_connections:
+        ghi_nhat_ky(
+            db,
+            user_id=current_user.id,
+            action="Reset",
+            object_type="charging_point",
+            object_id=code,
+            data={"command": "Reset", "reset_type": reset_in.type, "result": "Offline"},
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Trụ sạc đang ngoại tuyến.",
         )
 
     try:
-        return await send_call_and_wait(
+        result = await send_call_and_wait(
             code,
             "Reset",
             {"type": reset_in.type},
             timeout_seconds=30,
         )
+        ghi_nhat_ky(
+            db,
+            user_id=current_user.id,
+            action="Reset",
+            object_type="charging_point",
+            object_id=code,
+            data={"command": "Reset", "reset_type": reset_in.type, "result": result},
+        )
+        db.commit()
+        return result
     except ConnectionError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Trụ sạc đang ngoại tuyến.",
         ) from exc
     except TimeoutError as exc:
+        ghi_nhat_ky(
+            db,
+            user_id=current_user.id,
+            action="Reset",
+            object_type="charging_point",
+            object_id=code,
+            data={"command": "Reset", "reset_type": reset_in.type, "result": "Timeout"},
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="Trụ sạc không phản hồi lệnh Reset kịp thời.",
         ) from exc
     except OcppCallError as exc:
+        ghi_nhat_ky(
+            db,
+            user_id=current_user.id,
+            action="Reset",
+            object_type="charging_point",
+            object_id=code,
+            data={
+                "command": "Reset",
+                "reset_type": reset_in.type,
+                "result": "Rejected",
+                "error_code": exc.error_code,
+            },
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={
@@ -102,13 +155,10 @@ def list_chargers(
     - OPERATOR: Xem các trụ sạc thuộc các trạm do mình sở hữu/quản lý.
     - CUSTOMER / Khách vãng lai: Xem các trụ sạc đang hoạt động (is_active=True).
     """
-    query = db.query(ChargingPoint)
-
-    if current_user and current_user.role == "OPERATOR":
-        query = query.join(Station).filter(Station.operator_id == current_user.id)
-    elif current_user and current_user.role == "ADMIN":
-        pass
-    else:
+    query = filter_station_access(
+        db.query(ChargingPoint).join(Station), current_user
+    )
+    if current_user is None or current_user.role == "CUSTOMER":
         query = query.filter(ChargingPoint.is_active.is_(True))
 
     if station_id is not None:
@@ -227,17 +277,18 @@ def get_charger(
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
-    charger = db.query(ChargingPoint).filter(ChargingPoint.id == charger_id).first()
+    charger = (
+        filter_station_access(db.query(ChargingPoint).join(Station), current_user)
+        .filter(ChargingPoint.id == charger_id)
+        .first()
+    )
+    if charger and (current_user is None or current_user.role == "CUSTOMER"):
+        if not charger.is_active:
+            charger = None
     if not charger:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trụ sạc."
         )
-    if current_user and current_user.role == "OPERATOR":
-        if not charger.station or charger.station.operator_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bạn không có quyền truy cập trụ sạc này.",
-            )
     return enrich_charger_response(charger)
 
 
@@ -294,7 +345,18 @@ async def update_charger_status(
 
     verify_charger_ownership(charger, current_user)
 
-    charger.status = status_in.status
+    new_status = status_in.status
+    charger.status = new_status
+
+    if new_status in ("UNAVAILABLE", "FAULTED"):
+        for connector in charger.connectors:
+            if connector.status != "CHARGING":
+                connector.status = new_status
+    elif new_status == "AVAILABLE":
+        for connector in charger.connectors:
+            if connector.status == "UNAVAILABLE":
+                connector.status = "AVAILABLE"
+
     db.commit()
     db.refresh(charger)
 

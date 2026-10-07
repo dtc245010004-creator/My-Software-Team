@@ -93,6 +93,7 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 2. **Bảo mật Request**:
    - Mọi request yêu cầu xác thực phải gửi kèm Header `Authorization: Bearer <token>`.
    - Ngăn chặn IDOR: Tài xế chỉ được phép dừng phiên sạc hoặc xem lịch sử giao dịch ví của chính tài khoản mình sở hữu.
+   - `GET /stations` và `GET /chargers`: Admin thấy toàn hệ thống; Operator chỉ thấy trạm/trụ thuộc `Station.operator_id` của mình; khách chỉ thấy tài nguyên đang hoạt động. Chi tiết ngoài phạm vi trả `404`.
 
 ---
 
