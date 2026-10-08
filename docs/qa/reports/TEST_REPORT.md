@@ -6,7 +6,17 @@
 
 ---
 
-## Last Full Run Before OCPP (30/09/2026)
+## Latest Full Backend Run (08/10/2026)
+
+* **Lệnh**: `python -m pytest -p no:cacheprovider tests` từ `backend/`.
+* **Môi trường**: Python 3.14.7, pytest 9.1.1.
+* **Kết quả**: **298 passed, 1 skipped, 302 warnings**; 299 ca được thu thập, chạy trong 123.28 giây.
+* **S-28**: `test_billing_idle_fee.py` có 20 ca, tất cả passed trong full suite; kiểm tra mức trần cấu hình và xử lý `Available` muộn.
+* Cảnh báo là các cảnh báo deprecation hiện có về `datetime.utcnow()` từ SQLAlchemy schema defaults.
+
+---
+
+## Historical: Last Full Run Before OCPP (30/09/2026)
 
 Đợt thực thi kiểm thử toàn diện được thực hiện vào ngày **30/09/2026** trên môi trường cục bộ (Local Development) và cấu hình Staging:
 * **Backend**: Báo cáo lần chạy khi đó ghi nhận **89/89 test cases** đã **PASSED** (0 Failed, 0 Skipped). Các tài liệu lịch sử khác ghi tổng 84 hoặc 90 `[CẦN XÁC NHẬN]`; kết quả này không bao gồm thay đổi OCPP.

@@ -1,15 +1,32 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.station import Station
 from app.models.tariff import Tariff
+from app.models.tariff_period import TariffPeriod
 from app.models.user import User
 from app.schemas.tariff import TariffCreate, TariffResponse, TariffUpdate
 from app.services.station_service import verify_station_ownership
+from app.services.tariff_validation import validate_periods
 
 router = APIRouter(prefix="/tariffs", tags=["Biểu giá điện linh hoạt (Tariffs)"])
+
+
+def _build_periods(periods) -> list[TariffPeriod]:
+    errors = validate_periods(periods)
+    if errors:
+        raise HTTPException(status_code=422, detail=errors)
+    return [
+        TariffPeriod(
+            **period.model_dump(exclude={"sort_order"}),
+            sort_order=(
+                period.sort_order if "sort_order" in period.model_fields_set else index
+            ),
+        )
+        for index, period in enumerate(periods)
+    ]
 
 
 @router.get(
@@ -21,7 +38,11 @@ def list_tariffs(
     station_id: int | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(Tariff).filter(Tariff.is_active.is_(True))
+    query = (
+        db.query(Tariff)
+        .options(selectinload(Tariff.periods))
+        .filter(Tariff.is_active.is_(True))
+    )
     if station_id is not None:
         query = query.filter(
             (Tariff.station_id == station_id) | Tariff.station_id.is_(None)
@@ -77,7 +98,9 @@ def create_tariff(
             )
         verify_station_ownership(station, current_user)
 
-    new_tariff = Tariff(**tariff_in.model_dump())
+    new_tariff = Tariff(**tariff_in.model_dump(exclude={"periods"}))
+    if tariff_in.periods is not None:
+        new_tariff.periods = _build_periods(tariff_in.periods)
     db.add(new_tariff)
     db.commit()
     db.refresh(new_tariff)
@@ -113,7 +136,10 @@ def update_tariff(
         if station:
             verify_station_ownership(station, current_user)
 
-    update_data = tariff_in.model_dump(exclude_unset=True)
+    update_data = tariff_in.model_dump(exclude_unset=True, exclude={"periods"})
+    # Thay toàn bộ danh sách trong cùng giao dịch; bỏ qua/null giữ nguyên khung cũ.
+    if tariff_in.periods is not None:
+        tariff.periods = _build_periods(tariff_in.periods)
     if "station_id" in update_data and update_data["station_id"] != tariff.station_id:
         new_st_id = update_data["station_id"]
         if new_st_id is None:

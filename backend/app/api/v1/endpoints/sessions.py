@@ -13,6 +13,7 @@ from app.models.station import ChargingPoint, Connector
 from app.models.user import User
 from app.schemas.session import (
     CurrentSessionResponse,
+    ForceCloseSessionRequest,
     RemoteStartSessionRequest,
     RemoteStopRequest,
     SessionInvoiceResponse,
@@ -23,6 +24,7 @@ from app.schemas.session import (
     SessionSummaryResponse,
 )
 from app.services.session_service import (
+    force_close_abnormal_session,
     get_session_invoice,
     remote_start_charging_session,
     remote_stop_charging_session,
@@ -259,10 +261,12 @@ def remote_start_status(
     req = db.query(RemoteStartRequest).filter(RemoteStartRequest.id == request_id).first()
     if req is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu bắt đầu từ xa.")
-    from app.core.datetime_utils import ensure_utc
-
-    expires_at_utc = ensure_utc(req.expires_at)
-    if req.status == "PENDING" and expires_at_utc and expires_at_utc <= datetime.now(timezone.utc):
+    if req.user_id != current_user.id and current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xem yêu cầu này.")
+    expires_at = req.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if req.status == "PENDING" and expires_at <= datetime.now(timezone.utc):
         req.status = "EXPIRED"
         db.commit()
 
@@ -381,6 +385,99 @@ async def remote_stop_session_endpoint(
 
 
 @router.get(
+    "/abnormal",
+    response_model=List[SessionResponse],
+    summary="Danh sách các phiên bất thường (NFR: Chỉ Vận hành viên và Kế toán)",
+)
+def list_abnormal_sessions(
+    station_id: Optional[int] = Query(None, description="Lọc theo trạm cụ thể"),
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    Ràng buộc kỹ thuật (NFR):
+    Chỉ vai trò vận hành viên (OPERATOR), kế toán (ACCOUNTANT) và quản trị viên (ADMIN) vào được trang này.
+    Tài xế/khách (CUSTOMER) bị từ chối 403 Forbidden.
+    """
+    if current_user.role not in ("OPERATOR", "ACCOUNTANT", "ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ vai trò vận hành viên và kế toán vào được trang này.",
+        )
+
+    query = db.query(ChargingSession).filter(
+        ChargingSession.status.in_(["INTERRUPTED", "FAILED", "CANCELLED"])
+    )
+
+    if current_user.role == "OPERATOR":
+        accessible_ids = get_accessible_station_ids(current_user, db)
+        if station_id is not None:
+            if station_id not in accessible_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền xem phiên sạc của trạm sạc này.",
+                )
+            target_ids = [station_id]
+        else:
+            target_ids = accessible_ids
+
+        if not target_ids:
+            return []
+
+        query = (
+            query.join(ChargingSession.connector)
+            .join(Connector.charging_point)
+            .filter(ChargingPoint.station_id.in_(target_ids))
+        )
+    elif station_id is not None:
+        query = (
+            query.join(ChargingSession.connector)
+            .join(Connector.charging_point)
+            .filter(ChargingPoint.station_id == station_id)
+        )
+
+    return query.order_by(ChargingSession.id.desc()).all()
+
+
+@router.post(
+    "/{session_id}/force-close",
+    response_model=SessionResponse,
+    summary="Đóng tay phiên sạc bất thường (Bắt buộc phải có lý do can thiệp)",
+)
+def force_close_session_endpoint(
+    session_id: int,
+    force_in: ForceCloseSessionRequest,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    Đóng tay phiên sạc bất thường:
+    - Bắt buộc phải có lý do can thiệp (chặn nếu không có lý do).
+    - Phân quyền: Chỉ Vận hành viên (OPERATOR), Kế toán (ACCOUNTANT) và Admin.
+    """
+    if current_user.role not in ("OPERATOR", "ACCOUNTANT", "ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ vai trò vận hành viên và kế toán mới được thực hiện đóng tay phiên sạc.",
+        )
+
+    clean_reason = (force_in.reason or "").strip()
+    if not clean_reason or len(clean_reason) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bắt buộc phải cung cấp lý do can thiệp để đóng phiên sạc (tối thiểu 3 ký tự).",
+        )
+
+    return force_close_abnormal_session(
+        db=db,
+        user=current_user,
+        session_id=session_id,
+        reason=clean_reason,
+        meter_stop_kwh=force_in.meter_stop_kwh,
+    )
+
+
+@router.get(
     "/current",
     response_model=CurrentSessionResponse,
     responses={204: {"description": "Tài xế không có phiên đang sạc"}, 403: {"description": "Không có quyền"}},
@@ -442,10 +539,13 @@ def get_current_session(
     elif session.total_kwh is not None:
         latest_kwh += Decimal(str(session.total_kwh or 0))
 
-    result = CurrentSessionResponse.model_validate(session)
-    result.latest_kwh = latest_kwh
-    result.latest_meter_at = latest_meter_at
-    return result
+    session_data = {
+        field_name: getattr(session, field_name)
+        for field_name in SessionResponse.model_fields
+    }
+    session_data["latest_kwh"] = latest_kwh
+    session_data["latest_meter_at"] = latest_meter_at
+    return CurrentSessionResponse.model_validate(session_data)
 
 @router.get(
     "/me",

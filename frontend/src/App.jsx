@@ -15,7 +15,9 @@ import AIAdvisor from './pages/AIAdvisor';
 import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import DriverMap from './pages/DriverMap';
+import AbnormalSessions from './pages/AbnormalSessions';
 import AuditLogs from './pages/AuditLogs';
+import TariffForm from './components/TariffForm';
 import ChargerDetail from './pages/ChargerDetail';
 import InvoiceDetail from './pages/InvoiceDetail';
 import { getHomeRouteByRole } from './utils/routeUtils';
@@ -42,23 +44,25 @@ function AppLayout() {
       <Navigation />
       <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">
         <Routes>
-          {/* Trang chủ /: Chỉ ADMIN và OPERATOR xem Dashboard; CUSTOMER tự động chuyển sang Bản đồ */}
           <Route
             path="/"
             element={
               role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <Dashboard />
             }
           />
-          {/* Bản đồ trạm sạc: Dành cho Tài xế */}
           <Route path="/map" element={<DriverMap />} />
-          {/* Quản lý Hạ tầng trạm sạc: ADMIN và OPERATOR */}
           <Route
             path="/stations"
             element={
               role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <Stations />
             }
           />
-          {/* Giả lập sạc & Ví: Chỉ mở cho CUSTOMER; ADMIN & OPERATOR bị chặn URL */}
+          <Route
+            path="/tariffs"
+            element={
+              ['ADMIN', 'OPERATOR', 'CPO'].includes(role) ? <TariffForm /> : <Navigate to={homeRoute} replace />
+            }
+          />
           <Route
             path="/simulator"
             element={
@@ -71,8 +75,16 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
             }
           />
-          {/* Nhật ký phiên sạc: Mọi vai trò đều được xem (phân vùng dữ liệu tại backend) */}
           <Route path="/sessions" element={<Sessions />} />
+          {/* Danh sách phiên bất thường trên màn hình vận hành (SCRUM-52 / SCRUM-148): Chỉ Vận hành viên (OPERATOR) và Kế toán (ACCOUNTANT) */}
+          <Route
+            path="/abnormal-sessions"
+            element={
+              ['ADMIN', 'OPERATOR', 'ACCOUNTANT'].includes(role)
+                ? <AbnormalSessions />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
           <Route path="/session/:id" element={<ActiveSession />} />
           {/* Màn hình trụ sạc và điều khiển bắt đầu từ xa (S-24 / T-52 / SCRUM-154) */}
           <Route path="/chargers/:id" element={<ChargerDetail />} />
@@ -87,14 +99,12 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <AuditLogs />
             }
           />
-          {/* AI Cố Vấn: ADMIN và OPERATOR */}
           <Route
             path="/ai-advisor"
             element={
               role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <AIAdvisor />
             }
           />
-          {/* Admin Panel: Chỉ ADMIN */}
           <Route
             path="/admin"
             element={

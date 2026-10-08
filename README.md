@@ -1,7 +1,7 @@
-# CSMS — EV Charging Station Management System
+# EV CSMS — Hệ thống quản lý vận hành trạm sạc xe điện
 
 > **Nguồn xác thực chính**: Mã nguồn thực tế `backend/app/core/config.py`, `backend/app/main.py`, `backend/seed_data.py`, `frontend/package.json` và kết quả thực thi kiểm thử `pytest`.  
-> **Dấu vết tham khảo**: [nguồn tạm: nentang.md], [nguồn tạm: Prompt.md]
+> **Phạm vi**: Quản lý mạng lưới trạm/trụ sạc, phiên sạc, ví và biểu giá; giao tiếp OCPP 1.6J; giám sát telemetry thời gian thực; hỗ trợ điều phối công suất.
 
 ---
 
@@ -9,10 +9,12 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Full backend suite gần nhất đạt **268 passed, 299 warnings** ngày 05/10/2026 (Python 3.12 trong container); kịch bản OCPP reconnect/PostgreSQL đạt 3/3 vòng.
-- **Kiến trúc dữ liệu**: Các bảng kỹ thuật OCPP gồm `ocpp_messages` (idempotency), `id_tags` (ủy quyền thẻ) và `meter_values` (số đo điện năng theo phiên). *(Nguồn: `backend/app/models/`)*
-- **Migration Alembic**: `backend/alembic.ini` trỏ tới nguồn duy nhất `backend/alembic/`; revision mới nhất trong cây là `c4ab19f2d7e1`. DB dự án chưa được migrate.
-- **Khung Staging & CI/CD**: Hỗ trợ chạy đồng thời qua `docker-compose.staging.yml` và pipeline kiểm thử tự động `.github/workflows/ci-staging.yml`.
+- **Kiểm thử tự động**: Full backend suite ngày 08/10/2026 đạt **298 passed, 1 skipped, 302 warnings** trên Python 3.14.7; pytest thu thập 299 ca.
+- **Chức năng OCPP**: Bao gồm MeterValues, chống số đo lùi/trùng, khôi phục phiên khi reconnect, RemoteStart/RemoteStop và audit log giới hạn theo quyền sở hữu trạm.
+- **Kiến trúc dữ liệu**: Các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests` và `audit_logs`. *(Nguồn: `backend/app/models/`)*
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; head duy nhất hiện tại là `1660df6b86c6`. Hai migration S-28 đã kiểm tra tiến/lùi/tiến trên SQLite tạm; không áp dụng migration lên DB dự án.
+- **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
+- **Docker & CI/CD**: `docker-compose.yml` chạy backend, frontend và simulator 20 trụ; `docker-compose.staging.yml` chạy backend/frontend. CI cấu hình tại `.github/workflows/`.
 
 ---
 
@@ -53,9 +55,6 @@ npm run dev
 # Build image Backend và Frontend
 docker compose -f docker-compose.staging.yml build
 
-# Chỉ chạy một lần khi khởi tạo database Docker mới để tạo tài khoản và dữ liệu demo
-docker compose -f docker-compose.staging.yml run --rm --no-deps backend python seed_data.py
-
 # Khởi chạy toàn bộ cụm dịch vụ Backend & Frontend (Nginx reverse proxy)
 docker compose -f docker-compose.staging.yml up -d
 
@@ -73,10 +72,24 @@ docker compose -f docker-compose.staging.yml up -d --build
 ```
 
 > [!WARNING]
-> `backend/seed_data.py` xóa và tạo lại toàn bộ bảng trước khi nạp dữ liệu. Chỉ chạy trên database mới/trống; nếu database đã có dữ liệu cần giữ, hãy sao lưu trước. Không chạy lại lệnh seed mỗi lần khởi động dự án.
+> Không chạy `backend/seed_data.py` trên cơ sở dữ liệu đang dùng: script xóa và tạo lại toàn bộ bảng. Cấu hình Compose giữ dữ liệu bằng volume; lệnh `down` không xóa volume. Tránh thêm cờ `-v` khi dừng.
 
-- Giao diện người dùng Staging: `http://localhost` (cổng 80)
-- API Backend Staging: `http://localhost:8000` (hoặc qua proxy `http://localhost/api/v1`)
+- Giao diện người dùng Staging: `http://localhost:8081`
+- API Backend Staging: `http://localhost:8002/docs` (frontend gọi API qua proxy cùng origin)
+
+### Cách 2b: Khởi chạy stack phát triển Compose (Backend + Frontend + 20 trụ ảo)
+
+Lệnh dưới đây dùng tên project `ev-sprint3` để tiếp tục dùng các volume `ev-sprint3_sqlite_data` và `ev-sprint3_postgres_data` hiện có. Không chạy `down -v`.
+
+```powershell
+docker compose --project-name ev-sprint3 -f docker-compose.yml up -d --build
+docker compose --project-name ev-sprint3 -f docker-compose.yml ps
+```
+
+- Giao diện: `http://localhost:8080`
+- API Swagger: `http://localhost:8001/docs`
+- Cơ sở dữ liệu SQLite của backend nằm trong volume `sqlite_data`; cấu hình PostgreSQL dùng volume `postgres_data`.
+- Dừng container mà vẫn giữ dữ liệu: `docker compose --project-name ev-sprint3 -f docker-compose.yml stop`
 
 ### Cách 3: Khởi chạy Backend và Frontend cùng lúc bằng Python (Local Dev)
 
@@ -180,7 +193,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Baseline trước OCPP:** các tài liệu ghi tổng khác nhau (84 ca ở danh sách suite này, 89 trong README/QA Inventory, 90 trong Sprint Status) `[CẦN XÁC NHẬN]`. Các checkpoint sau S-16 đạt 163 passed, 1 warning với 43 test OCPP (01/10/2026); full backend mới nhất sau T-55/T-56 đạt 268 passed, 299 warnings (05/10/2026).
+**Kết quả mới nhất đã chạy tại workspace (08/10/2026):** `298 passed, 1 skipped, 302 warnings` (299 ca thu thập, 123.28 giây). Suite `test_billing_idle_fee.py` có 20 ca passed. Các con số lịch sử bên trên là baseline cũ, không đại diện cho lần kiểm thử hiện tại.
 
 ---
 
@@ -199,6 +212,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 
 ### Kiến trúc thực tế
 *(Nguồn: `backend/app/main.py:20-56`, `backend/app/core/websocket.py:10-50`)*
+- **Docker Compose**: Stack phát triển chạy backend, frontend Nginx proxy và simulator OCPP 20 trụ; giao diện mặc định ở cổng host `8080`, API ở `8001`. Stack staging dùng `8081` và `8002`; dữ liệu gắn với named volume để giữ lại khi dừng container.
 - **Dual-Loop**:
   - *Fast Loop (Telemetry & Heuristic)*: Cập nhật chỉ số sạc mỗi 2 giây (`SIMULATOR_INTERVAL_SECONDS = 2`), phát sóng trực tiếp qua WebSocket `/ws/telemetry`. Tự động ngắt khẩn cấp khi nhiệt độ $> 75^\circ\text{C}$ hoặc pin đầy.
   - *Slow Loop (AI Engine)*: Lập lịch phân tích phụ tải trạm định kỳ, điều phối chia sẻ công suất thông minh (Dynamic Load Balancing) qua Google Gemini API hoặc chuyển đổi Heuristic Fallback khi mất kết nối mạng.
@@ -220,7 +234,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 
 ### API hiện có
 *(Nguồn: `backend/app/api/v1/__init__.py:10-18`)*
-Hệ thống cung cấp 8 nhóm router REST API tại tiền tố `/api/v1`:
+Hệ thống cung cấp 9 nhóm router REST API tại tiền tố `/api/v1`:
 1. `/api/v1/auth`: Đăng ký, đăng nhập JWT, lấy thông tin cá nhân.
 2. `/api/v1/stations`: Quản lý trạm sạc, đo đếm phụ tải trạm.
 3. `/api/v1/chargers`: Quản lý trụ sạc và cổng sạc vật lý.
@@ -229,6 +243,7 @@ Hệ thống cung cấp 8 nhóm router REST API tại tiền tố `/api/v1`:
 6. `/api/v1/sessions`: Khởi động, dừng phiên sạc, chốt cước ACID.
 7. `/api/v1/simulator`: Điều khiển bộ giả lập và đo đếm Telemetry.
 8. `/api/v1/ai`: Điều phối công suất sạc thông minh và tư vấn vận hành.
+9. `/api/v1/audit-logs`: Tra cứu nhật ký thao tác; Operator chỉ xem bản ghi của trạm mình quản lý.
 
 ### Giao tiếp trụ sạc OCPP 1.6J
 
@@ -238,6 +253,9 @@ Hệ thống cung cấp 8 nhóm router REST API tại tiền tố `/api/v1`:
 * `MeterValues` chỉ lưu `Energy.Active.Import.Register` theo phiên `CHARGING`, giữ nguyên đơn vị OCPP; nếu không tìm thấy phiên thì ghi payload vào `orphan_messages`. Gateway gửi CALLRESULT trước thao tác DB.
 * MeterValues bỏ qua mẫu có timestamp cũ và ghi cảnh báo, bỏ qua mẫu trùng timestamp+value im lặng. Counter thấp hơn tại timestamp mới vẫn được lưu và bật `charging_sessions.needs_review`; cùng timestamp nhưng value khác được lưu để đối soát.
 * Sau reconnect, `StatusNotification(Charging)` giữ phiên CHARGING đã lưu; StartTransaction gửi lại với cùng thẻ và meterStart nhận lại transactionId cũ. MeterValues gắn theo transactionId DB; StopTransaction đóng phiên ngay cả khi trụ đã offline và dùng timestamp trong tin nhắn.
+* API `GET /api/v1/sessions/current` trả phiên sạc hiện tại cùng số đo mới nhất; `POST /api/v1/sessions/remote-start` gửi lệnh RemoteStartTransaction và có endpoint tra trạng thái yêu cầu.
+* RemoteStopTransaction chờ StopTransaction thật từ trụ để chốt phiên; trường hợp trụ nhận lệnh nhưng không gửi StopTransaction sẽ đánh dấu phiên cần xem xét.
+* Nhật ký thao tác được ghi append-only; quyền Operator bị giới hạn theo trạm sở hữu.
 * Job APScheduler kiểm tra phiên CHARGING mỗi phút. Nếu `last_seen_at` quá `ABNORMAL_SESSION_THRESHOLD_SECONDS` (mặc định 500 giây), job gắn cờ `is_abnormal` và ghi lý do; không tự đóng phiên.
 * Admin/Operator gọi `POST /api/v1/chargers/{code}/reset` với `Soft` hoặc `Hard`; offline trả 409, hết thời gian chờ trả 504. Dispatcher ghép phản hồi CALLRESULT/CALLERROR theo message ID và dùng lại được cho các action máy chủ gửi xuống sau này.
 * Seed demo tạo mã thẻ active `DEMO-<USERNAME>` cho mỗi tài khoản tài xế role `CUSTOMER`.
@@ -251,14 +269,14 @@ Hệ thống cung cấp 8 nhóm router REST API tại tiền tố `/api/v1`:
 *(Nguồn: Khảo sát thực tế cây thư mục dự án ngày 29/09/2026)*
 
 ```text
-E:\Nền tảng vận hành trạm sạc xe điện\
+My-Software-Team/
 ├── backend/                           # Dịch vụ máy chủ FastAPI, Models, Services, Tests
 ├── frontend/                          # Giao diện người dùng Web React + Vite + Tailwind
 ├── docs/                              # Trung tâm tài liệu và tri thức hệ thống chuẩn hóa
-├── phacthaobandau/                    # Thư mục lưu trữ tài liệu phác thảo ban đầu
+├── tools/ocpp-spike/                  # Simulator OCPP và kịch bản kiểm thử tích hợp
 ├── .github/                           # Biểu mẫu kiểm soát chất lượng kho mã nguồn
 ├── .env.example                       # Biến môi trường mẫu cho toàn hệ thống
-└── ev_csms.db                         # Cơ sở dữ liệu SQLite cục bộ
+└── docker-compose.yml                # Stack phát triển Backend, Frontend và simulator
 ```
 
 ---
@@ -266,6 +284,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 ## 7. Tài liệu liên quan
 
 - Cổng điều hướng tài liệu toàn hệ thống: [`docs/README.md`](docs/README.md)
+- Bản đồ các khu vực mã nguồn: [`docs/codebase-map.md`](docs/codebase-map.md)
 - Hướng dẫn chi tiết phân hệ Backend: [`backend/README.md`](backend/README.md)
 - Bản đồ cấu trúc và ma trận truy vết: [`docs/architecture/PROJECT_STRUCTURE.md`](docs/architecture/PROJECT_STRUCTURE.md)
 - Sổ tay vận hành kỹ thuật: [`docs/devops/OPERATIONS.md`](docs/devops/OPERATIONS.md)
@@ -274,3 +293,4 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 - Hồ sơ nghiệm thu BootNotification S-08: [`docs/qa/stories/S-08.md`](docs/qa/stories/S-08.md)
 - Hồ sơ nghiệm thu Authorize/idTag S-15: [`docs/qa/stories/S-15.md`](docs/qa/stories/S-15.md)
 - Hồ sơ nghiệm thu dispatcher/Reset OCPP S-16: [`docs/qa/stories/S-16.md`](docs/qa/stories/S-16.md)
+- Hồ sơ backend biểu giá/phí chiếm trụ S-28: [`docs/qa/stories/S-28.md`](docs/qa/stories/S-28.md)

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import {
-  MapPin,
   Navigation as NavigationIcon,
   Zap,
   BatteryCharging,
@@ -16,14 +15,11 @@ import {
   MapPinOff,
   LocateFixed,
   Eye,
-  ZoomIn,
-  ZoomOut,
-  Gauge,
-  Sparkles,
   Info,
 } from 'lucide-react';
 import api from '../services/api';
 import { MAP_CONFIG } from '../config/mapConfig';
+import { useTheme } from '../context/ThemeContext';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -120,6 +116,7 @@ function createStationMarkerIcon(st, isSelected) {
 
 export default function DriverMap() {
   const navigate = useNavigate();
+  const { isDark } = useTheme();
 
   // Tọa độ người dùng và trạng thái định vị
   const [userCoords, setUserCoords] = useState(null);
@@ -146,6 +143,7 @@ export default function DriverMap() {
   const userMarkerRef = useRef(null);
   const userRadiusRef = useRef(null);
   const routeLineRef = useRef(null);
+  const lastFittedKeyRef = useRef('');
 
   // Khởi tạo định vị vị trí người dùng
   const detectUserLocation = useCallback(() => {
@@ -227,6 +225,7 @@ export default function DriverMap() {
         zoomControl: false,
         attributionControl: true,
       });
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
 
       // 1. Lớp Đường phố tiêu chuẩn (Sắc nét, rõ tên đường tiếng Việt, màu đường cao tốc / nội đô phân biệt)
       const streetLayer = L.tileLayer(MAP_CONFIG.street.url, {
@@ -333,13 +332,19 @@ export default function DriverMap() {
     Object.values(markersRef.current).forEach((m) => m.remove());
     markersRef.current = {};
 
+    const validStations = [];
     stations.forEach((st) => {
       if (st.latitude == null || st.longitude == null) return;
+
+      const parsedLat = typeof st.latitude === 'string' ? parseFloat(st.latitude) : Number(st.latitude);
+      const parsedLng = typeof st.longitude === 'string' ? parseFloat(st.longitude) : Number(st.longitude);
+      if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng) || parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) return;
+      validStations.push({ ...st, parsedLat, parsedLng });
 
       const isSelected = selectedStationId === st.id;
       const icon = createStationMarkerIcon(st, isSelected);
 
-      const marker = L.marker([st.latitude, st.longitude], {
+      const marker = L.marker([parsedLat, parsedLng], {
         icon: icon,
         zIndexOffset: isSelected ? 800 : 200,
       }).addTo(map);
@@ -355,26 +360,26 @@ export default function DriverMap() {
       const popupContent = `
         <div style="min-width: 250px; font-family: system-ui, -apple-system, sans-serif; padding: 2px;">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;">
-            <div style="font-weight: 800; font-size: 15px; color: #0F172A; letter-spacing: -0.01em;">
+            <div style="font-weight: 800; font-size: 15px; color: ${isDark ? '#F1F5F9' : '#0F172A'}; letter-spacing: -0.01em;">
               ${st.name}
             </div>
-            <span style="font-size: 10px; font-weight: 700; background: #E0F2FE; color: #0369A1; padding: 2px 6px; border-radius: 9999px; font-family: monospace;">
+            <span style="font-size: 10px; font-weight: 700; background: ${isDark ? '#082F49' : '#E0F2FE'}; color: ${isDark ? '#7DD3FC' : '#0369A1'}; padding: 2px 6px; border-radius: 9999px; font-family: monospace;">
               ST-${st.id}
             </span>
           </div>
 
-          <div style="color: #64748B; font-size: 12px; margin-bottom: 10px; line-height: 1.4;">
+          <div style="color: ${isDark ? '#94A3B8' : '#64748B'}; font-size: 12px; margin-bottom: 10px; line-height: 1.4;">
             ${st.address || 'Không có địa chỉ chi tiết'}
           </div>
 
-          <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px;">
+          <div style="background: ${isDark ? '#0F172A' : '#F8FAFC'}; border: 1px solid ${isDark ? '#334155' : '#E2E8F0'}; border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px;">
             <div>
               <span style="color: #64748B; font-size: 11px; display: block;">Khoảng cách</span>
               <strong style="color: #0284C7; font-size: 13px; font-family: monospace;">${distText || 'N/A'}</strong>
             </div>
             <div>
               <span style="color: #64748B; font-size: 11px; display: block;">Công suất tối đa</span>
-              <strong style="color: #0F172A; font-size: 13px; font-family: monospace;">${maxKw} kW</strong>
+              <strong style="color: ${isDark ? '#F1F5F9' : '#0F172A'}; font-size: 13px; font-family: monospace;">${maxKw} kW</strong>
             </div>
             <div>
               <span style="color: #64748B; font-size: 11px; display: block;">Trụ sẵn sàng</span>
@@ -387,7 +392,7 @@ export default function DriverMap() {
           </div>
 
           <div style="display: flex; gap: 6px;">
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${st.latitude},${st.longitude}" target="_blank" rel="noreferrer"
+            <a href="https://www.google.com/maps/dir/?api=1&destination=${parsedLat},${parsedLng}" target="_blank" rel="noreferrer"
                style="flex: 1; text-align: center; background: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; padding: 7px 10px; border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
               <span>Chỉ đường</span>
             </a>
@@ -414,7 +419,21 @@ export default function DriverMap() {
 
       markersRef.current[st.id] = marker;
     });
-  }, [stations, selectedStationId]);
+
+    // Fit bounds once per distinct station set; rerendering selected markers must not reset the driver's map view.
+    const currentFingerprint = validStations
+      .map((station) => `${station.id}:${station.parsedLat.toFixed(4)},${station.parsedLng.toFixed(4)}`)
+      .join('|');
+    if (validStations.length > 0 && currentFingerprint !== lastFittedKeyRef.current) {
+      lastFittedKeyRef.current = currentFingerprint;
+      if (validStations.length === 1) {
+        map.setView([validStations[0].parsedLat, validStations[0].parsedLng], 15);
+      } else {
+        const bounds = L.latLngBounds(validStations.map((station) => [station.parsedLat, station.parsedLng]));
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      }
+    }
+  }, [stations, selectedStationId, isDark]);
 
   // Cập nhật đường nối trực quan (Direction route line) giữa GPS tài xế và trạm đang chọn
   useEffect(() => {

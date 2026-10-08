@@ -35,6 +35,20 @@ class SessionStopRequest(BaseModel):
     stop_reason: str | None = Field(default="USER_STOPPED", max_length=100)
 
 
+class ForceCloseSessionRequest(BaseModel):
+    reason: str = Field(
+        ...,
+        min_length=3,
+        max_length=255,
+        description="Lý do can thiệp bắt buộc đóng phiên sạc bất thường",
+    )
+    meter_stop_kwh: Decimal | None = Field(
+        default=None,
+        ge=0,
+        description="Chỉ số công tơ điện chốt cuối cùng (kWh)",
+    )
+
+
 class RemoteStopRequest(BaseModel):
     simulate_condition: str | None = Field(
         default=None,
