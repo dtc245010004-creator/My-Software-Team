@@ -1,3 +1,25 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Plus,
+  Zap,
+  Cpu,
+  MapPin,
+  ChevronRight,
+  ChevronDown,
+  CheckCircle,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Edit2,
+  Map as MapIcon,
+  List as ListIcon,
+  Search,
+  Filter,
+  RefreshCw,
+  Activity,
+  Layers,
+  ShieldAlert
+} from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Plus, Zap, Cpu, MapPin, ChevronRight, ChevronDown, CheckCircle, AlertCircle, X, Edit2, Map as MapIcon, List as ListIcon, RefreshCw, Play } from 'lucide-react';
@@ -49,6 +71,75 @@ export default function Stations() {
   const [connectorNumberError, setConnectorNumberError] = useState(null);
 
   const canManageChargers = role === 'ADMIN' || role === 'OPERATOR';
+
+  // Bộ lọc & Tìm kiếm danh sách trạm sạc
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Trạng thái lưu & Kiểm tra dữ liệu biểu mẫu (Client-Side Validation)
+  const [submittingStation, setSubmittingStation] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [editFormErrors, setEditFormErrors] = useState({});
+
+  // Hệ thống thông báo nổi (Toast Notification)
+  const [toast, setToast] = useState(null);
+
+  // Tự động tắt Toast sau 4 giây
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showToast = (type, title, message) => {
+    setToast({ type, title, message });
+  };
+
+  // Hàm kiểm tra tính hợp lệ biểu mẫu trạm sạc (Client-Side Validation)
+  const validateStationForm = (data) => {
+    const errors = {};
+    const nameTrim = (data.name || '').trim();
+    if (!nameTrim) {
+      errors.name = 'Vui lòng nhập tên trạm sạc.';
+    } else if (nameTrim.length < 2) {
+      errors.name = 'Tên trạm sạc phải có ít nhất 2 ký tự.';
+    } else if (nameTrim.length > 150) {
+      errors.name = 'Tên trạm sạc không được vượt quá 150 ký tự.';
+    }
+
+    const capacity = parseFloat(data.total_grid_capacity_kw);
+    if (isNaN(capacity) || capacity <= 0) {
+      errors.total_grid_capacity_kw = 'Công suất nguồn lưới phải là số dương lớn hơn 0 kW.';
+    } else if (capacity > 50000) {
+      errors.total_grid_capacity_kw = 'Công suất nguồn lưới tối đa cho phép là 50,000 kW.';
+    }
+
+    if (data.latitude == null || data.longitude == null) {
+      errors.location = 'Bắt buộc phải ghim vị trí trạm sạc trên bản đồ trước khi lưu.';
+    } else if (
+      data.latitude < 8.0 ||
+      data.latitude > 24.0 ||
+      data.longitude < 102.0 ||
+      data.longitude > 110.0
+    ) {
+      errors.location = 'Tọa độ ghim phải nằm trong phạm vi lãnh thổ Việt Nam (Vĩ độ: 8.0 - 24.0, Kinh độ: 102.0 - 110.0).';
+    }
+
+    const addrTrim = (data.address || '').trim();
+    if (!addrTrim) {
+      errors.address = 'Vui lòng nhập địa chỉ chi tiết hoặc chọn vị trí trên bản đồ.';
+    } else if (addrTrim.length < 5) {
+      errors.address = 'Địa chỉ chi tiết phải có ít nhất 5 ký tự.';
+    }
+
+    const hoursTrim = (data.operating_hours || '').trim();
+    if (!hoursTrim) {
+      errors.operating_hours = 'Vui lòng nhập giờ hoạt động (Ví dụ: 24/7).';
+    }
+
+    return errors;
+  };
 
   // Form tạo trụ sạc mới
   const [chargerFormData, setChargerFormData] = useState({
@@ -107,6 +198,7 @@ export default function Stations() {
       }
     } catch (err) {
       console.error('Lỗi tải danh sách trạm sạc:', err);
+      showToast('error', 'LỖI KẾT NỐI MÁY CHỦ', 'Không thể tải danh sách trạm sạc. Vui lòng kiểm tra kết nối mạng.');
     } finally {
       setLoading(false);
     }
@@ -123,28 +215,24 @@ export default function Stations() {
       status: 'ACTIVE',
       operator_id: null,
     });
+    setFormErrors({});
     setStationValidationError(null);
     setShowAddModal(true);
   };
 
   const handleCreateStation = async (e) => {
     e.preventDefault();
-    if (formData.latitude == null || formData.longitude == null) {
-      setStationValidationError('Bắt buộc phải có ghim vị trí trạm sạc trên bản đồ trước khi lưu.');
-      return;
-    }
-    if (
-      formData.latitude < 8.0 ||
-      formData.latitude > 24.0 ||
-      formData.longitude < 102.0 ||
-      formData.longitude > 110.0
-    ) {
-      setStationValidationError('Tọa độ ghim phải nằm trong phạm vi lãnh thổ Việt Nam (Vĩ độ: 8 - 24, Kinh độ: 102 - 110).');
+    const errors = validateStationForm(formData);
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      setStationValidationError(errors.location || null);
+      showToast('error', 'LỖI XÁC THỰC BIỂU MẪU', 'Vui lòng kiểm tra và hoàn thiện các trường được đánh dấu đỏ trước khi lưu.');
       return;
     }
 
     try {
-      await api.post('/stations', formData);
+      setSubmittingStation(true);
+      const res = await api.post('/stations', formData);
       setShowAddModal(false);
       setFormData({
         name: '',
@@ -154,11 +242,19 @@ export default function Stations() {
         total_grid_capacity_kw: 150.0,
         operating_hours: '24/7',
         status: 'ACTIVE',
+        operator_id: null,
       });
+      setFormErrors({});
       setStationValidationError(null);
-      fetchStations();
+      await fetchStations();
+      showToast('success', 'THÀNH CÔNG', `Đã thêm mới trạm sạc "${res.data?.name || formData.name}" vào hệ thống.`);
     } catch (err) {
-      alert('Lỗi tạo trạm sạc: ' + (err.response?.data?.detail || err.message));
+      console.error('Lỗi tạo trạm sạc:', err);
+      const detail = err.response?.data?.detail;
+      const errorMsg = typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail.map((d) => d.msg).join(', ') : err.message);
+      showToast('error', 'LỖI TẠO TRẠM SẠC', errorMsg || 'Không thể lưu thông tin trạm sạc.');
+    } finally {
+      setSubmittingStation(false);
     }
   };
 
@@ -174,6 +270,7 @@ export default function Stations() {
       status: st.status || 'ACTIVE',
       operator_id: st.operator_id || null,
     });
+    setEditFormErrors({});
     setStationValidationError(null);
     setShowEditModal(true);
   };
@@ -182,34 +279,35 @@ export default function Stations() {
     e.preventDefault();
     if (!editingStation) return;
 
-    if (editFormData.latitude == null || editFormData.longitude == null) {
-      setStationValidationError('Bắt buộc phải có ghim vị trí trạm sạc trên bản đồ trước khi lưu.');
-      return;
-    }
-    if (
-      editFormData.latitude < 8.0 ||
-      editFormData.latitude > 24.0 ||
-      editFormData.longitude < 102.0 ||
-      editFormData.longitude > 110.0
-    ) {
-      setStationValidationError('Tọa độ ghim phải nằm trong phạm vi lãnh thổ Việt Nam (Vĩ độ: 8 - 24, Kinh độ: 102 - 110).');
+    const errors = validateStationForm(editFormData);
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      setStationValidationError(errors.location || null);
+      showToast('error', 'LỖI XÁC THỰC BIỂU MẪU', 'Vui lòng kiểm tra và sửa các trường được đánh dấu đỏ trước khi lưu.');
       return;
     }
 
     try {
+      setSubmittingStation(true);
       const payload = { ...editFormData };
       if (role !== 'ADMIN') {
-        // Chủ trạm không được phép sửa công suất lưới và chủ sở hữu
         payload.total_grid_capacity_kw = editingStation.total_grid_capacity_kw;
         payload.operator_id = editingStation.operator_id;
       }
-      await api.put(`/stations/${editingStation.id}`, payload);
+      const res = await api.put(`/stations/${editingStation.id}`, payload);
       setShowEditModal(false);
       setEditingStation(null);
+      setEditFormErrors({});
       setStationValidationError(null);
-      fetchStations();
+      await fetchStations();
+      showToast('success', 'THÀNH CÔNG', `Đã cập nhật cấu hình trạm sạc "${res.data?.name || editFormData.name}".`);
     } catch (err) {
-      alert('Lỗi cập nhật trạm sạc: ' + (err.response?.data?.detail || err.message));
+      console.error('Lỗi cập nhật trạm sạc:', err);
+      const detail = err.response?.data?.detail;
+      const errorMsg = typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail.map((d) => d.msg).join(', ') : err.message);
+      showToast('error', 'LỖI CẬP NHẬT TRẠM SẠC', errorMsg || 'Không thể cập nhật trạm sạc.');
+    } finally {
+      setSubmittingStation(false);
     }
   };
 
@@ -218,8 +316,10 @@ export default function Stations() {
       const nextStatus = currentStatus === 'AVAILABLE' ? 'UNAVAILABLE' : 'AVAILABLE';
       await api.patch(`/chargers/${chargerId}/status`, { status: nextStatus });
       await fetchStations();
+      showToast('success', 'CẬP NHẬT TRỤ SẠC', `Đã chuyển trạng thái trụ sang ${nextStatus}`);
     } catch (err) {
-      alert('Lỗi cập nhật trạng thái trụ sạc: ' + (err.response?.data?.detail || err.message));
+      console.error('Lỗi cập nhật trạng thái trụ sạc:', err);
+      showToast('error', 'LỖI TRỤ SẠC', err.response?.data?.detail || err.message);
     }
   };
 
@@ -356,6 +456,36 @@ export default function Stations() {
     }
   };
 
+  // Lọc danh sách trạm sạc theo từ khóa tìm kiếm và trạng thái
+  const filteredStations = useMemo(() => {
+    return stations.filter((st) => {
+      if (statusFilter !== 'ALL' && st.status !== statusFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = (st.name || '').toLowerCase().includes(q);
+        const matchAddr = (st.address || '').toLowerCase().includes(q);
+        const matchId = `st-${st.id}`.toLowerCase().includes(q);
+        if (!matchName && !matchAddr && !matchId) return false;
+      }
+      return true;
+    });
+  }, [stations, statusFilter, searchQuery]);
+
+  // Thống kê nhanh mạng lưới trạm sạc
+  const stationStats = useMemo(() => {
+    const total = stations.length;
+    let active = 0;
+    let maintenance = 0;
+    let totalKw = 0;
+    stations.forEach((s) => {
+      if (s.status === 'ACTIVE') active++;
+      else if (s.status === 'MAINTENANCE') maintenance++;
+      totalKw += s.total_grid_capacity_kw || 0;
+    });
+    return { total, active, maintenance, totalKw: Math.round(totalKw) };
+  }, [stations]);
   const handleOpenAddConnector = (charger) => {
     const usedNumbers = (charger.connectors || []).map((c) => c.connector_number);
     const nextNumber = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
@@ -419,7 +549,32 @@ export default function Stations() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Notification Banner */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[999] max-w-md p-4 rounded-xl shadow-2xl border backdrop-blur-md flex items-start space-x-3 transition-all animate-fadeIn ${
+          toast.type === 'success'
+            ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-300'
+            : 'bg-rose-950/95 border-rose-500/60 text-rose-300'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 pr-2">
+            <h4 className="font-bold text-xs font-mono uppercase tracking-wide">{toast.title}</h4>
+            <p className="text-xs text-tech-white/90 mt-0.5 font-sans leading-relaxed">{toast.message}</p>
+          </div>
+          <button
+            onClick={() => setToast(null)}
+            className="text-steel-gray hover:text-tech-white p-1 rounded-md hover:bg-white/10 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-tech-white">Hạ Tầng Trạm Sạc & Điểm Cấp Nguồn</h1>
@@ -485,8 +640,103 @@ export default function Stations() {
         />
       ) : (
         <div className="space-y-6">
-          <div className="space-y-4">
-        {stations.map((st) => {
+          {/* KPI Summary Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="bg-panel border border-hairline p-3 rounded-lg">
+              <span className="text-[11px] font-mono text-steel-gray uppercase block">Tổng trạm sạc</span>
+              <span className="text-lg font-bold font-mono text-tech-white mt-1 block">
+                {stationStats.total} <span className="text-xs text-steel-gray font-normal">trạm</span>
+              </span>
+            </div>
+            <div className="bg-panel border border-hairline p-3 rounded-lg">
+              <span className="text-[11px] font-mono text-emerald-400 uppercase block">Đang hoạt động</span>
+              <span className="text-lg font-bold font-mono text-emerald-400 mt-1 block">
+                {stationStats.active}
+              </span>
+            </div>
+            <div className="bg-panel border border-hairline p-3 rounded-lg">
+              <span className="text-[11px] font-mono text-amber-400 uppercase block">Bảo trì</span>
+              <span className="text-lg font-bold font-mono text-amber-400 mt-1 block">
+                {stationStats.maintenance}
+              </span>
+            </div>
+            <div className="bg-panel border border-hairline p-3 rounded-lg">
+              <span className="text-[11px] font-mono text-electric-cyan uppercase block">Tổng công suất nguồn</span>
+              <span className="text-lg font-bold font-mono text-electric-cyan mt-1 block">
+                {stationStats.totalKw} <span className="text-xs text-steel-gray font-normal">kW</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Search & Status Filter Bar */}
+          <div className="bg-panel/90 border border-hairline p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-steel-gray absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm kiếm theo tên trạm hoặc địa chỉ..."
+                className="w-full bg-obsidian border border-hairline rounded-lg pl-9 pr-8 py-1.5 text-xs text-tech-white placeholder-steel-gray/60 focus:outline-none focus:border-electric-cyan font-mono"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-steel-gray hover:text-tech-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              <span className="text-[11px] font-mono text-steel-gray mr-1 hidden md:inline">Lọc trạng thái:</span>
+              {[
+                { id: 'ALL', label: 'TẤT CẢ', count: stationStats.total },
+                { id: 'ACTIVE', label: 'HOẠT ĐỘNG', count: stationStats.active, color: 'text-emerald-400' },
+                { id: 'MAINTENANCE', label: 'BẢO TRÌ', count: stationStats.maintenance, color: 'text-amber-400' },
+              ].map((item) => {
+                const active = statusFilter === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setStatusFilter(item.id)}
+                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-all ${
+                      active
+                        ? 'bg-electric-cyan text-tech-white font-bold shadow-sm'
+                        : 'bg-obsidian/70 text-steel-gray hover:text-tech-white hover:bg-obsidian border border-hairline'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    <span className={`px-1 rounded text-[10px] ${active ? 'bg-black/30 text-white' : item.color || 'text-steel-gray'}`}>
+                      {item.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Station List */}
+          {filteredStations.length === 0 ? (
+            <div className="py-12 text-center bg-panel/40 border border-dashed border-hairline rounded-xl">
+              <AlertCircle className="w-8 h-8 text-steel-gray mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-medium text-steel-gray">
+                Không tìm thấy trạm sạc nào phù hợp với bộ lọc hiện tại.
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('ALL');
+                }}
+                className="mt-2.5 px-3 py-1.5 rounded-lg text-xs bg-panel hover:bg-panel-hover text-electric-cyan border border-electric-cyan/30 font-mono"
+              >
+                Đặt lại bộ lọc
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredStations.map((st) => {
           const isExpanded = expandedStationId === st.id;
           const chargers = st.charging_points || [];
 
@@ -786,7 +1036,8 @@ export default function Stations() {
             </div>
           );
         })}
-          </div>
+            </div>
+          )}
 
           {/* Bản đồ tổng quát mạng lưới trạm sạc */}
           <div id="stations-overview-map" className="pt-6 border-t border-hairline space-y-3">
@@ -846,12 +1097,22 @@ export default function Stations() {
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="Ví dụ: Trạm Sạc VinFast Landmark 81"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value });
+                      if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: undefined }));
+                    }}
+                    className={`w-full bg-obsidian border p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan ${
+                      formErrors.name ? 'border-critical-red bg-rose-950/20' : 'border-hairline'
+                    }`}
                   />
+                  {formErrors.name && (
+                    <p className="text-critical-red text-[11px] mt-1 font-mono flex items-center space-x-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{formErrors.name}</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-steel-gray block mb-1">
@@ -859,13 +1120,23 @@ export default function Stations() {
                   </label>
                   <input
                     type="number"
-                    required
-                    min="10"
+                    min="1"
                     step="1"
                     value={formData.total_grid_capacity_kw}
-                    onChange={(e) => setFormData({ ...formData, total_grid_capacity_kw: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                    onChange={(e) => {
+                      setFormData({ ...formData, total_grid_capacity_kw: parseFloat(e.target.value) || 0 });
+                      if (formErrors.total_grid_capacity_kw) setFormErrors((prev) => ({ ...prev, total_grid_capacity_kw: undefined }));
+                    }}
+                    className={`w-full bg-obsidian border p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan ${
+                      formErrors.total_grid_capacity_kw ? 'border-critical-red bg-rose-950/20' : 'border-hairline'
+                    }`}
                   />
+                  {formErrors.total_grid_capacity_kw && (
+                    <p className="text-critical-red text-[11px] mt-1 font-mono flex items-center space-x-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{formErrors.total_grid_capacity_kw}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -878,7 +1149,7 @@ export default function Stations() {
                   initialLat={formData.latitude}
                   initialLng={formData.longitude}
                   initialAddress={formData.address}
-                  validationError={stationValidationError}
+                  validationError={formErrors.location || formErrors.address || stationValidationError}
                   onChangeLocation={({ latitude, longitude, address }) => {
                     setFormData((prev) => ({
                       ...prev,
@@ -886,11 +1157,20 @@ export default function Stations() {
                       longitude,
                       address,
                     }));
+                    if (formErrors.location || formErrors.address) {
+                      setFormErrors((prev) => ({ ...prev, location: undefined, address: undefined }));
+                    }
                     if (latitude != null && longitude != null) {
                       setStationValidationError(null);
                     }
                   }}
                 />
+                {(formErrors.location || formErrors.address) && (
+                  <p className="text-critical-red text-[11px] mt-1.5 font-mono flex items-center space-x-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{formErrors.location || formErrors.address}</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -900,9 +1180,20 @@ export default function Stations() {
                     type="text"
                     placeholder="24/7"
                     value={formData.operating_hours}
-                    onChange={(e) => setFormData({ ...formData, operating_hours: e.target.value })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                    onChange={(e) => {
+                      setFormData({ ...formData, operating_hours: e.target.value });
+                      if (formErrors.operating_hours) setFormErrors((prev) => ({ ...prev, operating_hours: undefined }));
+                    }}
+                    className={`w-full bg-obsidian border p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan ${
+                      formErrors.operating_hours ? 'border-critical-red bg-rose-950/20' : 'border-hairline'
+                    }`}
                   />
+                  {formErrors.operating_hours && (
+                    <p className="text-critical-red text-[11px] mt-1 font-mono flex items-center space-x-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{formErrors.operating_hours}</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-steel-gray block mb-1">TRẠNG THÁI HOẠT ĐỘNG</label>
@@ -938,16 +1229,25 @@ export default function Stations() {
               <div className="flex items-center justify-end space-x-2 pt-4 border-t border-hairline">
                 <button
                   type="button"
+                  disabled={submittingStation}
                   onClick={() => setShowAddModal(false)}
-                  className="px-3 py-1.5 rounded bg-hairline text-steel-gray hover:text-tech-white"
+                  className="px-3 py-1.5 rounded bg-hairline text-steel-gray hover:text-tech-white transition-colors disabled:opacity-50"
                 >
                   HỦY BỎ
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white font-bold"
+                  disabled={submittingStation}
+                  className="flex items-center space-x-1.5 px-4 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white font-bold transition-all disabled:opacity-50"
                 >
-                  LƯU CẤU HÌNH
+                  {submittingStation ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>ĐANG LƯU...</span>
+                    </>
+                  ) : (
+                    <span>LƯU CẤU HÌNH</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -986,11 +1286,21 @@ export default function Stations() {
                   </label>
                   <input
                     type="text"
-                    required
                     value={editFormData.name}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                    onChange={(e) => {
+                      setEditFormData({ ...editFormData, name: e.target.value });
+                      if (editFormErrors.name) setEditFormErrors((prev) => ({ ...prev, name: undefined }));
+                    }}
+                    className={`w-full bg-obsidian border p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan ${
+                      editFormErrors.name ? 'border-critical-red bg-rose-950/20' : 'border-hairline'
+                    }`}
                   />
+                  {editFormErrors.name && (
+                    <p className="text-critical-red text-[11px] mt-1 font-mono flex items-center space-x-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{editFormErrors.name}</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-steel-gray block mb-1">
@@ -998,16 +1308,24 @@ export default function Stations() {
                   </label>
                   <input
                     type="number"
-                    required
-                    min="10"
+                    min="1"
                     step="1"
                     disabled={role !== 'ADMIN'}
                     value={editFormData.total_grid_capacity_kw}
-                    onChange={(e) => setEditFormData({ ...editFormData, total_grid_capacity_kw: parseFloat(e.target.value) || 0 })}
-                    className={`w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan ${
-                      role !== 'ADMIN' ? 'opacity-60 cursor-not-allowed bg-obsidian/50' : ''
-                    }`}
+                    onChange={(e) => {
+                      setEditFormData({ ...editFormData, total_grid_capacity_kw: parseFloat(e.target.value) || 0 });
+                      if (editFormErrors.total_grid_capacity_kw) setEditFormErrors((prev) => ({ ...prev, total_grid_capacity_kw: undefined }));
+                    }}
+                    className={`w-full bg-obsidian border p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan ${
+                      editFormErrors.total_grid_capacity_kw ? 'border-critical-red bg-rose-950/20' : 'border-hairline'
+                    } ${role !== 'ADMIN' ? 'opacity-60 cursor-not-allowed bg-obsidian/50' : ''}`}
                   />
+                  {editFormErrors.total_grid_capacity_kw && (
+                    <p className="text-critical-red text-[11px] mt-1 font-mono flex items-center space-x-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{editFormErrors.total_grid_capacity_kw}</span>
+                    </p>
+                  )}
                   {role !== 'ADMIN' && (
                     <span className="text-[10px] text-caution-amber mt-1 block">
                       (Chỉ Quản trị viên hệ thống có quyền sửa công suất lưới định mức)
@@ -1025,7 +1343,7 @@ export default function Stations() {
                   initialLat={editFormData.latitude}
                   initialLng={editFormData.longitude}
                   initialAddress={editFormData.address}
-                  validationError={stationValidationError}
+                  validationError={editFormErrors.location || editFormErrors.address || stationValidationError}
                   onChangeLocation={({ latitude, longitude, address }) => {
                     setEditFormData((prev) => ({
                       ...prev,
@@ -1033,11 +1351,20 @@ export default function Stations() {
                       longitude,
                       address,
                     }));
+                    if (editFormErrors.location || editFormErrors.address) {
+                      setEditFormErrors((prev) => ({ ...prev, location: undefined, address: undefined }));
+                    }
                     if (latitude != null && longitude != null) {
                       setStationValidationError(null);
                     }
                   }}
                 />
+                {(editFormErrors.location || editFormErrors.address) && (
+                  <p className="text-critical-red text-[11px] mt-1.5 font-mono flex items-center space-x-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{editFormErrors.location || editFormErrors.address}</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1046,9 +1373,20 @@ export default function Stations() {
                   <input
                     type="text"
                     value={editFormData.operating_hours}
-                    onChange={(e) => setEditFormData({ ...editFormData, operating_hours: e.target.value })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                    onChange={(e) => {
+                      setEditFormData({ ...editFormData, operating_hours: e.target.value });
+                      if (editFormErrors.operating_hours) setEditFormErrors((prev) => ({ ...prev, operating_hours: undefined }));
+                    }}
+                    className={`w-full bg-obsidian border p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan ${
+                      editFormErrors.operating_hours ? 'border-critical-red bg-rose-950/20' : 'border-hairline'
+                    }`}
                   />
+                  {editFormErrors.operating_hours && (
+                    <p className="text-critical-red text-[11px] mt-1 font-mono flex items-center space-x-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{editFormErrors.operating_hours}</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-steel-gray block mb-1">TRẠNG THÁI HOẠT ĐỘNG</label>
@@ -1084,19 +1422,28 @@ export default function Stations() {
               <div className="flex items-center justify-end space-x-2 pt-4 border-t border-hairline">
                 <button
                   type="button"
+                  disabled={submittingStation}
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingStation(null);
                   }}
-                  className="px-3 py-1.5 rounded bg-hairline text-steel-gray hover:text-tech-white"
+                  className="px-3 py-1.5 rounded bg-hairline text-steel-gray hover:text-tech-white transition-colors disabled:opacity-50"
                 >
                   HỦY BỎ
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white font-bold"
+                  disabled={submittingStation}
+                  className="flex items-center space-x-1.5 px-4 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white font-bold transition-all disabled:opacity-50"
                 >
-                  LƯU THAY ĐỔI
+                  {submittingStation ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>ĐANG LƯU...</span>
+                    </>
+                  ) : (
+                    <span>LƯU THAY ĐỔI</span>
+                  )}
                 </button>
               </div>
             </form>
