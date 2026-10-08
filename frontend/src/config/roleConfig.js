@@ -42,8 +42,8 @@ export const DEMO_USERS = {
     password: 'AccPass123',
     role: 'ACCOUNTANT',
     label: 'Kế toán',
-    fullName: 'Nguyễn Kế Toán (Đối soát)',
-    description: 'Đối soát hóa đơn & phiên sạc bất thường',
+    fullName: 'Kế Toán Viên Hệ Thống',
+    description: 'Đối soát doanh thu, tra cứu kiểm toán và phiên sạc bất thường',
   },
   CUSTOMER: {
     username: 'driver_user',

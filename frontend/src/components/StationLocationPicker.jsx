@@ -215,7 +215,7 @@ export default function StationLocationPicker({
   }, [onChangeLocation, province, district, commune, detailAddress]);
 
   // Xử lý khi ghim được đặt hoặc kéo
-  const handlePinPlaced = async (newLat, newLng, shouldFly = false) => {
+  const handlePinPlaced = (newLat, newLng, shouldFly = false) => {
     const roundedLat = parseFloat(newLat.toFixed(6));
     const roundedLng = parseFloat(newLng.toFixed(6));
 
@@ -242,24 +242,8 @@ export default function StationLocationPicker({
       }
     }
 
-    // Ghép địa chỉ hiện tại
+    // Báo tọa độ và địa chỉ hiện có ngay, không chờ mạng reverse geocode.
     let assembledAddr = assembleFullAddress();
-
-    // Reverse geocode gợi ý địa chỉ nếu địa chỉ đang để trống
-    if (!detailAddress && !province && !district && !commune) {
-      try {
-        const suggested = await reverseGeocode(roundedLat, roundedLng);
-        if (suggested) {
-          setDetailAddress(suggested);
-          notifyParent(roundedLat, roundedLng, suggested);
-          return;
-        }
-      } catch (err) {
-        console.warn('Lỗi reverse geocode:', err);
-      }
-    }
-
-    // Đảm bảo assembledAddr không bao giờ rỗng hoặc dưới 5 ký tự để tránh lỗi 422
     if (!assembledAddr || assembledAddr.trim().length < 5) {
       const provName = provinceSearch?.trim() || province?.trim() || '';
       assembledAddr = provName
@@ -269,8 +253,21 @@ export default function StationLocationPicker({
         setDetailAddress(assembledAddr);
       }
     }
-
     notifyParent(roundedLat, roundedLng, assembledAddr);
+
+    // Reverse geocode gợi ý địa chỉ ngầm nếu địa chỉ đang để trống
+    if (!detailAddress && !province && !district && !commune) {
+      reverseGeocode(roundedLat, roundedLng)
+        .then((suggested) => {
+          if (suggested) {
+            setDetailAddress(suggested);
+            notifyParent(roundedLat, roundedLng, suggested);
+          }
+        })
+        .catch((err) => {
+          console.warn('Lỗi reverse geocode:', err);
+        });
+    }
   };
 
   // Ghép chuỗi địa chỉ từ chi tiết đến tổng quát
@@ -551,6 +548,7 @@ export default function StationLocationPicker({
             onChange={(e) => {
               const val = e.target.value;
               setDistrict(val);
+              notifyParent(lat, lng, [detailAddress, commune, val, province].filter(Boolean).join(', '));
               scheduleDebouncedGeocode({ province, district: val, commune, detailAddress });
             }}
             className="w-full bg-obsidian border border-hairline p-1.5 rounded text-tech-white text-xs focus:outline-none focus:border-electric-cyan"
@@ -569,6 +567,7 @@ export default function StationLocationPicker({
             onChange={(e) => {
               const val = e.target.value;
               setCommune(val);
+              notifyParent(lat, lng, [detailAddress, val, district, province].filter(Boolean).join(', '));
               scheduleDebouncedGeocode({ province, district, commune: val, detailAddress });
             }}
             className="w-full bg-obsidian border border-hairline p-1.5 rounded text-tech-white text-xs focus:outline-none focus:border-electric-cyan"
@@ -588,6 +587,7 @@ export default function StationLocationPicker({
               onChange={(e) => {
                 const val = e.target.value;
                 setDetailAddress(val);
+                notifyParent(lat, lng, [val, commune, district, province].filter(Boolean).join(', '));
                 scheduleDebouncedGeocode({ province, district, commune, detailAddress: val });
               }}
               className="flex-1 bg-obsidian border border-hairline p-1.5 rounded text-tech-white text-xs focus:outline-none focus:border-electric-cyan"

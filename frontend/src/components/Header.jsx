@@ -21,6 +21,7 @@ export default function Header() {
   const { user, rawUser, role, isGuest, logout, quickSwitch, currentDemoKey } = useAuth();
   const [wsStatus, setWsStatus] = useState(WS_STATUS.IDLE);
   const [switching, setSwitching] = useState(false);
+  const wsOnline = STATUS_OK.has(wsStatus);
 
   useEffect(() => {
     // Subscribe status thay vì poll setInterval(1s) — tiết kiệm CPU và cleanup đúng cách
@@ -159,7 +160,7 @@ export default function Header() {
             <button
               onClick={() => handleRoleChange('ACCOUNTANT')}
               disabled={switching}
-              title="Kế toán: Đối soát hóa đơn & phiên sạc bất thường"
+              title="Kế toán: Đối soát tài chính và phiên sạc bất thường"
               className={`px-2.5 py-1 rounded-lg font-medium transition-all duration-150 ${
                 currentDemoKey === 'ACCOUNTANT'
                   ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-600/30'

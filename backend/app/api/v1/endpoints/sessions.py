@@ -233,8 +233,18 @@ async def remote_start_session_endpoint(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    request = await remote_start_charging_session(db=db, user=current_user, connector_id=payload.connector_id)
-    return {"request_id": request.id, "status": request.status, "expires_at": request.expires_at, "connector_id": request.connector_id}
+    request = await remote_start_charging_session(
+        db=db,
+        user=current_user,
+        connector_id=payload.connector_id,
+        simulate_condition=payload.simulate_condition,
+    )
+    return {
+        "request_id": request.id,
+        "status": request.status,
+        "expires_at": request.expires_at,
+        "connector_id": request.connector_id,
+    }
 
 
 @router.get("/remote-start/{request_id}", summary="Kiểm tra trạng thái yêu cầu bắt đầu từ xa")
@@ -249,12 +259,40 @@ def remote_start_status(
     req = db.query(RemoteStartRequest).filter(RemoteStartRequest.id == request_id).first()
     if req is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu bắt đầu từ xa.")
-    if req.user_id != current_user.id and current_user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="Bạn không có quyền xem yêu cầu này.")
-    if req.status == "PENDING" and req.expires_at <= datetime.now(timezone.utc):
+    from app.core.datetime_utils import ensure_utc
+
+    expires_at_utc = ensure_utc(req.expires_at)
+    if req.status == "PENDING" and expires_at_utc and expires_at_utc <= datetime.now(timezone.utc):
         req.status = "EXPIRED"
         db.commit()
-    return {"request_id": req.id, "status": req.status, "transaction_id": req.transaction_id, "expires_at": req.expires_at, "connector_id": req.connector_id}
+
+    session_id = None
+    if req.transaction_id:
+        cs = db.query(ChargingSession).filter(ChargingSession.transaction_id == req.transaction_id).first()
+        if cs:
+            session_id = cs.id
+    if not session_id and req.status == "STARTED":
+        cs = (
+            db.query(ChargingSession)
+            .filter(
+                ChargingSession.connector_id == req.connector_id,
+                ChargingSession.user_id == req.user_id,
+                ChargingSession.status.in_(["CHARGING", "ACTIVE"]),
+            )
+            .order_by(ChargingSession.id.desc())
+            .first()
+        )
+        if cs:
+            session_id = cs.id
+
+    return {
+        "request_id": req.id,
+        "status": req.status,
+        "transaction_id": req.transaction_id,
+        "session_id": session_id,
+        "expires_at": req.expires_at,
+        "connector_id": req.connector_id,
+    }
 
 
 @router.post(
