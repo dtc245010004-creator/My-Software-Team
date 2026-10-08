@@ -2,6 +2,7 @@ import math
 from typing import List
 
 from fastapi import HTTPException, status
+from sqlalchemy import false
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
@@ -19,6 +20,18 @@ from app.schemas.station import (
     StationResponse,
     StationTreeItem,
 )
+
+
+def filter_station_access(query, user):
+    """Áp dụng phạm vi trạm thống nhất cho truy vấn danh sách và chi tiết."""
+    role = getattr(user, "role", None)
+    if role == "ADMIN":
+        return query
+    if role == "OPERATOR":
+        return query.filter(Station.operator_id == user.id)
+    if user is None or role == "CUSTOMER":
+        return query.filter(Station.is_active.is_(True))
+    return query.filter(false())
 
 
 def calculate_haversine_distance(
@@ -45,17 +58,15 @@ def get_accessible_station_ids(user: User, db: Session) -> List[int]:
     - OPERATOR (Chủ trạm): Chỉ các trạm active có operator_id == user.id.
     - CUSTOMER (Tài xế) hoặc khác: Trả về danh sách rỗng.
     """
-    if user.role == "ADMIN":
-        stations = db.query(Station.id).filter(Station.is_active.is_(True)).all()
-        return [s[0] for s in stations]
-    elif user.role == "OPERATOR":
-        stations = (
-            db.query(Station.id)
-            .filter(Station.is_active.is_(True), Station.operator_id == user.id)
-            .all()
-        )
-        return [s[0] for s in stations]
-    return []
+    if user.role not in ("ADMIN", "OPERATOR"):
+        return []
+    stations = (
+        filter_station_access(db.query(Station), user)
+        .filter(Station.is_active.is_(True))
+        .with_entities(Station.id)
+        .all()
+    )
+    return [station_id for (station_id,) in stations]
 
 
 def assert_station_accessible(station_id: int, user: User, db: Session) -> Station:
@@ -281,31 +292,22 @@ async def broadcast_status_change(
 def get_station_tree(db: Session, user: User) -> list[StationTreeItem]:
     """Lấy cây trạm -> trụ -> đầu nối đã lọc theo quyền sở hữu (RBAC).
 
-    - Admin / Operator (OPERATOR): thấy toàn bộ các trạm chưa soft-delete.
-    - Chủ trạm (OPERATOR có operator_id trên trạm): chỉ thấy trạm của mình.
+    - Admin: thấy toàn bộ trạm chưa soft-delete.
+    - Operator: chỉ thấy trạm có operator_id bằng ID của mình.
     - Sử dụng joinedload để nạp quan hệ ChargingPoint và Connector,
       tránh N+1 query.
     """
-    role_names = getattr(user, "role_names", None)
-    if role_names is None and hasattr(user, "roles"):
-        role_names = [role.name for role in (user.roles or [])]
-
-    is_admin_or_global_operator = user.role == "ADMIN" or (
-        role_names
-        and any(r in ("admin", "operator", "van_hanh_vien") for r in role_names)
-    )
-
-    stmt = (
-        db.query(Station)
-        .options(
+    stmt = filter_station_access(
+        db.query(Station).options(
             joinedload(Station.charging_points).joinedload(ChargingPoint.connectors)
-        )
+        ),
+        user,
+    )
+    stmt = (
+        stmt
         .filter(Station.is_active.is_(True))
         .filter(Station.deleted_at.is_(None))
     )
-
-    if not is_admin_or_global_operator:
-        stmt = stmt.filter(Station.operator_id == user.id)
 
     stations = stmt.all()
 
@@ -388,26 +390,17 @@ def get_station_grid(db: Session, user: User) -> list[StationGridItem]:
     - Sử dụng joinedload để tránh N+1 query.
     - Tổng hợp số lượng đầu nối theo từng trạng thái cho mỗi trụ và mỗi trạm.
     """
-    role_names = getattr(user, "role_names", None)
-    if role_names is None and hasattr(user, "roles"):
-        role_names = [role.name for role in (user.roles or [])]
-
-    is_admin_or_global_operator = user.role == "ADMIN" or (
-        role_names
-        and any(r in ("admin", "operator", "van_hanh_vien") for r in role_names)
-    )
-
-    stmt = (
-        db.query(Station)
-        .options(
+    stmt = filter_station_access(
+        db.query(Station).options(
             joinedload(Station.charging_points).joinedload(ChargingPoint.connectors)
-        )
+        ),
+        user,
+    )
+    stmt = (
+        stmt
         .filter(Station.is_active.is_(True))
         .filter(Station.deleted_at.is_(None))
     )
-
-    if not is_admin_or_global_operator:
-        stmt = stmt.filter(Station.operator_id == user.id)
 
     stations = stmt.all()
 

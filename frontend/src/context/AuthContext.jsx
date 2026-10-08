@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+
 import { DEMO_USERS } from '../config/roleConfig';
+import { telemetryWs } from '../services/websocket';
 
 const AuthContext = createContext(null);
 
@@ -56,6 +58,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('ev_csms_user');
     setUser(null);
     setToken(null);
+    // Đóng WS khi logout để không stream data của user cũ
+    telemetryWs.disconnect();
   };
 
   const updateGuestName = (name) => {
@@ -68,10 +72,17 @@ export const AuthProvider = ({ children }) => {
     try {
       if (roleKey === 'ADMIN') {
         await login(DEMO_USERS.ADMIN.username, DEMO_USERS.ADMIN.password);
-      } else if (roleKey === 'OPERATOR' || roleKey === 'OPERATOR_A' || roleKey === 'OPERATOR_B') {
-        await login('operator_a', 'OpPass123');
+      } else if (roleKey === 'OPERATOR' || roleKey === 'OPERATOR_A') {
+        await login(DEMO_USERS.OPERATOR.username, DEMO_USERS.OPERATOR.password);
+      } else if (roleKey === 'OPERATOR_B') {
+        await login('operator', 'OpPass123');
+      } else if (roleKey === 'ACCOUNTANT') {
+        await login(DEMO_USERS.ACCOUNTANT.username, DEMO_USERS.ACCOUNTANT.password);
+      } else if (roleKey === 'CUSTOMER') {
+        await login(DEMO_USERS.CUSTOMER.username, DEMO_USERS.CUSTOMER.password);
+      } else if (roleKey === 'DEBT') {
+        await login('driver_debt', 'DriverPass123');
       } else {
-        // Role Tài xế không cần đăng nhập: chuyển trực tiếp sang chế độ tài xế tự do
         logout();
       }
     } catch (err) {
@@ -81,11 +92,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Xác định tài khoản demo hiện tại
-  let currentDemoKey = 'CUSTOMER';
-  if (user?.role === 'ADMIN') {
-    currentDemoKey = 'ADMIN';
-  } else if (user?.role === 'OPERATOR') {
-    currentDemoKey = 'OPERATOR';
+  let currentDemoKey = null;
+  if (user) {
+    if (user.role === 'ADMIN') {
+      currentDemoKey = 'ADMIN';
+    } else if (user.role === 'OPERATOR') {
+      currentDemoKey = 'OPERATOR';
+    } else if (user.role === 'ACCOUNTANT') {
+      currentDemoKey = 'ACCOUNTANT';
+    } else if (user.role === 'CUSTOMER') {
+      currentDemoKey = 'CUSTOMER';
+    }
   }
 
   // Nếu chưa đăng nhập, mặc định hoạt động dưới vai trò CUSTOMER (Tài xế sạc không cần đăng nhập)

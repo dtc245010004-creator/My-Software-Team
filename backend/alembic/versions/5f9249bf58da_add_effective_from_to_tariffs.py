@@ -1,7 +1,7 @@
 """add_effective_from_to_tariffs
 
 Revision ID: 5f9249bf58da
-Revises: ab12cd34ef56
+Revises: 37ff169ee686
 Create Date: 2026-10-08 17:52:09.459642
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '5f9249bf58da'
-down_revision: Union[str, None] = 'ab12cd34ef56'
+down_revision: Union[str, None] = '37ff169ee686'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

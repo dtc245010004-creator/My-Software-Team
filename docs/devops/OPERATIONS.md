@@ -12,12 +12,13 @@ Căn cứ theo mã nguồn cấu hình tại `backend/app/main.py:68-96`, `front
 
 | Thành phần | Công nghệ | Cổng / Đường dẫn mặc định | Chức năng & Giao thức |
 | :--- | :--- | :--- | :--- |
-| **Backend API** | FastAPI / Uvicorn | `http://localhost:8000` | REST API quản lý trạm sạc, xác thực, ví tiền, phiên sạc |
-| **Tài liệu API Swagger** | OpenAPI 3.0 | `http://localhost:8000/docs` | Giao diện thử nghiệm và tra cứu API tương tác |
-| **Tài liệu API ReDoc** | ReDoc | `http://localhost:8000/redoc` | Tài liệu kỹ thuật API dạng tĩnh |
-| **Kiểm tra sức khỏe** | FastAPI Endpoint | `http://localhost:8000/api/v1/health` | HTTP GET kiểm tra trạng thái dịch vụ và CSDL |
-| **Kênh Telemetry Realtime** | WebSocket | `ws://localhost:8000/ws/telemetry` | Kênh WebSocket truyền phát thông số telemetry phiên sạc |
-| **Frontend UI** | React 18 / Vite 5 | `http://localhost:5173` | Giao diện điều hành và cổng tài xế (Reverse Proxy `/api` và `/ws` về `:8000`) |
+| **Backend API (Local Dev)** | FastAPI / Uvicorn | `http://localhost:8000` | REST API quản lý trạm sạc, xác thực, ví tiền, phiên sạc |
+| **Backend API (Compose)** | FastAPI / Uvicorn | Main `http://localhost:8001`; Staging `http://localhost:8002` | Cổng host; trong Docker backend vẫn nghe cổng `8000` |
+| **Tài liệu API Swagger** | OpenAPI 3.0 | Local `:8000/docs`; Compose main `:8001/docs`; staging `:8002/docs` | Giao diện thử nghiệm và tra cứu API tương tác |
+| **Tài liệu API ReDoc** | ReDoc | Local `:8000/redoc`; Compose main `:8001/redoc`; staging `:8002/redoc` | Tài liệu kỹ thuật API dạng tĩnh |
+| **Kiểm tra sức khỏe** | FastAPI Endpoint | Local `:8000/api/v1/health`; Compose main `:8001/api/v1/health`; staging `:8002/api/v1/health` | HTTP GET kiểm tra trạng thái dịch vụ và CSDL |
+| **Kênh Telemetry Realtime** | WebSocket | Local `ws://localhost:8000/ws/telemetry`; Compose main `ws://localhost:8001/ws/telemetry` | Kênh WebSocket truyền phát thông số telemetry phiên sạc |
+| **Frontend UI** | React 18 / Vite 5 / Nginx | Local `http://localhost:5173`; Compose main `:8080`; staging `:8081` | Giao diện điều hành; Nginx proxy `/api` và `/ws` đến backend nội bộ `:8000` |
 
 ---
 
@@ -109,7 +110,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-  `backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`. Revision mới nhất là `c4ab19f2d7e1`, thêm cờ bất thường vào `charging_sessions`; migration đã kiểm tra tiến/lùi/tiến trên DB tạm, chưa áp dụng lên DB dự án. Lưu ý: upgrade từ DB trống hiện lỗi tại migration lịch sử `5ba0e05433d7` vì cột `charging_points.last_seen_at` đã tồn tại. Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
+  `backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; head hiện tại là `1660df6b86c6`. Hai migration S-28 đã kiểm tra tiến/lùi/tiến trên SQLite tạm, chưa áp dụng lên DB dự án. Sao lưu cơ sở dữ liệu đích theo đúng loại backend trước khi chạy lệnh nâng cấp.
 
 ---
 
@@ -158,6 +159,8 @@ npm run build
   # Dừng và dọn dẹp cụm staging
   docker compose -f docker-compose.staging.yml down
   ```
+  Frontend dùng cổng host `8081`, backend `8002`. Dữ liệu SQLite ở volume `staging_db_data`; `down` giữ volume, không dùng `down -v` nếu cần bảo toàn dữ liệu.
+* **Compose phát triển**: Dùng `docker compose --project-name ev-sprint3 -f docker-compose.yml up -d --build`; giao diện ở `http://localhost:8080`, API ở `http://localhost:8001/docs`. Project name này giữ nguyên tên volume dữ liệu `ev-sprint3_sqlite_data` và `ev-sprint3_postgres_data` đã dùng trước đó. Dừng an toàn bằng `docker compose --project-name ev-sprint3 -f docker-compose.yml stop`.
 * **Lưu ý đám mây**: Đối với nền tảng Render.com, chỉ tạo file `render.yaml` khi có yêu cầu chỉ định triển khai lên hạ tầng này.
 
 ---
@@ -184,6 +187,7 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `HEARTBEAT_INTERVAL_SECONDS` | Integer | `300` | Chu kỳ heartbeat trả trong BootNotification OCPP 1.6J (giây) |
 | `OCPP_CALL_TIMEOUT_SECONDS` | Float | `30.0` | Thời gian chờ CALL do CSMS gửi xuống trụ khi không truyền timeout riêng (giây) |
 | `ABNORMAL_SESSION_THRESHOLD_SECONDS` | Integer | `500` | Ngưỡng thời gian không nhận liên lạc trước khi job gắn cờ phiên đang sạc bất thường (giây); job không tự đóng phiên |
+| `IDLE_FEE_MAX_MINUTES` | Integer | `240` | Trần số phút chịu phí chiếm trụ trong một phiên, sau khi trừ thời gian ân hạn |
 
 ---
 

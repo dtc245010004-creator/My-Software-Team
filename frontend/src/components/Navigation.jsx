@@ -10,6 +10,8 @@ import {
   MapPin,
   Shield,
   ScrollText,
+  Clock,
+  AlertOctagon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,13 +19,15 @@ export default function Navigation() {
   const { role } = useAuth();
 
   const navItems = [
-    { to: '/', label: 'Bảng Điều Khiển', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR'] },
+    { to: '/', label: 'Bảng Điều Khiển', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
     { to: '/map', label: 'Bản Đồ', icon: MapPin, roles: ['CUSTOMER'] },
     { to: '/stations', label: 'Hạ Tầng Trạm Sạc', icon: BatteryCharging, roles: ['ADMIN', 'OPERATOR'] },
+    { to: '/tariffs', label: 'Biểu Giá', icon: Clock, roles: ['ADMIN', 'OPERATOR', 'CPO'] },
+    { to: '/abnormal-sessions', label: 'Phiên Bất Thường', icon: AlertOctagon, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
     { to: '/simulator', label: 'Bảng Giả Lập Sạc', icon: Gauge, roles: ['CUSTOMER'] },
     { to: '/wallet', label: 'Ví Cá Nhân', icon: Wallet, roles: ['CUSTOMER'] },
-    { to: '/sessions', label: 'Nhật Ký Phiên Sạc', icon: History, roles: ['ADMIN', 'OPERATOR', 'CUSTOMER'] },
-    { to: '/audit-logs', label: 'Tra Cứu Nhật Ký', icon: ScrollText, roles: ['ADMIN', 'OPERATOR'] },
+    { to: '/sessions', label: 'Nhật Ký Phiên Sạc', icon: History, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CUSTOMER'] },
+    { to: '/audit-logs', label: 'Tra Cứu Nhật Ký', icon: ScrollText, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
     { to: '/ai-advisor', label: 'AI Cố Vấn & Bảo Trì', icon: Cpu, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/admin', label: 'Quản Trị Hệ Thống', icon: Shield, roles: ['ADMIN'] },
   ];
@@ -58,4 +62,3 @@ export default function Navigation() {
     </nav>
   );
 }
-

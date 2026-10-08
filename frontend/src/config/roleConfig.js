@@ -3,7 +3,8 @@
  */
 export const ROLE_LABELS = {
   ADMIN: 'Quản trị viên',
-  OPERATOR: 'Chủ trạm',
+  OPERATOR: 'Vận hành viên',
+  ACCOUNTANT: 'Kế toán',
   CUSTOMER: 'Tài xế',
 };
 
@@ -32,16 +33,25 @@ export const DEMO_USERS = {
     username: 'operator_a',
     password: 'OpPass123',
     role: 'OPERATOR',
-    label: 'Chủ trạm sạc',
-    fullName: 'Chủ Trạm Sạc Mẫu',
-    description: 'Quản lý trạm sạc thuộc quyền sở hữu',
+    label: 'Vận hành viên',
+    fullName: 'Vận Hành Viên Mẫu',
+    description: 'Quản lý trạm sạc & xử lý sự cố vận hành',
+  },
+  ACCOUNTANT: {
+    username: 'accountant',
+    password: 'AccPass123',
+    role: 'ACCOUNTANT',
+    label: 'Kế toán',
+    fullName: 'Kế Toán Viên Hệ Thống',
+    description: 'Đối soát doanh thu, tra cứu kiểm toán và phiên sạc bất thường',
   },
   CUSTOMER: {
-    username: 'driver_user',
+    username: 'driver_vip',
     password: 'DriverPass123',
     role: 'CUSTOMER',
     label: 'Tài xế',
-    fullName: 'Tài Xế Khách Hàng',
+    fullName: 'Trần Thị Bích Ngọc (Tài xế VF9)',
     description: 'Tìm trạm và cắm sạc xe điện',
   },
 };
+

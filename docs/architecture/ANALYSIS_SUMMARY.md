@@ -51,6 +51,7 @@ Danh mục dưới đây mô tả các file Markdown chuyên biệt được kh�
 
 ### 2.2. Nhóm tài liệu vận hành và cấu trúc hệ thống (docs/)
 * [`docs/README.md`](../README.md): Cổng điều hướng toàn hệ thống, giải đáp 18 câu hỏi FAQ Tester và ma trận routing theo cấp Epic/Story/Task.
+* [`docs/codebase-map.md`](../codebase-map.md): Bản đồ vai trò các khu vực mã nguồn, gồm nghiệp vụ billing S-28.
 * [`docs/devops/OPERATIONS.md`](../devops/OPERATIONS.md): Sổ tay kỹ thuật chi tiết về cổng mạng, biến môi trường, CSDL và các lệnh kiểm thử.
 * [`docs/architecture/PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md): Cây thư mục đã xác minh và ma trận truy vết Requirement $\leftrightarrow$ Task $\leftrightarrow$ Code $\leftrightarrow$ Test.
 
@@ -72,6 +73,7 @@ Danh mục dưới đây mô tả các file Markdown chuyên biệt được kh�
 * [`S-07.md`](../qa/stories/S-07.md): Hồ sơ S-07 Sprint 2; T-14/T-15 hoàn thành trong phạm vi bộ đọc/ghi khung và test, các tiêu chí tầng kết nối còn lại chưa nghiệm thu.
 * [`S-15.md`](../qa/stories/S-15.md): Hồ sơ nghiệm thu model `IdTag` và handler `Authorize` cho Story S-15.
 * [`S-16.md`](../qa/stories/S-16.md): Hồ sơ nghiệm thu dispatcher gửi Reset từ CSMS và ghép phản hồi theo message ID.
+* [`S-28.md`](../qa/stories/S-28.md): Hồ sơ phạm vi Backend SCRUM-188/189/190/192 về biểu giá và phí chiếm trụ.
 
 ### 2.6. Nhóm tài liệu Thiết kế UI & Nghiên cứu kỹ thuật (Design & Spikes)
 * [`docs/design/OPERATOR_DASHBOARD_UX.md`](../design/OPERATOR_DASHBOARD_UX.md): 26 mục đặc tả UX Level 3 cho Dashboard Điều hành.
@@ -132,6 +134,6 @@ Bảng quyết định chính thức về các file kỹ thuật cấp root (đ�
 | **Gateway OCPP 1.6J** | **ĐÃ KIỂM THỬ** | `/ocpp/{charge_point_code}`, BootNotification, Authorize và dispatcher Reset; 43 test OCPP | Tầng kết nối trụ tách biệt với telemetry; chưa kiểm chứng bằng thiết bị vật lý |
 | **CSDL & Giao dịch ACID** | **HOẠT ĐỘNG** | SQLite `ev_csms.db`, ràng buộc nợ `-500k` | Giao dịch ví bảo toàn toàn vẹn |
 | **Bộ kiểm thử tự động** | **ĐÃ KIỂM THỬ** | 163 passed, 1 warning ngày 01/10/2026 | Full backend suite bao gồm 43 test OCPP |
-| **Giao diện Client React** | **HOẠT ĐỘNG** | 6 màn hình chức năng, build thành công | Hoạt động đầy đủ (có UI drift có chủ đích) |
+| **Giao diện Client React** | **HOẠT ĐỘNG** | 6 màn hình nghiệp vụ, 16 file JSX trong `frontend/src/pages/` | Hoạt động đầy đủ (có UI drift có chủ đích) |
 | **Kết nối Trạm thật qua OCPP** | **CHƯA ĐẠT** | Thiếu phần cứng, dùng simulator thay thế | Hoãn sang Sprint 2 (Đã báo cáo PO) |
 | **Cấu hình Docker & CI/CD** | **ĐỂ SAU (ĐÃ DUYỆT)** | Đã có pull_request_template.md | Đóng gói khi cần demo trên máy khác hoặc đưa lên GitHub |

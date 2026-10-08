@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lần full suite mới nhất ngày 05/10/2026 đạt 268 passed, 299 warnings trong container Python 3.12; kịch bản OCPP reconnect chạy ba vòng với 5 trụ qua backend/PostgreSQL thật.
+Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Full suite mới nhất ngày 08/10/2026 đạt 298 passed, 1 skipped, 302 warnings trên Python 3.14.7; 299 ca được thu thập trong 123.28 giây.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -48,8 +48,9 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **OCPP MeterValues** | `backend/tests/test_meter_values.py` | 5 | 100% PASS | Lưu measurand năng lượng, bỏ qua measurand khác, ghi orphan, ACK trước DB, thời gian xử lý 20 lần gửi |
 | **OCPP MeterValues Dedup** | `backend/tests/test_meter_values_dedup.py` | 5 | 100% PASS | Timestamp lùi, bản tin trùng, counter giảm, cùng timestamp hiệu chỉnh và đồng thời |
 | **Abnormal Charging Session Job** | `backend/tests/test_abnormal_session_job.py` | 3 | 100% PASS | Đánh dấu heartbeat quá ngưỡng, bỏ qua heartbeat mới, xác minh job mỗi phút chỉ gắn cờ và không đóng phiên |
+| **Biểu giá và phí chiếm trụ S-28** | `backend/tests/test_billing_idle_fee.py` | 20 | 20/20 passed trong full suite 08/10/2026 | Ân hạn, làm tròn, trần phút cấu hình, Available muộn, field tariff và HTTP 422 |
 
-**Bổ sung kiểm chứng ngày 05/10/2026**: Các suite giao thức OCPP liệt kê trong bảng có 53 ca; kịch bản tích hợp reconnect và suite phát hiện phiên bất thường được chạy riêng. Full backend suite mới nhất đạt 268 passed, 299 warnings; kịch bản T-55/T-56 đạt 3/3 vòng với 5 trụ trên PostgreSQL.
+**Bổ sung kiểm chứng ngày 08/10/2026**: Full backend suite đạt **298 passed, 1 skipped, 302 warnings** (299 ca thu thập trong 123.28 giây, Python 3.14.7). Riêng S-28 có **20/20 ca passed**; migration nâng/hạ/nâng đã chạy trên SQLite tạm.
 
 ---
 
@@ -232,6 +233,19 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 3. `test_abnormal_session_job_is_registered_once_per_minute`: job được đăng ký vào APScheduler theo chu kỳ một phút.
 
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
+
+### 4.19. Suite `test_billing_idle_fee.py` (20 ca)
+1. `test_calculate_idle_fee_within_grace_period`: Không thu phí trong ân hạn.
+2. `test_calculate_idle_fee_rounds_billable_minutes_up_after_grace`: Phần vượt ân hạn được làm tròn lên theo phút.
+3. `test_calculate_session_total_without_idle_status_charges_energy_only`: Thiếu mốc chiếm trụ thì chỉ thu tiền điện.
+4. `test_status_notifications_capture_idle_start_and_available_time`: Ghi nhận thời điểm `Finishing` và `Available`.
+5. `test_calculate_idle_fee_caps_chargeable_minutes`: Giới hạn phần phút chịu phí ở 240 phút.
+6. `test_settings_default_idle_fee_cap_is_240_minutes`, `test_calculate_session_total_uses_configured_idle_fee_cap`: Xác minh mặc định và việc đọc trần từ settings.
+7. `test_late_available_only_records_marker_after_session_billing`: `Available` tới sau khi chốt chỉ lưu mốc, không đổi hóa đơn, số dư ví hoặc sổ giao dịch.
+8. `test_create_tariff_defaults_idle_fields_to_zero`, `test_update_tariff_accepts_idle_fields`: Kiểm tra mặc định và lưu các trường phí/ân hạn.
+9. `test_create_tariff_rejects_negative_values`, `test_update_tariff_rejects_negative_values`: Hai test được tham số hóa theo 5 trường giá/phí/ân hạn âm, kiểm tra HTTP 422 và tên trường trong lỗi tiếng Việt.
+
+**Kết quả kiểm thử ngày 08/10/2026**: 20/20 ca passed trong full suite.
 
 ---
 

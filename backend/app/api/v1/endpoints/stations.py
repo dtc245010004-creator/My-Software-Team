@@ -28,6 +28,7 @@ from app.services.station_service import (
     atomic_soft_delete_station,
     calculate_haversine_distance,
     enrich_station_response,
+    filter_station_access,
     get_accessible_station_ids,
     get_station_grid,
     get_station_tree,
@@ -94,11 +95,9 @@ def list_stations(
     - Quản trị viên (ADMIN): Thấy toàn bộ trạm trong hệ thống (kể cả trạm chưa gán chủ).
     - Khách / Tài xế (CUSTOMER): Thấy toàn bộ trạm active công khai để tìm kiếm và cắm sạc.
     """
-    query = db.query(Station).filter(Station.is_active)
-
-    # Phân quyền: Chủ trạm chỉ thấy các trạm do mình sở hữu
-    if current_user and current_user.role == "OPERATOR":
-        query = query.filter(Station.operator_id == current_user.id)
+    query = filter_station_access(db.query(Station), current_user).filter(
+        Station.is_active.is_(True)
+    )
 
     if status_filter:
         query = query.filter(Station.status == status_filter.upper())
@@ -138,6 +137,10 @@ def list_stations(
                     dist_item = StationDistanceResponse.model_validate(enriched)
                     dist_item.distance_km = dist
                     results.append(dist_item)
+            elif radius_km is None:
+                results.append(
+                    StationDistanceResponse.model_validate(enrich_station_response(st))
+                )
 
         # Sắp xếp theo khoảng cách tăng dần và áp dụng phân trang
         results.sort(
@@ -695,17 +698,15 @@ def get_station(
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
-    station = db.query(Station).filter(Station.id == station_id).first()
+    station = (
+        filter_station_access(db.query(Station), current_user)
+        .filter(Station.id == station_id)
+        .first()
+    )
     if not station:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
         )
-    if current_user and current_user.role == "OPERATOR":
-        if station.operator_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bạn không có quyền truy cập trạm sạc này.",
-            )
     return enrich_station_response(station)
 
 
