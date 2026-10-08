@@ -1,0 +1,57 @@
+INFO:     Started server process [23404]
+INFO:     Waiting for application startup.
+2026-10-07 08:31:02,484 - [INFO] - ev_csms.main: Kh\u1edfi \u0111\u1ed9ng EV Charging Station Management System v1.0.0
+2026-10-07 08:31:02,484 - [INFO] - ev_csms.main: C\u01a1 s\u1edf d\u1eef li\u1ec7u c\u1ea5u hình: sqlite:///./ev_csms.db
+2026-10-07 08:31:02,485 - [INFO] - ev_csms.main: CORS cho phép các ngu\u1ed3n: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173']
+2026-10-07 08:31:02,523 - [INFO] - ev_csms.main: \u0110ã \u0111\u1ed3ng b\u1ed9 schema CSDL qua Base.metadata.create_all
+2026-10-07 08:31:02,574 - [INFO] - ev_csms.simulator: SimulatorManager \u0111ã liên k\u1ebft v\u1edbi Main AsyncIO Event Loop.
+2026-10-07 08:31:03,054 - [INFO] - apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-10-07 08:31:03,056 - [INFO] - apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-10-07 08:31:03,057 - [INFO] - apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-10-07 08:31:03,066 - [INFO] - apscheduler.scheduler: Added job "periodic_smart_charging_job" to job store "default"
+2026-10-07 08:31:03,068 - [INFO] - apscheduler.scheduler: Added job "record_station_power_metrics_minute_job" to job store "default"
+2026-10-07 08:31:03,069 - [INFO] - apscheduler.scheduler: Added job "cleanup_old_ocpp_messages_job" to job store "default"
+2026-10-07 08:31:03,070 - [INFO] - apscheduler.scheduler: Scheduler started
+2026-10-07 08:31:03,072 - [INFO] - ev_csms.scheduler: \u0110ã kh\u1edfi \u0111\u1ed9ng APScheduler cho các tác v\u1ee5 \u0111\u1ecbnh k\u1ef3 (Smart Charging 3p & Power Metrics 1p).
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-10-07 08:32:03,064 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:33:03 +07)" (scheduled at 2026-10-07 08:32:03.055670+07:00)
+2026-10-07 08:32:03,115 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:33:03 +07)" executed successfully
+2026-10-07 08:33:03,058 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:34:03 +07)" (scheduled at 2026-10-07 08:33:03.055670+07:00)
+2026-10-07 08:33:03,060 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:34:03 +07)" executed successfully
+2026-10-07 08:34:03,064 - [INFO] - apscheduler.executors.default: Running job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:37:03 +07)" (scheduled at 2026-10-07 08:34:03.054438+07:00)
+2026-10-07 08:34:03,091 - [INFO] - apscheduler.executors.default: Job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:37:03 +07)" executed successfully
+2026-10-07 08:34:03,093 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:35:03 +07)" (scheduled at 2026-10-07 08:34:03.055670+07:00)
+2026-10-07 08:34:03,097 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:35:03 +07)" executed successfully
+2026-10-07 08:35:03,061 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:36:03 +07)" (scheduled at 2026-10-07 08:35:03.055670+07:00)
+2026-10-07 08:35:03,082 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:36:03 +07)" executed successfully
+2026-10-07 08:36:03,066 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:37:03 +07)" (scheduled at 2026-10-07 08:36:03.055670+07:00)
+2026-10-07 08:36:03,088 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:37:03 +07)" executed successfully
+2026-10-07 08:37:03,055 - [INFO] - apscheduler.executors.default: Running job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:40:03 +07)" (scheduled at 2026-10-07 08:37:03.054438+07:00)
+2026-10-07 08:37:03,060 - [INFO] - apscheduler.executors.default: Job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:40:03 +07)" executed successfully
+2026-10-07 08:37:03,061 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:38:03 +07)" (scheduled at 2026-10-07 08:37:03.055670+07:00)
+2026-10-07 08:37:03,063 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:38:03 +07)" executed successfully
+2026-10-07 08:38:03,060 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:39:03 +07)" (scheduled at 2026-10-07 08:38:03.055670+07:00)
+2026-10-07 08:38:03,064 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:39:03 +07)" executed successfully
+2026-10-07 08:39:03,080 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:40:03 +07)" (scheduled at 2026-10-07 08:39:03.055670+07:00)
+2026-10-07 08:39:03,137 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:40:03 +07)" executed successfully
+2026-10-07 08:40:03,057 - [INFO] - apscheduler.executors.default: Running job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:43:03 +07)" (scheduled at 2026-10-07 08:40:03.054438+07:00)
+2026-10-07 08:40:03,094 - [INFO] - apscheduler.executors.default: Job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:43:03 +07)" executed successfully
+2026-10-07 08:40:03,105 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:41:03 +07)" (scheduled at 2026-10-07 08:40:03.055670+07:00)
+2026-10-07 08:40:03,120 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:41:03 +07)" executed successfully
+2026-10-07 08:41:03,059 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:42:03 +07)" (scheduled at 2026-10-07 08:41:03.055670+07:00)
+2026-10-07 08:41:03,062 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:42:03 +07)" executed successfully
+2026-10-07 08:42:03,059 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:43:03 +07)" (scheduled at 2026-10-07 08:42:03.055670+07:00)
+2026-10-07 08:42:03,063 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:43:03 +07)" executed successfully
+2026-10-07 08:43:03,059 - [INFO] - apscheduler.executors.default: Running job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:46:03 +07)" (scheduled at 2026-10-07 08:43:03.054438+07:00)
+2026-10-07 08:43:03,077 - [INFO] - apscheduler.executors.default: Job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:46:03 +07)" executed successfully
+2026-10-07 08:43:03,078 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:44:03 +07)" (scheduled at 2026-10-07 08:43:03.055670+07:00)
+2026-10-07 08:43:03,080 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:44:03 +07)" executed successfully
+2026-10-07 08:44:03,070 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:45:03 +07)" (scheduled at 2026-10-07 08:44:03.055670+07:00)
+2026-10-07 08:44:03,092 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:45:03 +07)" executed successfully
+2026-10-07 08:45:03,071 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:46:03 +07)" (scheduled at 2026-10-07 08:45:03.055670+07:00)
+2026-10-07 08:45:03,076 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:46:03 +07)" executed successfully
+2026-10-07 08:46:03,065 - [INFO] - apscheduler.executors.default: Running job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:49:03 +07)" (scheduled at 2026-10-07 08:46:03.054438+07:00)
+2026-10-07 08:46:03,070 - [INFO] - apscheduler.executors.default: Job "periodic_smart_charging_job (trigger: interval[0:03:00], next run at: 2026-10-07 08:49:03 +07)" executed successfully
+2026-10-07 08:46:03,071 - [INFO] - apscheduler.executors.default: Running job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:47:03 +07)" (scheduled at 2026-10-07 08:46:03.055670+07:00)
+2026-10-07 08:46:03,074 - [INFO] - apscheduler.executors.default: Job "record_station_power_metrics_minute_job (trigger: interval[0:01:00], next run at: 2026-10-07 08:47:03 +07)" executed successfully
