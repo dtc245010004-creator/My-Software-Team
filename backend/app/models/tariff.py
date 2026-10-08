@@ -8,6 +8,7 @@ from sqlalchemy import (
     Numeric,
     String,
     func,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -51,6 +52,12 @@ class Tariff(Base):
     offpeak_end = Column(String(5), default="04:00", nullable=False)
 
     is_active = Column(Boolean, default=True, nullable=False)
+    effective_from = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("'2000-01-01 00:00:00+00'"),
+        index=True,
+    )
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

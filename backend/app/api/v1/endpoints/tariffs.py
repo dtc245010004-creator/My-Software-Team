@@ -1,8 +1,11 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.core.database import get_db
+from app.core.datetime_utils import VIETNAM_TZ, get_vn_now, to_vn_time
 from app.models.station import Station
 from app.models.tariff import Tariff
 from app.models.user import User
@@ -77,7 +80,28 @@ def create_tariff(
             )
         verify_station_ownership(station, current_user)
 
-    new_tariff = Tariff(**tariff_in.model_dump())
+    # Kiểm tra ngày hiệu lực (effective_from): bắt buộc từ ngày mai trở đi theo giờ Việt Nam
+    now_vn = get_vn_now()
+    tomorrow_start_vn = datetime(
+        now_vn.year, now_vn.month, now_vn.day, tzinfo=VIETNAM_TZ
+    ) + timedelta(days=1)
+
+    effective_dt = tariff_in.effective_from
+    if effective_dt is None:
+        # Mặc định bắt đầu từ 00:00 ngày mai theo giờ Việt Nam (chuyển sang UTC)
+        effective_dt = tomorrow_start_vn.astimezone(timezone.utc)
+    else:
+        # Nếu truyền vào, kiểm tra phải >= 00:00 ngày mai theo giờ VN
+        effective_dt_vn = to_vn_time(effective_dt)
+        if effective_dt_vn < tomorrow_start_vn:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ngày hiệu lực của biểu giá phải từ ngày mai trở đi (theo giờ Việt Nam). Không được áp dụng trong quá khứ hoặc hôm nay.",
+            )
+
+    tariff_dict = tariff_in.model_dump()
+    tariff_dict["effective_from"] = effective_dt
+    new_tariff = Tariff(**tariff_dict)
     db.add(new_tariff)
     db.commit()
     db.refresh(new_tariff)
@@ -87,7 +111,7 @@ def create_tariff(
 @router.put(
     "/{tariff_id}",
     response_model=TariffResponse,
-    summary="Cập nhật biểu giá (Kiểm tra quyền sở hữu trạm)",
+    summary="Cập nhật biểu giá (Tạo phiên bản kế tiếp có hiệu lực từ tương lai, không ghi đè bản đang dùng)",
 )
 def update_tariff(
     tariff_id: int,
@@ -95,48 +119,67 @@ def update_tariff(
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
-    tariff = db.query(Tariff).filter(Tariff.id == tariff_id).first()
-    if not tariff:
+    current_tariff = db.query(Tariff).filter(Tariff.id == tariff_id).first()
+    if not current_tariff:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy biểu giá."
         )
 
     # Biểu giá chung chỉ Admin được sửa
-    if tariff.station_id is None:
+    if current_tariff.station_id is None:
         if current_user.role != "ADMIN":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Chỉ Quản trị viên mới có quyền cập nhật biểu giá chung toàn hệ thống.",
             )
     else:
-        station = db.query(Station).filter(Station.id == tariff.station_id).first()
+        station = db.query(Station).filter(Station.id == current_tariff.station_id).first()
         if station:
             verify_station_ownership(station, current_user)
 
+    # Kiểm tra ngày hiệu lực (effective_from): bắt buộc từ ngày mai trở đi theo giờ Việt Nam
+    now_vn = get_vn_now()
+    tomorrow_start_vn = datetime(
+        now_vn.year, now_vn.month, now_vn.day, tzinfo=VIETNAM_TZ
+    ) + timedelta(days=1)
+
+    effective_dt = tariff_in.effective_from
+    if effective_dt is None:
+        effective_dt = tomorrow_start_vn.astimezone(timezone.utc)
+    else:
+        effective_dt_vn = to_vn_time(effective_dt)
+        if effective_dt_vn < tomorrow_start_vn:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ngày hiệu lực của biểu giá phải từ ngày mai trở đi (theo giờ Việt Nam). Không được áp dụng trong quá khứ hoặc hôm nay.",
+            )
+
     update_data = tariff_in.model_dump(exclude_unset=True)
-    if "station_id" in update_data and update_data["station_id"] != tariff.station_id:
-        new_st_id = update_data["station_id"]
-        if new_st_id is None:
-            if current_user.role != "ADMIN":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Chỉ Quản trị viên mới có quyền chuyển biểu giá thành dùng chung toàn hệ thống.",
-                )
-        else:
-            new_st = db.query(Station).filter(Station.id == new_st_id).first()
-            if not new_st:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Không tìm thấy trạm sạc mới.",
-                )
-            verify_station_ownership(new_st, current_user)
 
-    for field, value in update_data.items():
-        setattr(tariff, field, value)
+    # Nguyên tắc S-34: Không ghi đè bản ghi cũ; tạo phiên bản mới kế tiếp
+    new_version_data = {
+        "station_id": current_tariff.station_id,
+        "name": current_tariff.name,
+        "price_normal": current_tariff.price_normal,
+        "price_peak": current_tariff.price_peak,
+        "price_offpeak": current_tariff.price_offpeak,
+        "peak_start": current_tariff.peak_start,
+        "peak_end": current_tariff.peak_end,
+        "peak_start_2": current_tariff.peak_start_2,
+        "peak_end_2": current_tariff.peak_end_2,
+        "offpeak_start": current_tariff.offpeak_start,
+        "offpeak_end": current_tariff.offpeak_end,
+        "is_active": True,
+        "effective_from": effective_dt,
+    }
+    new_version_data.update(update_data)
+    new_version_data["effective_from"] = effective_dt
 
+    new_version_tariff = Tariff(**new_version_data)
+    db.add(new_version_tariff)
     db.commit()
-    db.refresh(tariff)
-    return tariff
+    db.refresh(new_version_tariff)
+    return new_version_tariff
 
 
 @router.delete(

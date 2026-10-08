@@ -22,6 +22,10 @@ class TariffBase(BaseModel):
     peak_end_2: str = Field(default="20:00", max_length=5)
     offpeak_start: str = Field(default="22:00", max_length=5)
     offpeak_end: str = Field(default="04:00", max_length=5)
+    effective_from: UTCDateTime | None = Field(
+        default=None,
+        description="Thời điểm bắt đầu có hiệu lực (UTC / ISO 8601). Phải từ ngày mai trở đi (giờ VN).",
+    )
 
 
 class TariffCreate(TariffBase):
@@ -41,12 +45,14 @@ class TariffUpdate(BaseModel):
     peak_end_2: str | None = None
     offpeak_start: str | None = None
     offpeak_end: str | None = None
+    effective_from: UTCDateTime | None = None
     is_active: bool | None = None
 
 
 class TariffResponse(TariffBase):
     id: int
     station_id: int | None = None
+    effective_from: UTCDateTime
     is_active: bool
     created_at: UTCDateTime
 
