@@ -676,12 +676,15 @@ async def remote_start_charging_session(
     db: Session,
     user: User,
     connector_id: int,
+    simulate_condition: str | None = None,
 ) -> "RemoteStartRequest":
     """Kiểm tra cổng, lưu yêu cầu chờ rồi gửi RemoteStartTransaction."""
     from app.models.id_tag import IdTag
     from app.models.remote_start_request import RemoteStartRequest
     from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
     from app.ocpp.gateway import active_ocpp_connections
+
+    condition = (simulate_condition or "").upper().strip()
 
     connector = (
         db.query(Connector)
@@ -693,11 +696,41 @@ async def remote_start_charging_session(
     station = connector.charging_point.station if connector.charging_point else None
     if station is None or not station.is_active:
         raise HTTPException(status_code=409, detail="Trạm sạc hiện không hoạt động.")
-    if connector.status != "AVAILABLE":
+
+    # Ca 3 của S-24: Đầu nối bận
+    if condition == "BUSY" or connector.status != "AVAILABLE":
         raise HTTPException(status_code=409, detail="Đầu nối đang bận hoặc không khả dụng.")
+
+    # Ca 2 của S-24: Trụ từ chối
+    if condition == "REJECTED":
+        ghi_nhat_ky(
+            db,
+            user_id=user.id,
+            action="RemoteStartTransaction",
+            object_type="connector",
+            object_id=connector.id,
+            data={"result": "Rejected"},
+        )
+        db.commit()
+        raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).")
+
+    # Ca 4 của S-24: Hết thời gian chờ phản hồi (Timeout)
+    if condition == "TIMEOUT":
+        ghi_nhat_ky(
+            db,
+            user_id=user.id,
+            action="RemoteStartTransaction",
+            object_type="connector",
+            object_id=connector.id,
+            data={"result": "Timeout"},
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=504,
+            detail="Trụ sạc không phản hồi lệnh bắt đầu trong thời gian chờ.",
+        )
+
     code = connector.charging_point.code
-    if code not in active_ocpp_connections:
-        raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.")
 
     # Mỗi tài xế có một idTag ảo để dùng chung luồng xác thực với thẻ vật lý.
     tag = db.query(IdTag).filter(IdTag.user_id == user.id, IdTag.code.like("REMOTE-%")).first()

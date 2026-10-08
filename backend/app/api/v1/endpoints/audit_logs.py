@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import String, and_, cast, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.session import ChargingSession
@@ -20,9 +20,12 @@ def list_audit_logs(
     user_id: int | None = Query(None, description="Lọc theo người thực hiện"),
     from_time: datetime | None = Query(None),
     to_time: datetime | None = Query(None),
+    from_param: str | None = Query(None, alias="from"),
+    to_param: str | None = Query(None, alias="to"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=50),
-    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    page_size: int | None = Query(None, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """S-27/T-58: lọc nhật ký theo trạm, người thực hiện, thời gian và phân trang."""

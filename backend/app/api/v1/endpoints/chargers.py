@@ -273,7 +273,7 @@ def create_charger_for_station(
     summary="Xem chi tiết trụ sạc và các cổng sạc trực thuộc",
 )
 def get_charger(
-    charger_id: int,
+    charger_id: str,
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):

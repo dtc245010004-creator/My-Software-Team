@@ -80,6 +80,7 @@ def update_user_role(
         "OWNER",
         "DRIVER",
         "CUSTOMER",
+        "ACCOUNTANT",
     }
 
     next_role = payload.role.upper()

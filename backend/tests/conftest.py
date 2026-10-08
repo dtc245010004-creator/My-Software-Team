@@ -41,7 +41,10 @@ def db_session():
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=test_engine)
+        try:
+            Base.metadata.drop_all(bind=test_engine)
+        except Exception:
+            pass
 
 
 def pytest_unconfigure(config):

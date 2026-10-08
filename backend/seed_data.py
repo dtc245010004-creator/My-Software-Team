@@ -76,6 +76,15 @@ def seed_database():
                 role="OPERATOR",
                 is_active=True,
             ),
+            # Kế toán viên hệ thống (Role: ACCOUNTANT)
+            User(
+                username="accountant",
+                email="accountant@evcsms.vn",
+                full_name="Kế Toán Viên Hệ Thống",
+                password_hash=get_password_hash("AccPass123"),
+                role="ACCOUNTANT",
+                is_active=True,
+            ),
             # Khách hàng tài xế
             User(
                 username="customer_user",
@@ -144,6 +153,9 @@ def seed_database():
                 is_locked = False
             elif u.username in ("operator", "operator_a"):
                 init_balance = Decimal("2000000.00")
+                is_locked = False
+            elif u.username == "accountant":
+                init_balance = Decimal("1000000.00")
                 is_locked = False
             elif u.username == "customer_user":
                 init_balance = Decimal("250000.00")
@@ -381,6 +393,46 @@ def seed_database():
                 db.add(sess)
                 sessions_created += 1
 
+        db.commit()
+
+        # 7. Tạo Nhật ký kiểm toán mẫu (Audit Logs - S-27 / T-58)
+        print("[+] Đang tạo nhật ký kiểm toán vận hành mẫu (Audit Logs)...")
+        from app.models.audit_log import AuditLog
+        sample_audit_logs = [
+            AuditLog(
+                user_id=1,
+                action="REMOTE_START",
+                object_type="charging_point",
+                object_id="1",
+                data={"result": "SUCCESS", "description": "Khởi động phiên sạc từ xa thành công trên trụ CP-01"},
+                created_at=now - timedelta(hours=2),
+            ),
+            AuditLog(
+                user_id=3,
+                action="RESTART_CHARGER",
+                object_type="charging_point",
+                object_id="2",
+                data={"result": "SUCCESS", "description": "Khởi động lại trụ sạc CP-02 định kỳ"},
+                created_at=now - timedelta(hours=5),
+            ),
+            AuditLog(
+                user_id=1,
+                action="UPDATE_TARIFF",
+                object_type="tariff",
+                object_id="1",
+                data={"result": "SUCCESS", "description": "Cập nhật biểu giá điện TOU giờ cao điểm"},
+                created_at=now - timedelta(days=1),
+            ),
+            AuditLog(
+                user_id=1,
+                action="LOCK_USER",
+                object_type="user",
+                object_id="7",
+                data={"result": "SUCCESS", "description": "Khóa đăng nhập do nợ cước vượt hạn mức"},
+                created_at=now - timedelta(days=2),
+            ),
+        ]
+        db.add_all(sample_audit_logs)
         db.commit()
 
         print("==================================================================")
