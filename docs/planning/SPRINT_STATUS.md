@@ -55,11 +55,18 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Timeout lệnh OCPP**: `OCPP_CALL_TIMEOUT_SECONDS = 30.0`; endpoint Reset ghi đè 30 giây theo hợp đồng API.
 * **Frontend SPA**: 6 màn hình chức năng tại `frontend/src/pages/`.
 * **Đăng nhập demo Admin**: Nút 1-Click đọc username/mật khẩu từ `DEMO_USERS.ADMIN`; cấu hình mã nguồn hiện tại là `admin / 12345678a`. Frontend Docker đã build lại; đăng nhập API xác nhận HTTP 200, user `admin`, role `ADMIN` sau khi gỡ khóa tạm.
-* **Kiểm thử tự động**: Full backend suite gần nhất đạt 268 passed, 299 warnings ngày 05/10/2026 trong container Python 3.12. Kịch bản OCPP reconnect qua Compose/PostgreSQL đạt ba vòng liên tiếp. Số lịch sử 90 ca ở tài liệu này mâu thuẫn với 84/89 ca trong README và QA Inventory `[CẦN XÁC NHẬN]`.
+* **Kiểm thử tự động**: Full backend suite đạt **284 passed, 1 skipped, 303 warnings trong 236.54 giây** ngày 08/10/2026 (chạy thực tế qua `pytest backend/tests -q`). Đã bổ sung 14 bài test cho module biểu giá chia đoạn và tính tiền theo khung giờ (S-30, S-31), bảo đảm Zero Regression 100%.
 * **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; revision mới nhất là `c4ab19f2d7e1`. Migration T-53 đã kiểm chứng tiến/lùi/tiến trên DB tạm, chưa áp dụng lên CSDL dự án. Nâng cấp từ DB trống còn lỗi lịch sử do tạo trùng `charging_points.last_seen_at` ở `5ba0e05433d7`.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
+* **Epic E-05: Biểu giá và tính tiền (S-30 & S-31)**: Ngày **08/10/2026** (chưa commit), thực hiện theo yêu cầu của người dùng:
+  * **S-30 (Chia đoạn khung giờ & nội suy tuyến tính)**: Triển khai module hàm thuần (Pure Function) `backend/app/services/pricing_engine.py` tính tiền phiên sạc chia đoạn theo khung giờ TOU (Time-of-Use), nội suy tuyến tính (Linear Interpolation) $kWh_{ranh\_gioi} = kWh_1 + (kWh_2 - kWh_1) \times \frac{t_{ranh\_gioi} - t_1}{t_2 - t_1}$ khi thiếu số đo tại ranh giới đổi giá, quy tắc làm tròn từng đoạn rồi cộng lại (`ROUND_EACH_SEGMENT`).
+  * **S-31 (Phiên qua nửa đêm & đa ngày)**: Xử lý phiên sạc vắt qua nửa đêm (00:00:00) theo múi giờ trạm (`Asia/Ho_Chi_Minh`), tự động chuyển sang biểu giá ngày hôm sau; gom nhóm hóa đơn theo từng ngày (`daily_groups`) cho phiên kéo dài trên 24 giờ. Hỗ trợ biểu giá đa ngày, ngày lễ/cuối tuần. Cấu trúc đầu ra tuân thủ chính xác hợp đồng dữ liệu hiển thị hóa đơn (Output Invoice Contract).
+  * **Tích hợp API chốt phiên & hóa đơn**: Bổ sung hàm `get_session_invoice_breakdown` tại `session_service.py` và endpoint `GET /api/v1/sessions/{id}/invoice` tại `sessions.py` hỗ trợ phân quyền chặt chẽ (Admin, CPO sở hữu trạm, Tài xế chủ phiên) và bảo vệ chống IDOR.
+  * **Kiểm thử & Chất lượng**: Tạo bộ 20 test cases (14 unit tests cho hàm thuần + 6 integration tests cho API endpoint) tại `backend/tests/test_pricing_engine.py`, nâng tổng số test suite toàn hệ thống lên **290 passed, 1 skipped** (Zero Regression). Linter `ruff check backend/` đạt All checks passed. Build frontend đạt thành công (16.99s).
+
+
 * **T-14/T-15 thuộc S-07 (01/10/2026 - chưa commit)**: Thêm package khung OCPP 1.6J và bộ test parametrize; 20/20 ca OCPP passed riêng và full backend suite đạt 140 passed, 1 warning.
 * **T-16/T-17 thuộc S-08 (01/10/2026 - chưa commit)**: Bổ sung gateway WebSocket OCPP, handler BootNotification, migration metadata trụ và trạng thái `online`, cấu hình heartbeat; 8 test WebSocket và full backend suite đạt 148 passed, 1 warning.
 * **T-30/T-31 thuộc S-14 (01/10/2026 - chưa commit)**: Thêm model và migration `OcppMessage`, phát lại phản hồi CALL theo khóa CSDL bền vững, cảnh báo khi action khác, và job scheduler dọn bản ghi quá 7 ngày. 4 test idempotency mới và full backend suite 152 passed, 1 warning.

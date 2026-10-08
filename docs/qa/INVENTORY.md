@@ -233,6 +233,30 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
+### 4.19. Suite biểu giá chia đoạn và qua nửa đêm — `test_pricing_engine.py` (20 ca)
+1. `test_s30_ac12_single_time_slot`: phiên sạc nằm trọn 1 khung giờ -> trả về 1 đoạn, `co_noi_suy = False`, tổng tiền = kWh * đơn giá.
+2. `test_s30_ac11_segmentation_with_linear_interpolation`: phiên cắt qua mốc đổi khung giờ 22:00, không có số đo mốc -> chia 2 đoạn, nội suy tuyến tính, `co_noi_suy = True`.
+3. `test_s30_ac11_segmentation_with_exact_boundary_reading`: phiên cắt qua mốc 22:00 có sẵn số đo mốc trong `meter_readings` -> lấy đúng số đo thực tế, `co_noi_suy = False`.
+4. `test_s30_ac13_rounding_per_segment_rule`: làm tròn từng đoạn rồi cộng lại (`"Làm tròn từng đoạn rồi cộng"`), kiểm chứng tính chuẩn xác khi tổng từng đoạn làm tròn lệch so với tính gộp.
+5. `test_s31_ac21_session_crossing_midnight_different_daily_tariffs`: phiên qua nửa đêm (23:00 - 01:30) chia 2 nhóm ngày, áp đúng 2 biểu giá khác nhau giữa 2 ngày.
+6. `test_s31_ac21_midnight_interpolation_without_midnight_reading`: phiên qua nửa đêm không có số đo lúc 00:00:00 -> tự động nội suy tại mốc nửa đêm.
+7. `test_s31_ac22_session_longer_than_24_hours`: phiên 36 giờ chia thành các nhóm ngày riêng biệt và gom nhóm theo ngày (`nhom_theo_ngay`).
+8. `test_station_timezone_not_utc`: kiểm chứng phép chia ngày theo múi giờ trạm (`Asia/Ho_Chi_Minh`), không dùng UTC.
+9. `test_zero_kwh_and_zero_duration`: xử lý an toàn trường hợp biên 0 kWh / 0 giây.
+10. `test_linear_interpolation_helper`: kiểm tra độc lập hàm nội suy tuyến tính $kWh_{ranh\_gioi}$.
+11. `test_multiple_time_slots_in_single_day`: phiên 09:00 - 12:00 cắt qua 2 ranh giới (09:30, 11:30) chia làm 3 đoạn liên tiếp (NORMAL -> PEAK -> NORMAL).
+12. `test_dict_readings_and_dict_tariff`: nhận linh hoạt biểu giá và số đo dạng dict.
+13. `test_pure_function_idempotency_nfr_s30`: thuật toán là hàm thuần (Pure Function), không đọc CSDL, gọi nhiều lần cho ra kết quả đồng nhất 100%.
+14. `test_output_contract_structure_compliance`: định dạng đầu ra khớp 100% cấu trúc JSON hóa đơn yêu cầu (`session_id`, `timezone`, `total_energy_kwh`, `total_amount`, `currency`, `rounding_rule`, `daily_groups`, các trường song song tiếng Việt).
+15. `test_api_get_session_invoice_success_admin`: Admin tra cứu chi tiết hóa đơn qua API `GET /api/v1/sessions/{id}/invoice`, kiểm chứng khớp đúng schema contract.
+16. `test_api_get_session_invoice_success_customer_owner`: Khách hàng tra cứu hóa đơn phiên sạc của chính mình thành công (200 OK).
+17. `test_api_get_session_invoice_idor_forbidden`: Ngăn chặn IDOR khi khách hàng khác cố tình xem hóa đơn phiên sạc không thuộc về mình (403 Forbidden).
+18. `test_api_get_session_invoice_operator_rbac`: Chủ trạm xem hóa đơn trạm mình quản lý (200 OK), bị chặn xem trạm của đơn vị khác (403 Forbidden).
+19. `test_api_get_session_invoice_not_found`: Tra cứu session không tồn tại trả về 404 Not Found.
+20. `test_api_get_session_invoice_with_meter_values`: Tra cứu session có số đo MeterValue thực tế tại mốc nửa đêm (00:00:00), xác nhận `is_interpolated = False` và lấy đúng số đo thực tế.
+
+**Kết quả kiểm thử ngày 08/10/2026 (chưa commit)**: Suite `test_pricing_engine.py` đạt 20 passed; full backend suite đạt **290 passed, 1 skipped, 303 warnings trong 154.09 giây** (`pytest backend/tests -q`).
+
 ---
 
 ## 5. Historical Tests
