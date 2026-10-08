@@ -50,7 +50,7 @@ def db_session():
         session.close()
         try:
             Base.metadata.drop_all(bind=test_engine)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
 
