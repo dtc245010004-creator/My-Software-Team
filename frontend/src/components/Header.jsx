@@ -21,6 +21,7 @@ export default function Header() {
   const { user, rawUser, role, isGuest, logout, quickSwitch, currentDemoKey } = useAuth();
   const [wsStatus, setWsStatus] = useState(WS_STATUS.IDLE);
   const [switching, setSwitching] = useState(false);
+  const wsOnline = STATUS_OK.has(wsStatus);
 
   useEffect(() => {
     // Subscribe status thay vì poll setInterval(1s) — tiết kiệm CPU và cleanup đúng cách
