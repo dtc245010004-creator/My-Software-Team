@@ -682,7 +682,6 @@ async def remote_start_charging_session(
     from app.models.id_tag import IdTag
     from app.models.remote_start_request import RemoteStartRequest
     from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
-    from app.ocpp.gateway import active_ocpp_connections
 
     condition = (simulate_condition or "").upper().strip()
 
@@ -701,36 +700,13 @@ async def remote_start_charging_session(
     if condition == "BUSY" or connector.status != "AVAILABLE":
         raise HTTPException(status_code=409, detail="Đầu nối đang bận hoặc không khả dụng.")
 
-    # Ca 2 của S-24: Trụ từ chối
-    if condition == "REJECTED":
-        ghi_nhat_ky(
-            db,
-            user_id=user.id,
-            action="RemoteStartTransaction",
-            object_type="connector",
-            object_id=connector.id,
-            data={"result": "Rejected"},
-        )
-        db.commit()
-        raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).")
+    # Kiểm tra kết nối OCPP chỉ khi không phải chế độ mô phỏng
+    if not condition:
+        from app.ocpp.gateway import active_ocpp_connections
 
-    # Ca 4 của S-24: Hết thời gian chờ phản hồi (Timeout)
-    if condition == "TIMEOUT":
-        ghi_nhat_ky(
-            db,
-            user_id=user.id,
-            action="RemoteStartTransaction",
-            object_type="connector",
-            object_id=connector.id,
-            data={"result": "Timeout"},
-        )
-        db.commit()
-        raise HTTPException(
-            status_code=504,
-            detail="Trụ sạc không phản hồi lệnh bắt đầu trong thời gian chờ.",
-        )
-
-    code = connector.charging_point.code
+        code = connector.charging_point.code
+        if code not in active_ocpp_connections:
+            raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.")
 
     # Mỗi tài xế có một idTag ảo để dùng chung luồng xác thực với thẻ vật lý.
     tag = db.query(IdTag).filter(IdTag.user_id == user.id, IdTag.code.like("REMOTE-%")).first()
@@ -738,6 +714,21 @@ async def remote_start_charging_session(
         tag = IdTag(code=f"REMOTE-{user.id}", user_id=user.id, status="active")
         db.add(tag)
         db.flush()
+
+    # Xử lý ca EXPIRED: tạo yêu cầu với thời gian hết hạn đã qua
+    if condition == "EXPIRED":
+        request = RemoteStartRequest(
+            user_id=user.id,
+            connector_id=connector.id,
+            id_tag=tag.code,
+            status="PENDING",
+            expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+        )
+        db.add(request)
+        db.flush()
+        db.commit()
+        db.refresh(request)
+        return request
 
     request = RemoteStartRequest(
         user_id=user.id,
@@ -770,6 +761,46 @@ async def remote_start_charging_session(
         )
         db.commit()
 
+    # Xử lý các ca mô phỏng kiểm thử
+    if condition == "OFFLINE":
+        record_failure("Offline")
+        raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.")
+
+    if condition == "REJECTED":
+        record_failure("Rejected")
+        raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).")
+
+    if condition == "TIMEOUT":
+        record_failure("Timeout")
+        raise HTTPException(status_code=504, detail="Trụ sạc không phản hồi lệnh bắt đầu trong thời gian chờ.")
+
+    if condition == "SUCCESS":
+        # Mô phỏng thành công: Đánh dấu request và ghi audit log
+        ghi_nhat_ky(
+            db,
+            user_id=user.id,
+            action="RemoteStartTransaction",
+            object_type="connector",
+            object_id=connector.id,
+            data={"result": "Accepted", "request_id": request.id},
+        )
+        try:
+            new_session = start_charging_session(
+                db=db,
+                user=user,
+                connector_id=connector.id,
+            )
+            request.status = "STARTED"
+            request.transaction_id = new_session.id
+        except (HTTPException, SQLAlchemyError, RuntimeError, ValueError) as exc:
+            logger.warning("Không thể khởi tạo phiên sạc mô phỏng: %s", exc)
+
+        db.commit()
+        db.refresh(request)
+        return request
+
+    # Luồng thật: gửi lệnh OCPP RemoteStartTransaction
+    code = connector.charging_point.code
     try:
         result = await send_call_and_wait(
             code,

@@ -76,6 +76,12 @@ class Tariff(Base):
 
     # Quan hệ
     station = relationship("Station")
+    periods = relationship(
+        "TariffPeriod",
+        back_populates="tariff",
+        cascade="all, delete-orphan",
+        order_by="(TariffPeriod.sort_order, TariffPeriod.id)",
+    )
 
     def __repr__(self) -> str:
         return f"<Tariff(id={self.id}, name='{self.name}', normal={self.price_normal}, peak={self.price_peak}, offpeak={self.price_offpeak})>"

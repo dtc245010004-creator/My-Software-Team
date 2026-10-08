@@ -3,6 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from app.core.datetime_utils import UTCDateTime
+from app.services.tariff_validation import time_to_minutes
 
 
 def _validate_non_negative(
@@ -11,6 +12,34 @@ def _validate_non_negative(
     if value is not None and value < 0:
         raise ValueError(f"Trường {field_name} không được âm.")
     return value
+
+
+class TariffPeriodCreate(BaseModel):
+    start_time: str
+    end_time: str
+    price_per_kwh: Decimal = Field(max_digits=10, decimal_places=2)
+    sort_order: int = 0
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_time(cls, value: str, info: ValidationInfo):
+        try:
+            time_to_minutes(value, allow_day_end=info.field_name == "end_time")
+        except ValueError as exc:
+            raise ValueError(f"Trường {info.field_name}: {exc}") from exc
+        return value
+
+    @field_validator("price_per_kwh")
+    @classmethod
+    def validate_price(cls, value: Decimal):
+        return _validate_non_negative(value, "price_per_kwh")
+
+
+class TariffPeriodResponse(TariffPeriodCreate):
+    id: int
+    tariff_id: int
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TariffBase(BaseModel):
@@ -49,12 +78,14 @@ class TariffBase(BaseModel):
 
 
 class TariffCreate(TariffBase):
+    periods: list[TariffPeriodCreate] | None = None
     station_id: int | None = Field(
         default=None, description="Trạm sạc áp dụng (Null = Biểu giá hệ thống)"
     )
 
 
 class TariffUpdate(BaseModel):
+    periods: list[TariffPeriodCreate] | None = None
     name: str | None = None
     price_normal: Decimal | None = None
     price_peak: Decimal | None = None
@@ -83,6 +114,7 @@ class TariffUpdate(BaseModel):
 
 
 class TariffResponse(TariffBase):
+    periods: list[TariffPeriodResponse] = Field(default_factory=list)
     id: int
     station_id: int | None = None
     is_active: bool
