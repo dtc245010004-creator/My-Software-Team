@@ -24,7 +24,7 @@ TEST_DATABASE_URL = f"sqlite:///{TEST_DB_FILE}"
 if os.path.exists(TEST_DB_FILE):
     try:
         os.remove(TEST_DB_FILE)
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError):
         pass
 
 test_engine = create_engine(
@@ -48,7 +48,10 @@ def db_session():
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=test_engine)
+        try:
+            Base.metadata.drop_all(bind=test_engine)
+        except Exception:
+            pass
 
 
 @pytest.fixture(scope="function")
