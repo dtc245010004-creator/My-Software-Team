@@ -15,6 +15,7 @@ import AIAdvisor from './pages/AIAdvisor';
 import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import DriverMap from './pages/DriverMap';
+import AbnormalSessions from './pages/AbnormalSessions';
 import AuditLogs from './pages/AuditLogs';
 import ChargerDetail from './pages/ChargerDetail';
 import { getHomeRouteByRole } from './utils/routeUtils';
@@ -72,6 +73,15 @@ function AppLayout() {
           />
           {/* Nhật ký phiên sạc: Mọi vai trò đều được xem (phân vùng dữ liệu tại backend) */}
           <Route path="/sessions" element={<Sessions />} />
+          {/* Danh sách phiên bất thường trên màn hình vận hành (SCRUM-52 / SCRUM-148): Chỉ Vận hành viên (OPERATOR) và Kế toán (ACCOUNTANT) */}
+          <Route
+            path="/abnormal-sessions"
+            element={
+              ['ADMIN', 'OPERATOR', 'ACCOUNTANT'].includes(role)
+                ? <AbnormalSessions />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
           <Route path="/session/:id" element={<ActiveSession />} />
           {/* Màn hình trụ sạc và điều khiển bắt đầu từ xa (S-24 / T-52 / SCRUM-154) */}
           <Route path="/chargers/:id" element={<ChargerDetail />} />

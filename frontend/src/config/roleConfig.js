@@ -3,7 +3,7 @@
  */
 export const ROLE_LABELS = {
   ADMIN: 'Quản trị viên',
-  OPERATOR: 'Chủ trạm',
+  OPERATOR: 'Vận hành viên',
   ACCOUNTANT: 'Kế toán',
   CUSTOMER: 'Tài xế',
 };
@@ -33,9 +33,9 @@ export const DEMO_USERS = {
     username: 'operator_a',
     password: 'OpPass123',
     role: 'OPERATOR',
-    label: 'Chủ trạm sạc',
-    fullName: 'Chủ Trạm Sạc Mẫu',
-    description: 'Quản lý trạm sạc thuộc quyền sở hữu',
+    label: 'Vận hành viên',
+    fullName: 'Vận Hành Viên Mẫu',
+    description: 'Quản lý trạm sạc & xử lý sự cố vận hành',
   },
   ACCOUNTANT: {
     username: 'accountant',
@@ -43,7 +43,7 @@ export const DEMO_USERS = {
     role: 'ACCOUNTANT',
     label: 'Kế toán',
     fullName: 'Kế Toán Viên Hệ Thống',
-    description: 'Đối soát doanh thu & tra cứu kiểm toán',
+    description: 'Đối soát doanh thu, tra cứu kiểm toán và phiên sạc bất thường',
   },
   CUSTOMER: {
     username: 'driver_user',

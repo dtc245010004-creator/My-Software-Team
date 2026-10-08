@@ -16,13 +16,9 @@ import {
   Search,
   Filter,
   RefreshCw,
-  Activity,
-  Layers,
-  ShieldAlert
+  Play
 } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Zap, Cpu, MapPin, ChevronRight, ChevronDown, CheckCircle, AlertCircle, X, Edit2, Map as MapIcon, List as ListIcon, RefreshCw, Play } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useRestartChargePoint } from '../hooks/useRestartChargePoint';
@@ -232,7 +228,18 @@ export default function Stations() {
 
     try {
       setSubmittingStation(true);
-      const res = await api.post('/stations', formData);
+      const payload = {
+        ...formData,
+        name: formData.name.trim(),
+        address: formData.address.trim(),
+        latitude: parseFloat(formData.latitude),
+        longitude: parseFloat(formData.longitude),
+        total_grid_capacity_kw: parseFloat(formData.total_grid_capacity_kw) || 150.0,
+        operating_hours: formData.operating_hours || '24/7',
+        status: formData.status || 'ACTIVE',
+        operator_id: formData.operator_id ? parseInt(formData.operator_id, 10) : null,
+      };
+      const res = await api.post('/stations', payload);
       setShowAddModal(false);
       setFormData({
         name: '',
@@ -251,7 +258,11 @@ export default function Stations() {
     } catch (err) {
       console.error('Lỗi tạo trạm sạc:', err);
       const detail = err.response?.data?.detail;
-      const errorMsg = typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail.map((d) => d.msg).join(', ') : err.message);
+      const errorMsg = typeof detail === 'string'
+        ? detail
+        : (Array.isArray(detail)
+          ? detail.map((d) => d.msg || `${d.loc?.join('.')}: ${d.type}`).join(', ')
+          : (detail ? JSON.stringify(detail) : err.message));
       showToast('error', 'LỖI TẠO TRẠM SẠC', errorMsg || 'Không thể lưu thông tin trạm sạc.');
     } finally {
       setSubmittingStation(false);
@@ -289,8 +300,18 @@ export default function Stations() {
 
     try {
       setSubmittingStation(true);
-      const payload = { ...editFormData };
-      if (role !== 'ADMIN') {
+      const payload = {
+        name: editFormData.name.trim(),
+        address: editFormData.address.trim(),
+        latitude: parseFloat(editFormData.latitude),
+        longitude: parseFloat(editFormData.longitude),
+        operating_hours: editFormData.operating_hours || '24/7',
+        status: editFormData.status || 'ACTIVE',
+      };
+      if (role === 'ADMIN') {
+        payload.total_grid_capacity_kw = parseFloat(editFormData.total_grid_capacity_kw) || editingStation.total_grid_capacity_kw;
+        payload.operator_id = editFormData.operator_id ? parseInt(editFormData.operator_id, 10) : null;
+      } else {
         payload.total_grid_capacity_kw = editingStation.total_grid_capacity_kw;
         payload.operator_id = editingStation.operator_id;
       }
@@ -304,7 +325,11 @@ export default function Stations() {
     } catch (err) {
       console.error('Lỗi cập nhật trạm sạc:', err);
       const detail = err.response?.data?.detail;
-      const errorMsg = typeof detail === 'string' ? detail : (Array.isArray(detail) ? detail.map((d) => d.msg).join(', ') : err.message);
+      const errorMsg = typeof detail === 'string'
+        ? detail
+        : (Array.isArray(detail)
+          ? detail.map((d) => d.msg || `${d.loc?.join('.')}: ${d.type}`).join(', ')
+          : (detail ? JSON.stringify(detail) : err.message));
       showToast('error', 'LỖI CẬP NHẬT TRẠM SẠC', errorMsg || 'Không thể cập nhật trạm sạc.');
     } finally {
       setSubmittingStation(false);

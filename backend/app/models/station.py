@@ -44,14 +44,6 @@ class Station(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
     deleted_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
 
     # Relationships
     operator = relationship("User", foreign_keys=[operator_id], lazy="joined")

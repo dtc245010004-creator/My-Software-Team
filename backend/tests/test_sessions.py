@@ -13,6 +13,7 @@ from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.session_service import (
+    force_close_abnormal_session,
     remote_start_charging_session,
     remote_stop_charging_session,
     start_charging_session,
@@ -238,6 +239,65 @@ class TestSessionLifecycle:
             meter_stop_kwh=Decimal("10.00"),
         )
         assert stopped_2.total_amount == amt_1
+
+    def test_force_close_abnormal_session_validation_and_rbac(
+        self, db_session, session_env
+    ):
+        """6. SCRUM-148: Kiểm tra đóng tay phiên bất thường:
+        - Đóng tay không có lý do thì bị chặn (400)
+        - Vai trò CUSTOMER bị từ chối quyền (403)
+        - Vận hành viên (OPERATOR) đóng tay có lý do thành công (200)
+        """
+        cpo = session_env["cpo"]
+        driver = session_env["driver_normal"]
+        conn = session_env["conn1"]
+
+        # Bắt đầu phiên sạc
+        session = start_charging_session(
+            db=db_session, user=driver, connector_id=conn.id
+        )
+
+        # Giả lập phiên bị gián đoạn / bất thường
+        session.status = "INTERRUPTED"
+        session.total_kwh = Decimal("12.50")
+        db_session.commit()
+
+        # 1. Chặn đóng tay nếu không có lý do (hoặc lý do rỗng)
+        with pytest.raises(HTTPException) as exc_empty:
+            force_close_abnormal_session(
+                db=db_session,
+                user=cpo,
+                session_id=session.id,
+                reason="   ",
+            )
+        assert exc_empty.value.status_code == 400
+        assert "Lý do can thiệp" in exc_empty.value.detail or "lý do" in exc_empty.value.detail
+
+        # 2. Chặn nếu tài khoản vai trò CUSTOMER cố tình can thiệp đóng tay
+        with pytest.raises(HTTPException) as exc_rbac:
+            force_close_abnormal_session(
+                db=db_session,
+                user=driver,
+                session_id=session.id,
+                reason="Lý do can thiệp từ tài xế",
+            )
+        assert exc_rbac.value.status_code == 403
+
+        # 3. Vận hành viên (OPERATOR) đóng tay hợp lệ kèm lý do
+        closed_session = force_close_abnormal_session(
+            db=db_session,
+            user=cpo,
+            session_id=session.id,
+            reason="Trụ sạc ngắt kết nối đột ngột, xe đã ngắt sạc an toàn",
+            meter_stop_kwh=Decimal("12.50"),
+        )
+        assert closed_session.status == "COMPLETED"
+        assert "ĐÓNG TAY THỦ CÔNG" in closed_session.stop_reason
+        assert "Trụ sạc ngắt kết nối đột ngột" in closed_session.stop_reason
+
+        # Cổng sạc được giải phóng về AVAILABLE
+        db_session.refresh(conn)
+        assert conn.status == "AVAILABLE"
 
     def test_remote_stop_session_success(self, db_session, session_env):
         """S-23 / T-49: Vận hành viên dừng phiên từ xa thành công (stop_reason='Remote', status='COMPLETED')."""
