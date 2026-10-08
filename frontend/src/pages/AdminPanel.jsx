@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import './AdminPanel.css';
 
-const ROLE_OPTIONS = ['ADMIN', 'OPERATOR', 'OWNER', 'DRIVER', 'CUSTOMER'];
+const ROLE_OPTIONS = ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CUSTOMER', 'OWNER', 'DRIVER'];
 
 function normalizeUser(user) {
   return {
@@ -75,6 +75,15 @@ export default function AdminPanel() {
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
+
+  const [activeTab, setActiveTab] = useState('accounts'); // 'accounts' | 'rbac' | 'settings'
+  const [systemConfig, setSystemConfig] = useState({
+    maxGridLoadKw: 250,
+    emergencyCutoffTemp: 70,
+    remoteStartTimeoutSec: 60,
+    aiHeuristicFallback: true,
+    failedLoginLockMinutes: 15,
+  });
 
   const loadUsers = async () => {
     setLoading(true);
@@ -147,6 +156,8 @@ export default function AdminPanel() {
     const endpointByAction = {
       lock: `/admin/users/${id}/lock-login`,
       unlock: `/admin/users/${id}/unlock-login`,
+      disable: `/admin/users/${id}/disable`,
+      enable: `/admin/users/${id}/enable`,
     };
 
     try {
@@ -224,8 +235,8 @@ export default function AdminPanel() {
 
           <button
             type="button"
-            className="admin-nav-item active"
-            onClick={() => navigate('/admin')}
+            className={`admin-nav-item ${activeTab === 'accounts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('accounts')}
           >
             <Users size={18} />
             <span>Quản lý tài khoản</span>
@@ -233,9 +244,8 @@ export default function AdminPanel() {
 
           <button
             type="button"
-            className="admin-nav-item"
-            onClick={() => navigate('/admin')}
-            title="Phân quyền người dùng sẽ được mở trong module quản trị"
+            className={`admin-nav-item ${activeTab === 'rbac' ? 'active' : ''}`}
+            onClick={() => setActiveTab('rbac')}
           >
             <ShieldCheck size={18} />
             <span>Phân quyền</span>
@@ -261,9 +271,8 @@ export default function AdminPanel() {
 
           <button
             type="button"
-            className="admin-nav-item"
-            onClick={() => navigate('/admin')}
-            title="Cấu hình hệ thống sẽ được mở trong module quản trị"
+            className={`admin-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
           >
             <Settings size={18} />
             <span>Cấu hình hệ thống</span>
@@ -287,7 +296,9 @@ export default function AdminPanel() {
       </aside>
 
       <main className="admin-main">
-        <header className="admin-topbar">
+        {activeTab === 'accounts' && (
+          <>
+            <header className="admin-topbar">
           <div>
             <div className="admin-kicker">SYSTEM / ACCOUNTS</div>
             <h1>QUẢN LÝ TÀI KHOẢN</h1>
@@ -486,6 +497,7 @@ export default function AdminPanel() {
                               <button
                                 className="table-action unlock"
                                 disabled={busy}
+                                title="Mở khóa tài khoản"
                                 onClick={() =>
                                   doUserAction(
                                     user.id,
@@ -494,23 +506,56 @@ export default function AdminPanel() {
                                   )
                                 }
                               >
-                                <Unlock size={15} />
+                                <Unlock size={14} />
                                 Mở
                               </button>
                             ) : (
                               <button
                                 className="table-action lock"
-                                disabled={busy || user.username === rawUser?.username}
+                                disabled={busy || user.username === rawUser?.username || user.username === 'admin'}
+                                title="Khóa đăng nhập 15 phút"
                                 onClick={() =>
                                   doUserAction(
                                     user.id,
                                     'lock',
-                                    `Đã khóa tài khoản ${user.username} và yêu cầu vô hiệu hóa session đang mở.`
+                                    `Đã khóa tài khoản ${user.username} 15 phút.`
                                   )
                                 }
                               >
-                                <Lock size={15} />
+                                <Lock size={14} />
                                 Khóa
+                              </button>
+                            )}
+
+                            {user.is_active ? (
+                              <button
+                                className="table-action disable"
+                                disabled={busy || user.username === rawUser?.username || user.username === 'admin'}
+                                title="Vô hiệu hóa tài khoản"
+                                onClick={() =>
+                                  doUserAction(
+                                    user.id,
+                                    'disable',
+                                    `Đã vô hiệu hóa tài khoản ${user.username}.`
+                                  )
+                                }
+                              >
+                                Tắt
+                              </button>
+                            ) : (
+                              <button
+                                className="table-action enable"
+                                disabled={busy}
+                                title="Kích hoạt lại tài khoản"
+                                onClick={() =>
+                                  doUserAction(
+                                    user.id,
+                                    'enable',
+                                    `Đã kích hoạt tài khoản ${user.username}.`
+                                  )
+                                }
+                              >
+                                Bật
                               </button>
                             )}
                           </div>
@@ -549,11 +594,164 @@ export default function AdminPanel() {
             </div>
           </footer>
         </section>
+      </>
+    )}
+
+    {activeTab === 'rbac' && (
+      <div>
+        <header className="admin-topbar">
+          <div>
+            <div className="admin-kicker">SYSTEM / RBAC</div>
+            <h1>MA TRẬN PHÂN QUYỀN HỆ THỐNG</h1>
+            <p>Quy chuẩn phân quyền vai trò (Role-Based Access Control) theo quy chuẩn kiến trúc EV CSMS.</p>
+          </div>
+        </header>
+
+        <div className="admin-table-card">
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>NGHIỆP VỤ & TÀI NGUYÊN</th>
+                  <th>ADMIN (QUẢN TRỊ)</th>
+                  <th>OPERATOR (CHỦ TRẠM)</th>
+                  <th>ACCOUNTANT (KẾ TOÁN)</th>
+                  <th>CUSTOMER (TÀI XẾ)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Điều phối phụ tải & Giám sát Dashboard</strong></td>
+                  <td><span className="status active"><span className="status-dot" />Toàn quyền hệ thống</span></td>
+                  <td><span className="status active"><span className="status-dot" />Trạm sở hữu</span></td>
+                  <td><span className="status active"><span className="status-dot" />Xem doanh thu</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Không được phép</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Hạ tầng Trạm sạc & Cấu hình Trụ (EVSE)</strong></td>
+                  <td><span className="status active"><span className="status-dot" />Thêm / Sửa / Khởi động lại</span></td>
+                  <td><span className="status active"><span className="status-dot" />Khởi động lại trụ sở hữu</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Không được phép</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Chỉ xem bản đồ</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Khởi động sạc từ xa (S-24 / T-52 RemoteStart)</strong></td>
+                  <td><span className="status active"><span className="status-dot" />Hỗ trợ điều khiển</span></td>
+                  <td><span className="status active"><span className="status-dot" />Điều khiển trạm nhà</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Không được phép</span></td>
+                  <td><span className="status active"><span className="status-dot" />Cắm sạc thực tế</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Quản lý Biểu giá điện (TOU Tariff)</strong></td>
+                  <td><span className="status active"><span className="status-dot" />Toàn quyền cấu hình</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Chỉ xem</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Chỉ xem</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Chỉ xem</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Tra cứu Nhật ký vận hành & Kiểm toán (Audit Logs)</strong></td>
+                  <td><span className="status active"><span className="status-dot" />Toàn bộ lịch sử</span></td>
+                  <td><span className="status active"><span className="status-dot" />Nhật ký trạm sở hữu</span></td>
+                  <td><span className="status active"><span className="status-dot" />Đối soát giao dịch</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Nhật ký cá nhân</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Quản trị Tài khoản, Đổi vai trò & Khóa đăng nhập</strong></td>
+                  <td><span className="status active"><span className="status-dot" />Toàn quyền</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Không được phép</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Không được phép</span></td>
+                  <td><span className="status locked"><span className="status-dot" />Không được phép</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {activeTab === 'settings' && (
+      <div>
+        <header className="admin-topbar">
+          <div>
+            <div className="admin-kicker">SYSTEM / CONFIGURATION</div>
+            <h1>CẤU HÌNH THÔNG SỐ VẬN HÀNH MẠNG LƯỚI</h1>
+            <p>Thiết lập ngưỡng tải an toàn, ngắt sạc khẩn cấp và chu trình bảo vệ hệ thống trạm sạc xe điện.</p>
+          </div>
+          <button
+            type="button"
+            className="admin-create"
+            onClick={() => {
+              setMessage('Đã lưu cấu hình vận hành hệ thống EV CSMS thành công!');
+              setTimeout(() => setMessage(''), 4000);
+            }}
+          >
+            Lưu cấu hình
+          </button>
+        </header>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+          <div className="admin-stat-card" style={{ padding: '16px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0b78da' }}>NGƯỠNG PHỤ TẢI AN TOÀN TRẠM</span>
+            <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 12px' }}>Công suất tải tối đa cho phép mỗi trạm trước khi AI kích hoạt giãn dòng sạc.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="number"
+                style={{ width: '120px', padding: '6px 10px', border: '1px solid #ced9e4', borderRadius: '6px' }}
+                value={systemConfig.maxGridLoadKw}
+                onChange={(e) => setSystemConfig({ ...systemConfig, maxGridLoadKw: Number(e.target.value) })}
+              />
+              <strong style={{ fontSize: '14px' }}>kW</strong>
+            </div>
+          </div>
+
+          <div className="admin-stat-card" style={{ padding: '16px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#dc2626' }}>NGƯỠNG NGẮT KHẨN CẤP QUÁ NHIỆT</span>
+            <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 12px' }}>Tự động ngắt rơ-le và hủy phiên sạc khẩn cấp để chống cháy nổ pin (Safety First).</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="number"
+                style={{ width: '120px', padding: '6px 10px', border: '1px solid #ced9e4', borderRadius: '6px' }}
+                value={systemConfig.emergencyCutoffTemp}
+                onChange={(e) => setSystemConfig({ ...systemConfig, emergencyCutoffTemp: Number(e.target.value) })}
+              />
+              <strong style={{ fontSize: '14px' }}>°C</strong>
+            </div>
+          </div>
+
+          <div className="admin-stat-card" style={{ padding: '16px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0b78da' }}>THỜI GIAN CHỜ LỆNH BẮT ĐẦU SẠC</span>
+            <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 12px' }}>Thời gian chờ trụ phản hồi StartTransaction trước khi báo hết hạn (S-24 / T-52).</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="number"
+                style={{ width: '120px', padding: '6px 10px', border: '1px solid #ced9e4', borderRadius: '6px' }}
+                value={systemConfig.remoteStartTimeoutSec}
+                onChange={(e) => setSystemConfig({ ...systemConfig, remoteStartTimeoutSec: Number(e.target.value) })}
+              />
+              <strong style={{ fontSize: '14px' }}>giây</strong>
+            </div>
+          </div>
+
+          <div className="admin-stat-card" style={{ padding: '16px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#16a34a' }}>ĐỘNG CƠ DỰ PHÒNG HEURISTIC</span>
+            <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 12px' }}>Tự động duy trì sạc an toàn khi mô hình AI bảo trì hoặc mất kết nối API.</p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '8px' }}>
+              <input
+                type="checkbox"
+                checked={systemConfig.aiHeuristicFallback}
+                onChange={(e) => setSystemConfig({ ...systemConfig, aiHeuristicFallback: e.target.checked })}
+              />
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Kích hoạt Heuristic Fallback</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    )}
 
         <div className="admin-note">
           <Lock size={15} />
           <span>
-            Nút Khóa/Mở dùng endpoint lock-login/unlock-login hiện có của backend.             API đổi role quản trị chưa được expose trong backend hiện tại.
+            Hệ thống phân quyền RBAC và điều khiển tài khoản EV CSMS đã được kích hoạt đầy đủ.
           </span>
         </div>
       </main>

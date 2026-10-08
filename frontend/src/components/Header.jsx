@@ -158,6 +158,18 @@ export default function Header() {
               Chủ trạm
             </button>
             <button
+              onClick={() => handleRoleChange('ACCOUNTANT')}
+              disabled={switching}
+              title="Kế toán viên: Tra cứu kiểm toán & đối soát tài chính"
+              className={`px-2.5 py-1 rounded-lg font-medium transition-all duration-150 ${
+                currentDemoKey === 'ACCOUNTANT'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Kế toán
+            </button>
+            <button
               onClick={() => handleRoleChange('CUSTOMER')}
               disabled={switching}
               title="Tài xế khách hàng"
