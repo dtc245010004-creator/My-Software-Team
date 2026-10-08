@@ -61,12 +61,10 @@ export default function Header() {
               Hệ thống Điều phối Trạm sạc & Quản trị Lưới điện
             </p>
           </div>
-          <p className="text-xs text-steel-gray">Hệ thống Điều phối Trạm sạc & Quản trị Lưới điện Thông minh</p>
         </div>
-      </div>
 
       {/* Realtime Status & Role Switcher */}
-      <div className="flex items-center space-x-5">
+      <div className="flex items-center space-x-3 sm:space-x-4 shrink-0 ml-auto">
         {/* Realtime Status & Actions */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           
@@ -186,6 +184,7 @@ export default function Header() {
           )}
 
         </div>
+      </div>
       </div>
     </header>
   );

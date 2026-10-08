@@ -21,6 +21,7 @@ import {
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatVNDateTime } from '../utils/formatTime';
+import InvoiceModal from '../components/InvoiceModal';
 
 export default function Sessions() {
   const { user, role } = useAuth();
@@ -771,80 +772,13 @@ export default function Sessions() {
         </div>
       )}
 
-      {/* Invoice Modal */}
-      {selectedSession && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-panel border border-hairline p-6 rounded-sm max-w-md w-full space-y-4 font-mono text-xs shadow-2xl">
-            <div className="flex items-center justify-between border-b border-hairline pb-3">
-              <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4 text-electric-cyan" />
-                <span className="font-bold text-sm text-tech-white">HÓA ĐƠN ĐIỆN TỬ SẠC XE</span>
-              </div>
-              <span className="text-steel-gray">#{selectedSession.id}</span>
-            </div>
-
-            <div className="space-y-2 text-steel-gray">
-              {selectedSession.station_name && (
-                <div className="flex justify-between">
-                  <span>Trạm sạc tiếp nhận:</span>
-                  <span className="text-tech-white font-bold">{selectedSession.station_name}</span>
-                </div>
-              )}
-              {selectedSession.charger_code && (
-                <div className="flex justify-between">
-                  <span>Trụ sạc (EVSE):</span>
-                  <span className="text-electric-cyan font-bold">{selectedSession.charger_code}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span>Cổng sạc:</span>
-                <span className="text-tech-white font-bold">Cổng #{selectedSession.connector_id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Bắt đầu sạc:</span>
-                <span className="text-tech-white">{formatVNDateTime(selectedSession.start_time)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Kết thúc sạc:</span>
-                <span className="text-tech-white">
-                  {selectedSession.end_time ? formatVNDateTime(selectedSession.end_time) : 'Đang sạc'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Chỉ số điện đầu:</span>
-                <span className="text-tech-white">{Number(selectedSession.meter_start_kwh).toFixed(2)} kWh</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Chỉ số điện cuối:</span>
-                <span className="text-tech-white">
-                  {selectedSession.meter_stop_kwh ? Number(selectedSession.meter_stop_kwh).toFixed(2) + ' kWh' : 'Đang cập nhật'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tổng điện năng tiêu thụ:</span>
-                <span className="text-electric-cyan font-bold">{Number(selectedSession.total_kwh).toFixed(2)} kWh</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Đơn giá TOU áp dụng:</span>
-                <span className="text-tech-white">{Number(selectedSession.applied_price_per_kwh).toLocaleString()} đ/kWh</span>
-              </div>
-              <div className="flex justify-between border-t border-hairline pt-2 text-sm font-bold text-tech-white">
-                <span>TỔNG TIỀN THANH TOÁN:</span>
-                <span className="text-caution-amber">{Number(selectedSession.total_amount).toLocaleString()} VND</span>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-hairline flex justify-end">
-              <button
-                onClick={() => setSelectedSession(null)}
-                className="px-4 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white font-bold transition-colors"
-              >
-                ĐÓNG
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Invoice Modal - S-33 / SCRUM-224: Diễn giải chi tiết từng đoạn giá */}
+      <InvoiceModal
+        sessionId={selectedSession?.id}
+        isOpen={Boolean(selectedSession)}
+        onClose={() => setSelectedSession(null)}
+        initialData={selectedSession}
+      />
     </div>
   );
 }

@@ -1040,3 +1040,243 @@ async def remote_stop_charging_session_ocpp(
     finally:
         if pending_stop_transactions.get(session.transaction_id) is waiter:
             del pending_stop_transactions[session.transaction_id]
+
+
+def calculate_session_price_segments(
+    start_time: datetime,
+    end_time: datetime,
+    total_kwh: Decimal,
+    tariff: Tariff,
+) -> list[dict]:
+    """
+    Chia phiên sạc thành danh sách các đoạn giá theo khung giờ TOU (Story S-33):
+    Mỗi đoạn gồm:
+    - segment_index: int
+    - rate_type: 'NORMAL' | 'PEAK' | 'OFFPEAK'
+    - rate_name: str
+    - time_range: str (HH:MM - HH:MM)
+    - start_time: ISO string
+    - end_time: ISO string
+    - duration_minutes: int
+    - kwh: Decimal
+    - unit_price: Decimal
+    - amount: Decimal
+    """
+    vn_start = to_vn_time(start_time)
+    vn_end = to_vn_time(end_time)
+    if not vn_start or not vn_end or vn_end <= vn_start:
+        vn_end = vn_start + timedelta(minutes=1)
+
+    # Lấy các mốc giờ ranh giới TOU
+    # 04:00 (Hết thấp điểm), 09:30 (Bắt đầu cao điểm 1), 11:30 (Hết cao điểm 1)
+    # 17:00 (Bắt đầu cao điểm 2), 20:00 (Hết cao điểm 2), 22:00 (Bắt đầu thấp điểm)
+    boundary_times = [
+        parse_time_str(tariff.offpeak_end),      # 04:00
+        parse_time_str(tariff.peak_start),       # 09:30
+        parse_time_str(tariff.peak_end),         # 11:30
+        parse_time_str(tariff.peak_start_2),     # 17:00
+        parse_time_str(tariff.peak_end_2),       # 20:00
+        parse_time_str(tariff.offpeak_start),    # 22:00
+    ]
+
+    # Tìm các điểm cắt giữa vn_start và vn_end
+    cut_points = [vn_start]
+    current_date = vn_start.date()
+    while current_date <= vn_end.date():
+        for b_time in boundary_times:
+            pt = datetime.combine(current_date, b_time, tzinfo=vn_start.tzinfo)
+            if vn_start < pt < vn_end:
+                cut_points.append(pt)
+        current_date += timedelta(days=1)
+    cut_points.append(vn_end)
+    cut_points = sorted(list(set(cut_points)))
+
+    raw_segments = []
+    total_duration_sec = max(1, int((vn_end - vn_start).total_seconds()))
+
+    for i in range(len(cut_points) - 1):
+        t1 = cut_points[i]
+        t2 = cut_points[i + 1]
+        mid_time = (t1 + (t2 - t1) / 2).time()
+        price = determine_tou_rate(tariff, mid_time)
+
+        if price == tariff.price_peak:
+            rate_type = "PEAK"
+            rate_name = "Giờ cao điểm (Peak)"
+        elif price == tariff.price_offpeak:
+            rate_type = "OFFPEAK"
+            rate_name = "Giờ thấp điểm (Off-peak)"
+        else:
+            rate_type = "NORMAL"
+            rate_name = "Giờ bình thường (Normal)"
+
+        sec = int((t2 - t1).total_seconds())
+        raw_segments.append({
+            "rate_type": rate_type,
+            "rate_name": rate_name,
+            "t1": t1,
+            "t2": t2,
+            "seconds": sec,
+            "unit_price": price,
+        })
+
+    # Gom các đoạn liền kề có cùng rate_type và unit_price
+    merged = []
+    for s in raw_segments:
+        if merged and merged[-1]["rate_type"] == s["rate_type"] and merged[-1]["unit_price"] == s["unit_price"]:
+            merged[-1]["t2"] = s["t2"]
+            merged[-1]["seconds"] += s["seconds"]
+        else:
+            merged.append(s)
+
+    # Phân bổ sản lượng kWh theo thời lượng
+    result = []
+    allocated_kwh = Decimal("0.000")
+    total_kwh_dec = Decimal(str(total_kwh or 0))
+
+    for idx, seg in enumerate(merged, start=1):
+        dur_sec = seg["seconds"]
+        dur_min = max(1, round(dur_sec / 60))
+        
+        if idx == len(merged):
+            seg_kwh = max(Decimal("0.000"), total_kwh_dec - allocated_kwh)
+        else:
+            proportion = Decimal(dur_sec) / Decimal(total_duration_sec)
+            seg_kwh = round(total_kwh_dec * proportion, 3)
+            allocated_kwh += seg_kwh
+
+        seg_price = seg["unit_price"]
+        amount = round(seg_kwh * seg_price, 2)
+        
+        t1_str = seg["t1"].strftime("%H:%M")
+        t2_str = seg["t2"].strftime("%H:%M")
+        time_range = f"{t1_str} - {t2_str}"
+
+        result.append({
+            "segment_index": idx,
+            "rate_type": seg["rate_type"],
+            "rate_name": seg["rate_name"],
+            "time_range": time_range,
+            "start_time": seg["t1"].isoformat(),
+            "end_time": seg["t2"].isoformat(),
+            "duration_minutes": dur_min,
+            "kwh": seg_kwh,
+            "unit_price": seg_price,
+            "amount": amount,
+        })
+
+    return result
+
+
+def get_session_invoice(db: Session, session_id: int, user: User) -> dict:
+    """
+    Truy xuất và tính toán chi tiết hóa đơn phiên sạc có diễn giải từng đoạn giá (S-33 / SCRUM-224):
+    - Kiểm tra quyền truy cập (IDOR Guard).
+    - Diễn giải từng đoạn giá theo khung giờ TOU (khoảng thời gian, kWh, đơn giá, thành tiền).
+    - Tính phí chiếm trụ (nếu có).
+    - Cảnh báo nếu phiên đang trong diện cần xem xét (NEEDS_REVIEW / ABNORMAL).
+    """
+    session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên sạc."
+        )
+
+    # IDOR Guard
+    if user.role != "ADMIN":
+        if user.role == "OPERATOR":
+            connector = session.connector
+            station = connector.charging_point.station if connector and connector.charging_point else None
+            if not station or (station.operator_id != user.id and session.user_id != user.id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền xem thông tin hóa đơn phiên sạc này.",
+                )
+        elif session.user_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền xem thông tin hóa đơn phiên sạc của người khác.",
+            )
+
+    # Tra cứu các thực thể liên quan
+    connector = session.connector
+    charger = connector.charging_point if connector else None
+    station = charger.station if charger else None
+    driver = session.user
+    tariff = session.tariff or get_or_create_default_tariff(db, station_id=station.id if station else None)
+
+    # Thời gian bắt đầu và kết thúc
+    now = datetime.now(timezone.utc)
+    start_time = session.start_time or session.created_at
+    end_time = session.end_time or (now if session.status == "ACTIVE" else start_time)
+    total_dur_sec = max(1, int((end_time - start_time).total_seconds()))
+    duration_minutes = max(1, round(total_dur_sec / 60))
+
+    # Từng đoạn giá (Price segments)
+    segments = calculate_session_price_segments(
+        start_time=start_time,
+        end_time=end_time,
+        total_kwh=session.total_kwh or Decimal("0.00"),
+        tariff=tariff,
+    )
+
+    charging_amount = sum((s["amount"] for s in segments), Decimal("0.00"))
+
+    # Phí chiếm trụ (Idle Fee)
+    idle_minutes = 0
+    idle_rate_per_min = Decimal("1000.00")
+    idle_fee = Decimal("0.00")
+    if session.stop_reason in ("BATTERY_FULL", "IDLE_CHARGER", "EmergencyStop"):
+        idle_minutes = 15
+        idle_fee = round(Decimal(idle_minutes) * idle_rate_per_min, 2)
+
+    total_amount = charging_amount + idle_fee
+    if session.total_amount and session.total_amount > Decimal("0.00") and idle_fee == Decimal("0.00"):
+        total_amount = session.total_amount
+
+    # Kiểm tra trạng thái cần xem xét (AC S-33)
+    is_reviewing = bool(
+        session.needs_review
+        or session.is_abnormal
+        or session.status in ("NEEDS_REVIEW", "ABNORMAL")
+    )
+    review_message = None
+    payment_status = "PAID" if session.status == "COMPLETED" else "IN_PROGRESS"
+    if is_reviewing:
+        review_message = (
+            session.abnormal_reason
+            or "Phiên sạc đang trong diện cần xem xét / đối soát kỹ thuật. Số tiền và sản lượng chi tiết đang được bộ phận vận hành xử lý."
+        )
+        payment_status = "PENDING_REVIEW"
+
+    return {
+        "session_id": session.id,
+        "status": session.status,
+        "is_reviewing": is_reviewing,
+        "review_message": review_message,
+        "driver_id": session.user_id,
+        "driver_name": driver.full_name or driver.username if driver else None,
+        "station_id": station.id if station else None,
+        "station_name": station.name if station else None,
+        "charger_code": charger.code if charger else None,
+        "connector_id": session.connector_id,
+        "connector_number": connector.connector_number if connector else None,
+        "connector_type": connector.connector_type if connector else None,
+        "start_time": start_time,
+        "end_time": session.end_time,
+        "duration_minutes": duration_minutes,
+        "meter_start_kwh": session.meter_start_kwh or Decimal("0.00"),
+        "meter_stop_kwh": session.meter_stop_kwh,
+        "total_kwh": session.total_kwh or Decimal("0.00"),
+        "applied_price_per_kwh": session.applied_price_per_kwh or tariff.price_normal,
+        "tariff_name": tariff.name if tariff else "Biểu giá EV CSMS chuẩn (TOU 3 khung giờ)",
+        "price_segments": segments,
+        "charging_amount": charging_amount,
+        "idle_minutes": idle_minutes,
+        "idle_rate_per_min": idle_rate_per_min,
+        "idle_fee": idle_fee,
+        "tax_amount": Decimal("0.00"),
+        "total_amount": total_amount,
+        "payment_status": payment_status,
+    }
+

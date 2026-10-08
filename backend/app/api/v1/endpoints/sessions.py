@@ -16,6 +16,7 @@ from app.schemas.session import (
     ForceCloseSessionRequest,
     RemoteStartSessionRequest,
     RemoteStopRequest,
+    SessionInvoiceResponse,
     SessionResponse,
     SessionStartRequest,
     SessionStopRequest,
@@ -24,6 +25,7 @@ from app.schemas.session import (
 )
 from app.services.session_service import (
     force_close_abnormal_session,
+    get_session_invoice,
     remote_start_charging_session,
     remote_stop_charging_session,
     remote_stop_charging_session_ocpp,
@@ -605,3 +607,24 @@ def get_session_detail(
         )
 
     return session
+
+
+@router.get(
+    "/{session_id}/invoice",
+    response_model=SessionInvoiceResponse,
+    summary="Xem chi tiết hóa đơn phiên sạc có diễn giải từng đoạn giá (S-33 / SCRUM-224)",
+)
+def get_session_invoice_endpoint(
+    session_id: int,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    S-33 / SCRUM-224: Trả về hóa đơn chi tiết phiên sạc:
+    - Danh sách từng đoạn giá theo khoảng thời gian, số kWh, đơn giá TOU, thành tiền.
+    - Dòng phí chiếm trụ (nếu có).
+    - Cảnh báo đang chờ xử lý nếu phiên đang ở trạng thái cần xem xét (NEEDS_REVIEW / ABNORMAL).
+    - Tổng cộng tiền thanh toán.
+    """
+    return get_session_invoice(db=db, session_id=session_id, user=current_user)
+

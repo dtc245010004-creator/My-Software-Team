@@ -46,11 +46,12 @@ export const DEMO_USERS = {
     description: 'Đối soát doanh thu, tra cứu kiểm toán và phiên sạc bất thường',
   },
   CUSTOMER: {
-    username: 'driver_user',
+    username: 'driver_vip',
     password: 'DriverPass123',
     role: 'CUSTOMER',
     label: 'Tài xế',
-    fullName: 'Tài Xế Khách Hàng',
+    fullName: 'Trần Thị Bích Ngọc (Tài xế VF9)',
     description: 'Tìm trạm và cắm sạc xe điện',
   },
 };
+
