@@ -20,6 +20,9 @@ import {
   Layers,
   ShieldAlert
 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Plus, Zap, Cpu, MapPin, ChevronRight, ChevronDown, CheckCircle, AlertCircle, X, Edit2, Map as MapIcon, List as ListIcon, RefreshCw, Play } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useRestartChargePoint } from '../hooks/useRestartChargePoint';
@@ -27,6 +30,7 @@ import StationLocationPicker from '../components/StationLocationPicker';
 import StationsMapView from '../components/StationsMapView';
 
 export default function Stations() {
+  const navigate = useNavigate();
   const { role } = useAuth();
   const { loading: restartLoading, result: restartResult, restart, resetResult } = useRestartChargePoint();
   const [restartingCharger, setRestartingCharger] = useState(null); // { id, status, mockState }
@@ -928,6 +932,18 @@ export default function Stations() {
                                   <span>Khởi động lại</span>
                                 </button>
                               )}
+                              <button
+                                type="button"
+                                title="Màn hình trụ & điều khiển bắt đầu sạc (S-24 / T-52)"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/chargers/${ch.id}`);
+                                }}
+                                className="text-[10px] font-mono flex items-center space-x-1 px-1.5 py-0.5 rounded border border-electric-cyan/40 text-electric-cyan hover:bg-electric-cyan/20 transition-colors"
+                              >
+                                <Play className="w-3 h-3 fill-current" />
+                                <span>Màn hình trụ</span>
+                              </button>
                             </div>
                           </div>
 

@@ -94,27 +94,23 @@ export default function AuditLogs() {
         if (!cancelled) setReferenceError('Không tải được danh sách trụ sạc.');
       }
 
-      // Danh sách người thực hiện: chỉ ADMIN được gọi /admin/users.
-      // OPERATOR sẽ nhận 403; khi đó bộ lọc người dùng vẫn dùng được nếu
-      // Backend hỗ trợ truy vấn theo tên — hiện chưa có, nên báo rõ cho người dùng.
-      try {
-        const res = await api.get('/admin/users');
-        if (!cancelled) {
-          setUsers(
-            (res.data || []).map((u) => ({
-              id: u.id,
-              username: u.username,
-              fullName: u.full_name,
-            }))
-          );
-        }
-      } catch (err) {
-        if (err.response?.status === 403 && !cancelled) {
-          setReferenceError(
-            'Tài khoản của bạn không được phép tải danh sách người dùng; bộ lọc "Người thực hiện" tạm thời không dùng được.'
-          );
-        } else if (!cancelled) {
-          setReferenceError('Không tải được danh sách người thực hiện.');
+      // Danh sách người thực hiện: Chỉ ADMIN mới có quyền truy cập /admin/users
+      if (role === 'ADMIN') {
+        try {
+          const res = await api.get('/admin/users');
+          if (!cancelled) {
+            setUsers(
+              (res.data || []).map((u) => ({
+                id: u.id,
+                username: u.username,
+                fullName: u.full_name,
+              }))
+            );
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.warn('Không tải được danh mục người dùng:', err);
+          }
         }
       }
     };

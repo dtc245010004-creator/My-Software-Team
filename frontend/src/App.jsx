@@ -16,6 +16,7 @@ import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import DriverMap from './pages/DriverMap';
 import AuditLogs from './pages/AuditLogs';
+import ChargerDetail from './pages/ChargerDetail';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -72,6 +73,9 @@ function AppLayout() {
           {/* Nhật ký phiên sạc: Mọi vai trò đều được xem (phân vùng dữ liệu tại backend) */}
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/session/:id" element={<ActiveSession />} />
+          {/* Màn hình trụ sạc và điều khiển bắt đầu từ xa (S-24 / T-52 / SCRUM-154) */}
+          <Route path="/chargers/:id" element={<ChargerDetail />} />
+          <Route path="/charger/:id" element={<ChargerDetail />} />
           {/* Tra cứu nhật ký vận hành (T-58): Chỉ ADMIN và OPERATOR */}
           <Route
             path="/audit-logs"
