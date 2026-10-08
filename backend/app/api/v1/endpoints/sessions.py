@@ -15,6 +15,7 @@ from app.schemas.session import (
     CurrentSessionResponse,
     RemoteStartSessionRequest,
     RemoteStopRequest,
+    SessionInvoiceResponse,
     SessionResponse,
     SessionStartRequest,
     SessionStopRequest,
@@ -22,6 +23,7 @@ from app.schemas.session import (
     SessionSummaryResponse,
 )
 from app.services.session_service import (
+    get_session_invoice_breakdown,
     remote_start_charging_session,
     remote_stop_charging_session,
     remote_stop_charging_session_ocpp,
@@ -423,6 +425,23 @@ def get_my_sessions(
         .all()
     )
     return sessions
+
+
+@router.get(
+    "/{session_id}/invoice",
+    response_model=SessionInvoiceResponse,
+    summary="Chi tiết hóa đơn phiên sạc chia đoạn theo khung giờ TOU và qua nửa đêm (S-30, S-31)",
+)
+def get_session_invoice(
+    session_id: int,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    Trả về chi tiết hóa đơn phiên sạc được chia đoạn theo các khung giờ biểu giá TOU
+    và theo ngày khi phiên sạc kéo dài qua nửa đêm.
+    """
+    return get_session_invoice_breakdown(db=db, session_id=session_id, user=current_user)
 
 
 @router.get(

@@ -822,3 +822,114 @@ async def remote_stop_charging_session_ocpp(
     finally:
         if pending_stop_transactions.get(session.transaction_id) is waiter:
             del pending_stop_transactions[session.transaction_id]
+
+
+def get_session_invoice_breakdown(
+    db: Session,
+    session_id: int,
+    user: User | None = None,
+) -> dict:
+    """
+    S-30 & S-31: Xuất chi tiết hóa đơn phiên sạc chia đoạn theo khung giờ TOU và qua nửa đêm.
+    1. Kiểm tra tồn tại và phân quyền (RBAC: Admin, Operator trạm, hoặc chính Khách hàng).
+    2. Thu thập điểm đo thực tế từ bảng meter_values (measurand = Energy.Active.Import.Register).
+    3. Xác định biểu giá trạm (Tariff) và múi giờ trạm (VIETNAM_TZ).
+    4. Gọi hàm thuần calculate_session_pricing(...) và trả về cấu trúc hóa đơn.
+    """
+    from app.core.datetime_utils import VIETNAM_TZ
+    from app.models.meter_value import MeterValue
+    from app.services.pricing_engine import calculate_session_pricing
+
+    session = db.query(ChargingSession).filter(ChargingSession.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy phiên sạc.",
+        )
+
+    # Kiểm tra phân quyền RBAC
+    if user is not None:
+        if user.role == "ADMIN":
+            pass
+        elif user.role == "OPERATOR":
+            connector = session.connector
+            station = (
+                connector.charging_point.station
+                if connector and connector.charging_point
+                else None
+            )
+            if not (
+                (station and station.operator_id == user.id)
+                or session.user_id == user.id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền xem thông tin hóa đơn của phiên sạc này.",
+                )
+        else:
+            if session.user_id != user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền xem thông tin hóa đơn của người khác.",
+                )
+
+    # Thu thập điểm đo thực tế
+    meter_rows = (
+        db.query(MeterValue)
+        .filter(
+            MeterValue.session_id == session.id,
+            MeterValue.measurand == "Energy.Active.Import.Register",
+        )
+        .order_by(MeterValue.recorded_at.asc())
+        .all()
+    )
+    meter_readings: list[tuple[datetime, Decimal]] = []
+    for row in meter_rows:
+        val = Decimal(str(row.value))
+        if (row.unit or "").lower() == "wh":
+            val = val / Decimal("1000")
+        meter_readings.append((row.recorded_at, val))
+
+    start_time = session.start_time
+    stop_time = session.end_time or session.stop_time
+    if stop_time is None:
+        stop_time = datetime.now(timezone.utc)
+    if stop_time < start_time:
+        stop_time = start_time
+
+    if session.meter_start_kwh is not None:
+        meter_start_kwh = Decimal(str(session.meter_start_kwh))
+    elif session.meter_start is not None:
+        meter_start_kwh = Decimal(session.meter_start) / Decimal("1000")
+    else:
+        meter_start_kwh = Decimal("0.00")
+
+    if session.meter_stop_kwh is not None:
+        meter_stop_kwh = Decimal(str(session.meter_stop_kwh))
+    elif session.meter_stop is not None:
+        meter_stop_kwh = Decimal(session.meter_stop) / Decimal("1000")
+    elif meter_readings:
+        meter_stop_kwh = meter_readings[-1][1]
+    elif session.total_kwh is not None:
+        meter_stop_kwh = meter_start_kwh + Decimal(str(session.total_kwh))
+    else:
+        meter_stop_kwh = meter_start_kwh
+
+    tariff = session.tariff
+    if not tariff:
+        station_id = None
+        if session.connector and session.connector.charging_point:
+            station_id = session.connector.charging_point.station_id
+        tariff = get_or_create_default_tariff(db, station_id=station_id)
+
+    return calculate_session_pricing(
+        start_time=start_time,
+        stop_time=stop_time,
+        meter_start_kwh=meter_start_kwh,
+        meter_stop_kwh=meter_stop_kwh,
+        tariff_schedule=tariff,
+        meter_readings=meter_readings,
+        station_tz=VIETNAM_TZ,
+        session_id=session.id,
+    )
+

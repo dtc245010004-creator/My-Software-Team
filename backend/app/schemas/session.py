@@ -82,3 +82,53 @@ class SessionSummaryResponse(BaseModel):
     group_by: str
     kpi: dict[str, float | int]
     items: list[SessionSummaryItem]
+
+
+class InvoiceSegmentResponse(BaseModel):
+    segment_index: int
+    start_time: str
+    end_time: str
+    energy_kwh: str
+    unit_price: int | float
+    raw_amount: str
+    rounded_amount: int
+    is_interpolated: bool
+    tu_gio: str | None = None
+    den_gio: str | None = None
+    so_kwh: str | None = None
+    don_gia: int | float | None = None
+    thanh_tien: int | None = None
+    co_noi_suy: bool | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class InvoiceDailyGroupResponse(BaseModel):
+    date: str
+    daily_energy_kwh: str
+    daily_total_amount: int
+    segments: list[InvoiceSegmentResponse]
+    ngay: str | None = None
+    tong_kwh_ngay: str | None = None
+    tong_tien_ngay: int | None = None
+    cac_doan: list[InvoiceSegmentResponse] | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class SessionInvoiceResponse(BaseModel):
+    session_id: str
+    timezone: str
+    total_energy_kwh: str
+    total_amount: int
+    currency: str
+    rounding_rule: str
+    rounding_note: str
+    daily_groups: list[InvoiceDailyGroupResponse]
+    tong_kwh: str | None = None
+    tong_tien: int | None = None
+    quy_tac_lam_tron: str | None = None
+    nhom_theo_ngay: list[InvoiceDailyGroupResponse] | None = None
+
+    model_config = ConfigDict(extra="allow")
+
