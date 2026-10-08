@@ -17,9 +17,14 @@ from app.ocpp.frames import build_call, build_call_result
 
 
 def _create_charging_point(
-    db_session: Session, code: str, *, station_is_active: bool = True
+    db_session: Session,
+    code: str,
+    *,
+    station_is_active: bool = True,
+    operator_id: int | None = None,
 ) -> ChargingPoint:
     station = Station(
+        operator_id=operator_id,
         name=f"Trạm {code}",
         address="Địa chỉ kiểm thử",
         total_grid_capacity_kw=100.0,
@@ -64,7 +69,7 @@ def _create_user_and_id_tag(
     return tag
 
 
-def _operator_headers(db_session: Session) -> dict[str, str]:
+def _operator_headers(db_session: Session) -> tuple[dict[str, str], User]:
     user = User(
         username="op_thai_duong",
         email="op_thai_duong@example.test",
@@ -75,7 +80,7 @@ def _operator_headers(db_session: Session) -> dict[str, str]:
     db_session.commit()
     db_session.refresh(user)
     token = create_access_token({"sub": str(user.id)})
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}"}, user
 
 
 def _read_frame(websocket) -> list:
@@ -222,8 +227,8 @@ def test_s16_scenario1_hard_reset_accepted(
     client: TestClient, db_session: Session
 ) -> None:
     code = "CP-RESET-HARD"
-    _create_charging_point(db_session, code)
-    headers = _operator_headers(db_session)
+    headers, operator = _operator_headers(db_session)
+    _create_charging_point(db_session, code, operator_id=operator.id)
 
     with client.websocket_connect(
         f"/ocpp/{code}", subprotocols=["ocpp1.6"]

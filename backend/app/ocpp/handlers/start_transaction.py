@@ -206,6 +206,8 @@ def handle_start_transaction(
 
     # 5. Khởi tạo ChargingSession mới
     meter_start_val = int(meter_start) if meter_start is not None else 0
+    connector.idle_started_at = None
+    connector.idle_ended_at = None
     new_session = ChargingSession(
         connector_id=connector.id,
         id_tag=id_tag_code,
@@ -232,12 +234,15 @@ def handle_start_transaction(
             RemoteStartRequest.connector_id == connector.id,
             RemoteStartRequest.id_tag == id_tag_code,
             RemoteStartRequest.status == "PENDING",
-            RemoteStartRequest.expires_at >= datetime.now(timezone.utc),
         )
         .order_by(RemoteStartRequest.id.desc())
         .first()
     )
     if pending is not None:
+        expires_at = pending.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if pending is not None and expires_at >= datetime.now(timezone.utc):
         pending.status = "STARTED"
         pending.transaction_id = new_session.transaction_id
 

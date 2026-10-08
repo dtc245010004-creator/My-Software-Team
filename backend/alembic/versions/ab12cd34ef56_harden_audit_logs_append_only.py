@@ -12,10 +12,8 @@ depends_on = None
 
 
 def upgrade():
-    # Trigger prevents UPDATE/DELETE even if an application endpoint
-    # is accidentally added later. INSERT/SELECT remain available normally.
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
+    dialect = op.get_bind().dialect.name
+    if dialect == "postgresql":
         op.execute("""
             CREATE OR REPLACE FUNCTION audit_logs_immutable()
             RETURNS trigger AS $$
@@ -29,28 +27,30 @@ def upgrade():
             BEFORE UPDATE OR DELETE ON audit_logs
             FOR EACH ROW EXECUTE FUNCTION audit_logs_immutable();
         """)
-    elif bind.dialect.name == "sqlite":
+    elif dialect == "sqlite":
         op.execute("""
-            CREATE TRIGGER IF NOT EXISTS trg_audit_logs_no_update
+            CREATE TRIGGER trg_audit_logs_no_update
             BEFORE UPDATE ON audit_logs
             BEGIN
-                SELECT RAISE(ABORT, 'audit_logs is append-only: UPDATE is forbidden');
+                SELECT RAISE(ABORT, 'audit_logs is append-only');
             END;
         """)
         op.execute("""
-            CREATE TRIGGER IF NOT EXISTS trg_audit_logs_no_delete
+            CREATE TRIGGER trg_audit_logs_no_delete
             BEFORE DELETE ON audit_logs
             BEGIN
-                SELECT RAISE(ABORT, 'audit_logs is append-only: DELETE is forbidden');
+                SELECT RAISE(ABORT, 'audit_logs is append-only');
             END;
         """)
+    else:
+        raise RuntimeError(f"Audit log immutability is not configured for {dialect}.")
 
 
 def downgrade():
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
+    dialect = op.get_bind().dialect.name
+    if dialect == "postgresql":
         op.execute("DROP TRIGGER IF EXISTS trg_audit_logs_immutable ON audit_logs;")
         op.execute("DROP FUNCTION IF EXISTS audit_logs_immutable();")
-    elif bind.dialect.name == "sqlite":
-        op.execute("DROP TRIGGER IF EXISTS trg_audit_logs_no_update;")
+    elif dialect == "sqlite":
         op.execute("DROP TRIGGER IF EXISTS trg_audit_logs_no_delete;")
+        op.execute("DROP TRIGGER IF EXISTS trg_audit_logs_no_update;")

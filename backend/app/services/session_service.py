@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException, status
@@ -16,6 +17,7 @@ from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.audit_service import ghi_nhat_ky
+from app.services.billing import calculate_session_total
 from app.services.wallet_service import deduct_charging_fee
 
 logger = logging.getLogger("ev_csms.session_service")
@@ -220,6 +222,8 @@ def start_charging_session(
 
     # 6. Khởi tạo phiên sạc
     init_soc = float(initial_soc) if initial_soc is not None else 20.0
+    connector.idle_started_at = None
+    connector.idle_ended_at = None
     new_session = ChargingSession(
         user_id=user.id,
         connector_id=connector_id,
@@ -319,7 +323,9 @@ def stop_charging_session(
         )
 
     total_kwh = meter_stop_kwh - session.meter_start_kwh
-    total_amount = round(total_kwh * session.applied_price_per_kwh, 2)
+    session.total_kwh = total_kwh
+    billing_total = calculate_session_total(session, session.tariff)
+    total_amount = billing_total.total_amount
 
     try:
         # 4. Trừ tiền ví ACID
@@ -335,6 +341,7 @@ def stop_charging_session(
         session.end_time = now
         session.meter_stop_kwh = meter_stop_kwh
         session.total_kwh = total_kwh
+        session.idle_amount = billing_total.idle_amount
         session.total_amount = total_amount
         session.status = "COMPLETED"
         session.stop_reason = stop_reason
@@ -425,7 +432,8 @@ def reconcile_interrupted_sessions(db: Session) -> int:
     now = datetime.now(timezone.utc)
     for session in active_sessions:
         try:
-            amount = round(session.total_kwh * session.applied_price_per_kwh, 2)
+            billing_total = calculate_session_total(session, session.tariff)
+            amount = billing_total.total_amount
             if amount > 0:
                 deduct_charging_fee(
                     db=db,
@@ -435,6 +443,7 @@ def reconcile_interrupted_sessions(db: Session) -> int:
                 )
             session.end_time = now
             session.meter_stop_kwh = session.total_kwh
+            session.idle_amount = billing_total.idle_amount
             session.total_amount = amount
             session.status = "INTERRUPTED"
             session.stop_reason = "SERVER_CRASH_RECONCILED"
@@ -561,6 +570,7 @@ def remote_stop_charging_session(
 
     # Ca 3: Hết thời gian chờ (Timeout)
     if condition == "TIMEOUT":
+        session.needs_review = True
         ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Timeout"})
         db.commit()
         raise HTTPException(
@@ -584,7 +594,9 @@ def remote_stop_charging_session(
         meter_stop_kwh = session.meter_start_kwh + Decimal("1.50")
 
     total_kwh = meter_stop_kwh - session.meter_start_kwh
-    total_amount = round(total_kwh * session.applied_price_per_kwh, 2)
+    session.total_kwh = total_kwh
+    billing_total = calculate_session_total(session, session.tariff)
+    total_amount = billing_total.total_amount
 
     try:
         # Quyết toán tiền ví
@@ -599,6 +611,7 @@ def remote_stop_charging_session(
         session.end_time = now
         session.meter_stop_kwh = meter_stop_kwh
         session.total_kwh = total_kwh
+        session.idle_amount = billing_total.idle_amount
         session.total_amount = total_amount
         session.status = "COMPLETED"
         session.stop_reason = "Remote"
@@ -665,13 +678,10 @@ async def remote_start_charging_session(
     connector_id: int,
     simulate_condition: str | None = None,
 ) -> "RemoteStartRequest":
-    """S-24/T-51: kiểm tra cổng rảnh rồi gửi RemoteStartTransaction và lưu request chờ 60 giây."""
-    from datetime import timedelta
-
+    """Kiểm tra cổng, lưu yêu cầu chờ rồi gửi RemoteStartTransaction."""
     from app.models.id_tag import IdTag
     from app.models.remote_start_request import RemoteStartRequest
     from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
-    from app.ocpp.gateway import active_ocpp_connections
 
     condition = (simulate_condition or "").upper().strip()
 
@@ -690,36 +700,13 @@ async def remote_start_charging_session(
     if condition == "BUSY" or connector.status != "AVAILABLE":
         raise HTTPException(status_code=409, detail="Đầu nối đang bận hoặc không khả dụng.")
 
-    # Ca 2 của S-24: Trụ từ chối
-    if condition == "REJECTED":
-        ghi_nhat_ky(
-            db,
-            user_id=user.id,
-            action="RemoteStartTransaction",
-            object_type="connector",
-            object_id=connector.id,
-            data={"result": "Rejected"},
-        )
-        db.commit()
-        raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).")
+    # Kiểm tra kết nối OCPP chỉ khi không phải chế độ mô phỏng
+    if not condition:
+        from app.ocpp.gateway import active_ocpp_connections
 
-    # Ca 4 của S-24: Hết thời gian chờ phản hồi (Timeout)
-    if condition == "TIMEOUT":
-        ghi_nhat_ky(
-            db,
-            user_id=user.id,
-            action="RemoteStartTransaction",
-            object_type="connector",
-            object_id=connector.id,
-            data={"result": "Timeout"},
-        )
-        db.commit()
-        raise HTTPException(
-            status_code=504,
-            detail="Trụ sạc không phản hồi lệnh bắt đầu trong thời gian chờ.",
-        )
-
-    code = connector.charging_point.code
+        code = connector.charging_point.code
+        if code not in active_ocpp_connections:
+            raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.")
 
     # Mỗi tài xế có một idTag ảo để dùng chung luồng xác thực với thẻ vật lý.
     tag = db.query(IdTag).filter(IdTag.user_id == user.id, IdTag.code.like("REMOTE-%")).first()
@@ -728,31 +715,67 @@ async def remote_start_charging_session(
         db.add(tag)
         db.flush()
 
-    # Ca 4 (Yêu cầu hết hạn 60s):
+    # Xử lý ca EXPIRED: tạo yêu cầu với thời gian hết hạn đã qua
     if condition == "EXPIRED":
         request = RemoteStartRequest(
             user_id=user.id,
             connector_id=connector.id,
             id_tag=tag.code,
-            status="EXPIRED",
+            status="PENDING",
             expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
         )
         db.add(request)
+        db.flush()
         db.commit()
         db.refresh(request)
         return request
 
-    # Mô phỏng Ca 1 thành công trên trụ ảo
-    if condition == "SUCCESS":
-        request = RemoteStartRequest(
+    request = RemoteStartRequest(
+        user_id=user.id,
+        connector_id=connector.id,
+        id_tag=tag.code,
+        status="PENDING",
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=60),
+    )
+    db.add(request)
+    db.flush()
+    # Commit trước khi gửi lệnh: Authorize/StartTransaction có thể về ngay sau
+    # CALLRESULT và chạy trên một kết nối database độc lập.
+    db.commit()
+    db.refresh(request)
+
+    def record_failure(result: str, error_code: str | None = None) -> None:
+        db.refresh(request)
+        if request.status != "STARTED":
+            request.status = result.upper()
+        data = {"result": result}
+        if error_code:
+            data["error_code"] = error_code
+        ghi_nhat_ky(
+            db,
             user_id=user.id,
-            connector_id=connector.id,
-            id_tag=tag.code,
-            status="PENDING",
-            expires_at=datetime.now(timezone.utc) + timedelta(seconds=60),
+            action="RemoteStartTransaction",
+            object_type="connector",
+            object_id=connector.id,
+            data=data,
         )
-        db.add(request)
-        db.flush()
+        db.commit()
+
+    # Xử lý các ca mô phỏng kiểm thử
+    if condition == "OFFLINE":
+        record_failure("Offline")
+        raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.")
+
+    if condition == "REJECTED":
+        record_failure("Rejected")
+        raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).")
+
+    if condition == "TIMEOUT":
+        record_failure("Timeout")
+        raise HTTPException(status_code=504, detail="Trụ sạc không phản hồi lệnh bắt đầu trong thời gian chờ.")
+
+    if condition == "SUCCESS":
+        # Mô phỏng thành công: Đánh dấu request và ghi audit log
         ghi_nhat_ky(
             db,
             user_id=user.id,
@@ -776,9 +799,8 @@ async def remote_start_charging_session(
         db.refresh(request)
         return request
 
-    if code not in active_ocpp_connections:
-        raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.")
-
+    # Luồng thật: gửi lệnh OCPP RemoteStartTransaction
+    code = connector.charging_point.code
     try:
         result = await send_call_and_wait(
             code,
@@ -787,40 +809,19 @@ async def remote_start_charging_session(
             timeout_seconds=30,
         )
     except ConnectionError as exc:
+        record_failure("Offline")
         raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến.") from exc
     except TimeoutError as exc:
-        ghi_nhat_ky(
-            db, user_id=user.id, action="RemoteStartTransaction",
-            object_type="connector", object_id=connector.id, data={"result": "Timeout"},
-        )
-        db.commit()
+        record_failure("Timeout")
         raise HTTPException(status_code=504, detail="Trụ sạc không phản hồi lệnh bắt đầu trong thời gian chờ.") from exc
     except OcppCallError as exc:
-        ghi_nhat_ky(
-            db, user_id=user.id, action="RemoteStartTransaction",
-            object_type="connector", object_id=connector.id,
-            data={"result": "Rejected", "error_code": exc.error_code},
-        )
-        db.commit()
+        record_failure("Rejected", exc.error_code)
         raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).") from exc
 
     if str(result.get("status", "")).lower() != "accepted":
-        ghi_nhat_ky(
-            db, user_id=user.id, action="RemoteStartTransaction",
-            object_type="connector", object_id=connector.id, data={"result": "Rejected"},
-        )
-        db.commit()
+        record_failure("Rejected")
         raise HTTPException(status_code=409, detail="Trụ sạc từ chối lệnh bắt đầu (Rejected).")
 
-    request = RemoteStartRequest(
-        user_id=user.id,
-        connector_id=connector.id,
-        id_tag=tag.code,
-        status="PENDING",
-        expires_at=datetime.now(timezone.utc) + timedelta(seconds=60),
-    )
-    db.add(request)
-    db.flush()
     ghi_nhat_ky(
         db,
         user_id=user.id,
@@ -874,6 +875,7 @@ async def remote_stop_charging_session_ocpp(
             # Không gửi được lệnh -> không ghi "result từ trụ".
             raise HTTPException(status_code=400, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.") from exc
         except TimeoutError as exc:
+            session.needs_review = True
             ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Timeout"})
             db.commit()
             raise HTTPException(status_code=504, detail="Hết thời gian chờ phản hồi từ trụ sạc (Timeout).") from exc
@@ -891,12 +893,11 @@ async def remote_stop_charging_session_ocpp(
         db.commit()
 
         try:
-            await __import__("asyncio").wait_for(waiter, timeout=120)
-        except __import__("asyncio").TimeoutError as exc:
+            await asyncio.wait_for(waiter, timeout=120)
+        except asyncio.TimeoutError as exc:
             session.needs_review = True
             session.is_abnormal = True
             session.abnormal_reason = "RemoteStopAcceptedButNoStopTransaction"
-            db.commit()
             db.commit()
             raise HTTPException(status_code=504, detail="Trụ đã chấp nhận lệnh dừng nhưng không gửi StopTransaction trong 2 phút; phiên được đánh dấu cần xem xét.") from exc
 

@@ -257,10 +257,12 @@ def remote_start_status(
     req = db.query(RemoteStartRequest).filter(RemoteStartRequest.id == request_id).first()
     if req is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu bắt đầu từ xa.")
-    from app.core.datetime_utils import ensure_utc
-
-    expires_at_utc = ensure_utc(req.expires_at)
-    if req.status == "PENDING" and expires_at_utc and expires_at_utc <= datetime.now(timezone.utc):
+    if req.user_id != current_user.id and current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xem yêu cầu này.")
+    expires_at = req.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if req.status == "PENDING" and expires_at <= datetime.now(timezone.utc):
         req.status = "EXPIRED"
         db.commit()
 
@@ -440,10 +442,13 @@ def get_current_session(
     elif session.total_kwh is not None:
         latest_kwh += Decimal(str(session.total_kwh or 0))
 
-    result = CurrentSessionResponse.model_validate(session)
-    result.latest_kwh = latest_kwh
-    result.latest_meter_at = latest_meter_at
-    return result
+    session_data = {
+        field_name: getattr(session, field_name)
+        for field_name in SessionResponse.model_fields
+    }
+    session_data["latest_kwh"] = latest_kwh
+    session_data["latest_meter_at"] = latest_meter_at
+    return CurrentSessionResponse.model_validate(session_data)
 
 @router.get(
     "/me",

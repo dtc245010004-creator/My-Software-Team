@@ -97,6 +97,9 @@ class ChargingSession(Base):
 
     # Tổng tiền thanh toán (VND)
     total_amount = Column(Numeric(12, 2), default=0.00, nullable=True)
+    idle_amount = Column(
+        Numeric(12, 2), nullable=False, default=0.00, server_default="0"
+    )
 
     # Checkpoint phục hồi khi server crash & trạng thái sạc tức thời
     current_soc = Column(Float, default=0.0, nullable=False)

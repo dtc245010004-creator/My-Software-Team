@@ -37,9 +37,9 @@
 
 ### BUG-05: Nguy cơ rò rỉ dữ liệu vận hành giữa các CPO (Multi-tenancy IDOR Gap)
 * **Mức độ nghiêm trọng**: Severity 3 (Moderate).
-* **Mô tả**: Một số API tra cứu trạm sạc công khai trả về toàn bộ thông tin trạm mà chưa phân nhóm chặt chẽ theo từng đơn vị vận hành CPO độc lập. Mặc dù các API cập nhật/xóa đã có kiểm tra quyền sở hữu IDOR (`test_idor_station_level_forbidden`), nhưng tầng dữ liệu cần được cách ly triệt để hơn.
-* **Biện pháp xử lý**: Đã kiểm tra chặn IDOR ở các endpoint nhạy cảm (CPO A không thể sửa trạm của CPO B); tiếp tục theo dõi và siết chặt ở Giai đoạn 2.
-* **Trạng thái**: **MONITORING / MITIGATED VIA RBAC TESTS**.
+* **Mô tả**: `GET /api/v1/stations/{station_id}` và `GET /api/v1/chargers/{charger_id}` truy vấn chi tiết trước rồi chỉ tự kiểm tra quyền nếu vai trò là `OPERATOR`; khách chưa đăng nhập và `CUSTOMER` có thể truy cập trực tiếp chi tiết tài nguyên đã ngừng hoạt động. Logic owner của từng route cũng bị lặp riêng.
+* **Biện pháp xử lý (07/10/2026 - chưa commit)**: Dùng chung `filter_station_access()` cho danh sách/chi tiết trạm và trụ. Operator chỉ truy cập dữ liệu có `Station.operator_id == user.id`; Admin không bị lọc chủ sở hữu; khách chỉ đọc tài nguyên hoạt động. ID ngoài phạm vi trả `404`. Kết quả truy vấn GPS giữ trạm chưa có tọa độ khi không đặt bán kính; giá trị `Type 2` cũ chỉ được chuẩn hóa trong DTO. 34 test liên quan passed trên SQLite tạm; Ruff sạch.
+* **Trạng thái**: **RESOLVED / CLOSED** (đã kiểm chứng test chọn lọc; chưa chạy toàn bộ suite hoặc kiểm thử trình duyệt).
 
 ### BUG-06: Nút Admin Demo 1-Click dùng mật khẩu không khớp dữ liệu seed
 * **Mức độ nghiêm trọng**: Severity 3 (Moderate).

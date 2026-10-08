@@ -208,8 +208,8 @@ def test_station_list_isolation(client, rbac_setup):
     assert len(res_driver.json()) == 4
 
 
-def test_station_detail_cross_access_403(client, rbac_setup):
-    """2. Chủ trạm không thể xem chi tiết trạm của chủ khác hoặc trạm unowned (403 Forbidden)."""
+def test_station_detail_cross_access_404(client, rbac_setup):
+    """2. Chủ trạm không thể xem chi tiết trạm ngoài phạm vi của mình."""
     # Chủ A xem trạm của Chủ A -> 200
     res_ok = client.get(
         f"/api/v1/stations/{rbac_setup['st_a1'].id}", headers=rbac_setup["h_op_a"]
@@ -217,18 +217,17 @@ def test_station_detail_cross_access_403(client, rbac_setup):
     assert res_ok.status_code == 200
     assert res_ok.json()["name"] == "Trạm VinFast A1"
 
-    # Chủ A xem trạm của Chủ B -> 403
+    # Chủ A xem trạm của Chủ B -> 404 để không tiết lộ trạm có tồn tại
     res_forbidden = client.get(
         f"/api/v1/stations/{rbac_setup['st_b1'].id}", headers=rbac_setup["h_op_a"]
     )
-    assert res_forbidden.status_code == 403
-    assert "Bạn không có quyền truy cập" in res_forbidden.json()["detail"]
+    assert res_forbidden.status_code == 404
 
-    # Chủ A xem trạm chưa có chủ -> 403
+    # Chủ A xem trạm chưa có chủ -> 404
     res_unowned = client.get(
         f"/api/v1/stations/{rbac_setup['st_unowned'].id}", headers=rbac_setup["h_op_a"]
     )
-    assert res_unowned.status_code == 403
+    assert res_unowned.status_code == 404
 
     # Admin xem trạm bất kỳ -> 200
     res_admin = client.get(
@@ -239,6 +238,89 @@ def test_station_detail_cross_access_403(client, rbac_setup):
         f"/api/v1/stations/{rbac_setup['st_unowned'].id}", headers=rbac_setup["h_admin"]
     )
     assert res_admin_unowned.status_code == 200
+
+
+def test_public_station_detail_hides_inactive_station(client, db_session, rbac_setup):
+    inactive_station = Station(
+        operator_id=rbac_setup["op_b"].id,
+        name="Trạm B đã ngừng hoạt động",
+        address="123 Đường thử nghiệm, Đà Nẵng",
+        total_grid_capacity_kw=80.0,
+        status="MAINTENANCE",
+        is_active=False,
+    )
+    db_session.add(inactive_station)
+    db_session.commit()
+
+    for headers in (None, rbac_setup["h_driver"]):
+        response = client.get(
+            f"/api/v1/stations/{inactive_station.id}", headers=headers
+        )
+        assert response.status_code == 404
+
+
+def test_operator_gps_list_includes_station_without_coordinates(
+    client, db_session, rbac_setup
+):
+    station_without_gps = Station(
+        operator_id=rbac_setup["op_a"].id,
+        name="Trạm A chưa khai báo GPS",
+        address="456 Đường thử nghiệm, Đà Nẵng",
+        total_grid_capacity_kw=80.0,
+        status="ACTIVE",
+        is_active=True,
+    )
+    db_session.add(station_without_gps)
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/stations?user_lat=16.0678&user_lon=108.2208",
+        headers=rbac_setup["h_op_a"],
+    )
+    assert response.status_code == 200
+    item = next(
+        station
+        for station in response.json()
+        if station["id"] == station_without_gps.id
+    )
+    assert item["distance_km"] is None
+
+
+def test_station_tree_and_grid_share_operator_scope(client, rbac_setup):
+    for endpoint in ("/api/v1/stations/tree", "/api/v1/stations/grid"):
+        operator_response = client.get(endpoint, headers=rbac_setup["h_op_a"])
+        assert operator_response.status_code == 200
+        operator_station_ids = [item["id"] for item in operator_response.json()]
+        assert rbac_setup["st_a1"].id in operator_station_ids
+        assert rbac_setup["st_b1"].id not in operator_station_ids
+
+        admin_response = client.get(endpoint, headers=rbac_setup["h_admin"])
+        assert admin_response.status_code == 200
+        admin_station_ids = [item["id"] for item in admin_response.json()]
+        assert rbac_setup["st_a1"].id in admin_station_ids
+        assert rbac_setup["st_b1"].id in admin_station_ids
+
+
+def test_station_list_normalizes_existing_connector_type_without_db_update(
+    client, db_session, rbac_setup
+):
+    rbac_setup["conn_a1"].connector_type = "Type 2"
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/stations?user_lat=16.0678&user_lon=108.2208",
+        headers=rbac_setup["h_op_a"],
+    )
+    assert response.status_code == 200
+    station = next(
+        station
+        for station in response.json()
+        if station["id"] == rbac_setup["st_a1"].id
+    )
+    assert (
+        station["charging_points"][0]["connectors"][0]["connector_type"]
+        == "TYPE_2"
+    )
 
 
 def test_station_create_auto_assignment(client, rbac_setup):
@@ -329,6 +411,19 @@ def test_station_update_restrictions(client, rbac_setup):
 
 def test_charger_management_rbac(client, rbac_setup):
     """5. Phân quyền trụ sạc: Chủ A không thể thêm/xem trụ sạc tại trạm của Chủ B."""
+    res_list_a = client.get("/api/v1/chargers", headers=rbac_setup["h_op_a"])
+    assert res_list_a.status_code == 200
+    listed_charger_ids = [charger["id"] for charger in res_list_a.json()]
+    assert listed_charger_ids == [rbac_setup["ch_a1"].id]
+    assert rbac_setup["ch_b1"].id not in listed_charger_ids
+
+    res_list_admin = client.get("/api/v1/chargers", headers=rbac_setup["h_admin"])
+    assert res_list_admin.status_code == 200
+    assert {charger["id"] for charger in res_list_admin.json()} >= {
+        rbac_setup["ch_a1"].id,
+        rbac_setup["ch_b1"].id,
+    }
+
     # Chủ A thêm trụ vào trạm của Chủ B -> 403
     payload_charger = {
         "code": "EVSE-HACK-01",
@@ -357,11 +452,11 @@ def test_charger_management_rbac(client, rbac_setup):
     )
     assert res_add_ok.status_code == 201
 
-    # Chủ A xem trụ sạc của Chủ B -> 403
+    # Chủ A xem trụ sạc của Chủ B -> 404 để không tiết lộ trụ có tồn tại
     res_view_hack = client.get(
         f"/api/v1/chargers/{rbac_setup['ch_b1'].id}", headers=rbac_setup["h_op_a"]
     )
-    assert res_view_hack.status_code == 403
+    assert res_view_hack.status_code == 404
 
     # Chủ A xem trụ sạc của mình -> 200
     res_view_ok = client.get(
