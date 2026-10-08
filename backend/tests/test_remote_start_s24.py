@@ -1,11 +1,10 @@
 """Kiểm thử tự động cho Story S-24 / Task T-51: Bốn ca của RemoteStartTransaction."""
 
 from decimal import Decimal
+
 import pytest
-from fastapi.testclient import TestClient
 
 from app.core.security import create_access_token
-from app.main import app
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
 from app.models.wallet import Wallet

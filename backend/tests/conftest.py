@@ -1,5 +1,6 @@
 # ruff: noqa: E402
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -17,6 +18,7 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 import app.models  # noqa: F401
@@ -25,6 +27,7 @@ from app.core.database import engine as test_engine
 from app.main import app as fastapi_app
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
@@ -43,8 +46,8 @@ def db_session():
         session.close()
         try:
             Base.metadata.drop_all(bind=test_engine)
-        except Exception:
-            pass
+        except SQLAlchemyError:
+            logger.exception("Không thể xóa bảng kiểm thử khi dọn fixture.")
 
 
 def pytest_unconfigure(config):
