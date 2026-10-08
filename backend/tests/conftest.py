@@ -1,37 +1,33 @@
 # ruff: noqa: E402
 
+import logging
 import os
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 # Đảm bảo thư mục backend luôn nằm trong sys.path khi chạy từ bất kỳ thư mục nào (bao gồm CI runner)
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
+# Dùng chung một CSDL SQLite riêng cho mỗi lượt pytest giữa app và fixtures.
+TEST_DB_FILE = Path.cwd() / f".pytest-ev-csms-{uuid4().hex}.db"
+TEST_DATABASE_URL = f"sqlite:///{TEST_DB_FILE.as_posix()}"
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 import app.models  # noqa: F401
 from app.core.database import Base, get_db
+from app.core.database import engine as test_engine
 from app.main import app as fastapi_app
 
-TEST_DB_FILE = "./test_ev_csms.db"
-TEST_DATABASE_URL = f"sqlite:///{TEST_DB_FILE}"
-
-if os.path.exists(TEST_DB_FILE):
-    try:
-        os.remove(TEST_DB_FILE)
-    except (FileNotFoundError, PermissionError):
-        pass
-
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 30},
-)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
@@ -50,13 +46,19 @@ def db_session():
         session.close()
         try:
             Base.metadata.drop_all(bind=test_engine)
-        except Exception:
-            pass
+        except SQLAlchemyError:
+            logger.exception("Không thể xóa bảng kiểm thử khi dọn fixture.")
+
+
+def pytest_unconfigure(config):
+    """Đóng engine và chỉ xóa file CSDL tạm do lượt pytest này tạo."""
+    test_engine.dispose()
+    TEST_DB_FILE.unlink(missing_ok=True)
 
 
 @pytest.fixture(scope="function")
 def client(db_session):
-    """Fixture cung cấp TestClient đã override get_db trỏ vào DB test in-memory."""
+    """TestClient dùng chung CSDL SQLite cô lập của lượt pytest hiện tại."""
 
     def override_get_db():
         session = TestingSessionLocal()

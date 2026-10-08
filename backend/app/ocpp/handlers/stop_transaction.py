@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.orphan_message import OrphanMessage
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
+from app.services.billing import calculate_session_total
 from app.services.metering import calculate_kwh
 
 logger = logging.getLogger(__name__)
@@ -128,15 +129,13 @@ def handle_stop_transaction(
         if id_tag_stop:
             session.stop_id_tag = str(id_tag_stop)
 
-        if session.applied_price_per_kwh:
-            session.total_amount = round(
-                Decimal(str(session.applied_price_per_kwh)) * decimal_kwh, 2
-            )
+        billing_total = calculate_session_total(session, session.tariff)
+        session.idle_amount = billing_total.idle_amount
+        session.total_amount = billing_total.total_amount
 
     # 5. Giải phóng cổng sạc
     if session.connector:
         session.connector.status = "AVAILABLE"
-        session.connector.ocpp_status = "Available"
 
     db.commit()
     logger.info(

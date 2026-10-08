@@ -2,19 +2,19 @@
 """add_last_seen_at_ocpp_status_and_connector_errors
 
 Revision ID: c0062f725df9
-Revises: 
+Revises: 45ab6640633a
 Create Date: 2026-09-30 22:25:00.000000
 
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'c0062f725df9'
-down_revision: Union[str, None] = None  # Hoặc điền mã revision trước đó nếu có
+down_revision: Union[str, None] = '45ab6640633a'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -52,12 +52,48 @@ def parse_timestamp_safe(ts_val: Any) -> datetime | None:
     if not ts_val:
         return None
     if isinstance(ts_val, datetime):
-        return ts_val
+        return (
+            ts_val.replace(tzinfo=timezone.utc)
+            if ts_val.tzinfo is None
+            else ts_val
+        )
     try:
         clean_ts = str(ts_val).replace("Z", "+00:00")
-        return datetime.fromisoformat(clean_ts)
+        parsed = datetime.fromisoformat(clean_ts)
+        return (
+            parsed.replace(tzinfo=timezone.utc)
+            if parsed.tzinfo is None
+            else parsed
+        )
     except (ValueError, TypeError):
         return None
+
+
+def _apply_connector_status(
+    connector: Connector,
+    raw_status: str,
+    internal_status: str,
+    timestamp: Any,
+) -> None:
+    previous_status = getattr(connector, "ocpp_status", None)
+    if previous_status != raw_status:
+        status_time = parse_timestamp_safe(timestamp) or datetime.now(timezone.utc)
+        connector.status_changed_at = status_time
+        if raw_status in ("Finishing", "SuspendedEV") and getattr(
+            connector, "idle_started_at", None
+        ) is None:
+            connector.idle_started_at = status_time
+            connector.idle_ended_at = None
+        elif raw_status == "Available" and getattr(
+            connector, "idle_started_at", None
+        ) is not None:
+            connector.idle_ended_at = status_time
+            # TODO(S-28): Nếu Available đến sau khi phiên đã quyết toán, bổ sung
+            # luồng tính phí sau tại đây sau khi mentor chốt cách ghi sổ/trừ ví.
+            # Không cập nhật hóa đơn đã chốt hoặc tự động trừ ví lần hai ở đây.
+
+    connector.status = internal_status
+    connector.ocpp_status = raw_status
 
 
 def handle_status_notification(
@@ -104,8 +140,12 @@ def handle_status_notification(
             )
             return {}
 
-        connector.status = OCPP_TO_CONNECTOR_STATUS[status]
-        connector.ocpp_status = status
+        _apply_connector_status(
+            connector,
+            status,
+            OCPP_TO_CONNECTOR_STATUS[status],
+            timestamp,
+        )
 
         if status == "Charging":
             active_session = (
@@ -180,8 +220,12 @@ async def handle(
     )
 
     if connector:
-        connector.status = internal_status
-        connector.ocpp_status = raw_status
+        _apply_connector_status(
+            connector,
+            raw_status,
+            internal_status,
+            timestamp,
+        )
 
         if error_code and error_code != "NoError":
             conn_error = ConnectorError(

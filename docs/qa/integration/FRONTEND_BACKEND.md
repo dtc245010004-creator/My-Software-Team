@@ -153,6 +153,20 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
 
 ---
 
+## TC-FB-16: Phạm vi truy cập danh sách và chi tiết trạm/trụ
+* **Hợp đồng API**: `GET /api/v1/stations` và `GET /api/v1/chargers` lọc tài nguyên của Operator theo `Station.operator_id`; Admin không bị giới hạn theo chủ sở hữu. Khách chỉ đọc trạm/trụ đang hoạt động. Truy cập chi tiết ngoài phạm vi trả `404`.
+* **Hiển thị trạm**: Khi có tọa độ tìm kiếm nhưng không đặt bán kính, trạm chưa khai báo GPS vẫn nằm trong kết quả với `distance_km: null`. Connector lưu kiểu cũ như `Type 2` được chuẩn hóa thành `TYPE_2` ở DTO, không ghi lại dữ liệu.
+* **Bằng chứng kiểm thử backend (07/10/2026, chưa commit)**: `test_station_ownership_rbac.py`, `test_stations.py`, `test_chargers_grid.py` đạt **35 passed, 4 warnings** trên SQLite tạm; bao gồm list, detail, tree và grid. Ruff các file đổi sạch. Chưa chạy kiểm thử trình duyệt cho ca này.
+
+---
+
+## TC-FB-17: Lưu biểu giá kWh và phí chiếm trụ
+* **Hợp đồng API**: `POST /api/v1/tariffs` và `PUT /api/v1/tariffs/{tariff_id}` nhận `idle_fee_per_minute` và `idle_grace_minutes`; phản hồi biểu giá trả lại cả hai trường. Nếu đơn giá kWh, phí chiếm trụ hoặc ân hạn âm, schema Pydantic trả HTTP 422 và thông báo tiếng Việt nêu tên trường.
+* **Tính tiền**: Backend giữ nguyên tiền điện `total_kwh × applied_price_per_kwh`; phí chiếm trụ chỉ áp dụng từ `Finishing`/`SuspendedEV` đến `Available`, sau ân hạn, làm tròn lên theo phút và chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến sau billing, mốc được lưu nhưng hóa đơn/sổ cái không đổi và ví không tự bị trừ lần hai.
+* **Bằng chứng kiểm thử backend (08/10/2026, chưa commit)**: `backend/tests/test_billing_idle_fee.py` đạt **20 passed** trong full suite; toàn backend đạt 298 passed, 1 skipped, 302 warnings (299 ca thu thập). Bao gồm giới hạn cấu hình và kiểm tra `Available` muộn không gây quyết toán bổ sung.
+
+---
+
 ## Current Summary
 
 ### Đánh giá mức độ tích hợp Frontend ↔ Backend

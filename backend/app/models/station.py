@@ -69,7 +69,6 @@ class ChargingPoint(Base):
     __tablename__ = "charging_points"
     __table_args__ = (
         CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
-        {"extend_existing": True},
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -153,7 +152,6 @@ class ChargingPoint(Base):
 
 class Connector(Base):
     __tablename__ = "connectors"
-    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     charge_point_id = Column(
@@ -169,6 +167,9 @@ class Connector(Base):
     connector_type = Column(String(50), nullable=True, default="Type 2")
     status = Column(String(50), default="AVAILABLE")
     ocpp_status = Column(String(50), default="Available")
+    status_changed_at = Column(DateTime(timezone=True), nullable=True)
+    idle_started_at = Column(DateTime(timezone=True), nullable=True)
+    idle_ended_at = Column(DateTime(timezone=True), nullable=True)
     max_kw = Column(Float, nullable=True, default=22.0)
     max_power_kw = Column(Float, nullable=True, default=22.0)
     type = Column(String(50), nullable=True, default="Type 2")
@@ -209,7 +210,6 @@ class Connector(Base):
 
 class ConnectorError(Base):
     __tablename__ = "connector_errors"
-    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     connector_id = Column(
@@ -230,7 +230,6 @@ class ConnectorError(Base):
 
 class StationPowerMetric(Base):
     __tablename__ = "station_power_metrics"
-    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     station_id = Column(
