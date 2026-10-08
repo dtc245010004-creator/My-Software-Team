@@ -1,7 +1,7 @@
 import json
 import os
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     MAX_SAFE_DEBT_LIMIT: int = (
         -500000
     )  # -500,000 VND cho CheckConstraint CSDL (khóa ở -300k, chỉ cho tràn tối đa 200k)
+    IDLE_FEE_MAX_MINUTES: int = Field(
+        default=240, ge=0
+    )  # Trần số phút được tính phí chiếm trụ mỗi phiên
 
     # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"

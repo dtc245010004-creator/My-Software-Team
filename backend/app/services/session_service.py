@@ -17,6 +17,7 @@ from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.audit_service import ghi_nhat_ky
+from app.services.billing import calculate_session_total
 from app.services.wallet_service import deduct_charging_fee
 
 logger = logging.getLogger("ev_csms.session_service")
@@ -221,6 +222,8 @@ def start_charging_session(
 
     # 6. Khởi tạo phiên sạc
     init_soc = float(initial_soc) if initial_soc is not None else 20.0
+    connector.idle_started_at = None
+    connector.idle_ended_at = None
     new_session = ChargingSession(
         user_id=user.id,
         connector_id=connector_id,
@@ -320,7 +323,9 @@ def stop_charging_session(
         )
 
     total_kwh = meter_stop_kwh - session.meter_start_kwh
-    total_amount = round(total_kwh * session.applied_price_per_kwh, 2)
+    session.total_kwh = total_kwh
+    billing_total = calculate_session_total(session, session.tariff)
+    total_amount = billing_total.total_amount
 
     try:
         # 4. Trừ tiền ví ACID
@@ -336,6 +341,7 @@ def stop_charging_session(
         session.end_time = now
         session.meter_stop_kwh = meter_stop_kwh
         session.total_kwh = total_kwh
+        session.idle_amount = billing_total.idle_amount
         session.total_amount = total_amount
         session.status = "COMPLETED"
         session.stop_reason = stop_reason
@@ -426,7 +432,8 @@ def reconcile_interrupted_sessions(db: Session) -> int:
     now = datetime.now(timezone.utc)
     for session in active_sessions:
         try:
-            amount = round(session.total_kwh * session.applied_price_per_kwh, 2)
+            billing_total = calculate_session_total(session, session.tariff)
+            amount = billing_total.total_amount
             if amount > 0:
                 deduct_charging_fee(
                     db=db,
@@ -436,6 +443,7 @@ def reconcile_interrupted_sessions(db: Session) -> int:
                 )
             session.end_time = now
             session.meter_stop_kwh = session.total_kwh
+            session.idle_amount = billing_total.idle_amount
             session.total_amount = amount
             session.status = "INTERRUPTED"
             session.stop_reason = "SERVER_CRASH_RECONCILED"
@@ -586,7 +594,9 @@ def remote_stop_charging_session(
         meter_stop_kwh = session.meter_start_kwh + Decimal("1.50")
 
     total_kwh = meter_stop_kwh - session.meter_start_kwh
-    total_amount = round(total_kwh * session.applied_price_per_kwh, 2)
+    session.total_kwh = total_kwh
+    billing_total = calculate_session_total(session, session.tariff)
+    total_amount = billing_total.total_amount
 
     try:
         # Quyết toán tiền ví
@@ -601,6 +611,7 @@ def remote_stop_charging_session(
         session.end_time = now
         session.meter_stop_kwh = meter_stop_kwh
         session.total_kwh = total_kwh
+        session.idle_amount = billing_total.idle_amount
         session.total_amount = total_amount
         session.status = "COMPLETED"
         session.stop_reason = "Remote"

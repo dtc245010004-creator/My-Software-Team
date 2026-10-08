@@ -6,6 +6,14 @@
 
 ---
 
+## Full Suite S-28 (08/10/2026)
+
+* **Kết quả**: **298 passed, 1 skipped, 302 warnings** trong 123.28 giây; pytest thu thập 299 ca trên Python 3.14.7.
+* **Phạm vi mới**: 20 ca `test_billing_idle_fee.py` kiểm tra tính phí, trạng thái connector, trần phút cấu hình, `Available` muộn, giá trị tariff và lỗi HTTP 422; toàn bộ 20 ca passed.
+* **Lỗi hồi quy**: Không có test thất bại sau khi sửa tương thích của StatusNotification với các mock OCPP hiện có.
+
+---
+
 ## 1. Danh sách Kiểm thử Hồi quy Hiện tại (Current Regression Tests)
 
 Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic khóa tạm chống vét cạn mật khẩu và đóng gói Staging ngày **30/09/2026**:
@@ -48,13 +56,16 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 
 * **Số lượng lỗi hồi quy phát hiện**: **0 lỗi**.
 * **Chi tiết**: Không có lỗi hồi quy nào được ghi nhận trong đợt kiểm thử tự động ngày 30/09/2026.
+* **Cập nhật 07/10/2026 (chưa commit)**: Trong phạm vi chọn lọc trạm/trụ, `test_station_ownership_rbac.py`, `test_stations.py` và `test_chargers_grid.py` đạt **35 passed, 4 warnings**. Chưa chạy toàn bộ backend suite.
 
 ---
 
 ## 5. Trạng thái Hồi quy Tổng thể (Regression Status)
 
-* **Trạng thái lần chạy gần nhất (30/09/2026)**: **PASSED**.
-* **Kết luận lần chạy đó**: Các thay đổi về hạn mức tài chính, bảo vệ đăng nhập và khung staging không gây lỗi hồi quy trong phạm vi bộ test đã chạy. Kết quả này không bao gồm thay đổi OCPP ngày 01/10/2026.
+* **Trạng thái lần chạy gần nhất (08/10/2026)**: **PASSED** — 298 passed, 1 skipped, 302 warnings.
+* **Kết luận lần chạy mới nhất**: Bộ backend suite chạy hết và không ghi nhận test thất bại sau thay đổi S-28.
+* **Lượt kiểm tra chọn lọc mới nhất (07/10/2026, chưa commit)**: Các test quyền trạm/trụ và tìm kiếm GPS đạt **35 passed, 4 warnings**; Ruff các file đổi sạch. Đây không phải kết quả của full suite.
+* **Lượt full suite mới nhất (08/10/2026, chưa commit)**: **298 passed, 1 skipped, 302 warnings**; 299 ca được thu thập trong 123.28 giây. Phần S-28 không phát sinh lỗi hồi quy; test mới xác nhận áp trần theo settings và không tự quyết toán khi `Available` đến muộn.
 
 ## 6. Kiểm chứng sau thay đổi khung OCPP (01/10/2026)
 

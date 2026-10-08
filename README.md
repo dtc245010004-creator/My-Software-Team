@@ -9,10 +9,11 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Backend suite gần nhất đạt **275 passed, 1 skipped, 298 warnings** ngày 07/10/2026 (Python 3.14).
+- **Kiểm thử tự động**: Full backend suite ngày 08/10/2026 đạt **298 passed, 1 skipped, 302 warnings** trên Python 3.14.7; pytest thu thập 299 ca.
 - **Chức năng OCPP**: Bao gồm MeterValues, chống số đo lùi/trùng, khôi phục phiên khi reconnect, RemoteStart/RemoteStop và audit log giới hạn theo quyền sở hữu trạm.
 - **Kiến trúc dữ liệu**: Các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests` và `audit_logs`. *(Nguồn: `backend/app/models/`)*
-- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; head hiện tại là `ab12cd34ef56`. Kiểm tra migration gần nhất chạy trên SQLite tạm; không áp dụng migration lên DB dự án.
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; head duy nhất hiện tại là `1660df6b86c6`. Hai migration S-28 đã kiểm tra tiến/lùi/tiến trên SQLite tạm; không áp dụng migration lên DB dự án.
+- **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
 - **Docker & CI/CD**: `docker-compose.yml` chạy backend, frontend và simulator 20 trụ; `docker-compose.staging.yml` chạy backend/frontend. CI cấu hình tại `.github/workflows/`.
 
 ---
@@ -192,7 +193,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Kết quả mới nhất đã chạy tại workspace (07/10/2026):** `275 passed, 1 skipped, 298 warnings`. Các con số lịch sử bên trên là baseline cũ, không đại diện cho lần kiểm thử hiện tại.
+**Kết quả mới nhất đã chạy tại workspace (08/10/2026):** `298 passed, 1 skipped, 302 warnings` (299 ca thu thập, 123.28 giây). Suite `test_billing_idle_fee.py` có 20 ca passed. Các con số lịch sử bên trên là baseline cũ, không đại diện cho lần kiểm thử hiện tại.
 
 ---
 
@@ -283,6 +284,7 @@ My-Software-Team/
 ## 7. Tài liệu liên quan
 
 - Cổng điều hướng tài liệu toàn hệ thống: [`docs/README.md`](docs/README.md)
+- Bản đồ các khu vực mã nguồn: [`docs/codebase-map.md`](docs/codebase-map.md)
 - Hướng dẫn chi tiết phân hệ Backend: [`backend/README.md`](backend/README.md)
 - Bản đồ cấu trúc và ma trận truy vết: [`docs/architecture/PROJECT_STRUCTURE.md`](docs/architecture/PROJECT_STRUCTURE.md)
 - Sổ tay vận hành kỹ thuật: [`docs/devops/OPERATIONS.md`](docs/devops/OPERATIONS.md)
@@ -291,3 +293,4 @@ My-Software-Team/
 - Hồ sơ nghiệm thu BootNotification S-08: [`docs/qa/stories/S-08.md`](docs/qa/stories/S-08.md)
 - Hồ sơ nghiệm thu Authorize/idTag S-15: [`docs/qa/stories/S-15.md`](docs/qa/stories/S-15.md)
 - Hồ sơ nghiệm thu dispatcher/Reset OCPP S-16: [`docs/qa/stories/S-16.md`](docs/qa/stories/S-16.md)
+- Hồ sơ backend biểu giá/phí chiếm trụ S-28: [`docs/qa/stories/S-28.md`](docs/qa/stories/S-28.md)

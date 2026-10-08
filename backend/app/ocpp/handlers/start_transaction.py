@@ -206,6 +206,8 @@ def handle_start_transaction(
 
     # 5. Khởi tạo ChargingSession mới
     meter_start_val = int(meter_start) if meter_start is not None else 0
+    connector.idle_started_at = None
+    connector.idle_ended_at = None
     new_session = ChargingSession(
         connector_id=connector.id,
         id_tag=id_tag_code,
