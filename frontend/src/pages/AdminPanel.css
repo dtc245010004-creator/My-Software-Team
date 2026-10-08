@@ -347,7 +347,7 @@
 
 .admin-table {
   width: 100%;
-  min-width: 1180px;
+  min-width: 900px;
   border-collapse: collapse;
   font-size: 12px;
 }
@@ -363,6 +363,28 @@
   text-align: left;
   white-space: nowrap;
   font-size: 11px;
+}
+
+.admin-table th:last-child,
+.admin-table td:last-child {
+  position: sticky;
+  right: 0;
+  background: #edf3f8;
+  box-shadow: -3px 0 8px rgba(0, 0, 0, 0.08);
+  z-index: 2;
+  text-align: center;
+}
+
+.admin-table td:last-child {
+  background: #ffffff;
+}
+
+.admin-table tbody tr:nth-child(even) td:last-child {
+  background: #fbfdff;
+}
+
+.admin-table tbody tr:hover td:last-child {
+  background: #eff7ff;
 }
 
 .admin-table td {
