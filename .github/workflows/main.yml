@@ -99,6 +99,7 @@ jobs:
           COMPOSE_DATABASE_URL: postgresql+psycopg2://admin:secretpassword@db:5432/ev_csms_db
           DATABASE_URL: postgresql+psycopg2://admin:secretpassword@127.0.0.1:5433/ev_csms_db
           POSTGRES_HOST_PORT: "5433"
+          BACKEND_HOST_PORT: "8000"
           SIMULATOR_CHARGE_POINT_COUNT: "20"
           OCPP_RECONNECT_CHARGE_POINTS: "5"
           OCPP_LIVE_TEST: "1"

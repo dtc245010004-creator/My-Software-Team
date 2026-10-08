@@ -16,6 +16,7 @@ import {
   Layers,
   X,
   MapPinOff,
+  Maximize2,
 } from 'lucide-react';
 import api from '../services/api';
 import { MAP_CONFIG } from '../config/mapConfig';
@@ -97,6 +98,9 @@ export default function DriverMap() {
   const [locationName, setLocationName] = useState('Đang định vị...');
   const [gpsStatus, setGpsStatus] = useState('locating'); // 'locating' | 'granted' | 'denied' | 'custom'
 
+  // Chế độ lớp bản đồ: 'street' (Đường phố rõ nét) | 'dark' (Tối) | 'satellite' (Vệ tinh)
+  const [layerMode, setLayerMode] = useState('street');
+
   // Dữ liệu trạm sạc & bộ lọc
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -108,9 +112,10 @@ export default function DriverMap() {
   // Tham chiếu Leaflet Map
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  const tileLayerRef = useRef(null);
+  const baseLayersRef = useRef({});
   const markersRef = useRef({});
   const userMarkerRef = useRef(null);
+  const lastFittedKeyRef = useRef('');
 
   // Khởi tạo định vị vị trí người dùng
   const detectUserLocation = useCallback(() => {
@@ -184,26 +189,40 @@ export default function DriverMap() {
 
     if (!mapInstanceRef.current) {
       const initialCenter = userCoords ? [userCoords.lat, userCoords.lon] : MAP_CONFIG.defaultCenter;
-      const initialZoom = userCoords ? 13 : MAP_CONFIG.defaultZoom;
+      const initialZoom = userCoords ? 13 : 6;
 
       const map = L.map(mapContainerRef.current, {
         center: initialCenter,
         zoom: initialZoom,
+        minZoom: 4,
+        maxZoom: 19,
         zoomControl: false,
         attributionControl: true,
       });
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // Thiết lập Tile Layer ban đầu theo theme
-      const tileConfig = isDark ? MAP_CONFIG.dark : MAP_CONFIG.light;
-      tileLayerRef.current = L.tileLayer(tileConfig.url, {
-        subdomains: tileConfig.subdomains || 'abc',
-        maxZoom: tileConfig.maxZoom,
-        attribution: tileConfig.attribution,
-      }).addTo(map);
+      // 3 lớp bản đồ chuẩn
+      const streetLayer = L.tileLayer(MAP_CONFIG.street.url, {
+        attribution: MAP_CONFIG.street.attribution,
+        maxZoom: MAP_CONFIG.street.maxZoom,
+      });
+      const darkLayer = L.tileLayer(MAP_CONFIG.dark.url, {
+        attribution: MAP_CONFIG.dark.attribution,
+        maxZoom: MAP_CONFIG.dark.maxZoom,
+      });
+      const satelliteLayer = L.tileLayer(MAP_CONFIG.satellite.url, {
+        attribution: MAP_CONFIG.satellite.attribution,
+        maxZoom: MAP_CONFIG.satellite.maxZoom,
+      });
 
+      streetLayer.addTo(map);
+      baseLayersRef.current = { street: streetLayer, dark: darkLayer, satellite: satelliteLayer };
       mapInstanceRef.current = map;
+
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 250);
     }
 
     return () => {
@@ -211,22 +230,20 @@ export default function DriverMap() {
     };
   }, []);
 
-  // Đổi Tile Layer khi chuyển chế độ Sáng / Tối
+  // Đổi Tile Layer khi chuyển layerMode
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map || !baseLayersRef.current.street) return;
 
-    if (tileLayerRef.current) {
-      map.removeLayer(tileLayerRef.current);
-    }
+    Object.values(baseLayersRef.current).forEach((l) => {
+      if (map.hasLayer(l)) {
+        map.removeLayer(l);
+      }
+    });
 
-    const tileConfig = isDark ? MAP_CONFIG.dark : MAP_CONFIG.light;
-    tileLayerRef.current = L.tileLayer(tileConfig.url, {
-      subdomains: tileConfig.subdomains || 'abc',
-      maxZoom: tileConfig.maxZoom,
-      attribution: tileConfig.attribution,
-    }).addTo(map);
-  }, [isDark]);
+    const activeLayer = baseLayersRef.current[layerMode] || baseLayersRef.current.street;
+    activeLayer.addTo(map);
+  }, [layerMode]);
 
   // Cập nhật marker vị trí người dùng trên bản đồ
   useEffect(() => {
@@ -245,11 +262,13 @@ export default function DriverMap() {
       userMarkerRef.current.setPopupContent(`<div style="font-size: 13px; font-weight: 600; padding: 2px;">📍 ${locationName}</div>`);
     }
 
-    // Bay bản đồ đến vị trí người dùng
-    map.flyTo([userCoords.lat, userCoords.lon], 13, { duration: 1.2 });
-  }, [userCoords, locationName]);
+    // Nếu không có trạm sạc nào thì mới bay đến vị trí người dùng
+    if (stations.length === 0) {
+      map.flyTo([userCoords.lat, userCoords.lon], 13, { duration: 1.2 });
+    }
+  }, [userCoords, locationName, stations.length]);
 
-  // Cập nhật markers trạm sạc trên bản đồ
+  // Cập nhật markers trạm sạc trên bản đồ & tự động fitBounds thông minh
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -258,13 +277,20 @@ export default function DriverMap() {
     Object.values(markersRef.current).forEach((m) => m.remove());
     markersRef.current = {};
 
+    const validStations = [];
+
     stations.forEach((st) => {
       if (st.latitude == null || st.longitude == null) return;
+      const parsedLat = typeof st.latitude === 'string' ? parseFloat(st.latitude) : Number(st.latitude);
+      const parsedLng = typeof st.longitude === 'string' ? parseFloat(st.longitude) : Number(st.longitude);
+      if (isNaN(parsedLat) || isNaN(parsedLng) || parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) return;
+
+      validStations.push({ ...st, parsedLat, parsedLng });
 
       const isSelected = selectedStationId === st.id;
       const icon = createStationMarkerIcon(st, isSelected);
 
-      const marker = L.marker([st.latitude, st.longitude], {
+      const marker = L.marker([parsedLat, parsedLng], {
         icon: icon,
         zIndexOffset: isSelected ? 500 : 100,
       }).addTo(map);
@@ -277,7 +303,7 @@ export default function DriverMap() {
       const distText = st.distance_km != null ? `${st.distance_km.toFixed(1)} km` : '';
 
       const popupContent = `
-        <div style="min-width: 210px; font-family: 'Inter', sans-serif;">
+        <div style="min-width: 220px; font-family: 'Inter', sans-serif;">
           <div style="font-weight: 700; font-size: 14px; margin-bottom: 2px; color: ${isDark ? '#F1F5F9' : '#0F172A'};">
             ${st.name}
           </div>
@@ -295,7 +321,7 @@ export default function DriverMap() {
             </span>
           </div>
           <div style="display: flex; gap: 6px;">
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${st.latitude},${st.longitude}" target="_blank" rel="noreferrer"
+            <a href="https://www.google.com/maps/dir/?api=1&destination=${parsedLat},${parsedLng}" target="_blank" rel="noreferrer"
                style="flex: 1; text-align: center; background: #0284C7; color: white; padding: 6px 10px; border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-block;">
               Chỉ đường
             </a>
@@ -315,7 +341,46 @@ export default function DriverMap() {
 
       markersRef.current[st.id] = marker;
     });
+
+    // Tự động căn chỉnh bounds khi danh sách trạm thay đổi (tránh loop)
+    const currentFingerprint = validStations.map((s) => `${s.id}:${s.parsedLat.toFixed(4)},${s.parsedLng.toFixed(4)}`).join('|');
+    if (validStations.length > 0 && currentFingerprint !== lastFittedKeyRef.current) {
+      lastFittedKeyRef.current = currentFingerprint;
+      if (validStations.length === 1) {
+        map.setView([validStations[0].parsedLat, validStations[0].parsedLng], 15);
+      } else {
+        const bounds = L.latLngBounds(validStations.map((s) => [s.parsedLat, s.parsedLng]));
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      }
+    }
   }, [stations, selectedStationId, isDark]);
+
+  // Nút Xem tất cả: căn trọn vẹn tất cả trạm sạc
+  const handleFitAll = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const validStations = stations
+      .map((st) => {
+        const lat = typeof st.latitude === 'string' ? parseFloat(st.latitude) : Number(st.latitude);
+        const lng = typeof st.longitude === 'string' ? parseFloat(st.longitude) : Number(st.longitude);
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+        return [lat, lng];
+      })
+      .filter(Boolean);
+
+    if (validStations.length === 0) {
+      if (userCoords) {
+        map.flyTo([userCoords.lat, userCoords.lon], 14, { duration: 0.8 });
+      } else {
+        map.flyTo(MAP_CONFIG.defaultCenter, MAP_CONFIG.defaultZoom, { duration: 0.8 });
+      }
+    } else if (validStations.length === 1) {
+      map.flyTo(validStations[0], 15, { duration: 0.8 });
+    } else {
+      const bounds = L.latLngBounds(validStations);
+      map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 0.8 });
+    }
+  }, [stations, userCoords]);
 
   // Chọn thành phố thủ công khi GPS từ chối hoặc người dùng muốn đổi khu vực
   const handleSelectCity = (city) => {
@@ -441,6 +506,55 @@ export default function DriverMap() {
             ref={mapContainerRef}
             className="w-full h-full relative z-0"
           />
+
+          {/* Controls nổi trên bản đồ: Xem tất cả & Bộ chọn lớp */}
+          <div className="absolute top-4 right-4 z-[400] flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleFitAll}
+              title="Căn chỉnh bao trọn tất cả trạm sạc"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/90 dark:bg-slate-900/90 text-sky-700 dark:text-sky-300 border border-slate-200 dark:border-slate-700 shadow-md hover:bg-sky-50 dark:hover:bg-slate-800 transition-all flex items-center gap-1.5 backdrop-blur-md"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>Xem tất cả</span>
+            </button>
+
+            <div className="flex items-center bg-white/90 dark:bg-slate-900/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-md backdrop-blur-md text-xs">
+              <button
+                type="button"
+                onClick={() => setLayerMode('street')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-all duration-150 ${
+                  layerMode === 'street'
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Đường phố
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayerMode('dark')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-all duration-150 ${
+                  layerMode === 'dark'
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Bản đồ tối
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayerMode('satellite')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-all duration-150 ${
+                  layerMode === 'satellite'
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Vệ tinh
+              </button>
+            </div>
+          </div>
 
           {/* Map floating legend (Glassmorphism) */}
           <div className="absolute bottom-4 left-4 z-[400] glass-panel border border-slate-200/80 dark:border-slate-800/80 p-3 rounded-2xl text-xs text-slate-700 dark:text-slate-300 space-y-1.5 shadow-lg">

@@ -1,27 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, Shield, User, LogOut, Radio, ChevronDown, Check } from 'lucide-react';
+import { Zap, Shield, User, LogOut, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { telemetryWs, WS_STATUS } from '../services/websocket';
 import { getRoleLabel } from '../config/roleConfig';
 import ThemeToggle from './ui/ThemeToggle';
 
-const STATUS_LABELS = {
-  [WS_STATUS.IDLE]: 'CHƯA KẾT NỐI',
-  [WS_STATUS.CONNECTING]: 'ĐANG KẾT NỐI…',
-  [WS_STATUS.CONNECTED]: 'TELEMETRY LIVE',
-  [WS_STATUS.RECONNECTING]: 'ĐANG KẾT NỐI LẠI…',
-  [WS_STATUS.DISCONNECTED]: 'DISCONNECTED',
-  [WS_STATUS.CLOSED]: 'ĐÃ ĐÓNG',
-};
-
-const STATUS_OK = new Set([WS_STATUS.CONNECTED]);
-const STATUS_WARN = new Set([WS_STATUS.CONNECTING, WS_STATUS.RECONNECTING]);
-
 export default function Header() {
   const { user, rawUser, role, isGuest, logout, quickSwitch, currentDemoKey } = useAuth();
   const [wsStatus, setWsStatus] = useState(WS_STATUS.IDLE);
   const [switching, setSwitching] = useState(false);
-  const wsOnline = STATUS_OK.has(wsStatus);
+  const wsOnline = wsStatus === WS_STATUS.CONNECTED;
 
   useEffect(() => {
     // Subscribe status thay vì poll setInterval(1s) — tiết kiệm CPU và cleanup đúng cách
@@ -79,30 +67,6 @@ export default function Header() {
 
       {/* Realtime Status & Role Switcher */}
       <div className="flex items-center space-x-5">
-        {/* WebSocket Signal Indicator */}
-        <div className="flex items-center space-x-2 bg-obsidian px-3 py-1.5 rounded border border-hairline text-xs font-mono">
-          <Radio
-            className={`w-3.5 h-3.5 ${
-              STATUS_OK.has(wsStatus)
-                ? 'text-grid-green'
-                : STATUS_WARN.has(wsStatus)
-                ? 'text-caution-amber animate-pulse'
-                : 'text-critical-red animate-pulse'
-            }`}
-          />
-          <span
-            className={
-              STATUS_OK.has(wsStatus)
-                ? 'text-grid-green'
-                : STATUS_WARN.has(wsStatus)
-                ? 'text-caution-amber'
-                : 'text-critical-red'
-            }
-          >
-            {STATUS_LABELS[wsStatus] || 'DISCONNECTED'}
-          </span>
-        </div>
-
         {/* Realtime Status & Actions */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           
@@ -160,10 +124,10 @@ export default function Header() {
             <button
               onClick={() => handleRoleChange('ACCOUNTANT')}
               disabled={switching}
-              title="Kế toán viên: Tra cứu kiểm toán & đối soát tài chính"
+              title="Kế toán: Đối soát tài chính và phiên sạc bất thường"
               className={`px-2.5 py-1 rounded-lg font-medium transition-all duration-150 ${
                 currentDemoKey === 'ACCOUNTANT'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                  ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-600/30'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
