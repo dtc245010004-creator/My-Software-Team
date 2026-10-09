@@ -9,7 +9,6 @@ from app.models.id_tag import IdTag
 from app.models.user import User
 from app.models.wallet import Wallet
 
-
 DEMO_ACCOUNTS = (
     {
         "username": "admin",
