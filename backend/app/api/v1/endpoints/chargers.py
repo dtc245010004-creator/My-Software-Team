@@ -63,14 +63,20 @@ async def reset_charging_point(
             {"type": reset_in.type},
             timeout_seconds=30,
         )
-        # Ghi audit ngay khi có kết quả từ trụ; không lưu dữ liệu thẻ/PII.
+        # Tra DB ID của trụ để ghi audit đúng; không lưu dữ liệu thẻ/PII.
+        charger = db.query(ChargingPoint).filter(ChargingPoint.code == code).first()
         ghi_nhat_ky(
             db,
             user_id=current_user.id,
             action="Reset",
             object_type="charging_point",
-            object_id=code,
-            data={"command": "Reset", "reset_type": reset_in.type, "result": result},
+            object_id=charger.id if charger else code,
+            data={
+                "command": "Reset",
+                "charge_point_code": code,
+                "reset_type": reset_in.type,
+                "result": result,
+            },
         )
         db.commit()
         return result
@@ -80,10 +86,11 @@ async def reset_charging_point(
             detail="Trụ sạc đang ngoại tuyến.",
         ) from exc
     except TimeoutError as exc:
+        charger = db.query(ChargingPoint).filter(ChargingPoint.code == code).first()
         ghi_nhat_ky(
             db, user_id=current_user.id, action="Reset",
-            object_type="charging_point", object_id=code,
-            data={"command": "Reset", "reset_type": reset_in.type, "result": "Timeout"},
+            object_type="charging_point", object_id=charger.id if charger else code,
+            data={"command": "Reset", "charge_point_code": code, "reset_type": reset_in.type, "result": "Timeout"},
         )
         db.commit()
         raise HTTPException(
@@ -91,10 +98,11 @@ async def reset_charging_point(
             detail="Trụ sạc không phản hồi lệnh Reset kịp thời.",
         ) from exc
     except OcppCallError as exc:
+        charger = db.query(ChargingPoint).filter(ChargingPoint.code == code).first()
         ghi_nhat_ky(
             db, user_id=current_user.id, action="Reset",
-            object_type="charging_point", object_id=code,
-            data={"command": "Reset", "reset_type": reset_in.type, "result": "Rejected", "error_code": exc.error_code},
+            object_type="charging_point", object_id=charger.id if charger else code,
+            data={"command": "Reset", "charge_point_code": code, "reset_type": reset_in.type, "result": "Rejected", "error_code": exc.error_code},
         )
         db.commit()
         raise HTTPException(

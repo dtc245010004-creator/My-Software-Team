@@ -12,12 +12,18 @@ export const ACTION_LABELS = {
   RESET: 'Khởi động lại trụ',
   REMOTE_STOP_TRANSACTION: 'Dừng phiên từ xa',
   CLOSE_ABNORMAL_SESSION: 'Đóng phiên bất thường',
+  REMOTE_START_TRANSACTION: 'Bắt đầu phiên từ xa',
+  CHANGE_AVAILABILITY: 'Đổi trạng thái trụ',
+  UPDATE_FIRMWARE: 'Cập nhật firmware',
 };
 
 export const RESULT_LABELS = {
   SUCCESS: 'Thành công',
   FAILED: 'Thất bại',
   PENDING: 'Đang xử lý',
+  Accepted: 'Chấp nhận',
+  Rejected: 'Từ chối',
+  Timeout: 'Quá thời gian',
 };
 
 /**
