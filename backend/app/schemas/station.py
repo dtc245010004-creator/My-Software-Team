@@ -20,7 +20,9 @@ class ConnectorBase(BaseModel):
     @field_validator("connector_type")
     @classmethod
     def validate_connector_type(cls, v: str) -> str:
-        v_upper = v.upper()
+        v_upper = v.strip().upper().replace(" ", "_")
+        if v_upper == "TYPE2":
+            v_upper = "TYPE_2"
         if v_upper not in ["CCS2", "TYPE_2", "CHADEMO"]:
             raise ValueError(
                 "Chuẩn sạc không hợp lệ. Chỉ chấp nhận: CCS2, TYPE_2, CHADEMO."

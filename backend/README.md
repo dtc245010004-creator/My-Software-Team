@@ -66,7 +66,7 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 | **Auth** | `/api/v1/auth` | Đăng ký tài khoản (ép role CUSTOMER), Đăng nhập JWT, Lấy profile (`/me`) |
 | **Stations** | `/api/v1/stations` | CRUD thông tin trạm sạc, đo đếm phụ tải điện theo phút, tìm trạm theo Haversine |
 | **Chargers** | `/api/v1/chargers` | Quản lý danh mục trụ sạc vật lý và cổng sạc (CCS2, Type 2, CHAdeMO) |
-| **Tariffs** | `/api/v1/tariffs` | Cấu hình biểu giá điện TOU 3 khung giờ (Peak, Normal, Off-peak) |
+| **Tariffs** | `/api/v1/tariffs` | Cấu hình biểu giá TOU theo trạm, phí chiếm trụ theo phút và thời gian ân hạn; POST/PUT trả HTTP 422 tiếng Việt nếu đơn giá, phí hoặc ân hạn âm |
 | **Wallet** | `/api/v1/wallet` | Xem số dư ví, nạp tiền trực tiếp, truy xuất nhật ký giao dịch ACID |
 | **Sessions** | `/api/v1/sessions` | Bắt đầu phiên sạc (Atomic Lock), dừng phiên sạc (Chốt cước ACID), xem lịch sử |
 | **Simulator** | `/api/v1/simulator` | Kích hoạt mô phỏng sạc pin CC-CV, tăng tốc thời gian, ngắt sạc an toàn |
@@ -93,6 +93,7 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 2. **Bảo mật Request**:
    - Mọi request yêu cầu xác thực phải gửi kèm Header `Authorization: Bearer <token>`.
    - Ngăn chặn IDOR: Tài xế chỉ được phép dừng phiên sạc hoặc xem lịch sử giao dịch ví của chính tài khoản mình sở hữu.
+   - `GET /stations` và `GET /chargers`: Admin thấy toàn hệ thống; Operator chỉ thấy trạm/trụ thuộc `Station.operator_id` của mình; khách chỉ thấy tài nguyên đang hoạt động. Chi tiết ngoài phạm vi trả `404`.
 
 ---
 

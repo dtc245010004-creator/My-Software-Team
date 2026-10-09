@@ -5,7 +5,7 @@
  * - CUSTOMER: Bản Đồ Trạm Sạc ('/map')
  */
 export function getHomeRouteByRole(role) {
-  if (role === 'ADMIN' || role === 'OPERATOR') {
+  if (role === 'ADMIN' || role === 'OPERATOR' || role === 'ACCOUNTANT') {
     return '/';
   }
   return '/map';

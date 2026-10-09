@@ -203,7 +203,7 @@
 
 ---
 
-#### 13. Ngày 2026-10-01 | Người thực hiện: `KimiCoNY`
+#### 13. Ngày 2026-10-05 | Người thực hiện: `KimiCoNY`
 * **Người yêu cầu:** Người dùng.
 * **Nhiệm vụ thực hiện:** Hoàn thành các task OCPP của Story S-07, S-08, S-14, S-15 và S-16: T-14/T-15, T-16/T-17, T-30/T-31, T-32/T-33, T-34/T-35.
 * **Nội dung thực hiện:** Tạo package `backend/app/ocpp/` với parser/serializer frame OCPP 1.6J, gateway WebSocket riêng `/ocpp/{charge_point_code}`, BootNotification, idempotency dựa trên DB và cleanup scheduler, Authorize/idTag, dispatcher dùng chung và API Reset có RBAC. Kênh `/ws/telemetry` không bị thay đổi.
