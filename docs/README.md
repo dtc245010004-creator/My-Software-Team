@@ -9,7 +9,7 @@
 ## 1. TỔNG QUAN HỆ THỐNG TÀI LIỆU TESTER (DOCUMENT ARCHITECTURE)
 
 Hệ thống tài liệu dự án EV CSMS được tổ chức theo mô hình **Đóng gói theo vai trò (Role-based Packaging)** nhằm tách bạch rõ ràng quyền sở hữu và công năng tra cứu:
-* **Trung tâm điều phối QA (`docs/qa/`)**: Chứa Hiến chương kiểm thử ([`STANDARD.md`](qa/STANDARD.md)), Sổ cái kiểm thử ([`INVENTORY.md`](qa/INVENTORY.md); full backend ngày 08/10/2026 đạt 298 passed, 1 skipped, 302 warnings), Kế hoạch kiểm thử ([`plans/TEST_PLAN.md`](qa/plans/TEST_PLAN.md)), Các báo cáo thực nghiệm ([`reports/`](qa/reports/)), và Hồ sơ nghiệm thu ([`stories/`](qa/stories/)).
+* **Trung tâm điều phối QA (`docs/qa/`)**: Chứa Hiến chương kiểm thử ([`STANDARD.md`](qa/STANDARD.md)), Sổ cái kiểm thử ([`INVENTORY.md`](qa/INVENTORY.md); full backend gần nhất ngày 09/10/2026 đạt 411 passed, 303 warnings), Kế hoạch kiểm thử ([`plans/TEST_PLAN.md`](qa/plans/TEST_PLAN.md)), Các báo cáo thực nghiệm ([`reports/`](qa/reports/)), và Hồ sơ nghiệm thu ([`stories/`](qa/stories/)).
 * **Phân khu Vận hành (`docs/devops/`)**: Sổ tay vận hành hệ thống, cổng mạng, biến môi trường ([`OPERATIONS.md`](devops/OPERATIONS.md)).
 * **Phân khu Thiết kế & Nghiên cứu (`docs/design/`, `docs/research/`)**: Đặc tả UX/UI, nhật ký sai lệch giao diện và các báo cáo thử nghiệm kỹ thuật (Spikes K-01, S-05 AC3).
 * **Phân khu Quản trị & Kiến trúc (`docs/planning/`, `docs/architecture/`)**: Kế hoạch Sprint, [bản đồ mã nguồn](codebase-map.md), Bản đồ cấu trúc và Ma trận truy vết hệ thống.
@@ -121,3 +121,4 @@ Ghi lại log lỗi chính xác, phân loại nguyên nhân vào `BUG_REPORT.md`
 | **Hồ sơ ủy quyền Authorize/idTag S-15** | [`docs/qa/stories/S-15.md`](qa/stories/S-15.md) |
 | **Hồ sơ dispatcher và lệnh Reset OCPP S-16** | [`docs/qa/stories/S-16.md`](qa/stories/S-16.md) |
 | **Hồ sơ biểu giá và phí chiếm trụ S-28** | [`docs/qa/stories/S-28.md`](qa/stories/S-28.md) |
+| **Hồ sơ hóa đơn theo từng đoạn giá S-33** | [`docs/qa/stories/S-33.md`](qa/stories/S-33.md) |

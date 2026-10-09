@@ -68,7 +68,7 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 | **Chargers** | `/api/v1/chargers` | Quản lý danh mục trụ sạc vật lý và cổng sạc (CCS2, Type 2, CHAdeMO) |
 | **Tariffs** | `/api/v1/tariffs` | Cấu hình biểu giá TOU theo trạm, phí chiếm trụ theo phút và thời gian ân hạn; POST/PUT trả HTTP 422 tiếng Việt nếu đơn giá, phí hoặc ân hạn âm |
 | **Wallet** | `/api/v1/wallet` | Xem số dư ví, nạp tiền trực tiếp, truy xuất nhật ký giao dịch ACID |
-| **Sessions** | `/api/v1/sessions` | Bắt đầu phiên sạc (Atomic Lock), dừng phiên sạc (Chốt cước ACID), xem lịch sử |
+| **Sessions** | `/api/v1/sessions` | Bắt đầu/dừng phiên sạc (chốt cước ACID), xem lịch sử; `GET /{session_id}/invoice` chỉ trả hóa đơn đã chốt, có phân đoạn snapshot, dòng phí chiếm trụ và kiểm tra ownership |
 | **Simulator** | `/api/v1/simulator` | Kích hoạt mô phỏng sạc pin CC-CV, tăng tốc thời gian, ngắt sạc an toàn |
 | **AI** | `/api/v1/ai` | Điều phối chia sẻ công suất sạc thông minh, Heuristic Fallback khi mất mạng |
 

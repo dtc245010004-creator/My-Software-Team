@@ -51,7 +51,7 @@ Danh mục dưới đây mô tả các file Markdown chuyên biệt được kh�
 
 ### 2.2. Nhóm tài liệu vận hành và cấu trúc hệ thống (docs/)
 * [`docs/README.md`](../README.md): Cổng điều hướng toàn hệ thống, giải đáp 18 câu hỏi FAQ Tester và ma trận routing theo cấp Epic/Story/Task.
-* [`docs/codebase-map.md`](../codebase-map.md): Bản đồ vai trò các khu vực mã nguồn, gồm nghiệp vụ billing S-28.
+* [`docs/codebase-map.md`](../codebase-map.md): Bản đồ vai trò các khu vực mã nguồn, gồm billing S-28, snapshot đoạn giá S-33 và API hóa đơn.
 * [`docs/devops/OPERATIONS.md`](../devops/OPERATIONS.md): Sổ tay kỹ thuật chi tiết về cổng mạng, biến môi trường, CSDL và các lệnh kiểm thử.
 * [`docs/architecture/PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md): Cây thư mục đã xác minh và ma trận truy vết Requirement $\leftrightarrow$ Task $\leftrightarrow$ Code $\leftrightarrow$ Test.
 
@@ -74,6 +74,7 @@ Danh mục dưới đây mô tả các file Markdown chuyên biệt được kh�
 * [`S-15.md`](../qa/stories/S-15.md): Hồ sơ nghiệm thu model `IdTag` và handler `Authorize` cho Story S-15.
 * [`S-16.md`](../qa/stories/S-16.md): Hồ sơ nghiệm thu dispatcher gửi Reset từ CSMS và ghép phản hồi theo message ID.
 * [`S-28.md`](../qa/stories/S-28.md): Hồ sơ phạm vi Backend SCRUM-188/189/190/192 về biểu giá và phí chiếm trụ.
+* [`S-33.md`](../qa/stories/S-33.md): Hồ sơ Backend SCRUM-222/221/220/223/225 về snapshot đoạn giá và API hóa đơn.
 
 ### 2.6. Nhóm tài liệu Thiết kế UI & Nghiên cứu kỹ thuật (Design & Spikes)
 * [`docs/design/OPERATOR_DASHBOARD_UX.md`](../design/OPERATOR_DASHBOARD_UX.md): 26 mục đặc tả UX Level 3 cho Dashboard Điều hành.

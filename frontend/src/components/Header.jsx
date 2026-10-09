@@ -24,7 +24,10 @@ export default function Header() {
       setSwitching(true);
       await quickSwitch(targetRole);
     } catch (err) {
-      alert(`Không thể chuyển sang ${targetRole}. Hãy đăng ký hoặc kiểm tra backend.`);
+      const detail = err.response?.data?.detail;
+      alert(
+        detail || `Không thể chuyển sang ${targetRole}. Hãy kiểm tra thông tin demo và backend.`
+      );
     } finally {
       setSwitching(false);
     }
