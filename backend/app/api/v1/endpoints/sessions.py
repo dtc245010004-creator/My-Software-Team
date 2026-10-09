@@ -11,12 +11,12 @@ from app.models.meter_value import MeterValue
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
 from app.models.user import User
+from app.schemas.invoice import SessionInvoiceResponse
 from app.schemas.session import (
     CurrentSessionResponse,
     ForceCloseSessionRequest,
     RemoteStartSessionRequest,
     RemoteStopRequest,
-    SessionInvoiceResponse,
     SessionResponse,
     SessionStartRequest,
     SessionStopRequest,
@@ -568,16 +568,16 @@ def get_my_sessions(
 @router.get(
     "/{session_id}/invoice",
     response_model=SessionInvoiceResponse,
-    summary="Chi tiết hóa đơn phiên sạc chia đoạn theo khung giờ TOU và qua nửa đêm (S-30, S-31)",
+    summary="Hóa đơn phiên sạc đã chốt theo từng đoạn giá (S-33)",
 )
 def get_session_invoice(
     session_id: int,
-    current_user: User = Depends(get_current_user_or_driver_guest),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Trả về chi tiết hóa đơn phiên sạc được chia đoạn theo các khung giờ biểu giá TOU
-    và theo ngày khi phiên sạc kéo dài qua nửa đêm.
+    Trả về snapshot giá đã lưu lúc chốt phiên. Phiên đang sạc không có hóa đơn;
+    phiên cần xem xét chỉ trả thông báo chờ xử lý, không trả số tiền tạm tính.
     """
     return get_session_invoice_breakdown(db=db, session_id=session_id, user=current_user)
 

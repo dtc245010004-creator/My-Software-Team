@@ -100,6 +100,9 @@ class ChargingSession(Base):
     idle_amount = Column(
         Numeric(12, 2), nullable=False, default=0.00, server_default="0"
     )
+    idle_chargeable_minutes = Column(Integer, nullable=False, default=0, server_default="0")
+    idle_fee_per_minute_applied = Column(Numeric(10, 2), nullable=True)
+    idle_grace_minutes_applied = Column(Integer, nullable=True)
 
     # Checkpoint phục hồi khi server crash & trạng thái sạc tức thời
     current_soc = Column(Float, default=0.0, nullable=False)

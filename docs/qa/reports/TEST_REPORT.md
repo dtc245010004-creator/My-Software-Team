@@ -6,14 +6,20 @@
 
 ---
 
-## Latest Full Backend Run (09/10/2026)
+## Latest Completed Full Backend Run (09/10/2026)
 
 * **Lệnh**: `python -m pytest tests -q` trong backend container, gắn mã nguồn và fixture OCPP từ workspace.
 * **Môi trường**: Docker backend, Python 3.12.
-* **Kết quả**: **403 passed, 303 warnings**; 403 ca được thu thập, chạy trong 463.59 giây.
+* **Kết quả**: **411 passed, 303 warnings**; 411 ca được thu thập, chạy trong 159.16 giây.
 * **S-28**: `test_billing_idle_fee.py` có 20 ca; kiểm tra mức trần cấu hình và xử lý `Available` muộn.
-* **S-33 / SCRUM-222**: `test_billing_segments.py` có 6 ca; tất cả passed. Migration `5ccaa686da2b` đã nâng/hạ/nâng trên PostgreSQL Compose tạm.
+* **S-33 / SCRUM-222/221/220/223/225**: `test_billing_segments.py` có 6 ca và `test_invoice.py` có 8 ca; tất cả passed. Migration `d8f56c4a911e` đã nâng/hạ/nâng trên PostgreSQL Compose tạm.
 * Cảnh báo là các cảnh báo deprecation hiện có về `datetime.utcnow()` từ SQLAlchemy schema defaults.
+
+## Kiểm tra sau điều chỉnh thông tin idle fee legacy (09/10/2026)
+
+* `backend/tests/test_invoice.py`: **8 passed** sau khi thay đổi để hóa đơn legacy không suy ra rate/grace từ biểu giá hiện tại.
+* Full suite chạy trên host Python 3.14 đạt **409 passed, 1 skipped**, nhưng một ca migration không khởi tạo được fixture `tmp_path` do Windows trả `WinError 5: Access is denied`; không có assertion test nào báo fail. Docker daemon hiện không truy cập được để lặp lại full suite trong container đã dùng cho lượt hoàn chỉnh phía trên.
+* Vì lượt full suite mới nhất bị chặn ở thiết lập thư mục tạm của môi trường host, cần chạy lại full suite trong Docker khi daemon hoạt động.
 
 ---
 

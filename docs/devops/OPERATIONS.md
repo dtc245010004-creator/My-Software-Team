@@ -110,7 +110,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-  `backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; head hiện tại là `5ccaa686da2b`. Migration S-33 `session_billing_segments` đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL Compose tạm. DB dự án chưa được migrate. Trước khi nâng cấp môi trường thật, sao lưu cơ sở dữ liệu đích theo đúng loại backend.
+`backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; head hiện tại là `d8f56c4a911e`. Các migration S-33 (`session_billing_segments` và snapshot chi tiết phí idle) đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL Compose tạm. DB dự án chưa được migrate. Trước khi nâng cấp môi trường thật, sao lưu cơ sở dữ liệu đích theo đúng loại backend.
 
 ---
 

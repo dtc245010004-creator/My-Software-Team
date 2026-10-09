@@ -12,11 +12,17 @@
 * **Phạm vi mới**: 20 ca `test_billing_idle_fee.py` kiểm tra tính phí, trạng thái connector, trần phút cấu hình, `Available` muộn, giá trị tariff và lỗi HTTP 422; toàn bộ 20 ca passed.
 * **Lỗi hồi quy**: Không có test thất bại sau khi sửa tương thích của StatusNotification với các mock OCPP hiện có.
 
-## Full Suite S-33 — SCRUM-222 (09/10/2026)
+## Full Suite S-33 — SCRUM-222/221/220/223/225 (09/10/2026, chưa commit)
 
-* **Kết quả**: **403 passed, 303 warnings**; 403 test cases thu thập, 463.59 giây trong backend container Python 3.12.
-* **Phạm vi mới**: 6 ca `test_billing_segments.py` xác minh snapshot giá và thành tiền, idempotency khi chốt lặp, đọc hóa đơn sau khi đổi biểu giá, ngày địa phương qua nửa đêm, phiên review và legacy không backfill.
-* **Migration**: `5ccaa686da2b` tạo bảng `session_billing_segments`; PostgreSQL Compose tạm đạt chu trình upgrade → downgrade → upgrade và duy trì một Alembic head. DB dự án không bị migrate.
+* **Kết quả**: **411 passed, 303 warnings**; 411 test cases thu thập, 159.16 giây trong backend container Python 3.12.
+* **Phạm vi mới**: 6 ca `test_billing_segments.py` xác minh snapshot giá/idempotency/legacy; 8 ca `test_invoice.py` xác minh DTO, phí chiếm trụ, RBAC, trạng thái review và hóa đơn chưa chốt.
+* **Migration**: `d8f56c4a911e` thêm các snapshot idle fee trên `charging_sessions`, sau migration `5ccaa686da2b` tạo `session_billing_segments`; PostgreSQL Compose tạm đạt chu trình upgrade → downgrade → upgrade và duy trì một Alembic head. DB dự án không bị migrate.
+
+## Kiểm tra lại sau điều chỉnh idle fee legacy (09/10/2026, chưa commit)
+
+* `test_invoice.py`: **8 passed**.
+* Lượt full suite trên host: **409 passed, 1 skipped, 1 error**. Lỗi là khởi tạo `tmp_path` cho test migration do `WinError 5: Access is denied`; không phải test assertion. Docker daemon không truy cập được để chạy lại suite trong container.
+* Lượt full suite hoàn chỉnh gần nhất trong backend container ở phía trên đạt 411 passed, 303 warnings trước điều chỉnh nhỏ về metadata idle fee của phiên legacy. Cần xác nhận lại full suite sau điều chỉnh khi Docker sẵn sàng.
 
 ---
 
@@ -68,10 +74,10 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 
 ## 5. Trạng thái Hồi quy Tổng thể (Regression Status)
 
-* **Trạng thái lần chạy gần nhất (09/10/2026)**: **PASSED** — 403 passed, 303 warnings (403 ca).
-* **Kết luận lần chạy mới nhất**: Bộ backend suite chạy hết; 6 test SCRUM-222 và hồi quy hiện có đều passed.
+* **Lượt full suite hoàn chỉnh gần nhất**: **PASSED** — 411 passed, 303 warnings (09/10/2026, Python 3.12 container; trước thay đổi nhỏ về metadata legacy).
+* **Lượt kiểm tra sau thay đổi mới nhất**: **CHƯA HOÀN TẤT** — 409 passed, 1 skipped; một test migration không khởi tạo fixture tạm vì quyền Windows. 14 test S-33 đã qua ở lượt đầy đủ trước đó; `test_invoice.py` vẫn đạt 8/8 sau thay đổi mới.
 * **Lượt kiểm tra chọn lọc mới nhất (07/10/2026, chưa commit)**: Các test quyền trạm/trụ và tìm kiếm GPS đạt **35 passed, 4 warnings**; Ruff các file đổi sạch. Đây không phải kết quả của full suite.
-* **Lượt full suite mới nhất (09/10/2026, chưa commit)**: **403 passed, 303 warnings**; 403 ca được thu thập trong 463.59 giây trên Python 3.12 container. S-28, S-30/S-31 và SCRUM-222 đã chạy cùng suite.
+* **Lượt full suite hoàn chỉnh (09/10/2026, chưa commit)**: **411 passed, 303 warnings**; 411 ca được thu thập trong 159.16 giây trên Python 3.12 container. Sau thay đổi nhỏ cuối cùng, host suite gặp một lỗi thiết lập `tmp_path`; cần lặp lại trong Docker.
 
 ## 6. Kiểm chứng sau thay đổi khung OCPP (01/10/2026)
 

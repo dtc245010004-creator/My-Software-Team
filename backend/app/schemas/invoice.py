@@ -15,48 +15,66 @@ class InvoiceSegmentResponse(BaseModel):
     price_per_kwh: Decimal = Field(
         ..., ge=0, description="Đơn giá đã chốt cho đoạn (VNĐ/kWh)"
     )
-    amount: Decimal = Field(..., ge=0, description="Thành tiền đã làm tròn của đoạn (VNĐ)")
+    amount: Decimal = Field(
+        ..., ge=0, description="Thành tiền đã làm tròn của đoạn (VNĐ)"
+    )
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
 class IdleFeeLineResponse(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Phí chiếm trụ (VNĐ)")
-    chargeable_minutes: int = Field(..., gt=0, description="Số phút bị tính phí")
-    fee_per_minute: Decimal = Field(..., ge=0, description="Đơn giá (VNĐ/phút)")
-    grace_minutes_applied: int = Field(..., ge=0, description="Số phút ân hạn đã áp dụng")
+    chargeable_minutes: int | None = Field(
+        default=None,
+        gt=0,
+        description="Số phút bị tính phí; null nếu phiên cũ chưa lưu chi tiết",
+    )
+    fee_per_minute: Decimal | None = Field(
+        default=None,
+        ge=0,
+        description="Đơn giá (VNĐ/phút); null nếu phiên cũ chưa lưu chi tiết",
+    )
+    grace_minutes_applied: int | None = Field(
+        default=None,
+        ge=0,
+        description="Số phút ân hạn đã áp dụng; null nếu phiên cũ chưa lưu chi tiết",
+    )
 
     model_config = ConfigDict(extra="forbid")
 
 
 class SessionInvoiceResponse(BaseModel):
-    session_id: int
-    status: Literal["finalized", "pending_review"]
+    session_id: int | str
+    invoice_status: Literal["finalized", "pending_review"]
     is_legacy: bool = False
     message: str | None = None
     segments: list[InvoiceSegmentResponse] | None = None
     energy_amount: Decimal | None = Field(
         default=None, description="Tổng tiền điện sau khi cộng thành tiền từng đoạn"
     )
-    idle_fee: IdleFeeLineResponse | None = Field(
+    idle_fee_line: IdleFeeLineResponse | None = Field(
         default=None,
         description="Dòng phí chiếm trụ; bỏ khỏi response khi không phát sinh phí",
+    )
+    idle_fee_amount: Decimal | None = Field(
+        default=None, description="Số tiền phí chiếm trụ đã chốt (VNĐ)"
     )
     total_amount: Decimal | None = Field(
         default=None, description="Tổng tiền hóa đơn đã chốt (VNĐ)"
     )
-    rounding_rule: Literal["round_each_segment_then_sum"] = Field(
-        default="round_each_segment_then_sum",
+    rounding_rule: str = Field(
+        default="ROUND_EACH_SEGMENT",
         description="Làm tròn từng đoạn rồi cộng",
     )
+    rounding_note: str | None = None
     currency: Literal["VND"] = "VND"
 
     @model_validator(mode="after")
     def validate_finalization_state(self):
-        if self.status == "pending_review":
+        if self.invoice_status == "pending_review":
             if self.segments not in (None, []):
                 raise ValueError("Hóa đơn pending_review không được có các đoạn giá tạm tính.")
-            if self.idle_fee is not None:
+            if self.idle_fee_line is not None or self.idle_fee_amount is not None:
                 raise ValueError("Hóa đơn pending_review không được có phí tạm tính.")
             if self.energy_amount is not None or self.total_amount is not None:
                 raise ValueError("Hóa đơn pending_review phải để các trường tiền là null.")
@@ -68,4 +86,6 @@ class SessionInvoiceResponse(BaseModel):
             raise ValueError("Hóa đơn finalized phải có đoạn giá và tổng tiền đã chốt.")
         return self
 
-    model_config = ConfigDict(from_attributes=True, extra="forbid")
+    # Giữ các trường chi tiết S-30/S-31 mà màn hình hiện tại đang dùng.
+    # Các trường chuẩn hóa ở trên là hợp đồng hóa đơn riêng của S-33.
+    model_config = ConfigDict(from_attributes=True, extra="allow")

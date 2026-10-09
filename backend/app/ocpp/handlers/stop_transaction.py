@@ -132,6 +132,9 @@ def handle_stop_transaction(
 
         billing_total = calculate_session_total(session, session.tariff)
         session.idle_amount = billing_total.idle_amount
+        session.idle_chargeable_minutes = billing_total.idle_chargeable_minutes
+        session.idle_fee_per_minute_applied = billing_total.idle_fee_per_minute
+        session.idle_grace_minutes_applied = billing_total.idle_grace_minutes
         session.total_amount = billing_total.total_amount
         persist_session_billing_segments(db, session)
 
