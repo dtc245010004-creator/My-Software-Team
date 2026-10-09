@@ -14,11 +14,11 @@
 - **Kiến trúc dữ liệu**: SQLAlchemy khai báo 18 bảng; các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. Bảng mới giữ nguyên giá/kWh và thành tiền của từng đoạn phiên. *(Nguồn: `backend/app/models/`)*
 - **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; head duy nhất hiện tại là `d8f56c4a911e`. Migration hóa đơn S-33 đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL Compose tạm; không áp dụng migration lên DB dự án.
 - **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
-- **Docker & CI/CD**: `docker-compose.yml` chạy backend, frontend và simulator 20 trụ; `docker-compose.staging.yml` chạy backend/frontend. CI cấu hình tại `.github/workflows/`.
+- **Docker & CI/CD**: `docker-compose.yml` chạy stack Backend, Frontend, PostgreSQL và simulator 20 trụ dùng chung cho Sprint 1–4. CI cấu hình tại `.github/workflows/`.
 
 ---
 
-## 1. Chạy dự án (môi trường phát triển & staging)
+## 1. Chạy dự án
 
 ### Cách 1: Khởi chạy môi trường phát triển cục bộ (Local Dev)
 
@@ -44,100 +44,42 @@ npm run dev
 ```
 - Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
 
-### Cách 2: Khởi chạy môi trường Staging qua Docker Compose (NHỚ CÀI DOCKER DESKTOP)
-*Link tải: https://docs.docker.com/desktop/setup/install/windows-install/*
+### Cách 2: Khởi chạy toàn bộ hệ thống bằng Docker Compose
 
-*(Nguồn: `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`)*
-
-*Nhớ là chạy trên terminal/powershell ở thư mục project*
-
-```bash
-# Build image Backend và Frontend
-docker compose -f docker-compose.staging.yml build
-
-# Khởi chạy toàn bộ cụm dịch vụ Backend & Frontend (Nginx reverse proxy)
-docker compose -f docker-compose.staging.yml up -d
-
-# Kiểm tra trạng thái và logs
-docker compose -f docker-compose.staging.yml logs -f
-
-# Để tắt dự án và dọn container/network nhưng giữ database, chạy
-docker compose -f docker-compose.staging.yml down
-
-# Muốn chỉ dừng container để bật lại nhanh sau đó
-docker compose -f docker-compose.staging.yml stop
-
-# Muốn chạy lại thì
-docker compose -f docker-compose.staging.yml up -d --build
-```
-
-> [!WARNING]
-> Không chạy `backend/seed_data.py` trên cơ sở dữ liệu đang dùng: script xóa và tạo lại toàn bộ bảng. Cấu hình Compose giữ dữ liệu bằng volume; lệnh `down` không xóa volume. Tránh thêm cờ `-v` khi dừng.
-
-- Giao diện người dùng Staging: `http://localhost:8081`
-- API Backend Staging: `http://localhost:8002/docs` (frontend gọi API qua proxy cùng origin)
-
-### Cách 2b: Khởi chạy stack phát triển Compose (Backend + Frontend + 20 trụ ảo)
-
-Lệnh dưới đây dùng tên project `ev-sprint3` để tiếp tục dùng các volume `ev-sprint3_sqlite_data` và `ev-sprint3_postgres_data` hiện có. Không chạy `down -v`.
+Mở terminal tại thư mục gốc. Compose tự nhận `docker-compose.yml`; tên project dùng chung `ev-csms` cho toàn bộ Sprint 1–4. Hai volume dữ liệu phát triển hiện có vẫn được giữ nguyên.
 
 ```powershell
-docker compose --project-name ev-sprint3 -f docker-compose.yml up -d --build
-docker compose --project-name ev-sprint3 -f docker-compose.yml ps
+docker compose up -d --build
+docker compose ps
 ```
 
 - Giao diện: `http://localhost:8080`
 - API Swagger: `http://localhost:8001/docs`
-- Cơ sở dữ liệu SQLite của backend nằm trong volume `sqlite_data`; cấu hình PostgreSQL dùng volume `postgres_data`.
-- Dừng container mà vẫn giữ dữ liệu: `docker compose --project-name ev-sprint3 -f docker-compose.yml stop`
+- Backend, frontend, PostgreSQL và 20 trụ OCPP ảo dùng chung một cấu hình cho toàn bộ code Sprint 1–4.
+- Tài khoản demo được khởi tạo an toàn khi backend Compose phát triển khởi động.
+- Dừng và giữ dữ liệu: `docker compose down` (không thêm `-v`).
 
-### Cách 3: Khởi chạy Backend và Frontend cùng lúc bằng Python (Local Dev)
-
-Cách này chạy trực tiếp trên máy, không cần Docker Desktop. Yêu cầu Python 3.12+ và Node.js/npm; mở PowerShell tại thư mục gốc dự án. Cài dependencies một lần:
-
-```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
-npm --prefix frontend install
-```
-
-Nếu cần tài khoản demo, nạp dữ liệu một lần vào database local. Lệnh này xóa và tạo lại database; hãy sao lưu `backend\ev_csms.db` trước khi chạy nếu file đã có dữ liệu:
-
-```powershell
-Push-Location backend
-..\.venv\Scripts\python.exe seed_data.py
-Pop-Location
-```
-
-Khởi chạy cả Backend và Frontend trong cùng terminal:
-
-```powershell
-.\.venv\Scripts\python.exe run.py
-```
-
-- Frontend: `http://localhost:5173`
-- Backend Swagger UI: `http://localhost:8000/docs`
-- Nhấn `Ctrl+C` để dừng cả hai dịch vụ.
-- `run.py` không tự cài dependencies hoặc nạp lại dữ liệu demo.
+Có thể dùng `py run.py` để build và chạy stack; xem trạng thái bằng `py run.py ps`, xem log bằng `py run.py logs`, và dừng an toàn bằng `py run.py down`.
 
 ---
 
 ## 2. Dùng thử hệ thống
 
-### Tài khoản demo (có sau khi nạp dữ liệu bằng `backend/seed_data.py`)
-*(Nguồn: `backend/seed_data.py:44-95`)*
+### Tài khoản demo (có sau khi chạy Compose phát triển)
+*(Nguồn: `backend/app/services/demo_account_service.py` và `frontend/src/config/roleConfig.js`)*
 
 | Vai trò (Role) | Tên đăng nhập | Email | Mật khẩu mặc định | Chức năng chính |
 | :--- | :--- | :--- | :--- | :--- |
-| **Quản trị viên (ADMIN)** | `admin` | `admin@evcsms.vn` | `12345678a` | Quản trị toàn hệ thống, cấu hình tham số, giám sát tải busbar |
+| **Quản trị viên (ADMIN)** | `admin` | `admin@evcsms.vn` | `12345678a` | Quản trị toàn hệ thống |
 | **Quản trị viên dự phòng (ADMIN)** | `admin2` | `admin2@evcsms.vn` | `AdminPass123` | Quản trị viên dự phòng hệ thống |
-| **Chủ trạm (OPERATOR)** | `operator` | `operator@evcsms.vn` | `OpPass123` | Quản lý trạm sạc, trụ sạc, cổng sạc, xem telemetry, AI Advisor |
-| **Chủ trạm VinFast** | `operator_a` | `cpo_vinfast@evcsms.vn` | `OpPass123` | Quản trị mạng lưới trạm sạc khu vực |
-| **Tài xế chuẩn (CUSTOMER)** | `customer_user` | `driver1@gmail.com` | `CusPass123` | Xem ví điện tử, nạp tiền, theo dõi phiên sạc trực tiếp |
-| **Tài xế VIP (CUSTOMER)** | `driver_vip` | `driver_vip@gmail.com` | `DriverPass123` | Tài xế số dư lớn, sạc xe VF9 |
-| **Tài xế nợ (CUSTOMER)** | `driver_debt` | `driver_debt@gmail.com` | `DriverPass123` | Tài khoản mô phỏng trường hợp nợ âm ví quá hạn mức |
+| **Chủ trạm (OPERATOR)** | `operator` | `operator@evcsms.vn` | `OpPass123` | Quản lý trạm của Chủ B |
+| **Chủ trạm VinFast (OPERATOR)** | `operator_a` | `cpo_vinfast@evcsms.vn` | `OpPass123` | Quản lý trạm của Chủ A |
+| **Kế toán (ACCOUNTANT)** | `accountant` | `accountant@evcsms.vn` | `AccPass123` | Đối soát doanh thu và nhật ký |
+| **Tài xế chuẩn (CUSTOMER)** | `customer_user` | `driver1@gmail.com` | `CusPass123` | Tài khoản tài xế mẫu |
+| **Tài xế VIP (CUSTOMER)** | `driver_vip` | `driver_vip@gmail.com` | `DriverPass123` | Tài xế số dư lớn |
+| **Tài xế nợ (CUSTOMER)** | `driver_debt` | `driver_debt@gmail.com` | `DriverPass123` | Ví bị khóa nợ; đăng nhập bị từ chối theo quy tắc nghiệp vụ |
 
-Seed tạo một thẻ OCPP active cho mỗi tài khoản tài xế role `CUSTOMER`, theo mẫu `DEMO-<USERNAME>`.
+Compose đồng bộ các tài khoản demo, ví còn thiếu và thẻ OCPP cho tài xế mà không xóa dữ liệu khác. Tài khoản `driver_debt` bị chặn đăng nhập có chủ đích vì ví demo đang khóa nợ.
 
 ### Đăng ký công khai — luôn ra tài khoản Tài xế, không gửi "role"
 *(Nguồn: `backend/app/api/v1/endpoints/auth.py:28-32`)*
@@ -212,7 +154,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 
 ### Kiến trúc thực tế
 *(Nguồn: `backend/app/main.py:20-56`, `backend/app/core/websocket.py:10-50`)*
-- **Docker Compose**: Stack phát triển chạy backend, frontend Nginx proxy và simulator OCPP 20 trụ; giao diện mặc định ở cổng host `8080`, API ở `8001`. Stack staging dùng `8081` và `8002`; dữ liệu gắn với named volume để giữ lại khi dừng container.
+- **Docker Compose**: Stack chung chạy backend, frontend Nginx proxy, PostgreSQL và simulator OCPP 20 trụ; giao diện ở cổng host `8080`, API ở `8001`, PostgreSQL ở `5433`. Dữ liệu gắn với named volume để giữ lại khi dừng container.
 - **Dual-Loop**:
   - *Fast Loop (Telemetry & Heuristic)*: Cập nhật chỉ số sạc mỗi 2 giây (`SIMULATOR_INTERVAL_SECONDS = 2`), phát sóng trực tiếp qua WebSocket `/ws/telemetry`. Tự động ngắt khẩn cấp khi nhiệt độ $> 75^\circ\text{C}$ hoặc pin đầy.
   - *Slow Loop (AI Engine)*: Lập lịch phân tích phụ tải trạm định kỳ, điều phối chia sẻ công suất thông minh (Dynamic Load Balancing) qua Google Gemini API hoặc chuyển đổi Heuristic Fallback khi mất kết nối mạng.

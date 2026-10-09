@@ -1,4 +1,4 @@
-name: ev-sprint3
+name: ev-csms
 
 services:
   db:
@@ -25,6 +25,7 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-sqlite:////app/data/ev_csms.db}
+      ENABLE_DEMO_ACCOUNTS: ${ENABLE_DEMO_ACCOUNTS:-true}
       BACKEND_CORS_ORIGINS: '["http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:5173", "http://127.0.0.1:5173"]'
     ports:
       - "${BACKEND_HOST_PORT:-8001}:8000"
@@ -79,7 +80,9 @@ services:
 
 volumes:
   postgres_data:
+    name: ev-sprint3_postgres_data
   sqlite_data:
+    name: ev-sprint3_sqlite_data
 
 networks:
   ev_net:

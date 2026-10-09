@@ -35,38 +35,41 @@ Căn cứ theo `backend/requirements.txt` và `frontend/package.json`:
 
 ## 3. Chạy: một lệnh, tự build
 
-* **Quyết định đối với `run.py`**: **Không cần**.
-* **Lý do**: Việc khởi động đã được đề xuất bằng `start.bat` hoặc `run.ps1`. Hai thứ này trùng vai trò, chọn một script shell OS thay vì viết script wrapper Python phức tạp để spawn 2 tiến trình.
-* **Hiện trạng**: Khởi động các dịch vụ qua 2 cửa sổ terminal riêng biệt theo Mục 12.
+* **Quyết định hiện tại đối với `run.py` (09/10/2026)**: dùng làm bộ điều khiển Compose phát triển theo yêu cầu người dùng; mặc định build và chạy toàn bộ stack Backend, Frontend, PostgreSQL và OCPP simulator trên cùng mã nguồn Sprint 1–4.
+* **Khởi chạy tương đương**: `docker compose up -d --build` từ thư mục gốc. Compose tự nhận `docker-compose.yml` và giữ tên project/volume phát triển đã khai báo trong file.
+* **Lệnh qua `run.py`**: `python run.py` (chạy), `python run.py ps` (trạng thái), `python run.py logs` (log), `python run.py down` (dừng, giữ dữ liệu).
 
 ### Tài khoản trên máy cá nhân
 
-Căn cứ theo mã nguồn khởi tạo dữ liệu mẫu tại `backend/seed_data.py:44-96` và cơ chế đăng nhập nhanh tại `frontend/src/context/AuthContext.jsx:66-91`:
+Căn cứ theo `backend/app/services/demo_account_service.py`, `frontend/src/config/roleConfig.js` và `frontend/src/context/AuthContext.jsx`:
 
 | Vai trò (Role) | Username / Email | Mật khẩu | Số dư ví ban đầu | Trạng thái ghi nhận |
 | :--- | :--- | :--- | :--- | :--- |
-| **Admin (Quản trị viên)** | `admin` (`admin@evcsms.vn`) | `AdminPass123` | 5.000.000 VND | Hoạt động bình thường |
+| **Admin (Quản trị viên)** | `admin` (`admin@evcsms.vn`) | `12345678a` | 5.000.000 VND | Đăng nhập nhanh và quản trị hệ thống |
+| **Admin dự phòng** | `admin2` (`admin2@evcsms.vn`) | `AdminPass123` | 5.000.000 VND | Tài khoản demo dự phòng |
+| **Chủ trạm B** | `operator` (`operator@evcsms.vn`) | `OpPass123` | 2.000.000 VND | Quản lý trạm của Chủ B |
 | **CPO / Operator (Vận hành)** | `operator_a` (`cpo_vinfast@evcsms.vn`) | `OpPass123` | 2.000.000 VND | Quản lý mạng lưới trạm sạc |
+| **Kế toán** | `accountant` (`accountant@evcsms.vn`) | `AccPass123` | 1.000.000 VND | Đối soát tài chính |
 | **Tài xế sạc (Customer)** | `customer_user` (`driver1@gmail.com`) | `CusPass123` | 250.000 VND | Đủ điều kiện bắt đầu sạc (> 50k) |
 | **Tài xế VIP** | `driver_vip` (`driver_vip@gmail.com`) | `DriverPass123` | 1.500.000 VND | Số dư khả dụng cao |
-| **Tài xế nợ (Bị khóa)** | `driver_debt` (`driver_debt@gmail.com`) | `DriverPass123` | -120.000 VND | Bị khóa nợ (`is_debt_locked: True`), chặn đăng nhập nếu âm quá ngưỡng |
+| **Tài xế nợ (Bị khóa)** | `driver_debt` (`driver_debt@gmail.com`) | `DriverPass123` | -120.000 VND | Bị khóa nợ (`is_debt_locked: True`), đăng nhập bị từ chối có chủ đích |
+
+Các tài khoản demo trên được đồng bộ an toàn khi Compose phát triển bật `ENABLE_DEMO_ACCOUNTS=true`; staging không bật cờ này. Đồng bộ chỉ tác động các tài khoản demo đã định danh và không xóa dữ liệu khác. Không dùng `backend/seed_data.py` cho mục đích này vì script đó xóa toàn bộ schema.
 | **Khách sạc vãng lai** | *(Không cần đăng nhập)* | *(Không cần)* | 0 VND | Mặc định quyền `CUSTOMER` tại client |
 
 ---
 
 ## 4. Dừng, khởi động lại
 
-Căn cứ theo cơ chế vận hành tiến trình Node.js & Python:
-
-* **Dừng dịch vụ**: Tại cửa sổ dòng lệnh (Terminal) đang chạy tiến trình, bấm tổ hợp phím `Ctrl + C`.
-* **Khởi động lại**: Thực hiện lại lệnh khởi chạy tương ứng của từng phân hệ (xem Mục 12).
+* **Dừng stack và giữ dữ liệu**: `docker compose down` hoặc `python run.py down`.
+* **Khởi động lại**: `docker compose up -d --build` hoặc `python run.py`.
+* Không thêm `-v` vào lệnh dừng nếu cần giữ database.
 
 ---
 
-## 5. Lệnh Docker tương đương (khi cần làm tay)
+## 5. Cấu hình Compose phát triển
 
-* **Quyết định đối với `docker-compose.yml` (kèm `Dockerfile`)**: **Để sau, đã duyệt**.
-* **Lý do**: Chỉ đáng làm khi cần demo hoặc nộp bài trên máy khác chưa cài môi trường. Hệ thống hiện đang chạy trực tiếp ổn định trên môi trường máy chủ cục bộ (Host Python/Node runtime).
+`docker-compose.yml` là cấu hình dùng chung cho các story đã tích hợp từ Sprint 1–4. Backend mặc định lưu SQLite trong named volume; PostgreSQL cũng được khởi chạy cho các cấu hình Compose cần dùng `COMPOSE_DATABASE_URL`. Giao diện ở `http://localhost:8080`, API ở `http://localhost:8001/docs`.
 
 ---
 
@@ -141,27 +144,16 @@ npm run build
 
 ---
 
-## 9. Staging (Docker & CI/CD)
+## 9. Docker Compose dùng chung (Sprint 1–4)
 
-* **Cấu hình Staging Container**:
-  * Dự án cung cấp file cấu hình điều phối cụm dịch vụ Staging tại `docker-compose.staging.yml`.
-  * Đóng gói Backend qua `backend/Dockerfile` (Python 3.12 / FastAPI / Uvicorn).
-  * Đóng gói Frontend qua `frontend/Dockerfile` (Node 20 build -> Nginx Alpine reverse proxy).
-  * Đường dẫn kiểm thử tự động CI/CD: `.github/workflows/ci-staging.yml` (chạy `pytest backend/tests` và `npm run build` trên GitHub Actions).
-* **Lệnh khởi chạy môi trường Staging**:
-  ```bash
-  # Build và khởi chạy ngầm toàn bộ dịch vụ staging
-  docker compose -f docker-compose.staging.yml up -d --build
+Từ thư mục gốc, dùng cấu hình duy nhất `docker-compose.yml`:
 
-  # Kiểm tra nhật ký hoạt động
-  docker compose -f docker-compose.staging.yml logs -f
+```powershell
+docker compose up -d --build
+docker compose ps
+```
 
-  # Dừng và dọn dẹp cụm staging
-  docker compose -f docker-compose.staging.yml down
-  ```
-  Frontend dùng cổng host `8081`, backend `8002`. Dữ liệu SQLite ở volume `staging_db_data`; `down` giữ volume, không dùng `down -v` nếu cần bảo toàn dữ liệu.
-* **Compose phát triển**: Dùng `docker compose --project-name ev-sprint3 -f docker-compose.yml up -d --build`; giao diện ở `http://localhost:8080`, API ở `http://localhost:8001/docs`. Project name này giữ nguyên tên volume dữ liệu `ev-sprint3_sqlite_data` và `ev-sprint3_postgres_data` đã dùng trước đó. Dừng an toàn bằng `docker compose --project-name ev-sprint3 -f docker-compose.yml stop`.
-* **Lưu ý đám mây**: Đối với nền tảng Render.com, chỉ tạo file `render.yaml` khi có yêu cầu chỉ định triển khai lên hạ tầng này.
+Giao diện ở `http://localhost:8080`, API ở `http://localhost:8001/docs`; dừng an toàn bằng `docker compose down` hoặc `python run.py down`. Lệnh `down` giữ named volume dữ liệu. CI kiểm tra cấu hình bằng `docker compose config --quiet` trong `.github/workflows/ci.yml`.
 
 ---
 
@@ -182,6 +174,7 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `NEGATIVE_BALANCE_LIMIT` | Integer | `-300000` | Ngưỡng số dư ví kích hoạt khóa tài khoản (-300.000 VND) |
 | `MAX_SAFE_DEBT_LIMIT` | Integer | `-500000` | Hạn mức CSDL CheckConstraint chặn cứng chống tràn (-500.000 VND) |
 | `BACKEND_CORS_ORIGINS` | JSON List | `["http://localhost:5173", ...]` | Danh sách origin trình duyệt được phép gọi API |
+| `ENABLE_DEMO_ACCOUNTS` | Boolean | Compose phát triển: `true`; staging: không bật | Đồng bộ tài khoản demo chỉ cho stack phát triển; không bật trên staging |
 | `GEMINI_API_KEY` | String | `""` | Khóa API dịch vụ AI Google Gemini (tùy chọn) |
 | `AI_MODEL_NAME` | String | `gemini-1.5-flash` | Định danh mô hình AI phân tích tải trạm |
 | `HEARTBEAT_INTERVAL_SECONDS` | Integer | `300` | Chu kỳ heartbeat trả trong BootNotification OCPP 1.6J (giây) |

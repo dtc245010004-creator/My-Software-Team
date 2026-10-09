@@ -84,7 +84,7 @@ jobs:
         working-directory: frontend
         run: npm run build
       - name: Check Docker Compose configuration
-        run: docker compose --env-file docker-compose.env.example config --quiet
+        run: docker compose config --quiet
 
   publish-images:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
