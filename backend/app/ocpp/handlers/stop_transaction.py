@@ -12,6 +12,7 @@ from app.models.orphan_message import OrphanMessage
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
 from app.services.billing import calculate_session_total
+from app.services.billing_segment_service import persist_session_billing_segments
 from app.services.metering import calculate_kwh
 
 logger = logging.getLogger(__name__)
@@ -132,6 +133,7 @@ def handle_stop_transaction(
         billing_total = calculate_session_total(session, session.tariff)
         session.idle_amount = billing_total.idle_amount
         session.total_amount = billing_total.total_amount
+        persist_session_billing_segments(db, session)
 
     # 5. Giải phóng cổng sạc
     if session.connector:

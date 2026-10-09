@@ -150,7 +150,7 @@ class InvoiceDailyGroupResponse(BaseModel):
 class SessionInvoiceResponse(BaseModel):
     session_id: str
     timezone: str
-    total_energy_kwh: str
+    total_energy_kwh: str | None
     currency: str
     rounding_rule: str
     rounding_note: str
@@ -159,7 +159,11 @@ class SessionInvoiceResponse(BaseModel):
     tong_tien: int | None = None
     quy_tac_lam_tron: str | None = None
     nhom_theo_ngay: list[InvoiceDailyGroupResponse] | None = None
-    total_amount: Decimal | int | float
+    total_amount: Decimal | int | float | None
+    is_legacy: bool = Field(
+        default=False,
+        description="Phiên cũ không có snapshot đoạn giá; tổng tiền lấy từ charging_sessions.",
+    )
     status: str | None = None
     is_reviewing: bool = Field(default=False, description="Phiên đang ở trạng thái cần xem xét đối soát")
     review_message: str | None = Field(default=None, description="Thông điệp thông báo đang chờ xử lý")
@@ -180,11 +184,11 @@ class SessionInvoiceResponse(BaseModel):
     applied_price_per_kwh: Decimal | None = None
     tariff_name: str | None = None
     price_segments: list[PriceSegmentItem] = Field(default_factory=list, description="Danh sách từng đoạn giá")
-    charging_amount: Decimal = Field(default=Decimal("0.00"), description="Tổng tiền sạc điện năng (tổng các đoạn giá)")
+    charging_amount: Decimal | None = Field(default=Decimal("0.00"), description="Tổng tiền sạc điện năng (tổng các đoạn giá)")
     idle_minutes: int = Field(default=0, description="Số phút chiếm trụ sau khi sạc xong")
-    idle_rate_per_min: Decimal = Field(default=Decimal("1000.00"), description="Đơn giá phí chiếm trụ (VNĐ/phút)")
-    idle_fee: Decimal = Field(default=Decimal("0.00"), description="Phí chiếm trụ (VNĐ)")
-    tax_amount: Decimal = Field(default=Decimal("0.00"), description="Thuế GTGT / Phí dịch vụ phụ trợ")
+    idle_rate_per_min: Decimal | None = Field(default=Decimal("1000.00"), description="Đơn giá phí chiếm trụ (VNĐ/phút)")
+    idle_fee: Decimal | None = Field(default=Decimal("0.00"), description="Phí chiếm trụ (VNĐ)")
+    tax_amount: Decimal | None = Field(default=Decimal("0.00"), description="Thuế GTGT / Phí dịch vụ phụ trợ")
     payment_status: str = Field(default="PAID", description="Trạng thái thanh toán: PAID | PENDING | PENDING_REVIEW")
 
     model_config = ConfigDict(from_attributes=True, extra="allow")

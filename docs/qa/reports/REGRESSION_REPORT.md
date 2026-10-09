@@ -12,6 +12,12 @@
 * **Phạm vi mới**: 20 ca `test_billing_idle_fee.py` kiểm tra tính phí, trạng thái connector, trần phút cấu hình, `Available` muộn, giá trị tariff và lỗi HTTP 422; toàn bộ 20 ca passed.
 * **Lỗi hồi quy**: Không có test thất bại sau khi sửa tương thích của StatusNotification với các mock OCPP hiện có.
 
+## Full Suite S-33 — SCRUM-222 (09/10/2026)
+
+* **Kết quả**: **403 passed, 303 warnings**; 403 test cases thu thập, 463.59 giây trong backend container Python 3.12.
+* **Phạm vi mới**: 6 ca `test_billing_segments.py` xác minh snapshot giá và thành tiền, idempotency khi chốt lặp, đọc hóa đơn sau khi đổi biểu giá, ngày địa phương qua nửa đêm, phiên review và legacy không backfill.
+* **Migration**: `5ccaa686da2b` tạo bảng `session_billing_segments`; PostgreSQL Compose tạm đạt chu trình upgrade → downgrade → upgrade và duy trì một Alembic head. DB dự án không bị migrate.
+
 ---
 
 ## 1. Danh sách Kiểm thử Hồi quy Hiện tại (Current Regression Tests)
@@ -62,10 +68,10 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 
 ## 5. Trạng thái Hồi quy Tổng thể (Regression Status)
 
-* **Trạng thái lần chạy gần nhất (08/10/2026)**: **PASSED** — 298 passed, 1 skipped, 302 warnings.
-* **Kết luận lần chạy mới nhất**: Bộ backend suite chạy hết và không ghi nhận test thất bại sau thay đổi S-28.
+* **Trạng thái lần chạy gần nhất (09/10/2026)**: **PASSED** — 403 passed, 303 warnings (403 ca).
+* **Kết luận lần chạy mới nhất**: Bộ backend suite chạy hết; 6 test SCRUM-222 và hồi quy hiện có đều passed.
 * **Lượt kiểm tra chọn lọc mới nhất (07/10/2026, chưa commit)**: Các test quyền trạm/trụ và tìm kiếm GPS đạt **35 passed, 4 warnings**; Ruff các file đổi sạch. Đây không phải kết quả của full suite.
-* **Lượt full suite mới nhất (08/10/2026, chưa commit)**: **298 passed, 1 skipped, 302 warnings**; 299 ca được thu thập trong 123.28 giây. Phần S-28 không phát sinh lỗi hồi quy; test mới xác nhận áp trần theo settings và không tự quyết toán khi `Available` đến muộn.
+* **Lượt full suite mới nhất (09/10/2026, chưa commit)**: **403 passed, 303 warnings**; 403 ca được thu thập trong 463.59 giây trên Python 3.12 container. S-28, S-30/S-31 và SCRUM-222 đã chạy cùng suite.
 
 ## 6. Kiểm chứng sau thay đổi khung OCPP (01/10/2026)
 

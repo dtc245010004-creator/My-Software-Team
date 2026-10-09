@@ -9,10 +9,10 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Full backend suite ngày 08/10/2026 đạt **298 passed, 1 skipped, 302 warnings** trên Python 3.14.7; pytest thu thập 299 ca.
+- **Kiểm thử tự động**: Full backend suite ngày 09/10/2026 đạt **403 passed, 303 warnings** trong container Python 3.12; pytest thu thập 403 ca.
 - **Chức năng OCPP**: Bao gồm MeterValues, chống số đo lùi/trùng, khôi phục phiên khi reconnect, RemoteStart/RemoteStop và audit log giới hạn theo quyền sở hữu trạm.
-- **Kiến trúc dữ liệu**: Các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests` và `audit_logs`. *(Nguồn: `backend/app/models/`)*
-- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; head duy nhất hiện tại là `1660df6b86c6`. Hai migration S-28 đã kiểm tra tiến/lùi/tiến trên SQLite tạm; không áp dụng migration lên DB dự án.
+- **Kiến trúc dữ liệu**: SQLAlchemy khai báo 18 bảng; các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. Bảng mới giữ nguyên giá/kWh và thành tiền của từng đoạn phiên. *(Nguồn: `backend/app/models/`)*
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; head duy nhất hiện tại là `5ccaa686da2b`. Migration snapshot đoạn giá đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL Compose tạm; không áp dụng migration lên DB dự án.
 - **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
 - **Docker & CI/CD**: `docker-compose.yml` chạy backend, frontend và simulator 20 trụ; `docker-compose.staging.yml` chạy backend/frontend. CI cấu hình tại `.github/workflows/`.
 
@@ -193,7 +193,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Kết quả mới nhất đã chạy tại workspace (08/10/2026):** `298 passed, 1 skipped, 302 warnings` (299 ca thu thập, 123.28 giây). Suite `test_billing_idle_fee.py` có 20 ca passed. Các con số lịch sử bên trên là baseline cũ, không đại diện cho lần kiểm thử hiện tại.
+**Kết quả mới nhất (09/10/2026):** `403 passed, 303 warnings` (403 ca thu thập, 463.59 giây trong container Python 3.12). `test_billing_segments.py` có 6 ca passed; migration snapshot đoạn giá đã thử tiến/lùi/tiến trên PostgreSQL Compose tạm.
 
 ---
 

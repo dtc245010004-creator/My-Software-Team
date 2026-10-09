@@ -623,4 +623,4 @@ def get_session_detail(
             detail="Bạn không có quyền xem thông tin phiên sạc của người khác.",
         )
 
-    return sessio\n
+    return session

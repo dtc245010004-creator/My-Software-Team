@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Full suite mới nhất ngày 08/10/2026 đạt 298 passed, 1 skipped, 302 warnings trên Python 3.14.7; 299 ca được thu thập trong 123.28 giây.
+Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Full suite mới nhất ngày 09/10/2026 đạt 403 passed, 303 warnings; 403 ca được thu thập và chạy trong 463.59 giây bằng container Python 3.12.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -49,8 +49,9 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **OCPP MeterValues Dedup** | `backend/tests/test_meter_values_dedup.py` | 5 | 100% PASS | Timestamp lùi, bản tin trùng, counter giảm, cùng timestamp hiệu chỉnh và đồng thời |
 | **Abnormal Charging Session Job** | `backend/tests/test_abnormal_session_job.py` | 3 | 100% PASS | Đánh dấu heartbeat quá ngưỡng, bỏ qua heartbeat mới, xác minh job mỗi phút chỉ gắn cờ và không đóng phiên |
 | **Biểu giá và phí chiếm trụ S-28** | `backend/tests/test_billing_idle_fee.py` | 20 | 20/20 passed trong full suite 08/10/2026 | Ân hạn, làm tròn, trần phút cấu hình, Available muộn, field tariff và HTTP 422 |
+| **Snapshot đoạn giá hóa đơn S-33** | `backend/tests/test_billing_segments.py` | 6 | 6/6 passed trong full suite 09/10/2026 | Lưu nguyên đoạn và đơn giá, idempotency, đổi tariff, qua nửa đêm, review và legacy |
 
-**Bổ sung kiểm chứng ngày 08/10/2026**: Full backend suite đạt **298 passed, 1 skipped, 302 warnings** (299 ca thu thập trong 123.28 giây, Python 3.14.7). Riêng S-28 có **20/20 ca passed**; migration nâng/hạ/nâng đã chạy trên SQLite tạm.
+**Bổ sung kiểm chứng ngày 09/10/2026**: Full backend suite đạt **403 passed, 303 warnings** (403 ca thu thập trong 463.59 giây, container Python 3.12). `test_billing_segments.py` có **6/6 ca passed**; migration S-33 nâng/hạ/nâng đã chạy trên PostgreSQL Compose tạm.
 
 ---
 
@@ -234,8 +235,8 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
-* **Kiểm thử tự động**: Baseline trước khi nhập S-30/S-31 đạt 298 passed, 1 skipped, 302 warnings ngày 08/10/2026; 299 ca được thu thập trên Python 3.14.7. Cần chạy lại full suite sau khi hợp nhất.
-* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; head hiện tại là `1660df6b86c6`. Hai migration S-28 đã kiểm chứng tiến/lùi/tiến trên DB SQLite tạm, chưa áp dụng lên CSDL dự án.
+* **Kiểm thử tự động**: Lần full suite gần nhất ngày 09/10/2026 đạt 403 passed, 303 warnings; 403 ca được thu thập và chạy bằng container Python 3.12.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; head hiện tại là `5ccaa686da2b`. Migration S-33 đã kiểm chứng nâng/hạ/nâng trên PostgreSQL Compose tạm, chưa áp dụng lên CSDL dự án.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
@@ -258,7 +259,17 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 ### 4.20. Suite biểu giá chia đoạn và qua nửa đêm — `test_pricing_engine.py` (20 ca)
 S-30 kiểm thử chia các phiên thành nhiều khung TOU và nội suy tại ranh giới thiếu số đo; S-31 kiểm thử phiên qua nửa đêm/đa ngày, múi giờ trạm, biểu giá từng ngày và nhóm hóa đơn. Bộ test cũng kiểm tra làm tròn từng đoạn, đầu vào dict, tính thuần và quyền truy cập API/IDOR.
 
-**Kết quả được nhánh `quocdung` ghi nhận ngày 08/10/2026**: 20 ca `test_pricing_engine.py` passed; full suite khi đó đạt 290 passed, 1 skipped. Đây là kết quả trên revision trước khi hợp nhất với `main`; cần đối chiếu với lượt kiểm thử mới.
+**Kết quả**: 20 ca `test_pricing_engine.py` passed. Snapshot đoạn giá S-33 dùng đúng đầu ra của hàm này khi chốt phiên.
+
+### 4.21. Snapshot đoạn giá phiên — `test_billing_segments.py` (6 ca)
+1. `test_closing_session_persists_segments_once_in_the_close_transaction`: luồng chốt lưu rows và gọi lại không nhân đôi.
+2. `test_three_segments_are_saved_with_frozen_price_and_rounding`: lưu đủ ba đoạn, kWh, giá, thành tiền đã làm tròn và ngày.
+3. `test_invoice_uses_saved_segments_after_tariff_changes`: đổi tariff sau khi chốt không làm thay đổi hóa đơn.
+4. `test_segments_keep_local_date_when_session_crosses_midnight`: lưu đúng `segment_date` theo ngày địa phương.
+5. `test_review_session_does_not_persist_or_return_price_segments`: phiên cần xem xét không có rows hoặc số tiền.
+6. `test_legacy_invoice_uses_stored_total_without_backfill`: phiên cũ dùng tổng đã lưu và không tạo snapshot hồi tố.
+
+**Kết quả ngày 09/10/2026**: 6/6 ca passed; full suite 403 passed, 303 warnings.
 
 ---
 

@@ -13,12 +13,14 @@ from app.core.config import settings
 from app.core.datetime_utils import to_vn_time
 from app.models.remote_start_request import RemoteStartRequest
 from app.models.session import ChargingSession
+from app.models.session_billing_segment import SessionBillingSegment
 from app.models.station import Connector
 from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.audit_service import ghi_nhat_ky
 from app.services.billing import calculate_session_total
+from app.services.billing_segment_service import persist_session_billing_segments
 from app.services.wallet_service import deduct_charging_fee
 
 logger = logging.getLogger("ev_csms.session_service")
@@ -346,6 +348,7 @@ def stop_charging_session(
         session.total_amount = total_amount
         session.status = "COMPLETED"
         session.stop_reason = stop_reason
+        persist_session_billing_segments(db, session)
 
         # 6. Mở khóa cổng sạc (bảo toàn trạng thái bảo trì nếu trụ cha đang bảo trì/lỗi)
         connector = (
@@ -448,6 +451,7 @@ def reconcile_interrupted_sessions(db: Session) -> int:
             session.total_amount = amount
             session.status = "INTERRUPTED"
             session.stop_reason = "SERVER_CRASH_RECONCILED"
+            persist_session_billing_segments(db, session)
 
             db.execute(
                 text("UPDATE connectors SET status = 'AVAILABLE' WHERE id = :cid;"),
@@ -616,6 +620,7 @@ def remote_stop_charging_session(
         session.total_amount = total_amount
         session.status = "COMPLETED"
         session.stop_reason = "Remote"
+        persist_session_billing_segments(db, session)
 
         # Giải phóng cổng sạc về AVAILABLE
         db.execute(
@@ -756,6 +761,7 @@ def force_close_abnormal_session(
         session.total_amount = total_amount
         session.status = "COMPLETED"
         session.stop_reason = f"ĐÓNG TAY THỦ CÔNG: {clean_reason}"
+        persist_session_billing_segments(db, session)
 
         # Mở khóa cổng sạc về AVAILABLE
         db.execute(
@@ -1169,7 +1175,13 @@ def calculate_session_price_segments(
     return result
 
 
-def get_session_invoice(db: Session, session_id: int, user: User) -> dict:
+def get_session_invoice(
+    db: Session,
+    session_id: int,
+    user: User | None,
+    *,
+    include_price_calculation: bool = True,
+) -> dict:
     """
     Truy xuất và tính toán chi tiết hóa đơn phiên sạc có diễn giải từng đoạn giá (S-33 / SCRUM-224):
     - Kiểm tra quyền truy cập (IDOR Guard).
@@ -1184,7 +1196,7 @@ def get_session_invoice(db: Session, session_id: int, user: User) -> dict:
         )
 
     # IDOR Guard
-    if user.role != "ADMIN":
+    if user is not None and user.role != "ADMIN":
         if user.role == "OPERATOR":
             connector = session.connector
             station = connector.charging_point.station if connector and connector.charging_point else None
@@ -1197,14 +1209,35 @@ def get_session_invoice(db: Session, session_id: int, user: User) -> dict:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Bạn không có quyền xem thông tin hóa đơn phiên sạc của người khác.",
+                )
+
+    is_reviewing = bool(
+        session.needs_review
+        or session.is_abnormal
+        or session.status in ("NEEDS_REVIEW", "ABNORMAL")
+    )
+    is_closed = session.status not in ("ACTIVE", "CHARGING")
+    stored_rows: list[SessionBillingSegment] = []
+    if include_price_calculation and is_closed:
+        if not is_reviewing:
+            stored_rows = (
+                db.query(SessionBillingSegment)
+                .filter(SessionBillingSegment.session_id == session.id)
+                .order_by(SessionBillingSegment.segment_index.asc())
+                .all()
             )
+        include_price_calculation = False
 
     # Tra cứu các thực thể liên quan
     connector = session.connector
     charger = connector.charging_point if connector else None
     station = charger.station if charger else None
     driver = session.user
-    tariff = session.tariff or get_or_create_default_tariff(db, station_id=station.id if station else None)
+    tariff = session.tariff
+    if tariff is None and include_price_calculation:
+        tariff = get_or_create_default_tariff(
+            db, station_id=station.id if station else None
+        )
 
     # Thời gian bắt đầu và kết thúc
     now = datetime.now(timezone.utc)
@@ -1214,12 +1247,38 @@ def get_session_invoice(db: Session, session_id: int, user: User) -> dict:
     duration_minutes = max(1, round(total_dur_sec / 60))
 
     # Từng đoạn giá (Price segments)
-    segments = calculate_session_price_segments(
-        start_time=start_time,
-        end_time=end_time,
-        total_kwh=session.total_kwh or Decimal("0.00"),
-        tariff=tariff,
-    )
+    if stored_rows:
+        segments = []
+        for row in stored_rows:
+            start_local = to_vn_time(row.start_at) or row.start_at
+            end_local = to_vn_time(row.end_at) or row.end_at
+            segments.append(
+                {
+                    "segment_index": row.segment_index,
+                    "rate_type": "TOU",
+                    "rate_name": "Đơn giá đã chốt tại thời điểm phát sinh",
+                    "time_range": f"{start_local:%H:%M} - {end_local:%H:%M}",
+                    "start_time": start_local.isoformat(),
+                    "end_time": end_local.isoformat(),
+                    "duration_minutes": max(
+                        0, int((row.end_at - row.start_at).total_seconds() // 60)
+                    ),
+                    "kwh": Decimal(str(row.kwh)),
+                    "unit_price": Decimal(str(row.price_per_kwh)),
+                    "amount": Decimal(str(row.amount)),
+                }
+            )
+    else:
+        segments = (
+            calculate_session_price_segments(
+                start_time=start_time,
+                end_time=end_time,
+                total_kwh=session.total_kwh or Decimal("0.00"),
+                tariff=tariff,
+            )
+            if include_price_calculation and tariff is not None
+            else []
+        )
 
     charging_amount = sum((s["amount"] for s in segments), Decimal("0.00"))
 
@@ -1227,20 +1286,32 @@ def get_session_invoice(db: Session, session_id: int, user: User) -> dict:
     idle_minutes = 0
     idle_rate_per_min = Decimal("1000.00")
     idle_fee = Decimal("0.00")
-    if session.stop_reason in ("BATTERY_FULL", "IDLE_CHARGER", "EmergencyStop"):
+    if include_price_calculation and session.stop_reason in (
+        "BATTERY_FULL",
+        "IDLE_CHARGER",
+        "EmergencyStop",
+    ):
         idle_minutes = 15
         idle_fee = round(Decimal(idle_minutes) * idle_rate_per_min, 2)
 
     total_amount = charging_amount + idle_fee
-    if session.total_amount and session.total_amount > Decimal("0.00") and idle_fee == Decimal("0.00"):
+    if not include_price_calculation:
+        idle_fee = Decimal(str(session.idle_amount or 0))
+        if stored_rows:
+            charging_amount = sum(
+                (Decimal(str(row.amount)) for row in stored_rows),
+                Decimal("0.00"),
+            )
+            total_amount = charging_amount + idle_fee
+        else:
+            stored_total = Decimal(str(session.total_amount or 0))
+            charging_amount = max(Decimal("0.00"), stored_total - idle_fee)
+            total_amount = stored_total
+        idle_rate_per_min = Decimal("0.00")
+    elif session.total_amount and session.total_amount > Decimal("0.00") and idle_fee == Decimal("0.00"):
         total_amount = session.total_amount
 
     # Kiểm tra trạng thái cần xem xét (AC S-33)
-    is_reviewing = bool(
-        session.needs_review
-        or session.is_abnormal
-        or session.status in ("NEEDS_REVIEW", "ABNORMAL")
-    )
     review_message = None
     payment_status = "PAID" if session.status == "COMPLETED" else "IN_PROGRESS"
     if is_reviewing:
@@ -1269,8 +1340,12 @@ def get_session_invoice(db: Session, session_id: int, user: User) -> dict:
         "meter_start_kwh": session.meter_start_kwh or Decimal("0.00"),
         "meter_stop_kwh": session.meter_stop_kwh,
         "total_kwh": session.total_kwh or Decimal("0.00"),
-        "applied_price_per_kwh": session.applied_price_per_kwh or tariff.price_normal,
-        "tariff_name": tariff.name if tariff else "Biểu giá EV CSMS chuẩn (TOU 3 khung giờ)",
+        "applied_price_per_kwh": (
+            session.applied_price_per_kwh
+            if session.applied_price_per_kwh is not None
+            else (tariff.price_normal if include_price_calculation and tariff else None)
+        ),
+        "tariff_name": tariff.name if tariff else "Biểu giá đã lưu trên phiên",
         "price_segments": segments,
         "charging_amount": charging_amount,
         "idle_minutes": idle_minutes,
@@ -1279,6 +1354,76 @@ def get_session_invoice(db: Session, session_id: int, user: User) -> dict:
         "tax_amount": Decimal("0.00"),
         "total_amount": total_amount,
         "payment_status": payment_status,
+        "is_legacy": bool(is_closed and not stored_rows and not is_reviewing),
+    }
+
+
+def _pricing_from_billing_segments(rows: list[SessionBillingSegment]) -> dict:
+    grouped: dict[str, list[dict]] = {}
+    total_kwh = Decimal("0.0000")
+    total_amount = Decimal("0.00")
+
+    for row in rows:
+        day = row.segment_date.isoformat()
+        start_local = to_vn_time(row.start_at) or row.start_at
+        end_local = to_vn_time(row.end_at) or row.end_at
+        kwh = Decimal(str(row.kwh))
+        price = Decimal(str(row.price_per_kwh))
+        amount = Decimal(str(row.amount))
+        total_kwh += kwh
+        total_amount += amount
+        grouped.setdefault(day, []).append(
+            {
+                "segment_index": row.segment_index,
+                "start_time": start_local.isoformat(),
+                "end_time": end_local.isoformat(),
+                "energy_kwh": f"{kwh:.4f}",
+                "unit_price": int(price) if price % 1 == 0 else float(price),
+                "raw_amount": f"{(kwh * price):.2f}",
+                "rounded_amount": int(amount),
+                "is_interpolated": False,
+                "tu_gio": start_local.isoformat(),
+                "den_gio": end_local.isoformat(),
+                "so_kwh": f"{kwh:.3f}",
+                "don_gia": int(price) if price % 1 == 0 else float(price),
+                "thanh_tien": int(amount),
+                "co_noi_suy": False,
+            }
+        )
+
+    daily_groups = []
+    for day, segments in sorted(grouped.items()):
+        daily_kwh = sum(
+            (Decimal(segment["energy_kwh"]) for segment in segments),
+            Decimal("0.0000"),
+        )
+        daily_amount = sum(segment["rounded_amount"] for segment in segments)
+        daily_groups.append(
+            {
+                "date": day,
+                "daily_energy_kwh": f"{daily_kwh:.4f}",
+                "daily_total_amount": daily_amount,
+                "segments": segments,
+                "ngay": day,
+                "tong_tien_ngay": daily_amount,
+                "tong_kwh_ngay": f"{daily_kwh:.3f}",
+                "cac_doan": segments,
+            }
+        )
+
+    return {
+        "session_id": f"SESS-{rows[0].session_id}" if rows else "",
+        "timezone": "Asia/Ho_Chi_Minh",
+        "total_energy_kwh": f"{total_kwh:.4f}",
+        "total_amount": int(total_amount),
+        "currency": "VND",
+        "rounding_rule": "ROUND_EACH_SEGMENT",
+        "rounding_note": "Tổng tiền điện bằng tổng thành tiền đã làm tròn của từng đoạn.",
+        "daily_groups": daily_groups,
+        "tong_kwh": f"{total_kwh:.3f}",
+        "tong_tien": int(total_amount),
+        "quy_tac_lam_tron": "Làm tròn từng đoạn rồi cộng",
+        "nhom_theo_ngay": daily_groups,
     }
 def get_session_invoice_breakdown(
     db: Session,
@@ -1328,6 +1473,128 @@ def get_session_invoice_breakdown(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Bạn không có quyền xem thông tin hóa đơn của người khác.",
                 )
+
+    is_reviewing = bool(
+        session.needs_review
+        or session.is_abnormal
+        or session.status in ("NEEDS_REVIEW", "ABNORMAL")
+    )
+    if is_reviewing:
+        invoice = get_session_invoice(
+            db=db,
+            session_id=session_id,
+            user=user,
+            include_price_calculation=False,
+        )
+        invoice.update(
+            {
+                "session_id": f"SESS-{session.id}",
+                "timezone": "Asia/Ho_Chi_Minh",
+                "total_energy_kwh": None,
+                "currency": "VND",
+                "rounding_rule": "ROUND_EACH_SEGMENT",
+                "rounding_note": "Hóa đơn sẽ được lập sau khi hoàn tất đối soát.",
+                "daily_groups": [],
+                "total_amount": None,
+                "price_segments": [],
+                "charging_amount": None,
+                "idle_minutes": 0,
+                "idle_rate_per_min": None,
+                "idle_fee": None,
+                "tax_amount": None,
+                "applied_price_per_kwh": None,
+                "is_reviewing": True,
+                "review_message": session.abnormal_reason
+                or "Phiên sạc đang chờ đối soát; chưa có số tiền được chốt.",
+                "payment_status": "PENDING_REVIEW",
+                "is_legacy": False,
+            }
+        )
+        return invoice
+
+    if session.status not in ("ACTIVE", "CHARGING"):
+        rows = (
+            db.query(SessionBillingSegment)
+            .filter(SessionBillingSegment.session_id == session.id)
+            .order_by(SessionBillingSegment.segment_index.asc())
+            .all()
+        )
+        invoice = get_session_invoice(
+            db=db,
+            session_id=session_id,
+            user=user,
+            include_price_calculation=False,
+        )
+        if not rows:
+            # Phiên cũ: không tái dựng giá từ biểu giá hiện tại.
+            stored_total = Decimal(str(session.total_amount or 0))
+            idle_amount = Decimal(str(session.idle_amount or 0))
+            invoice.update(
+                {
+                    "session_id": f"SESS-{session.id}",
+                    "timezone": "Asia/Ho_Chi_Minh",
+                    "total_energy_kwh": f"{Decimal(str(session.total_kwh or 0)):.4f}",
+                    "currency": "VND",
+                    "rounding_rule": "LEGACY_STORED_SESSION_TOTAL",
+                    "rounding_note": "Phiên được chốt trước khi lưu đoạn giá; hiển thị tổng tiền đã lưu.",
+                    "daily_groups": [],
+                    "total_amount": stored_total,
+                    "price_segments": [],
+                    "charging_amount": max(
+                        Decimal("0.00"), stored_total - idle_amount
+                    ),
+                    "idle_fee": idle_amount if idle_amount > 0 else Decimal("0.00"),
+                    "is_legacy": True,
+                    "payment_status": "PAID"
+                    if session.status in ("COMPLETED", "INTERRUPTED")
+                    else "PENDING",
+                }
+            )
+            return invoice
+
+        pricing = _pricing_from_billing_segments(rows)
+        price_segments = []
+        for group in pricing["daily_groups"]:
+            for segment in group["segments"]:
+                segment_start = datetime.fromisoformat(segment["start_time"])
+                segment_end = datetime.fromisoformat(segment["end_time"])
+                price_segments.append(
+                    {
+                        "segment_index": segment["segment_index"],
+                        "rate_type": "TOU",
+                        "rate_name": "Đơn giá đã chốt tại thời điểm phát sinh",
+                        "time_range": f"{segment_start:%H:%M} - {segment_end:%H:%M}",
+                        "start_time": segment["start_time"],
+                        "end_time": segment["end_time"],
+                        "duration_minutes": max(
+                            0,
+                            int(
+                                (segment_end - segment_start).total_seconds()
+                                // 60
+                            ),
+                        ),
+                        "kwh": Decimal(segment["energy_kwh"]),
+                        "unit_price": Decimal(str(segment["unit_price"])),
+                        "amount": Decimal(str(segment["rounded_amount"])),
+                    }
+                )
+        idle_amount = Decimal(str(session.idle_amount or 0))
+        pricing["session_id"] = f"SESS-{session.id}"
+        invoice.update(
+            {
+                **pricing,
+                "price_segments": price_segments,
+                "charging_amount": Decimal(str(pricing["total_amount"])),
+                "idle_fee": idle_amount,
+                "total_amount": Decimal(str(pricing["total_amount"]))
+                + idle_amount,
+                "is_legacy": False,
+                "payment_status": "PAID"
+                if session.status in ("COMPLETED", "INTERRUPTED")
+                else "PENDING",
+            }
+        )
+        return invoice
 
     # Thu thập điểm đo thực tế
     meter_rows = (

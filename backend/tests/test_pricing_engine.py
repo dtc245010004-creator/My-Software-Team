@@ -7,9 +7,11 @@ from app.core.datetime_utils import VIETNAM_TZ
 from app.core.security import create_access_token, get_password_hash
 from app.models.meter_value import MeterValue
 from app.models.session import ChargingSession
+from app.models.session_billing_segment import SessionBillingSegment
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
+from app.services.billing_segment_service import persist_session_billing_segments
 from app.services.pricing_engine import (
     calculate_session_pricing,
     interpolate_kwh_linear,
@@ -682,6 +684,8 @@ def invoice_api_setup(db_session, standard_tariff):
     )
     db_session.add(session)
     db_session.commit()
+    persist_session_billing_segments(db_session, session)
+    db_session.commit()
 
     h_admin = {
         "Authorization": f"Bearer {create_access_token({'sub': str(admin.id), 'role': admin.role})}"
@@ -730,7 +734,7 @@ def test_api_get_session_invoice_success_admin(client, invoice_api_setup):
     assert data["currency"] == "VND"
     assert data["rounding_rule"] == "ROUND_EACH_SEGMENT"
     assert data["total_energy_kwh"] == "32.4500"
-    assert data["total_amount"] > 0
+    assert Decimal(data["total_amount"]) > 0
     assert len(data["daily_groups"]) == 2
     assert data["daily_groups"][0]["date"] == "2026-10-08"
     assert data["daily_groups"][1]["date"] == "2026-10-09"
@@ -800,7 +804,12 @@ def test_api_get_session_invoice_with_meter_values(
         unit="Wh",
         recorded_at=midnight_dt,
     )
+    db_session.query(SessionBillingSegment).filter(
+        SessionBillingSegment.session_id == session.id
+    ).delete(synchronize_session=False)
     db_session.add(mv)
+    db_session.commit()
+    persist_session_billing_segments(db_session, session)
     db_session.commit()
 
     resp = client.get(
@@ -813,6 +822,3 @@ def test_api_get_session_invoice_with_meter_values(
     seg1 = day1_group["segments"][0]
     assert seg1["energy_kwh"] == "12.0000"
     assert seg1["is_interpolated"] is False
-
-
-\n

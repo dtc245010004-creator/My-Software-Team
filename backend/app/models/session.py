@@ -129,6 +129,12 @@ class ChargingSession(Base):
     driver = synonym("user")
     connector = relationship("Connector")
     tariff = relationship("Tariff")
+    billing_segments = relationship(
+        "SessionBillingSegment",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="SessionBillingSegment.segment_index",
+    )
 
     def __init__(self, **kwargs):
         if "id" in kwargs and "transaction_id" not in kwargs:
