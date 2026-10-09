@@ -1,5 +1,5 @@
 """S-29: kiểm tra khung giờ, API, tương thích biểu giá cũ và ràng buộc lưu trữ."""
-
+ 
 import os
 import sqlite3
 import subprocess
@@ -9,11 +9,11 @@ from copy import deepcopy
 from datetime import time
 from decimal import Decimal
 from pathlib import Path
-
+ 
 import pytest
 from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
-
+ 
 from app.core.security import create_access_token
 from app.models import Tariff, TariffPeriod, User
 from app.services.session_service import (
@@ -25,12 +25,12 @@ from app.services.tariff_validation import (
     normalize_periods,
     validate_periods,
 )
-
-
+ 
+ 
 def _period(start, end, price="3000.00", **kwargs):
     return {"start_time": start, "end_time": end, "price_per_kwh": price, **kwargs}
-
-
+ 
+ 
 VALID_PERIODS = [
     pytest.param(
         [
@@ -47,7 +47,7 @@ VALID_PERIODS = [
         [_period("22:00", "00:00"), _period("00:00", "22:00")], id="ends-midnight"
     ),
 ]
-
+ 
 INVALID_PERIODS = [
     pytest.param(
         [
@@ -81,18 +81,18 @@ INVALID_PERIODS = [
     pytest.param([_period("10:00", "10:00")], "trùng giờ kết thúc", id="equal-daytime"),
     pytest.param([], "Chưa có khung giờ cho 00:00-24:00", id="empty"),
 ]
-
-
+ 
+ 
 @pytest.mark.parametrize("periods", VALID_PERIODS)
 def test_validate_valid_periods(periods):
     assert validate_periods(periods) == []
-
-
+ 
+ 
 @pytest.mark.parametrize("periods, message", INVALID_PERIODS)
 def test_validate_invalid_periods_identifies_problem(periods, message):
     assert any(message in error for error in validate_periods(periods))
-
-
+ 
+ 
 @pytest.mark.parametrize(
     "period, message",
     [
@@ -108,14 +108,14 @@ def test_validation_rejects_bad_time_and_price(period, message):
     assert any(message in error for error in validate_periods([period]))
     with pytest.raises(ValueError):
         normalize_periods([period])
-
-
+ 
+ 
 def test_normalize_midnight_preserves_input_price_and_source():
     periods = [_period("22:00", "02:00", "1234.56"), _period("02:00", "22:00", "3000")]
     original = deepcopy(periods)
-
+ 
     result = normalize_periods(periods)
-
+ 
     assert periods == original
     assert [
         (p.start_minute, p.end_minute, p.price_per_kwh, p.source_index) for p in result
@@ -124,8 +124,8 @@ def test_normalize_midnight_preserves_input_price_and_source():
         (120, 1320, Decimal("3000"), 1),
         (1320, 1440, Decimal("1234.56"), 0),
     ]
-
-
+ 
+ 
 def test_validation_reports_all_gaps_and_nested_overlaps():
     assert validate_periods([_period("02:00", "05:00"), _period("07:00", "23:00")]) == [
         "Chưa có khung giờ cho 00:00-02:00",
@@ -141,8 +141,8 @@ def test_validation_reports_all_gaps_and_nested_overlaps():
     )
     assert len(errors) == 3
     assert "Khung 04:00-06:00 chồng với khung 05:00-07:00" in errors
-
-
+ 
+ 
 @pytest.fixture
 def headers(db_session):
     admin = User(
@@ -157,8 +157,8 @@ def headers(db_session):
     return {
         "Authorization": f"Bearer {create_access_token({'sub': str(admin.id), 'role': admin.role})}"
     }
-
-
+ 
+ 
 def _payload(**kwargs):
     return {
         "name": "Biểu giá nhiều khung",
@@ -167,8 +167,8 @@ def _payload(**kwargs):
         "price_offpeak": 2000,
         **kwargs,
     }
-
-
+ 
+ 
 def _write(client, headers, method, payload):
     if method == "post":
         return client.post("/api/v1/tariffs", json=_payload(**payload), headers=headers)
@@ -177,15 +177,15 @@ def _write(client, headers, method, payload):
     return client.put(
         f"/api/v1/tariffs/{created.json()['id']}", json=payload, headers=headers
     )
-
-
+ 
+ 
 @pytest.mark.parametrize("method", ["post", "put"])
 @pytest.mark.parametrize("periods", VALID_PERIODS)
 def test_api_saves_and_returns_original_periods(
     client, db_session, headers, method, periods
 ):
     response = _write(client, headers, method, {"periods": periods})
-
+ 
     assert response.status_code == (201 if method == "post" else 200)
     result = response.json()
     assert [
@@ -210,19 +210,20 @@ def test_api_saves_and_returns_original_periods(
     assert (
         client.get(f"/api/v1/tariffs/{saved.id}").json()["periods"] == result["periods"]
     )
-    assert client.get("/api/v1/tariffs").json()[0]["periods"] == result["periods"]
-
-
+    listed = {t["id"]: t for t in client.get("/api/v1/tariffs").json()}
+    assert listed[result["id"]]["periods"] == result["periods"]
+ 
+ 
 @pytest.mark.parametrize("method", ["post", "put"])
 @pytest.mark.parametrize("periods, message", INVALID_PERIODS)
 def test_api_rejects_invalid_coverage(client, headers, method, periods, message):
     response = _write(client, headers, method, {"periods": periods})
-
+ 
     assert response.status_code == 422
     assert isinstance(response.json()["detail"], list)
     assert any(message in error for error in response.json()["detail"])
-
-
+ 
+ 
 @pytest.mark.parametrize("method", ["post", "put"])
 @pytest.mark.parametrize(
     "period, field, message",
@@ -236,14 +237,20 @@ def test_api_schema_rejects_invalid_period_fields(
     client, headers, method, period, field, message
 ):
     response = _write(client, headers, method, {"periods": [period]})
-
+ 
     assert response.status_code == 422
     assert any(
         error["loc"][-1] == field and message in error["msg"]
         for error in response.json()["detail"]
     )
-
-
+ 
+ 
+def _strip_ids(periods):
+    """Bỏ id/tariff_id: PUT tạo phiên bản mới nên khung giờ được nhân bản với id mới."""
+    keys = ("start_time", "end_time", "price_per_kwh", "sort_order")
+    return [{key: period[key] for key in keys} for period in periods]
+ 
+ 
 def test_update_replaces_periods_atomically_and_omission_keeps_them(
     client, db_session, headers
 ):
@@ -251,13 +258,19 @@ def test_update_replaces_periods_atomically_and_omission_keeps_them(
     created = client.post(
         "/api/v1/tariffs", json=_payload(periods=original), headers=headers
     ).json()
-    url = f"/api/v1/tariffs/{created['id']}"
-
+    expected = _strip_ids(created["periods"])
+    current_id = created["id"]
+ 
+    # S-34: mỗi lần PUT tạo phiên bản mới, nên luôn đi theo id của phiên bản mới nhất.
     for data in ({"name": "Đổi tên biểu giá"}, {"periods": None}):
-        response = client.put(url, json=data, headers=headers)
+        response = client.put(
+            f"/api/v1/tariffs/{current_id}", json=data, headers=headers
+        )
         assert response.status_code == 200
-        assert response.json()["periods"] == created["periods"]
-
+        assert _strip_ids(response.json()["periods"]) == expected
+        current_id = response.json()["id"]
+ 
+    url = f"/api/v1/tariffs/{current_id}"
     rejected = client.put(
         url,
         json={"name": "Không được lưu", "periods": [_period("00:00", "12:00")]},
@@ -266,23 +279,22 @@ def test_update_replaces_periods_atomically_and_omission_keeps_them(
     assert rejected.status_code == 422
     unchanged = client.get(url).json()
     assert unchanged["name"] == "Đổi tên biểu giá"
-    assert unchanged["periods"] == created["periods"]
-
+    assert _strip_ids(unchanged["periods"]) == expected
+ 
     replaced = client.put(
         url, json={"periods": [_period("00:00", "24:00", "1234.56")]}, headers=headers
     )
     assert replaced.status_code == 200
+    new_id = replaced.json()["id"]
     db_session.expire_all()
-    assert (
-        db_session.query(TariffPeriod).filter_by(tariff_id=created["id"]).count() == 1
-    )
+    assert db_session.query(TariffPeriod).filter_by(tariff_id=new_id).count() == 1
     assert Decimal(replaced.json()["periods"][0]["price_per_kwh"]) == Decimal("1234.56")
-
-
+ 
+ 
 def test_legacy_fallback_covers_day_without_creating_rows(db_session):
     tariff = get_or_create_default_tariff(db_session)
     periods = get_effective_periods(tariff)
-
+ 
     assert [(p["start_time"], p["end_time"], p["price_per_kwh"]) for p in periods] == [
         ("00:00", "04:00", Decimal("2500")),
         ("04:00", "09:30", Decimal("3200")),
@@ -295,8 +307,8 @@ def test_legacy_fallback_covers_day_without_creating_rows(db_session):
     assert validate_periods(periods) == []
     assert db_session.query(TariffPeriod).count() == 0
     assert get_or_create_default_tariff(db_session).id == tariff.id
-
-
+ 
+ 
 @pytest.mark.parametrize(
     "hour, minute, expected",
     [
@@ -316,8 +328,8 @@ def test_existing_rate_lookup_keeps_legacy_boundaries(
 ):
     tariff = get_or_create_default_tariff(db_session)
     assert determine_tou_rate(tariff, time(hour, minute)) == Decimal(expected)
-
-
+ 
+ 
 @pytest.mark.parametrize("delete_mode", ["orm", "sql"])
 def test_deleting_tariff_cascades_periods(db_session, delete_mode):
     tariff = get_or_create_default_tariff(db_session)
@@ -329,16 +341,16 @@ def test_deleting_tariff_cascades_periods(db_session, delete_mode):
         db_session.execute(delete(Tariff).where(Tariff.id == tariff.id))
     db_session.commit()
     assert db_session.query(TariffPeriod).count() == 0
-
-
+ 
+ 
 def test_database_rejects_negative_period_price(db_session):
     tariff = get_or_create_default_tariff(db_session)
     db_session.add(TariffPeriod(tariff_id=tariff.id, **_period("00:00", "24:00", "-1")))
     with pytest.raises(IntegrityError):
         db_session.flush()
     db_session.rollback()
-
-
+ 
+ 
 def test_api_respects_explicit_sort_order(client, headers):
     periods = [
         _period("00:00", "10:00", sort_order=20),
@@ -353,8 +365,8 @@ def test_api_respects_explicit_sort_order(client, headers):
         "00:00",
     ]
     assert [period["sort_order"] for period in response.json()["periods"]] == [10, 20]
-
-
+ 
+ 
 @pytest.mark.parametrize("period_fields", [{}, {"periods": None}])
 def test_legacy_create_without_periods_still_works(client, headers, period_fields):
     response = client.post(
@@ -363,8 +375,8 @@ def test_legacy_create_without_periods_still_works(client, headers, period_field
     assert response.status_code == 201
     assert response.json()["periods"] == []
     assert response.json()["offpeak_start"] == "22:00"
-
-
+ 
+ 
 @pytest.mark.parametrize("off_start, off_end", [("12:00", "15:00"), ("10:00", "23:00")])
 def test_legacy_fallback_respects_custom_times_and_peak_priority(
     db_session, off_start, off_end
@@ -379,8 +391,8 @@ def test_legacy_fallback_respects_custom_times_and_peak_priority(
         assert segment.price_per_kwh == determine_tou_rate(
             tariff, time(minute // 60, minute % 60)
         )
-
-
+ 
+ 
 def test_migration_upgrade_downgrade_keeps_legacy_data(tmp_path):
     """Chạy chuỗi migration thật trên DB riêng, không dùng DB ứng dụng/fixture."""
     database = tmp_path / "tariff-period-migration.db"
@@ -390,7 +402,7 @@ def test_migration_upgrade_downgrade_keeps_legacy_data(tmp_path):
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONIOENCODING": "utf-8",
     }
-
+ 
     def alembic(*arguments):
         result = subprocess.run(
             [sys.executable, "-m", "alembic", *arguments],
@@ -402,14 +414,14 @@ def test_migration_upgrade_downgrade_keeps_legacy_data(tmp_path):
             timeout=60,
         )
         assert result.returncode == 0, result.stdout + result.stderr
-
+ 
     def legacy_schema(connection):
         return connection.execute(
             "SELECT type, name, sql FROM sqlite_master "
             "WHERE tbl_name NOT IN ('tariff_periods', 'alembic_version') "
             "ORDER BY type, name"
         ).fetchall()
-
+ 
     alembic("upgrade", "1660df6b86c6")
     with closing(sqlite3.connect(database)) as connection, connection:
         connection.execute(
@@ -422,7 +434,7 @@ def test_migration_upgrade_downgrade_keeps_legacy_data(tmp_path):
         )
         old_rows = connection.execute("SELECT * FROM tariffs").fetchall()
         old_schema = legacy_schema(connection)
-
+ 
     for _ in range(2):
         alembic("upgrade", "37ff169ee686")
         with closing(sqlite3.connect(database)) as connection, connection:
@@ -462,7 +474,7 @@ def test_migration_upgrade_downgrade_keeps_legacy_data(tmp_path):
             assert connection.execute(
                 "SELECT sort_order FROM tariff_periods"
             ).fetchone() == (0,)
-
+ 
         alembic("downgrade", "1660df6b86c6")
         with closing(sqlite3.connect(database)) as connection, connection:
             assert legacy_schema(connection) == old_schema
