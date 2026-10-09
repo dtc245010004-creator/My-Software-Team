@@ -10,6 +10,7 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 | `backend/app/schemas/` | Kiểm tra dữ liệu vào/ra bằng Pydantic. |
 | `backend/app/models/` | Model SQLAlchemy cho trạm, đầu nối, phiên sạc, biểu giá và ví. |
 | `backend/app/services/` | Nghiệp vụ dùng chung như quản lý phiên sạc, biểu giá, ví và billing. |
+| `backend/app/services/billing_segment_service.py` | Chuyển kết quả phân đoạn S-30/S-31 thành snapshot DB khi chốt phiên; không tự commit. |
 | `backend/app/ocpp/handlers/` | Xử lý thông điệp OCPP, gồm trạng thái connector và kết thúc phiên. |
 | `backend/alembic/versions/` | Migration Alembic; cấu hình tại `backend/alembic.ini`. |
 | `backend/tests/` | Kiểm thử backend, bao gồm API, ACID và luồng OCPP. |
@@ -62,3 +63,16 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 - Toàn bộ backend: **365 passed, 1 skipped**; nhóm `test_tariff_periods.py`: **67 passed** trong Docker, gồm tạo schema bằng chuỗi migration thật, upgrade/downgrade S-29 và kiểm tra dữ liệu/schema cũ giữ nguyên.
 - Autogenerate bằng Docker Compose staging, dùng override tạm để gắn mã nguồn hiện tại và SQLite riêng. Đã rà soát, loại khỏi migration các chênh lệch schema lịch sử ngoài S-29. Không migrate DB dự án.
 - Alembic chỉ có một head trước (`1660df6b86c6`) và sau (`37ff169ee686`) khi tạo migration. Ruff đạt trên các file Python thay đổi.
+
+## S-30/S-31 và snapshot/hóa đơn S-33
+
+- `backend/app/services/pricing_engine.py` tính các đoạn giá và nhóm kết quả theo ngày trong bộ nhớ, gồm nội suy số đo tại ranh giới, chuyển khung giờ và phiên qua nửa đêm.
+- `backend/app/models/session_billing_segment.py` định nghĩa bảng `session_billing_segments`: lưu `segment_date`, thời gian, kWh, đơn giá `Numeric` đã chốt, thành tiền làm tròn và `tariff_id` nullable để truy vết. Khóa duy nhất `(session_id, segment_index)` ngăn lưu trùng; không có quan hệ tính tiền động qua Tariff.
+- `persist_session_billing_segments` gọi nguyên `calculate_session_pricing` và lưu `daily_groups[].segments` cùng giao dịch chốt phiên. Hàm được gọi ở `stop_charging_session`, `reconcile_interrupted_sessions`, `remote_stop_charging_session`, `force_close_abnormal_session` và `handle_stop_transaction`; không commit riêng.
+- Phiên cần xem xét không lưu đoạn. Phiên đã chốt có rows thì `get_session_invoice_breakdown` đọc snapshot DB, không dựng lại giá. Phiên cũ không có rows không được backfill; hóa đơn dùng tổng đã lưu trên phiên và `is_legacy=true`.
+- `GET /api/v1/sessions/{session_id}/invoice` yêu cầu đăng nhập và dùng DTO riêng `backend/app/schemas/invoice.py`; tài xế chỉ đọc phiên của mình, Operator đọc phiên thuộc trạm sở hữu, Admin đọc toàn hệ thống. Không cho tài khoản khách dùng chung truy cập hóa đơn (401 khi chưa đăng nhập); tài xế khác nhận 403. Phiên đang `ACTIVE`/`CHARGING` trả 409; phiên review trả `pending_review` với trường tiền null; phiên cũ không có snapshot đọc tổng đã lưu và gắn `is_legacy=true`.
+- Hợp đồng S-33 trả danh sách `segments`, tiền điện, tổng cộng, quy tắc làm tròn từng đoạn rồi cộng và dòng `idle_fee_line` nếu `idle_amount > 0`. Các field `price_segments`, `daily_groups`, `idle_fee` dạng số và thông tin phiên cũ vẫn được giữ để tương thích màn hình hiện tại.
+- `ChargingSession` lưu thêm `idle_chargeable_minutes`, `idle_fee_per_minute_applied` và `idle_grace_minutes_applied` cùng `idle_amount` khi billing chốt. Hóa đơn đọc các giá trị này thay vì lấy phí/ân hạn từ biểu giá đã bị sửa. `Available` đến sau billing chỉ ghi mốc connector; không cập nhật hóa đơn hay tự trừ ví lần hai.
+- Migration `backend/alembic/versions/5ccaa686da2b_add_session_billing_segments.py` nối revision `37ff169ee686`; chỉ tạo bảng và hai index. Trên PostgreSQL Compose tạm đã xác nhận một head và chu trình upgrade → downgrade → upgrade; không dùng DB dự án.
+- Migration `backend/alembic/versions/d8f56c4a911e_add_idle_fee_invoice_snapshot.py` nối revision `5ccaa686da2b`; lưu chi tiết phí đã áp dụng trên ChargingSession. PostgreSQL Compose tạm đã chạy chu trình upgrade → downgrade → upgrade; head duy nhất là `d8f56c4a911e`; DB dự án không bị migrate.
+- `backend/tests/test_billing_segments.py` có 6 ca về lưu/idempotency/legacy; `backend/tests/test_invoice.py` có 8 ca về response, phí chiếm trụ, giá đóng băng, review, IDOR và phiên chưa chốt. Full backend suite hoàn chỉnh ngày 09/10/2026 đạt **411 passed, 303 warnings** trong 159.16 giây, container Python 3.12. Sau chỉnh sửa metadata phí cho phiên legacy, `test_invoice.py` đạt 8 passed; lượt full suite host đạt 409 passed, 1 skipped nhưng test migration vướng `WinError 5` khi tạo `tmp_path`, cần xác nhận lại trong Docker.

@@ -47,11 +47,11 @@ def db_session():
         try:
             Base.metadata.drop_all(bind=test_engine)
         except SQLAlchemyError:
-            logger.exception("Không thể xóa bảng kiểm thử khi dọn fixture.")
+            logger.exception("Could not drop test tables during fixture teardown.")
 
 
 def pytest_unconfigure(config):
-    """Đóng engine và chỉ xóa file CSDL tạm do lượt pytest này tạo."""
+    """Close the engine and remove only this pytest run's temporary database."""
     test_engine.dispose()
     TEST_DB_FILE.unlink(missing_ok=True)
 

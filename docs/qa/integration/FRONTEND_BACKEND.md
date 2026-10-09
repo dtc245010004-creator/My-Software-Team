@@ -167,18 +167,25 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
 
 ---
 
+## TC-FB-18: Hóa đơn phiên đã chốt theo từng đoạn giá (S-33)
+* **Hợp đồng API**: `GET /api/v1/sessions/{session_id}/invoice` đọc `session_billing_segments` đã lưu lúc chốt, trả `segments`, `energy_amount`, `total_amount`, `rounding_rule` và `idle_fee_line` nếu có phí. DTO riêng nằm trong `backend/app/schemas/invoice.py`; các trường chi tiết S-30/S-31 cũ được giữ để màn hình đang dùng tiếp tục đọc được.
+* **Phân quyền/trạng thái**: Endpoint yêu cầu xác thực (401 nếu chưa đăng nhập); tài xế chỉ xem phiên mình; Operator xem phiên thuộc trạm mình sở hữu; Admin xem tất cả. Tài xế khác nhận 403, phiên chưa chốt nhận 409, phiên cần xem xét nhận `pending_review` và các trường tiền null. Phiên cũ không có snapshot dùng tổng đã lưu, không dựng lại giá hiện hành.
+* **Bằng chứng kiểm thử backend (09/10/2026, code commit `60e801a` trên `origin/Duong`)**: `test_invoice.py` + `test_pricing_engine.py` đạt **28 passed** sau xác thực endpoint; lượt full suite hoàn chỉnh trước chỉnh sửa cuối đạt **411 passed, 303 warnings**. Lượt host sau chỉnh sửa có 409 passed, 1 skipped và 1 lỗi quyền `tmp_path` ở test migration; cần chạy lại trong Docker. PostgreSQL Compose tạm đã kiểm tra migration `d8f56c4a911e` theo chu trình upgrade → downgrade → upgrade.
+
+---
+
 ## Current Summary
 
 ### Đánh giá mức độ tích hợp Frontend ↔ Backend
-* **Mức độ tương thích**: Hoạt động trơn tru trên môi trường tích hợp cục bộ.
-* Toàn bộ 15 ca kiểm thử tích hợp (TC-FB-01 đến TC-FB-15) đều được xác minh đồng bộ.
+  * **Mức độ tương thích**: Hợp đồng API có kiểm thử backend tự động; chưa kiểm tra thủ công giao diện trên trình duyệt sau cập nhật hóa đơn S-33.
+* TC-FB-01 đến TC-FB-18 có mô tả hợp đồng; các ca backend cho hóa đơn S-33 được kiểm chứng tự động. Chưa xác minh thủ công trên trình duyệt sau thay đổi response.
 * Luồng dữ liệu hai chiều giữa REST API và WebSocket Telemetry được xử lý bất đồng bộ nhịp nhàng, đảm bảo trải nghiệm người dùng liền mạch.
 
 ---
 
 ## Current Defects
 
-* **0 lỗi phát hiện trong 15 luồng tích hợp cốt lõi**.
+* **0 lỗi assertion trong các test API hóa đơn S-33 đã chạy**; chưa có xác nhận kiểm thử trình duyệt cho thay đổi này.
 * Các vấn đề nhỏ về giao diện (như căn chỉnh lề trên màn hình điện thoại siêu nhỏ) đã được đưa vào danh mục theo dõi của giai đoạn UI polish.
 
 ---

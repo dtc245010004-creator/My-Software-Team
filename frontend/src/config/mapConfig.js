@@ -1,7 +1,5 @@
 /**
- * Cấu hình tập trung cho các lớp bản đồ (Tile Layers) trong hệ thống EV CSMS
- * Sử dụng dịch vụ Esri ArcGIS toàn cầu: 100% miễn phí, tốc độ cao, không bao giờ cần API Key,
- * không bị lỗi chặn DNS mạng nội bộ như OpenStreetMap và không có watermark như Carto.
+ * Cấu hình tập trung cho các lớp bản đồ (Tile Layers) trong hệ thống EV CSMS.
  */
 export const MAP_CONFIG = {
   // 1. Bản đồ đường phố (Street Map): Esri World Street Map - Tên đường, địa danh, tòa nhà Việt Nam cực kỳ sắc nét & chi tiết
@@ -20,14 +18,13 @@ export const MAP_CONFIG = {
     className: '',
   },
 
-  // 2. Bản đồ đêm công nghệ cao: CartoDB Dark Matter (Độ tương phản cao, tên đường sáng rõ, không bị mờ đen)
+  // Dùng OSM kết hợp bộ lọc CSS map-tiles-dark để hiển thị nền tối, không phụ thuộc API key.
   dark: {
     name: 'Bản đồ Tối',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    subdomains: 'abcd',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     maxZoom: 19,
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
-    className: '',
+    attribution: '&copy; OpenStreetMap contributors',
+    className: 'map-tiles-dark',
   },
 
   // 3. Ảnh vệ tinh độ nét cao: Esri World Imagery

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -33,6 +34,29 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("Đã đồng bộ schema CSDL qua Base.metadata.create_all")
 
+    if os.getenv("ENABLE_DEMO_ACCOUNTS", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        from app.services.compose_schema_service import upgrade_compose_sqlite_schema
+        from app.services.demo_account_service import ensure_demo_accounts
+
+        added_columns = upgrade_compose_sqlite_schema(engine)
+        if added_columns:
+            logger.info(
+                "Đã nâng bổ sung schema SQLite phát triển: %s",
+                ", ".join(added_columns),
+            )
+
+        with SessionLocal() as db:
+            created_accounts = ensure_demo_accounts(db)
+        logger.info(
+            "Đã đồng bộ tài khoản demo phát triển (mới tạo %s tài khoản).",
+            created_accounts,
+        )
+
     # Phục hồi các phiên sạc bị gián đoạn nếu server crash trước đó (Crash Reconciliation)
     from app.services.session_service import reconcile_interrupted_sessions
 
@@ -51,8 +75,6 @@ async def lifespan(app: FastAPI):
     simulator_manager.set_main_loop(asyncio.get_running_loop())
 
     # Khởi động dịch vụ lập lịch phân tích AI định kỳ (Slow Loop) ngoài môi trường pytest
-    import os
-
     from app.services.scheduler_service import start_scheduler, stop_scheduler
 
     is_testing = os.environ.get("PYTEST_CURRENT_TEST") is not None

@@ -6,13 +6,20 @@
 
 ---
 
-## Latest Full Backend Run (08/10/2026)
+## Latest Completed Full Backend Run (09/10/2026)
 
-* **Lệnh**: `python -m pytest -p no:cacheprovider tests` từ `backend/`.
-* **Môi trường**: Python 3.14.7, pytest 9.1.1.
-* **Kết quả**: **298 passed, 1 skipped, 302 warnings**; 299 ca được thu thập, chạy trong 123.28 giây.
-* **S-28**: `test_billing_idle_fee.py` có 20 ca, tất cả passed trong full suite; kiểm tra mức trần cấu hình và xử lý `Available` muộn.
+* **Lệnh**: `python -m pytest tests -q` trong backend container, gắn mã nguồn và fixture OCPP từ workspace.
+* **Môi trường**: Docker backend, Python 3.12.
+* **Kết quả**: **411 passed, 303 warnings**; 411 ca được thu thập, chạy trong 159.16 giây.
+* **S-28**: `test_billing_idle_fee.py` có 20 ca; kiểm tra mức trần cấu hình và xử lý `Available` muộn.
+* **S-33 / SCRUM-222/221/220/223/225**: `test_billing_segments.py` có 6 ca và `test_invoice.py` có 8 ca; tất cả passed. Migration `d8f56c4a911e` đã nâng/hạ/nâng trên PostgreSQL Compose tạm.
 * Cảnh báo là các cảnh báo deprecation hiện có về `datetime.utcnow()` từ SQLAlchemy schema defaults.
+
+## Kiểm tra sau điều chỉnh thông tin idle fee legacy (09/10/2026)
+
+* `backend/tests/test_invoice.py`: **8 passed** sau khi thay đổi để hóa đơn legacy không suy ra rate/grace từ biểu giá hiện tại.
+* Full suite chạy trên host Python 3.14 đạt **409 passed, 1 skipped**, nhưng một ca migration không khởi tạo được fixture `tmp_path` do Windows trả `WinError 5: Access is denied`; không có assertion test nào báo fail. Docker daemon hiện không truy cập được để lặp lại full suite trong container đã dùng cho lượt hoàn chỉnh phía trên.
+* Vì lượt full suite mới nhất bị chặn ở thiết lập thư mục tạm của môi trường host, cần chạy lại full suite trong Docker khi daemon hoạt động.
 
 ---
 
@@ -215,3 +222,37 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_wh
 * Full backend suite: **267 passed, 1 skipped, 298 warnings trong 155.32 giây**. Ruff trên file cấu hình, model, scheduler, migration và test: `All checks passed!`.
 * T-55/T-56: full backend suite trong container Python 3.12 đạt **268 passed, 299 warnings**; kịch bản reconnect Compose/PostgreSQL đạt **3/3 vòng** với 5 trụ, 5 kWh mỗi phiên; simulator ghi nhận **20/20 trụ Online**.
 * Migration `c4ab19f2d7e1` nâng/hạ/nâng thành công trên SQLite tạm đã stamp ở revision `339c5001fe7a`; không chạy migration lên DB dự án.
+
+## Kiểm thử biểu giá chia đoạn và qua nửa đêm — S-30 & S-31 (08/10/2026 - chưa commit)
+
+* `backend/tests/test_pricing_engine.py`: **20 passed**:
+  * **S-30 (Chia đoạn và nội suy tuyến tính)**:
+    * `test_s30_ac12_single_time_slot`: Phiên nằm trọn trong 1 khung giờ -> trả về đúng 1 đoạn, `co_noi_suy = False`, tổng tiền = kWh * đơn giá.
+    * `test_s30_ac11_segmentation_with_linear_interpolation`: Phiên 21:30 - 23:30 cắt qua 22:00, không có số đo mốc -> chia 2 đoạn, nội suy tuyến tính chính xác, `co_noi_suy = True`.
+    * `test_s30_ac11_segmentation_with_exact_boundary_reading`: Phiên cắt qua 22:00 có sẵn số đo mốc trong `meter_readings` -> lấy đúng số đo thực tế, `co_noi_suy = False`.
+    * `test_s30_ac13_rounding_per_segment_rule`: Quy tắc làm tròn từng đoạn rồi cộng lại (`"Làm tròn từng đoạn rồi cộng"`), kiểm chứng tính chuẩn xác khi tổng từng đoạn làm tròn lệch so với tính gộp.
+    * `test_multiple_time_slots_in_single_day`: Phiên 09:00 - 12:00 cắt qua 2 ranh giới (09:30, 11:30) chia làm 3 đoạn liên tiếp (NORMAL -> PEAK -> NORMAL).
+    * `test_linear_interpolation_helper`: Kiểm tra độc lập hàm nội suy tuyến tính $kWh_{ranh\_gioi}$.
+  * **S-31 (Phiên qua nửa đêm và kéo dài > 24h)**:
+    * `test_s31_ac21_session_crossing_midnight_different_daily_tariffs`: Phiên qua nửa đêm (23:00 - 01:30) chia 2 nhóm ngày, áp đúng 2 biểu giá khác nhau giữa 2 ngày.
+    * `test_s31_ac21_midnight_interpolation_without_midnight_reading`: Phiên qua nửa đêm không có số đo lúc 00:00:00 -> tự động nội suy tại mốc nửa đêm.
+    * `test_s31_ac22_session_longer_than_24_hours`: Phiên 36 giờ chia thành các nhóm ngày riêng biệt và gom nhóm theo ngày (`nhom_theo_ngay` / `daily_groups`).
+    * `test_station_timezone_not_utc`: Kiểm chứng phép chia ngày theo múi giờ trạm (`Asia/Ho_Chi_Minh`), không dùng UTC.
+  * **Tính thuần túy & Hợp đồng hóa đơn**:
+    * `test_pure_function_idempotency_nfr_s30`: Thuật toán là hàm thuần (Pure Function), không đọc CSDL, gọi nhiều lần cho ra kết quả đồng nhất 100%.
+    * `test_output_contract_structure_compliance`: Định dạng đầu ra khớp 100% hợp đồng dữ liệu đầu ra JSON hóa đơn (`session_id`, `timezone`, `total_energy_kwh`, `total_amount`, `currency`, `rounding_rule`, `rounding_note`, `daily_groups`, các trường song song tiếng Việt).
+    * `test_dict_readings_and_dict_tariff`: Nhận linh hoạt biểu giá và số đo dạng dict.
+    * `test_zero_kwh_and_zero_duration`: Xử lý an toàn trường hợp biên 0 kWh / 0 giây.
+  * **Kiểm thử tích hợp API Endpoint `GET /api/v1/sessions/{id}/invoice`**:
+    * `test_api_get_session_invoice_success_admin`: Admin tra cứu chi tiết hóa đơn phiên sạc qua nửa đêm thành công (200 OK), xác nhận đầy đủ các trường schema response.
+    * `test_api_get_session_invoice_success_customer_owner`: Khách hàng tra cứu hóa đơn phiên sạc của chính mình thành công (200 OK).
+    * `test_api_get_session_invoice_idor_forbidden`: Ngăn chặn IDOR khi khách hàng khác cố xem hóa đơn của tài xế khác (403 Forbidden).
+    * `test_api_get_session_invoice_operator_rbac`: Chủ trạm xem hóa đơn trạm mình sở hữu (200 OK), bị chặn xem trạm đơn vị khác (403 Forbidden).
+    * `test_api_get_session_invoice_not_found`: Tra cứu session không tồn tại trả về 404 Not Found.
+    * `test_api_get_session_invoice_with_meter_values`: Tích hợp các mẫu đo `MeterValue` thực tế ở mốc nửa đêm (00:00:00), xác nhận `is_interpolated = False` và lấy đúng số đo thực tế.
+* **Full backend suite**: **290 passed, 1 skipped, 303 warnings trong 154.09 giây** (`pytest backend/tests -q`), đạt Zero Regression 100%.
+* **Kiểm tra linter**: `ruff check backend/` đạt **All checks passed!**.
+* **Kiểm tra Frontend**: `npm --prefix frontend run build` biên dịch thành công trong 16.99 giây.
+
+
+\n
