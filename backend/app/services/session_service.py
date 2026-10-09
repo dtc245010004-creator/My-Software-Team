@@ -61,24 +61,56 @@ def determine_tou_rate(tariff: Tariff, check_time: time) -> Decimal:
     return tariff.price_normal
 
 
-def get_or_create_default_tariff(db: Session, station_id: int | None = None) -> Tariff:
-    """Lấy biểu giá áp dụng riêng cho trạm hoặc biểu giá mặc định hệ thống."""
+def get_or_create_default_tariff(
+    db: Session,
+    station_id: int | None = None,
+    at_time: datetime | None = None,
+) -> Tariff:
+    """
+    Lấy biểu giá áp dụng riêng cho trạm hoặc biểu giá mặc định hệ thống.
+    Hỗ trợ versioning theo thời gian hiệu lực (effective_from <= at_time).
+    Nếu không truyền at_time, lấy theo thời điểm hiện tại (UTC).
+    """
+    check_time = at_time or datetime.now(timezone.utc)
+    if check_time.tzinfo is None:
+        check_time = check_time.replace(tzinfo=timezone.utc)
+
     if station_id:
         tariff = (
             db.query(Tariff)
-            .filter(Tariff.station_id == station_id, Tariff.is_active.is_(True))
+            .filter(
+                Tariff.station_id == station_id,
+                Tariff.is_active.is_(True),
+                Tariff.effective_from <= check_time,
+            )
+            .order_by(Tariff.effective_from.desc(), Tariff.id.desc())
             .first()
         )
         if tariff:
             return tariff
 
-    # Lấy biểu giá mặc định hệ thống
+    # Lấy biểu giá mặc định hệ thống theo phiên bản có hiệu lực
     default_tariff = (
         db.query(Tariff)
-        .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
+        .filter(
+            Tariff.station_id.is_(None),
+            Tariff.is_active.is_(True),
+            Tariff.effective_from <= check_time,
+        )
+        .order_by(Tariff.effective_from.desc(), Tariff.id.desc())
         .first()
     )
     if not default_tariff:
+        # Nếu chưa có biểu giá nào thoả effective_from <= check_time, thử lấy biểu giá active bất kỳ
+        fallback_tariff = (
+            db.query(Tariff)
+            .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
+            .order_by(Tariff.effective_from.asc())
+            .first()
+        )
+        if fallback_tariff:
+            return fallback_tariff
+
         try:
             default_tariff = Tariff(
                 station_id=None,
@@ -93,6 +125,7 @@ def get_or_create_default_tariff(db: Session, station_id: int | None = None) -> 
                 offpeak_start="22:00",
                 offpeak_end="04:00",
                 is_active=True,
+                effective_from=datetime(2000, 1, 1, 0, 0, tzinfo=timezone.utc),
             )
             db.add(default_tariff)
             db.commit()
@@ -102,6 +135,7 @@ def get_or_create_default_tariff(db: Session, station_id: int | None = None) -> 
             default_tariff = (
                 db.query(Tariff)
                 .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
+                .order_by(Tariff.effective_from.desc(), Tariff.id.desc())
                 .first()
             )
 
@@ -213,10 +247,9 @@ def start_charging_session(
         {"cpid": charger.id},
     )
     station_id = station.id if station else None
-    tariff = get_or_create_default_tariff(db, station_id=station_id)
-
     # 5. Chốt đơn giá điện TOU tại thời điểm bắt đầu phiên sạc theo giờ Việt Nam
     now = datetime.now(timezone.utc)
+    tariff = get_or_create_default_tariff(db, station_id=station_id, at_time=now)
     vn_now = to_vn_time(now)
     applied_price = determine_tou_rate(tariff, vn_now.time())
 
