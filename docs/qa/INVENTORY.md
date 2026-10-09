@@ -234,6 +234,14 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
+* **Kiểm thử tự động**: Baseline trước khi nhập S-30/S-31 đạt 298 passed, 1 skipped, 302 warnings ngày 08/10/2026; 299 ca được thu thập trên Python 3.14.7. Cần chạy lại full suite sau khi hợp nhất.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; head hiện tại là `1660df6b86c6`. Hai migration S-28 đã kiểm chứng tiến/lùi/tiến trên DB SQLite tạm, chưa áp dụng lên CSDL dự án.
+* **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
+
+### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
+* **SCRUM-188/189/190/192 thuộc S-28 (08/10/2026 - chưa commit)**: Thêm phí chiếm trụ theo biểu giá và ân hạn, kiểm tra dữ liệu âm ở schema, lưu thời điểm connector báo `Finishing`/`SuspendedEV` và `Available`, tập trung phép tính vào `billing.py`, lưu `idle_amount`, và áp trần số phút từ `IDLE_FEE_MAX_MINUTES` (mặc định 240). Khi `Available` đến sau billing, không sửa hóa đơn/sổ cái và không tự trừ ví lần hai; mentor cần xác nhận cách quyết toán bổ sung. 20 test billing chọn lọc passed; baseline full suite đạt 298 passed, 1 skipped. Hai migration đã kiểm tra nâng/hạ/nâng trên SQLite tạm.
+* **Sửa phân quyền đọc trạm/trụ và hiển thị trạm thiếu GPS (07/10/2026 - chưa commit)**: Dùng chung bộ lọc truy vấn cho API list/detail/tree/grid trạm và list/detail trụ; truy cập ngoài phạm vi trả `404`; chuẩn hóa `Type 2` cũ trong DTO, không ghi DB. 35 test chọn lọc passed, Ruff sạch.
+
 ### 4.19. Suite `test_billing_idle_fee.py` (20 ca)
 1. `test_calculate_idle_fee_within_grace_period`: Không thu phí trong ân hạn.
 2. `test_calculate_idle_fee_rounds_billable_minutes_up_after_grace`: Phần vượt ân hạn được làm tròn lên theo phút.
@@ -243,9 +251,14 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 6. `test_settings_default_idle_fee_cap_is_240_minutes`, `test_calculate_session_total_uses_configured_idle_fee_cap`: Xác minh mặc định và việc đọc trần từ settings.
 7. `test_late_available_only_records_marker_after_session_billing`: `Available` tới sau khi chốt chỉ lưu mốc, không đổi hóa đơn, số dư ví hoặc sổ giao dịch.
 8. `test_create_tariff_defaults_idle_fields_to_zero`, `test_update_tariff_accepts_idle_fields`: Kiểm tra mặc định và lưu các trường phí/ân hạn.
-9. `test_create_tariff_rejects_negative_values`, `test_update_tariff_rejects_negative_values`: Hai test được tham số hóa theo 5 trường giá/phí/ân hạn âm, kiểm tra HTTP 422 và tên trường trong lỗi tiếng Việt.
+9. `test_create_tariff_rejects_negative_values`, `test_update_tariff_rejects_negative_values`: Kiểm tra HTTP 422 và tên trường trong lỗi tiếng Việt.
 
-**Kết quả kiểm thử ngày 08/10/2026**: 20/20 ca passed trong full suite.
+**Kết quả baseline ngày 08/10/2026**: 20/20 ca passed.
+
+### 4.20. Suite biểu giá chia đoạn và qua nửa đêm — `test_pricing_engine.py` (20 ca)
+S-30 kiểm thử chia các phiên thành nhiều khung TOU và nội suy tại ranh giới thiếu số đo; S-31 kiểm thử phiên qua nửa đêm/đa ngày, múi giờ trạm, biểu giá từng ngày và nhóm hóa đơn. Bộ test cũng kiểm tra làm tròn từng đoạn, đầu vào dict, tính thuần và quyền truy cập API/IDOR.
+
+**Kết quả được nhánh `quocdung` ghi nhận ngày 08/10/2026**: 20 ca `test_pricing_engine.py` passed; full suite khi đó đạt 290 passed, 1 skipped. Đây là kết quả trên revision trước khi hợp nhất với `main`; cần đối chiếu với lượt kiểm thử mới.
 
 ---
 
