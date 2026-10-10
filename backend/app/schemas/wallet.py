@@ -42,3 +42,8 @@ class WalletResponse(BaseModel):
     transactions: list[WalletTransactionResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+class TopupOrderResponse(BaseModel):
+    order_id: str
+    redirect_url: str
+
