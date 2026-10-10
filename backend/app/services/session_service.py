@@ -5,7 +5,7 @@ from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import text
+from sqlalchemy import func, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -181,12 +181,26 @@ def start_charging_session(
     3. Khóa cổng sạc độc quyền chống Race Condition bằng Atomic Conditional Update.
     4. Chốt đơn giá điện TOU 1 lần tại thời điểm cắm sạc.
     """
-    # 1. Kiểm tra ví người dùng
-    wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
+    # Khóa ví để kiểm tra reconcile lock tuần tự với job đối soát và các giao dịch.
+    wallet_query = db.query(Wallet).filter(Wallet.user_id == user.id)
+    if db.get_bind().dialect.name == "sqlite":
+        # SQLite không hỗ trợ SELECT FOR UPDATE; lấy quyền ghi trước khi đọc.
+        db.execute(
+            update(Wallet)
+            .where(Wallet.user_id == user.id)
+            .values(updated_at=func.now())
+        )
+    wallet = wallet_query.with_for_update().populate_existing().first()
     if not wallet:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy ví tiền người dùng.",
+        )
+
+    if wallet.is_reconcile_locked:
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="Ví đang bị khóa giao dịch do số dư không khớp sổ cái. Vui lòng liên hệ quản trị viên.",
         )
 
     if wallet.balance < Decimal(0):

@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     MAX_SAFE_DEBT_LIMIT: int = (
         -500000
     )  # -500,000 VND cho CheckConstraint CSDL (khóa ở -300k, chỉ cho tràn tối đa 200k)
+    RECONCILE_INTERVAL_MINUTES: int = Field(default=15, gt=0)
     IDLE_FEE_MAX_MINUTES: int = Field(
         default=240, ge=0
     )  # Trần số phút được tính phí chiếm trụ mỗi phiên

@@ -8,10 +8,10 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 | --- | --- |
 | `backend/app/api/v1/endpoints/` | Router REST và điều phối request/response. |
 | `backend/app/schemas/` | Kiểm tra dữ liệu vào/ra bằng Pydantic. |
-| `backend/app/models/` | Model SQLAlchemy cho trạm, đầu nối, phiên sạc, biểu giá và ví. |
-| `backend/app/services/` | Nghiệp vụ dùng chung như quản lý phiên sạc, biểu giá, ví và billing. |
+| `backend/app/models/` | Model SQLAlchemy cho trạm, đầu nối, phiên sạc, biểu giá, ví và dòng sổ cái. |
+| `backend/app/services/` | Nghiệp vụ dùng chung như quản lý phiên sạc, biểu giá, ví, sổ cái và billing. |
 | `backend/app/services/billing_segment_service.py` | Chuyển kết quả phân đoạn S-30/S-31 thành snapshot DB khi chốt phiên; không tự commit. |
-| `backend/app/services/scheduler_service.py` | Job định kỳ, gồm gắn cờ phiên OCPP bất thường và hết hạn RemoteStart đang PENDING. |
+| `backend/app/services/scheduler_service.py` | Job định kỳ, gồm đối soát sổ cái ví, gắn cờ phiên OCPP bất thường và hết hạn RemoteStart đang PENDING. |
 | `backend/app/ocpp/handlers/` | Xử lý thông điệp OCPP, gồm trạng thái connector và kết thúc phiên. |
 | `backend/alembic/versions/` | Migration Alembic; cấu hình tại `backend/alembic.ini`. |
 | `backend/tests/` | Kiểm thử backend, bao gồm API, ACID và luồng OCPP. |
@@ -30,14 +30,34 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - Quyết định S-28: lúc billing chỉ tính phí chiếm trụ nếu đã có cả mốc bắt đầu và mốc `Available`. Nếu phiên đã quyết toán khi chưa có `Available`, không tự trừ tiền; hóa đơn và dòng sổ cái hiện có không bị sửa. Khi `Available` tới muộn, handler chỉ lưu mốc kết thúc và để TODO cho bước tính phí bổ sung.
 - `[CẦN XÁC NHẬN VỚI MENTOR]` Trước khi triển khai phí bổ sung, cần chốt liệu phí sẽ tạo dòng sổ cái thứ hai hay sẽ hoãn trừ ví. Chưa có cơ chế trừ ví lần hai.
 
+## Ví điện tử và sổ cái S-41
+
+- `backend/app/models/wallet.py` khai báo `Wallet.is_reconcile_locked` riêng với `is_debt_locked`; `WalletTransaction` có chỉ mục duy nhất `(wallet_id, reference_id, transaction_type)` và trigger CSDL chặn `UPDATE`/`DELETE`.
+- `backend/app/services/wallet_service.py::post_ledger_entry` là đường ghi chung cho nạp và trừ: `TOPUP`/`REFUND` ghi amount dương, `CHARGE_FEE` ghi amount âm; `SUM(amount)` đối chiếu với `Wallet.balance`. Hàm khóa hàng ví trên PostgreSQL, lấy quyền ghi trước khi đọc trên SQLite, thêm một dòng và cập nhật số dư trong cùng transaction.
+- `backend/app/services/compose_schema_service.py` nâng an toàn SQLite volume cũ lúc Compose khởi động: thêm `is_reconcile_locked`, chỉ mục duy nhất và trigger chặn sửa/xóa ledger còn thiếu; không đặt lại số dư hay xóa dòng cũ. Test hồi quy schema legacy nằm ở `backend/tests/test_compose_schema_service.py`.
+- Giao dịch trừ có tham chiếu `session_{id}`; lặp cùng tham chiếu/loại/số tiền trả lại dòng hiện có, tham chiếu trùng với số tiền khác bị từ chối. Mọi đường cập nhật số dư trong mã ứng dụng đã được rà soát; phép gán số dư duy nhất nằm trong `post_ledger_entry`.
+- Job `reconcile_wallet_ledger_job` chạy theo `RECONCILE_INTERVAL_MINUTES` (mặc định 15), dùng một truy vấn nhóm, ghi log và audit log khi phát hiện lệch, rồi bật cờ khóa đối soát. Nạp, trừ và bắt đầu phiên mới bị chặn khi ví đang khóa.
+- `POST /api/v1/wallet/admin/{wallet_id}/reconciliation/unlock` yêu cầu role `ADMIN` và lý do; chỉ mở khi tổng sổ cái đã khớp số dư. Mỗi lần mở khóa được ghi log và audit log.
+- Migration `backend/alembic/versions/f41a0b7c9d22_wallet_ledger_append_only.py` thêm cờ, chỉ mục duy nhất và trigger append-only. Do `wallet_transactions.wallet_id` và `wallets.user_id` dùng `ON DELETE CASCADE`, trigger cũng làm thao tác xóa ví/người dùng có giao dịch thất bại; giữ lịch sử bằng soft delete. Migration cố REVOKE UPDATE/DELETE cho role kết nối nếu role tồn tại, nhưng quyền của table owner/superuser không thể bị loại bỏ bằng REVOKE; trigger vẫn chặn DML thông thường.
+- Ví cũ thiếu dòng sổ sẽ được job phát hiện và khóa. Chưa backfill số dư đầu kỳ; cần phê duyệt riêng trước khi tạo dữ liệu opening-balance.
+- `[CẦN XÁC NHẬN]` S-37 cho phép phát sinh số dư âm, trong khi DB hiện chặn dưới `-500000` và tầng ứng dụng đặt ngưỡng khóa nợ `-300000`; chưa thay đổi hai ngưỡng này.
+
+### Đã thay đổi (10/10/2026 - chưa commit)
+
+- SCRUM-283/284/288: ghi nạp/trừ qua một hàm append-only, khóa ghi đồng thời, unique reference, trigger PostgreSQL/SQLite và migration mới.
+- SCRUM-285/287: job đối soát theo chu kỳ cấu hình, khóa ví lệch và chặn giao dịch mới; log/audit cho phát hiện lệch.
+- SCRUM-286/289: endpoint mở khóa chỉ dành cho Admin, yêu cầu lý do và chỉ mở sau khi ledger khớp; ghi log/audit.
+- SCRUM-290: thêm `backend/tests/test_wallet_ledger_s41.py` và test nâng schema Compose SQLite cũ. Full backend suite Docker đạt **451 passed, 307 warnings**; migration tiến/lùi/tiến trên PostgreSQL tạm thành công, trigger đã chặn UPDATE/DELETE. Database tạm đã xóa; database dự án không bị migrate.
+- Lỗi khởi động Compose ngày 10/10: backend dùng volume SQLite cũ thiếu `wallets.is_reconcile_locked`; `compose_schema_service` đã được bổ sung nâng schema idempotent. Sau khi build lại, backend healthy, `/docs` trả 200 và toàn stack Compose đã được khởi động.
+
 ## Sửa lỗi theo báo cáo EV CSMS (10/10/2026, code commit `0bb5f67`)
 
 - `frontend/src/services/telemetryClient.js` dùng WebSocket singleton từ `frontend/src/services/websocket.js`; ánh xạ tên telemetry backend sang trường mà ActiveSession hiển thị. Frontend có 39 test passed và build thành công; chưa kiểm tra trực quan qua trình duyệt.
 - `backend/app/ocpp/handlers/stop_transaction.py` lưu `transactionData` hợp lệ vào `MeterValue` đã có. Nếu Available đến trước StopTransaction, phiên được đánh dấu cần xem xét; StopTransaction hợp lệ đến sau mới chốt. Không tự hoàn tất phiên chỉ dựa vào Available.
 - Scheduler chuyển RemoteStart quá hạn từ `PENDING` sang `EXPIRED` mỗi phút. RemoteStop trả HTTP 409 khi trụ offline.
 - `ALLOW_REMOTE_START_SIMULATION` mặc định false; khi bật, mô phỏng chỉ dùng được bởi ADMIN ngoài test pytest đang chạy.
-- Alembic hiện có một head `e72b461d9ac3`, merge `5f9249bf58da` và `d8f56c4a911e` (đã kiểm tra bằng `alembic heads` ngày 10/10/2026; chưa chạy migration).
-- Kiểm chứng ngày 10/10/2026: backend full suite trong Docker **437 passed, 307 warnings**; Ruff báo `All checks passed`; frontend **39 passed**, build thành công (có cảnh báo bundle >500 kB); `docker compose config --quiet` thành công. Runtime smoke: backend/frontend HTTP 200, đăng nhập tài xế và chủ trạm thành công, WebSocket `CONNECTED/SUBSCRIBED/PONG`. Migration heads có một head `e72b461d9ac3`; không chạy migration lên DB dự án. Chưa kiểm tra UI trực quan trên trình duyệt.
+- Trước migration S-41, Alembic có head `e72b461d9ac3`; hiện có một head `f41a0b7c9d22`. Toàn bộ migration lên head, rồi migration mới nhất lùi một revision và nâng lại, đã chạy trên PostgreSQL tạm; database tạm được xóa sau kiểm thử và DB dự án không bị migrate.
+- Kiểm chứng gần nhất ngày 10/10/2026: backend full suite trong Docker **451 passed, 307 warnings**; PostgreSQL trigger chặn UPDATE/DELETE; backend `/docs` trả 200 và backend/DB/frontend/OCPP simulator đều được Compose khởi động. Chưa kiểm tra UI trực quan trên trình duyệt.
 
 ## S-29 — Biểu giá nhiều khung giờ (Backend)
 

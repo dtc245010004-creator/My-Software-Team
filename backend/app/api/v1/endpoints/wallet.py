@@ -3,12 +3,17 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user_or_driver_guest
+from app.api.deps import get_current_user_or_driver_guest, require_roles
 from app.core.database import get_db
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
-from app.schemas.wallet import TopupRequest, WalletResponse, WalletTransactionResponse
-from app.services.wallet_service import topup_wallet
+from app.schemas.wallet import (
+    TopupRequest,
+    WalletReconciliationUnlockRequest,
+    WalletResponse,
+    WalletTransactionResponse,
+)
+from app.services.wallet_service import topup_wallet, unlock_wallet_reconciliation
 
 router = APIRouter(prefix="/wallet", tags=["Ví điện tử & Giao dịch (Wallet)"])
 
@@ -91,3 +96,22 @@ def topup_my_wallet(
         note=note_text,
     )
     return wallet
+
+
+@router.post(
+    "/admin/{wallet_id}/reconciliation/unlock",
+    response_model=WalletResponse,
+    summary="Admin mở khóa giao dịch ví sau khi xử lý lệch sổ cái",
+)
+def unlock_wallet_reconciliation_lock(
+    wallet_id: int,
+    request: WalletReconciliationUnlockRequest,
+    current_user: User = Depends(require_roles(["ADMIN"])),
+    db: Session = Depends(get_db),
+):
+    return unlock_wallet_reconciliation(
+        db,
+        wallet_id,
+        admin_user_id=current_user.id,
+        reason=request.reason,
+    )

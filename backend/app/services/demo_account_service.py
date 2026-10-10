@@ -8,6 +8,7 @@ from app.core.security import get_password_hash, verify_password
 from app.models.id_tag import IdTag
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.wallet_service import post_ledger_entry
 
 DEMO_ACCOUNTS = (
     {
@@ -110,11 +111,23 @@ def ensure_demo_accounts(db: Session) -> int:
             is_debt_locked = account["username"] == "driver_debt"
             wallet = Wallet(
                 user_id=user.id,
-                balance=account["balance"],
+                balance=Decimal("0.00"),
                 currency="VND",
                 is_debt_locked=is_debt_locked,
             )
             db.add(wallet)
+            db.flush()
+            opening_balance = account["balance"]
+            if opening_balance:
+                is_opening_topup = opening_balance > 0
+                post_ledger_entry(
+                    db=db,
+                    wallet_id=wallet.id,
+                    amount=opening_balance,
+                    transaction_type="TOPUP" if is_opening_topup else "CHARGE_FEE",
+                    reference_id=f"demo_opening_{user.id}",
+                    note="Số dư khởi tạo tài khoản demo",
+                )
 
         if account["role"] == "CUSTOMER":
             id_tag_code = f"DEMO-{account['username'].upper()}"

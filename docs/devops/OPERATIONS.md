@@ -173,6 +173,7 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `LOCKOUT_DURATION_MINUTES` | Integer | `15` | Thời gian khóa tạm thời tài khoản tính theo phút |
 | `NEGATIVE_BALANCE_LIMIT` | Integer | `-300000` | Ngưỡng số dư ví kích hoạt khóa tài khoản (-300.000 VND) |
 | `MAX_SAFE_DEBT_LIMIT` | Integer | `-500000` | Hạn mức CSDL CheckConstraint chặn cứng chống tràn (-500.000 VND) |
+| `RECONCILE_INTERVAL_MINUTES` | Integer | `15` | Chu kỳ job so sánh tổng sổ cái với số dư từng ví; ví lệch bị khóa giao dịch mới |
 | `BACKEND_CORS_ORIGINS` | JSON List | `["http://localhost:5173", ...]` | Danh sách origin trình duyệt được phép gọi API |
 | `ENABLE_DEMO_ACCOUNTS` | Boolean | Compose phát triển: `true`; staging: không bật | Đồng bộ tài khoản demo chỉ cho stack phát triển; không bật trên staging |
 | `GEMINI_API_KEY` | String | `""` | Khóa API dịch vụ AI Google Gemini (tùy chọn) |

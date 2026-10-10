@@ -9,11 +9,12 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Sau sửa lỗi ngày 10/10/2026, full backend suite trong Docker đạt **437 passed, 307 warnings**; frontend đạt **39 passed** và `npm run build` thành công. Build có cảnh báo bundle JavaScript lớn hơn 500 kB.
+- **Kiểm thử tự động**: Backend full suite trong Docker gần nhất đạt **451 passed, 307 warnings**. Lỗi khởi động Compose do SQLite volume cũ thiếu cột khóa đối soát đã được sửa và backend healthy trở lại.
 - **Chức năng OCPP**: Bao gồm MeterValues, chống số đo lùi/trùng, khôi phục phiên khi reconnect, RemoteStart/RemoteStop và audit log giới hạn theo quyền sở hữu trạm.
 - **Kiến trúc dữ liệu**: SQLAlchemy khai báo 18 bảng; các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. Bảng mới giữ nguyên giá/kWh và thành tiền của từng đoạn phiên. *(Nguồn: `backend/app/models/`)*
-- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; `alembic heads` ngày 10/10/2026 xác nhận head duy nhất `e72b461d9ac3`, merge hai revision `5f9249bf58da` và `d8f56c4a911e`. Lượt này không chạy migration lên DB dự án.
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; `alembic heads` ngày 10/10/2026 xác nhận head duy nhất `f41a0b7c9d22`. Đã kiểm tra toàn chuỗi migration và trigger trên PostgreSQL tạm; DB dự án không bị migrate.
 - **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
+- **Sổ cái ví S-41**: Nạp/trừ được ghi qua một hàm append-only; job đối soát chạy mỗi `RECONCILE_INTERVAL_MINUTES` (mặc định 15) và khóa ví lệch. Compose mặc định dùng SQLite và tự bổ sung schema còn thiếu trên volume cũ; không backfill ví legacy.
 - **Realtime theo dõi phiên**: ActiveSession nhận dữ liệu qua WebSocket singleton dùng cùng-origin `/ws/telemetry` và ánh xạ tên trường backend (`energy_kwh`, `cost_estimate`, `soc`, `temp_c`) sang giao diện. Đã có test frontend cho mapper và smoke WebSocket runtime `CONNECTED/SUBSCRIBED/PONG`; chưa kiểm tra trực quan qua trình duyệt.
 - **Mô phỏng RemoteStart/RemoteStop**: mặc định tắt (`ALLOW_REMOTE_START_SIMULATION=false`); khi được chủ động bật, chỉ ADMIN dùng được ngoài pytest. `TESTING` mặc định false và không được bật trong triển khai.
 - **Docker & CI/CD**: `docker-compose.yml` chạy stack Backend, Frontend, PostgreSQL và simulator 20 trụ dùng chung cho Sprint 1–4. CI cấu hình tại `.github/workflows/`.
@@ -137,7 +138,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Lượt full suite gần nhất (10/10/2026):** `437 passed, 307 warnings` trong container Python 3.12. Frontend: `npm test` đạt 39 passed; `npm run build` thành công, có cảnh báo bundle lớn. Ruff báo `All checks passed`; một số thư mục pytest tạm cũ bị từ chối quyền khi quét. Compose health/frontend trả HTTP 200, đăng nhập tài xế và chủ trạm thành công, WebSocket trả `CONNECTED/SUBSCRIBED/PONG`. Migration: `alembic heads` có một head `e72b461d9ac3`; lượt này không chạy migration lên DB dự án. Chưa kiểm tra trực quan UI trên trình duyệt.
+**Lượt full suite hoàn chỉnh gần nhất trong Docker (10/10/2026, chưa commit):** `451 passed, 307 warnings` trong container Python 3.12. Migration S-41 đã được kiểm tra upgrade/downgrade/upgrade trên PostgreSQL tạm; trigger chặn UPDATE/DELETE. Compose khởi động backend, PostgreSQL, frontend và OCPP simulator; backend healthcheck và `/docs` đều đạt. DB dự án không bị migrate hoặc backfill. Frontend lần kiểm chứng trước đạt 39 passed/build; chưa kiểm tra UI trực quan trên trình duyệt.
 
 ---
 

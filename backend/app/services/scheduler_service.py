@@ -71,6 +71,23 @@ def reset_cumulative_energy_cache():
     _last_station_cumulative_energy.clear()
 
 
+def reconcile_wallet_ledger_job():
+    """Đối soát sổ cái ví định kỳ và khóa các ví có tổng tiền không khớp."""
+    from app.services.wallet_service import reconcile_wallet_ledger
+
+    try:
+        result = reconcile_wallet_ledger()
+        logger.info(
+            "Wallet ledger reconciliation complete: checked=%s mismatched=%s",
+            result["checked"],
+            result["mismatched"],
+        )
+        return result
+    except SQLAlchemyError:
+        logger.exception("Lỗi CSDL khi chạy đối soát sổ cái ví")
+        return {"checked": 0, "mismatched": 0}
+
+
 async def calculate_and_broadcast_smart_charging(
     station_id: int,
     db: Session,
@@ -457,9 +474,18 @@ def start_scheduler():
             id="expire_pending_remote_start_requests",
             replace_existing=True,
         )
+        scheduler.add_job(
+            reconcile_wallet_ledger_job,
+            "interval",
+            minutes=settings.RECONCILE_INTERVAL_MINUTES,
+            id="reconcile_wallet_ledger",
+            replace_existing=True,
+        )
         scheduler.start()
         logger.info(
-            "Đã khởi động APScheduler cho các tác vụ định kỳ (Smart Charging 3p, Power Metrics 1p, kiểm tra phiên bất thường 1p và dọn RemoteStart hết hạn 1p)."
+            "Đã khởi động APScheduler cho Smart Charging (3p), Power Metrics (1p), "
+            "phiên bất thường (1p), dọn RemoteStart (1p) và đối soát ví (%sp).",
+            settings.RECONCILE_INTERVAL_MINUTES,
         )
 
 

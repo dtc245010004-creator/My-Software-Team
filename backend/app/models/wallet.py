@@ -1,12 +1,15 @@
 from sqlalchemy import (
+    DDL,
     Boolean,
     CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
+    event,
     func,
 )
 from sqlalchemy.orm import relationship
@@ -35,6 +38,9 @@ class Wallet(Base):
     is_debt_locked = Column(
         Boolean, default=False, nullable=False
     )  # Bị khóa nợ nếu âm quá hạn mức
+    is_reconcile_locked = Column(
+        Boolean, default=False, nullable=False
+    )  # Khóa giao dịch khi số dư không khớp sổ cái
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -64,6 +70,13 @@ class WalletTransaction(Base):
             "transaction_type IN ('TOPUP', 'CHARGE_FEE', 'REFUND')",
             name="ck_wallet_transaction_type_valid",
         ),
+        Index(
+            "uq_wallet_transactions_wallet_reference_type",
+            "wallet_id",
+            "reference_id",
+            "transaction_type",
+            unique=True,
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -91,3 +104,58 @@ class WalletTransaction(Base):
 
     def __repr__(self) -> str:
         return f"<WalletTransaction(id={self.id}, wallet_id={self.wallet_id}, type='{self.transaction_type}', amount={self.amount})>"
+
+
+# Compose và các test SQLite khởi tạo schema bằng Base.metadata.create_all();
+# cài trigger tại thời điểm tạo bảng để các đường này cũng giữ append-only.
+event.listen(
+    WalletTransaction.__table__,
+    "after_create",
+    DDL(
+        """
+        CREATE TRIGGER IF NOT EXISTS trg_wallet_transactions_no_update
+        BEFORE UPDATE ON wallet_transactions
+        BEGIN
+            SELECT RAISE(ABORT, 'wallet_transactions is append-only');
+        END;
+        """
+    ).execute_if(dialect="sqlite"),
+)
+event.listen(
+    WalletTransaction.__table__,
+    "after_create",
+    DDL(
+        """
+        CREATE OR REPLACE FUNCTION wallet_transactions_immutable()
+        RETURNS trigger AS $$
+        BEGIN
+            RAISE EXCEPTION 'wallet_transactions is append-only: UPDATE/DELETE is forbidden';
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    ).execute_if(dialect="postgresql"),
+)
+event.listen(
+    WalletTransaction.__table__,
+    "after_create",
+    DDL(
+        """
+        CREATE TRIGGER trg_wallet_transactions_immutable
+        BEFORE UPDATE OR DELETE ON wallet_transactions
+        FOR EACH ROW EXECUTE FUNCTION wallet_transactions_immutable();
+        """
+    ).execute_if(dialect="postgresql"),
+)
+event.listen(
+    WalletTransaction.__table__,
+    "after_create",
+    DDL(
+        """
+        CREATE TRIGGER IF NOT EXISTS trg_wallet_transactions_no_delete
+        BEFORE DELETE ON wallet_transactions
+        BEGIN
+            SELECT RAISE(ABORT, 'wallet_transactions is append-only');
+        END;
+        """
+    ).execute_if(dialect="sqlite"),
+)

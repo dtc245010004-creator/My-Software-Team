@@ -84,6 +84,8 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
   * Sau khi dừng sạc: Gọi lại API ví, số dư trên thanh trạng thái Topbar tự động cập nhật giảm đúng bằng số tiền trên hóa đơn sạc.
 * **Kết quả**: **PASS**.
 
+* **Cập nhật S-41 (10/10/2026 - chưa commit)**: Các thay đổi số dư phía backend hiện đi qua `post_ledger_entry`; `GET /api/v1/wallet/me` tiếp tục trả số dư/flag khóa. Admin có endpoint backend `POST /api/v1/wallet/admin/{wallet_id}/reconciliation/unlock` cần lý do và chỉ mở khi tổng sổ khớp. Frontend chưa có giao diện quản lý/mở khóa ví; chưa thực hiện kiểm thử trình duyệt cho endpoint Admin.
+
 ---
 
 ## TC-FB-09: Chặn đăng nhập khi tài khoản nợ quá hạn mức
