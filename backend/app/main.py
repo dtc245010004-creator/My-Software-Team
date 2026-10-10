@@ -1,11 +1,8 @@
- feature/ManhDung
-
 import json
 import logging
 import os
 from contextlib import asynccontextmanager
 
- main
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -120,7 +117,6 @@ app.include_router(ocpp_router)
 def root():
     """Thông tin tổng quan dịch vụ."""
     return {
-feature/ManhDung
         "status": "ok",
         "service": "ev-csms-backend",
 
@@ -129,12 +125,10 @@ feature/ManhDung
         "docs": "/docs",
         "health": f"{settings.API_V1_STR}/health",
         "websocket": "/ws/telemetry",
- main
     }
 
 
 @app.websocket("/ws/telemetry")
- feature/ManhDung
 async def websocket_telemetry(websocket: WebSocket):
     """Stub WebSocket endpoint cho telemetry trụ sạc ảo.
     Echo lại message từ client + ping định kỳ để giữ kết nối.
@@ -198,4 +192,3 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
     except (RuntimeError, OSError):
         logger.exception("Lỗi kết nối WebSocket")
         ws_manager.disconnect(websocket)
- main
