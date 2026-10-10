@@ -254,14 +254,14 @@ tests/test_wallet_acid.py::TestWalletServiceACID::test_topup_clears_debt_lock_wh
 * **Kiểm tra linter**: `ruff check backend/` đạt **All checks passed!**.
 * **Kiểm tra Frontend**: `npm --prefix frontend run build` biên dịch thành công trong 16.99 giây.
 
-## S-41 — Sổ cái ví append-only (10/10/2026, chưa commit)
+## S-41 — Kiểm chứng ban đầu (10/10/2026, code commit `9ceae53`)
 
 * `test_wallet_ledger_s41.py` + `test_wallet_acid.py`: **18 passed**; bao gồm append-only, khóa ghi đồng thời, reconcile lock, RBAC mở khóa và kiểm tra audit.
 * Full suite host: **448 passed, 1 skipped, 1 error**. Lỗi duy nhất xảy ra ở bước setup `test_migration_upgrade_downgrade_keeps_legacy_data` do Windows `WinError 5` khi pytest tạo/đọc thư mục tạm; không phải assertion của mã S-41. Docker Desktop pipe không kết nối được trong lượt này.
 * Migration S-41 đã chạy upgrade → downgrade → upgrade trên SQLite tạm; sau upgrade cuối, trigger chặn UPDATE/DELETE. Không chạy migration lên DB dự án. Kiểm tra trigger PostgreSQL chưa thực hiện được.
 * Ruff toàn backend: `All checks passed!` (Ruff báo thêm cảnh báo quyền đọc thư mục pytest cũ).
 
-## 13. Xác minh PostgreSQL và sửa Compose unhealthy (10/10/2026, chưa commit)
+## 13. Xác minh PostgreSQL và sửa Compose unhealthy (10/10/2026, code commit `9ceae53`)
 
 * **PostgreSQL migration**: tạo database tạm, chạy toàn bộ `alembic upgrade head` đến `f41a0b7c9d22`, sau đó downgrade một revision và upgrade lại thành công. Database tạm được xóa; không migrate database ứng dụng.
 * **Trigger append-only**: trên database tạm sau lần upgrade cuối, thử UPDATE và DELETE bằng role sở hữu database; cả hai đều bị PostgreSQL trigger từ chối.

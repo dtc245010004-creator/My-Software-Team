@@ -138,7 +138,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Lượt full suite hoàn chỉnh gần nhất trong Docker (10/10/2026, chưa commit):** `451 passed, 307 warnings` trong container Python 3.12. Migration S-41 đã được kiểm tra upgrade/downgrade/upgrade trên PostgreSQL tạm; trigger chặn UPDATE/DELETE. Compose khởi động backend, PostgreSQL, frontend và OCPP simulator; backend healthcheck và `/docs` đều đạt. DB dự án không bị migrate hoặc backfill. Frontend lần kiểm chứng trước đạt 39 passed/build; chưa kiểm tra UI trực quan trên trình duyệt.
+**Lượt full suite hoàn chỉnh gần nhất trong Docker (10/10/2026, code commit `9ceae53`):** `451 passed, 307 warnings` trong container Python 3.12. Migration S-41 đã được kiểm tra upgrade/downgrade/upgrade trên PostgreSQL tạm; trigger chặn UPDATE/DELETE. Compose khởi động backend, PostgreSQL, frontend và OCPP simulator; backend healthcheck và `/docs` đều đạt. DB dự án không bị migrate hoặc backfill. Frontend lần kiểm chứng trước đạt 39 passed/build; chưa kiểm tra UI trực quan trên trình duyệt.
 
 ---
 

@@ -54,7 +54,7 @@ Căn cứ full suite backend trong Docker ngày 10/10/2026: **451 passed, 307 wa
 | **Snapshot đoạn giá hóa đơn S-33** | `backend/tests/test_billing_segments.py` | 6 | 6/6 passed trong full suite 09/10/2026 | Lưu nguyên đoạn và đơn giá, idempotency, đổi tariff, qua nửa đêm, review và legacy |
 | **API hóa đơn diễn giải S-33** | `backend/tests/test_invoice.py` | 8 | 8/8 passed sau chỉnh sửa ngày 09/10/2026 | Snapshot giá, dòng phí idle, tariff đổi, pending review, RBAC và phiên chưa chốt |
 
-**Bổ sung kiểm chứng ngày 10/10/2026 (chưa commit)**: Full backend suite trong Docker đạt **451 passed, 307 warnings**. Nhóm S-41, wallet ACID và helper schema Compose đạt **19 passed**; Ruff báo `All checks passed`. Migration lên head và S-41 nâng/hạ/nâng trên PostgreSQL tạm thành công; trigger chặn UPDATE/DELETE. Backend Compose healthy, database dự án không bị migrate.
+**Bổ sung kiểm chứng ngày 10/10/2026 (code commit `9ceae53`)**: Full backend suite trong Docker đạt **451 passed, 307 warnings**. Nhóm S-41, wallet ACID và helper schema Compose đạt **19 passed**; Ruff báo `All checks passed`. Migration lên head và S-41 nâng/hạ/nâng trên PostgreSQL tạm thành công; trigger chặn UPDATE/DELETE. Backend Compose healthy, database dự án không bị migrate.
 
 ---
 
@@ -300,7 +300,7 @@ S-30 kiểm thử chia các phiên thành nhiều khung TOU và nội suy tại 
 
 Kiểm tra volume SQLite cũ nhận cột khóa đối soát, chỉ mục duy nhất và trigger append-only theo cách idempotent; số dư/dòng ledger cũ được giữ nguyên, UPDATE/DELETE bị từ chối.
 
-**Kết quả 10/10/2026 (chưa commit)**: 1/1 passed; full suite backend Docker đạt **451 passed, 307 warnings**.
+**Kết quả 10/10/2026 (code commit `9ceae53`)**: 1/1 passed; full suite backend Docker đạt **451 passed, 307 warnings**.
 
 ---
 

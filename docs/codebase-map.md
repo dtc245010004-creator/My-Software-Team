@@ -42,7 +42,7 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - Ví cũ thiếu dòng sổ sẽ được job phát hiện và khóa. Chưa backfill số dư đầu kỳ; cần phê duyệt riêng trước khi tạo dữ liệu opening-balance.
 - `[CẦN XÁC NHẬN]` S-37 cho phép phát sinh số dư âm, trong khi DB hiện chặn dưới `-500000` và tầng ứng dụng đặt ngưỡng khóa nợ `-300000`; chưa thay đổi hai ngưỡng này.
 
-### Đã thay đổi (10/10/2026 - chưa commit)
+### Đã thay đổi (10/10/2026, code commit `9ceae53`)
 
 - SCRUM-283/284/288: ghi nạp/trừ qua một hàm append-only, khóa ghi đồng thời, unique reference, trigger PostgreSQL/SQLite và migration mới.
 - SCRUM-285/287: job đối soát theo chu kỳ cấu hình, khóa ví lệch và chặn giao dịch mới; log/audit cho phát hiện lệch.

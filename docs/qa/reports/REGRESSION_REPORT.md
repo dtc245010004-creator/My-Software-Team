@@ -149,13 +149,13 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 * **Kiểm chứng build**: `npm --prefix frontend run build` trên host bị chặn do `'vite' is not recognized`; `docker compose -f docker-compose.staging.yml build frontend` thành công và container frontend được cập nhật.
 * **Điều tra / xác minh đăng nhập**: Các POST login trong log trả 403; DB cho thấy `failed_login_attempts = 5` và `locked_until` còn hiệu lực. Đã xóa khóa tạm cho `admin`. Gửi một lần đăng nhập API với `admin / 12345678a` nhận HTTP 200, username `admin`, role `ADMIN` (không ghi token ra output).
 
-## 12. Hồi quy sổ cái ví append-only S-41 (10/10/2026, chưa commit)
+## 12. Hồi quy ban đầu sổ cái ví append-only S-41 (10/10/2026, code commit `9ceae53`)
 
 * `test_wallet_ledger_s41.py` + `test_wallet_acid.py`: **18 passed**; xác minh giao dịch chỉ thêm dòng, hai writer không làm mất dòng, reconcile lock chặn giao dịch và Admin chỉ mở sau khi ledger khớp.
 * Full suite host: **448 passed, 1 skipped, 1 setup error** do Windows `WinError 5` ở thư mục pytest tạm cho test migration. Không có failure assertion trong lượt chạy; Docker Desktop chưa truy cập được để chạy suite container.
 * Migration S-41 đạt chu trình tiến/lùi/tiến và kiểm tra trigger trên SQLite tạm; trigger PostgreSQL chưa kiểm chứng. Không có migration nào chạy trên DB dự án.
 
-## 13. Xác minh bổ sung S-41 và hồi phục Compose (10/10/2026, chưa commit)
+## 13. Xác minh bổ sung S-41 và hồi phục Compose (10/10/2026, code commit `9ceae53`)
 
 * Backend full suite trong Docker: **451 passed, 307 warnings**. Bộ test schema SQLite Compose cũ cùng S-41/wallet ACID: **19 passed**.
 * PostgreSQL tạm đạt `upgrade head → downgrade -1 → upgrade head`; trigger thực tế từ chối UPDATE và DELETE trên `wallet_transactions`. Database tạm đã xóa.
