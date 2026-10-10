@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.websocket import ws_manager
 from app.models.ocpp_message import OcppMessage
+from app.models.remote_start_request import RemoteStartRequest
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.services.ai_service import AIService, latest_smart_charging_cache
@@ -349,6 +350,10 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
 
         reason = f"Mất liên lạc với trụ quá {threshold_seconds} giây"
         for session, charging_point in rows:
+            if session.abnormal_reason == (
+                "StatusNotificationAvailableWithoutStopTransaction"
+            ):
+                continue
             last_seen_at = charging_point.last_seen_at
             if last_seen_at.tzinfo is None:
                 last_seen_at = last_seen_at.replace(tzinfo=timezone.utc)
@@ -373,6 +378,37 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
     except SQLAlchemyError:
         db.rollback()
         logger.exception("Lỗi quét phiên sạc bất thường")
+        return 0
+    finally:
+        if should_close:
+            db.close()
+
+
+def expire_pending_remote_start_requests_job(db: Session = None) -> int:
+    """Chuyển request RemoteStart quá hạn sang EXPIRED mà không cần client poll."""
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    try:
+        expired_count = (
+            db.query(RemoteStartRequest)
+            .filter(
+                RemoteStartRequest.status == "PENDING",
+                RemoteStartRequest.expires_at <= datetime.now(timezone.utc),
+            )
+            .update(
+                {RemoteStartRequest.status: "EXPIRED"},
+                synchronize_session=False,
+            )
+        )
+        if expired_count:
+            db.commit()
+        return expired_count
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Lỗi dọn yêu cầu RemoteStart đã hết hạn")
         return 0
     finally:
         if should_close:
@@ -414,9 +450,16 @@ def start_scheduler():
             id="flag_abnormal_charging_sessions",
             replace_existing=True,
         )
+        scheduler.add_job(
+            expire_pending_remote_start_requests_job,
+            "interval",
+            minutes=1,
+            id="expire_pending_remote_start_requests",
+            replace_existing=True,
+        )
         scheduler.start()
         logger.info(
-            "Đã khởi động APScheduler cho các tác vụ định kỳ (Smart Charging 3p, Power Metrics 1p và kiểm tra phiên bất thường 1p)."
+            "Đã khởi động APScheduler cho các tác vụ định kỳ (Smart Charging 3p, Power Metrics 1p, kiểm tra phiên bất thường 1p và dọn RemoteStart hết hạn 1p)."
         )
 
 

@@ -1,13 +1,17 @@
 """Kiểm thử tự động cho Story S-24 / Task T-51: Bốn ca của RemoteStartTransaction."""
 
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
 
+from app.core.config import settings
 from app.core.security import create_access_token
+from app.models.remote_start_request import RemoteStartRequest
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.services.scheduler_service import expire_pending_remote_start_requests_job
 
 
 @pytest.fixture
@@ -168,3 +172,51 @@ def test_s24_case_4_expired_request(test_data):
     )
     assert status_res.status_code == 200
     assert status_res.json()["status"] == "EXPIRED"
+
+
+def test_remote_start_simulation_requires_admin_outside_pytest(
+    test_data, monkeypatch
+):
+    """Cờ TESTING đơn lẻ không cho tài khoản tài xế mô phỏng ngoài pytest."""
+    client, headers, _, connector = test_data
+    monkeypatch.setattr(settings, "ALLOW_REMOTE_START_SIMULATION", True)
+    monkeypatch.setattr(settings, "TESTING", True)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+    response = client.post(
+        "/api/v1/sessions/remote-start",
+        json={"connector_id": connector.id, "simulate_condition": "SUCCESS"},
+        headers=headers,
+    )
+
+    assert response.status_code == 403
+    assert "Chỉ quản trị viên" in response.json()["detail"]
+
+
+def test_scheduler_expires_only_elapsed_pending_remote_starts(
+    test_data, db_session
+):
+    """Job chỉ chuyển request PENDING đã quá hạn sang EXPIRED."""
+    _, _, driver, connector = test_data
+    expired = RemoteStartRequest(
+        user_id=driver.id,
+        connector_id=connector.id,
+        id_tag=f"REMOTE-{driver.id}",
+        status="PENDING",
+        expires_at=datetime.now(timezone.utc) - timedelta(seconds=5),
+    )
+    pending = RemoteStartRequest(
+        user_id=driver.id,
+        connector_id=connector.id,
+        id_tag=f"REMOTE-{driver.id}",
+        status="PENDING",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    )
+    db_session.add_all([expired, pending])
+    db_session.commit()
+
+    assert expire_pending_remote_start_requests_job(db_session) == 1
+    db_session.refresh(expired)
+    db_session.refresh(pending)
+    assert expired.status == "EXPIRED"
+    assert pending.status == "PENDING"

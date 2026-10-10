@@ -26,6 +26,7 @@ services:
     environment:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-sqlite:////app/data/ev_csms.db}
       ENABLE_DEMO_ACCOUNTS: ${ENABLE_DEMO_ACCOUNTS:-true}
+      ALLOW_REMOTE_START_SIMULATION: ${ALLOW_REMOTE_START_SIMULATION:-false}
       BACKEND_CORS_ORIGINS: '["http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:5173", "http://127.0.0.1:5173"]'
     ports:
       - "${BACKEND_HOST_PORT:-8001}:8000"
@@ -44,6 +45,7 @@ services:
       - ev_net
 
   ocpp-simulator:
+    image: ev-csms-simulator:1.0.0
     build:
       context: .
       dockerfile: tools/ocpp-spike/Dockerfile

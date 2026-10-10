@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     IDLE_FEE_MAX_MINUTES: int = Field(
         default=240, ge=0
     )  # Trần số phút được tính phí chiếm trụ mỗi phiên
+    ALLOW_REMOTE_START_SIMULATION: bool = False
+    TESTING: bool = False
 
     # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"

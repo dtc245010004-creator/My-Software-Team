@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
+from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.ocpp.frames import build_call
 
@@ -239,3 +240,74 @@ def test_status_notification_unknown_status_does_not_crash_connection(
 
     db_session.refresh(connector)
     assert connector.status == "AVAILABLE"
+
+
+def test_available_without_stop_transaction_marks_review_until_stop_arrives(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    charging_point, connector = _create_charging_point_with_connector(
+        db_session,
+        "CP-AVAILABLE-WITHOUT-STOP",
+    )
+    session = ChargingSession(
+        connector_id=connector.id,
+        applied_price_per_kwh=0,
+        meter_start=0,
+        meter_start_kwh=0,
+        total_kwh=0,
+        status="CHARGING",
+    )
+    db_session.add(session)
+    db_session.commit()
+    db_session.refresh(session)
+
+    with client.websocket_connect(
+        f"/ocpp/{charging_point.code}",
+        subprotocols=["ocpp1.6"],
+    ) as websocket:
+        _boot(websocket, "boot-available-without-stop")
+        websocket.send_text(
+            build_call(
+                "status-available-without-stop",
+                "StatusNotification",
+                {
+                    "connectorId": 1,
+                    "status": "Available",
+                    "errorCode": "NoError",
+                    "timestamp": "2026-10-10T10:00:00Z",
+                },
+            )
+        )
+        assert _read_frame(websocket) == [
+            3,
+            "status-available-without-stop",
+            {},
+        ]
+
+        db_session.refresh(session)
+        assert session.needs_review is True
+        assert session.is_abnormal is True
+        assert (
+            session.abnormal_reason
+            == "StatusNotificationAvailableWithoutStopTransaction"
+        )
+
+        websocket.send_text(
+            build_call(
+                "stop-after-available",
+                "StopTransaction",
+                {
+                    "transactionId": session.transaction_id,
+                    "meterStop": 0,
+                    "timestamp": "2026-10-10T10:01:00Z",
+                },
+            )
+        )
+        assert _read_frame(websocket)[0:2] == [3, "stop-after-available"]
+
+    db_session.refresh(session)
+    assert session.status == "COMPLETED"
+    assert session.needs_review is False
+    assert session.is_abnormal is False
+    assert session.abnormal_reason is None

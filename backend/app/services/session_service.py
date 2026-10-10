@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
@@ -23,6 +24,26 @@ from app.services.billing_segment_service import persist_session_billing_segment
 from app.services.wallet_service import deduct_charging_fee
 
 logger = logging.getLogger("ev_csms.session_service")
+
+
+def _ensure_simulation_allowed(user: User, condition: str) -> None:
+    """Chỉ cho mô phỏng hoạt động khi bật cờ và gọi từ ADMIN.
+
+    Ngoại lệ cho tài khoản test chỉ có hiệu lực trong một test pytest đang chạy.
+    """
+    if not condition:
+        return
+    if not settings.ALLOW_REMOTE_START_SIMULATION:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chế độ mô phỏng chưa được bật trên môi trường này.",
+        )
+    running_pytest = settings.TESTING and "PYTEST_CURRENT_TEST" in os.environ
+    if not running_pytest and user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ quản trị viên được dùng chế độ mô phỏng.",
+        )
 
 
 def parse_time_str(time_str: str) -> time:
@@ -585,6 +606,7 @@ def remote_stop_charging_session(
 
     # 5. Xử lý các ca lỗi của S-23
     condition = (simulate_condition or "").upper().strip()
+    _ensure_simulation_allowed(user, condition)
 
     # Ca 1: Trụ sạc ngoại tuyến (Offline)
     is_offline = condition == "OFFLINE"
@@ -598,7 +620,7 @@ def remote_stop_charging_session(
         ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Offline"})
         db.commit()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa, vui lòng kiểm tra kết nối mạng của trụ.",
         )
 
@@ -865,6 +887,7 @@ async def remote_start_charging_session(
     from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
 
     condition = (simulate_condition or "").upper().strip()
+    _ensure_simulation_allowed(user, condition)
 
     connector = (
         db.query(Connector)
@@ -1044,7 +1067,7 @@ async def remote_stop_charging_session_ocpp(
             raise HTTPException(status_code=400, detail=f"Phiên sạc không ở trạng thái đang sạc (trạng thái hiện tại: {session.status}).")
     code = connector.charging_point.code if connector and connector.charging_point else None
     if not code or code not in active_ocpp_connections:
-        raise HTTPException(status_code=400, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.")
+        raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.")
 
     waiter = register_stop_transaction_waiter(session.transaction_id)
     try:
@@ -1054,7 +1077,7 @@ async def remote_stop_charging_session_ocpp(
             )
         except ConnectionError as exc:
             # Không gửi được lệnh -> không ghi "result từ trụ".
-            raise HTTPException(status_code=400, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.") from exc
+            raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.") from exc
         except TimeoutError as exc:
             session.needs_review = True
             ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Timeout"})

@@ -182,7 +182,7 @@ def handle_start_transaction(
             connector.id,
         )
         active_session.status = "ABNORMAL"
-        active_session.stop_reason = "EmergencyStop"
+        active_session.stop_reason = "Other"
         active_session.stop_time = datetime.now(timezone.utc)
         active_session.end_time = active_session.stop_time
         db.flush()
