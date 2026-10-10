@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Wallet as WalletIcon,
   PlusCircle,
@@ -13,6 +14,9 @@ import {
   Check,
   CreditCard,
   Zap,
+  Lock,
+  ChevronRight,
+  ArrowRight
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +27,8 @@ export default function Wallet() {
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error403, setError403] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Trạng thái cửa sổ / Modal nạp tiền qua QR
   const [showQrModal, setShowQrModal] = useState(false);
@@ -31,6 +37,10 @@ export default function Wallet() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // Pagination (Client-side cho danh sách 50 dòng API trả về)
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
 
   useEffect(() => {
     fetchWalletData();
@@ -45,14 +55,23 @@ export default function Wallet() {
   const fetchWalletData = async () => {
     try {
       setLoading(true);
+      setError403(false);
+      setErrorMsg('');
+      
       const [walletRes, txRes] = await Promise.all([
         api.get('/wallet/me'),
-        api.get('/wallet/transactions').catch(() => ({ data: [] })),
+        api.get('/wallet/transactions'),
       ]);
+      
       setWallet(walletRes.data);
       setTransactions(txRes.data || walletRes.data?.transactions || []);
     } catch (err) {
       console.error('Lỗi tải dữ liệu ví:', err);
+      if (err.response?.status === 403) {
+        setError403(true);
+      } else {
+        setErrorMsg(err.response?.data?.detail || err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -103,6 +122,45 @@ export default function Wallet() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12 text-steel-gray">
+        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+        <span>Đang tải thông tin ví...</span>
+      </div>
+    );
+  }
+
+  if (error403) {
+    return (
+      <div className="max-w-3xl mx-auto mt-12 bg-panel border border-hairline p-8 rounded-sm text-center space-y-4">
+        <div className="mx-auto w-12 h-12 bg-critical-red/10 text-critical-red flex items-center justify-center rounded-full mb-4">
+          <Lock className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-tech-white font-mono">Truy Cập Bị Từ Chối (403)</h2>
+        <p className="text-steel-gray text-sm">
+          Bạn không có quyền xem thông tin ví của người dùng khác. Vui lòng đăng nhập đúng tài khoản để thực hiện thao tác.
+        </p>
+      </div>
+    );
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="max-w-3xl mx-auto mt-12 bg-critical-red/10 border border-critical-red/40 p-6 rounded-sm text-center text-critical-red space-y-2">
+        <AlertOctagon className="w-6 h-6 mx-auto mb-2" />
+        <p className="font-bold">Lỗi tải dữ liệu</p>
+        <p className="text-xs">{errorMsg}</p>
+        <button 
+          onClick={fetchWalletData}
+          className="mt-4 px-4 py-2 bg-critical-red/20 hover:bg-critical-red/30 rounded text-xs font-bold transition-colors"
+        >
+          Thử Lại
+        </button>
+      </div>
+    );
+  }
+
   const balance = wallet ? Number(wallet.balance) : 0;
   const isDebtLocked = wallet?.is_debt_locked;
 
@@ -112,13 +170,17 @@ export default function Wallet() {
     transferContent
   )}&accountName=EV%20CSMS%20CHARGING`;
 
+  // Pagination logic
+  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
+  const currentTransactions = transactions.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
   return (
     <div className="space-y-6">
       {/* Headline */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-tech-white">Ví Điện Tử Nạp Tiền & Quản Trị Cước Phí</h1>
         <p className="text-xs text-steel-gray mt-0.5 font-mono">
-          ROLE TÀI XẾ KHÔNG CẦN ĐĂNG NHẬP — NẠP TIỀN CHUYỂN KHOẢN QR &amp; CỘNG SỐ DƯ TỨC THÌ
+          ROLE TÀI XẾ KHÔNG CẦN ĐĂNG NHẬP ĐỂ NẠP TIỀN CHUYỂN KHOẢN QR &amp; CỘNG SỐ DƯ TỨC THÌ
         </p>
       </div>
 
@@ -228,7 +290,7 @@ export default function Wallet() {
         </div>
 
         {/* Right Column: Transaction History */}
-        <div className="lg:col-span-2 bg-panel border border-hairline p-5 rounded-sm space-y-4">
+        <div className="lg:col-span-2 bg-panel border border-hairline p-5 rounded-sm space-y-4 flex flex-col">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
               LỊCH SỬ BIẾN ĐỘNG SỐ DƯ &amp; QUYẾT TOÁN CƯỚC SẠC
@@ -236,7 +298,7 @@ export default function Wallet() {
             <span className="text-[11px] font-mono text-steel-gray">{transactions.length} Giao dịch</span>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto flex-1">
             {transactions.length === 0 ? (
               <div className="text-xs text-steel-gray text-center py-12 font-mono">
                 Chưa có lịch sử giao dịch nào được ghi nhận cho ví này.
@@ -247,19 +309,23 @@ export default function Wallet() {
                   <tr className="border-b border-hairline text-steel-gray">
                     <th className="pb-2">MÃ GD</th>
                     <th className="pb-2">LOẠI</th>
-                    <th className="pb-2">BIẾN ĐỘNG</th>
-                    <th className="pb-2">SỐ DƯ SAU</th>
-                    <th className="pb-2">NỘI DUNG</th>
+                    <th className="pb-2">SỐ TIỀN</th>
                     <th className="pb-2">THỜI GIAN</th>
+                    <th className="pb-2 text-right">CHI TIẾT</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
-                  {transactions.map((tx) => {
+                  {currentTransactions.map((tx) => {
                     const isCredit = tx.transaction_type === 'TOPUP';
                     const amountNum = Number(tx.amount);
+                    
+                    // Route to proper detail page based on type
+                    const targetLink = isCredit 
+                      ? `/topup/${tx.reference_id || tx.id}` // Placeholder route
+                      : `/session/${tx.reference_id || tx.id}`;
 
                     return (
-                      <tr key={tx.id} className="hover:bg-panel-hover">
+                      <tr key={tx.id} className="hover:bg-panel-hover group transition-colors">
                         <td className="py-2.5 text-steel-gray">#{tx.id}</td>
                         <td className="py-2.5">
                           <span
@@ -275,12 +341,17 @@ export default function Wallet() {
                         <td className={`py-2.5 font-bold tabular-nums ${isCredit ? 'text-grid-green' : 'text-critical-red'}`}>
                           {isCredit ? '+' : '-'}{amountNum.toLocaleString()} đ
                         </td>
-                        <td className="py-2.5 tabular-nums text-tech-white">
-                          {Number(tx.balance_after).toLocaleString()} đ
-                        </td>
-                        <td className="py-2.5 text-steel-gray max-w-xs truncate">{tx.note || tx.description || 'Giao dịch ví'}</td>
                         <td className="py-2.5 text-steel-gray text-[11px]">
                           {formatVNDateTime(tx.created_at)}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <Link 
+                            to={targetLink}
+                            className="inline-flex items-center text-[10px] uppercase font-bold text-electric-cyan hover:text-white transition-colors p-1"
+                          >
+                            <span>Xem</span>
+                            <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                          </Link>
                         </td>
                       </tr>
                     );
@@ -289,6 +360,39 @@ export default function Wallet() {
               </table>
             )}
           </div>
+          
+          {/* Pagination Controls */}
+          {transactions.length > 0 && (
+            <div className="border-t border-hairline pt-4 flex items-center justify-between text-[11px] font-mono text-steel-gray">
+              <div>
+                Đang hiển thị {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, transactions.length)} trong tổng số {transactions.length} giao dịch
+              </div>
+              <div className="flex items-center space-x-2">
+                <button 
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  className="px-2 py-1 bg-obsidian border border-hairline rounded hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Trang trước
+                </button>
+                <span className="text-tech-white">
+                  {currentPage} / {totalPages || 1}
+                </span>
+                <button 
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  className="px-2 py-1 bg-obsidian border border-hairline rounded hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Trang sau
+                </button>
+              </div>
+            </div>
+          )}
+          {transactions.length >= 50 && (
+            <div className="text-[10px] text-steel-gray/60 italic text-center mt-2 font-mono">
+              *Hệ thống API hiện tại giới hạn hiển thị tối đa 50 giao dịch gần nhất
+            </div>
+          )}
         </div>
       </div>
 
@@ -303,7 +407,7 @@ export default function Wallet() {
                   <QrCode className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-tech-white">NẠP TIỀN VÍ SẠC XE ĐIỆN</h3>
+                  <h3 className="font-bold text-sm text-tech-white">NẠP TIỀN VÀO SẠC XE ĐIỆN</h3>
                   <p className="text-[10px] text-steel-gray">CỔNG THANH TOÁN VIETQR / NAPAS 247</p>
                 </div>
               </div>
