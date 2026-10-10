@@ -131,3 +131,29 @@ def create_topup_request(
     redirect_url = build_payment_url(order_code=order_code, amount=amount_int)
     
     return TopupOrderResponse(order_id=order_code, redirect_url=redirect_url)
+
+from app.schemas.wallet import TopupOrderStatusResponse
+
+@router.get(
+    "/topup-requests/{order_code}",
+    response_model=TopupOrderStatusResponse,
+    summary="Polling kiểm tra trạng thái giao dịch nạp tiền",
+)
+def get_topup_request_status(
+    order_code: str,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    order = db.query(TopupOrder).filter(TopupOrder.order_code == order_code).first()
+    
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topup order not found")
+        
+    # Phân quyền: Chỉ user tạo giao dịch mới được xem
+    if order.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this order"
+        )
+        
+    return order

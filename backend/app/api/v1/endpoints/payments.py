@@ -61,3 +61,19 @@ def payment_webhook(payload: WebhookPayload, db: Session = Depends(get_db)):
             return {"message": "Webhook processed successfully", "status": "SUCCESS"}
             
     return {"message": "Ignored"}
+
+from fastapi.responses import RedirectResponse
+
+@router.get("/return", summary="Return URL từ cổng thanh toán")
+def payment_return(order_code: str, db: Session = Depends(get_db)):
+    # Tuyệt đối không thay đổi trạng thái giao dịch hay số dư ở đây
+    # Chỉ đọc DB để lấy trạng thái thực tế
+    order = db.query(TopupOrder).filter(TopupOrder.order_code == order_code).first()
+    
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        
+    frontend_url = "http://localhost:5173/wallet/topup/result"
+    redirect_url = f"{frontend_url}?order_code={order.order_code}&status={order.status}"
+    
+    return RedirectResponse(url=redirect_url)

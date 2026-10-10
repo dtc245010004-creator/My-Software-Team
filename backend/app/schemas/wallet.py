@@ -47,3 +47,11 @@ class TopupOrderResponse(BaseModel):
     order_id: str
     redirect_url: str
 
+class TopupOrderStatusResponse(BaseModel):
+    order_code: str
+    amount: Decimal
+    status: str
+    failure_reason: str | None = None
+    created_at: UTCDateTime
+    
+    model_config = ConfigDict(from_attributes=True)
