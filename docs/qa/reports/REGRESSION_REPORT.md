@@ -6,6 +6,18 @@
 
 ---
 
+## Sửa lỗi theo Báo cáo EV CSMS (10/10/2026, code commit `0bb5f67`)
+
+* **Mã nguồn đã cập nhật**: telemetry ActiveSession dùng WebSocket singleton và ánh xạ đúng tên trường; StopTransaction lưu transactionData vào `MeterValue` hiện có và xử lý cảnh báo `Available` đến trước StopTransaction; scheduler tự chuyển RemoteStart đã quá hạn sang `EXPIRED`; RemoteStop offline trả 409; mô phỏng bị tắt mặc định và chỉ ADMIN dùng được ngoài pytest; trang phiên trống có CTA cho tài xế; Compose đặt tag image simulator.
+* **Ruff**: `backend/.venv/Scripts/ruff.exe check .` đạt **All checks passed** ngày 10/10/2026.
+* **Alembic**: `alembic heads` trả một head `e72b461d9ac3` (merge của `5f9249bf58da` và `d8f56c4a911e`). Chỉ kiểm tra danh sách head, chưa chạy upgrade/downgrade.
+* **Backend**: full suite trong Docker **437 passed, 307 warnings**.
+* **Frontend**: `npm test` **39 passed**; `npm run build` thành công với cảnh báo bundle JavaScript lớn hơn 500 kB.
+* **Compose/runtime**: cấu hình hợp lệ; backend/frontend HTTP 200, tài khoản demo đăng nhập được, WebSocket smoke `CONNECTED/SUBSCRIBED/PONG`. Chưa kiểm tra giao diện trực quan trên trình duyệt.
+* **Migration**: `alembic heads` có một head `e72b461d9ac3`; không chạy migration lên DB dự án trong lượt này.
+
+---
+
 ## Full Suite S-28 (08/10/2026)
 
 * **Kết quả**: **298 passed, 1 skipped, 302 warnings** trong 123.28 giây; pytest thu thập 299 ca trên Python 3.14.7.
@@ -14,15 +26,14 @@
 
 ## Full Suite S-33 — SCRUM-222/221/220/223/225 (09/10/2026, code commit `60e801a` trên `origin/Duong`)
 
-* **Kết quả**: **411 passed, 303 warnings**; 411 test cases thu thập, 159.16 giây trong backend container Python 3.12.
+* **Kết quả tại thời điểm chạy S-33 (09/10/2026)**: **411 passed, 303 warnings**; 411 test cases thu thập, 159.16 giây trong backend container Python 3.12. Full suite mới hơn ngày 10/10 đạt 437 passed, 307 warnings (mục phía trên).
 * **Phạm vi mới**: 6 ca `test_billing_segments.py` xác minh snapshot giá/idempotency/legacy; 8 ca `test_invoice.py` xác minh DTO, phí chiếm trụ, RBAC, trạng thái review và hóa đơn chưa chốt.
 * **Migration**: `d8f56c4a911e` thêm các snapshot idle fee trên `charging_sessions`, sau migration `5ccaa686da2b` tạo `session_billing_segments`; PostgreSQL Compose tạm đạt chu trình upgrade → downgrade → upgrade và duy trì một Alembic head. DB dự án không bị migrate.
 
 ## Kiểm tra lại sau điều chỉnh idle fee legacy (09/10/2026, code commit `60e801a` trên `origin/Duong`)
 
 * `test_invoice.py`: **8 passed**.
-* Lượt full suite trên host: **409 passed, 1 skipped, 1 error**. Lỗi là khởi tạo `tmp_path` cho test migration do `WinError 5: Access is denied`; không phải test assertion. Docker daemon không truy cập được để chạy lại suite trong container.
-* Lượt full suite hoàn chỉnh gần nhất trong backend container ở phía trên đạt 411 passed, 303 warnings trước điều chỉnh nhỏ về metadata idle fee của phiên legacy. Cần xác nhận lại full suite sau điều chỉnh khi Docker sẵn sàng.
+* Lượt host lịch sử: **409 passed, 1 skipped, 1 error** do Windows `WinError 5` khi tạo `tmp_path` cho test migration; đây không phải lỗi assertion. Vấn đề môi trường được giải quyết bằng cách chạy full suite trong Docker; kết quả mới nhất là 437 passed, 307 warnings.
 
 ---
 
@@ -74,10 +85,10 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 
 ## 5. Trạng thái Hồi quy Tổng thể (Regression Status)
 
-* **Lượt full suite hoàn chỉnh gần nhất**: **PASSED** — 411 passed, 303 warnings (09/10/2026, Python 3.12 container; trước thay đổi nhỏ về metadata legacy).
-* **Lượt kiểm tra sau thay đổi mới nhất**: **CHƯA HOÀN TẤT** — 409 passed, 1 skipped; một test migration không khởi tạo fixture tạm vì quyền Windows. 14 test S-33 đã qua ở lượt đầy đủ trước đó; `test_invoice.py` vẫn đạt 8/8 sau thay đổi mới.
+* **Lượt full suite hoàn chỉnh gần nhất**: **PASSED** — 437 passed, 307 warnings (10/10/2026, Python 3.12 container, code commit `0bb5f67`).
+* **Kiểm tra frontend/runtime**: frontend 39 passed và build thành công; Compose backend/frontend HTTP 200, đăng nhập demo và WebSocket smoke thành công. Chưa kiểm tra trực quan trên trình duyệt.
 * **Lượt kiểm tra chọn lọc mới nhất (07/10/2026, chưa commit)**: Các test quyền trạm/trụ và tìm kiếm GPS đạt **35 passed, 4 warnings**; Ruff các file đổi sạch. Đây không phải kết quả của full suite.
-* **Lượt full suite hoàn chỉnh (09/10/2026, code commit `60e801a` trên `origin/Duong`)**: **411 passed, 303 warnings**; 411 ca được thu thập trong 159.16 giây trên Python 3.12 container. Sau thay đổi nhỏ cuối cùng, host suite gặp một lỗi thiết lập `tmp_path`; cần lặp lại trong Docker.
+* **Lượt full suite lịch sử (09/10/2026, code commit `60e801a` trên `origin/Duong`)**: **411 passed, 303 warnings**; đã được thay thế bởi lượt xác minh ngày 10/10/2026 với 437 passed, 307 warnings.
 
 ## 6. Kiểm chứng sau thay đổi khung OCPP (01/10/2026)
 

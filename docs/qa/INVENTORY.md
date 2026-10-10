@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lượt full suite hoàn chỉnh gần nhất ngày 09/10/2026 đạt 411 passed, 303 warnings; 411 ca được thu thập và chạy trong 159.16 giây bằng container Python 3.12. Lượt host sau điều chỉnh metadata legacy: 409 passed, 1 skipped và 1 lỗi thiết lập fixture migration do quyền Windows.
+Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Lượt full suite gần nhất ngày 10/10/2026 đạt 437 passed, 307 warnings trong container Python 3.12.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -52,7 +52,7 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **Snapshot đoạn giá hóa đơn S-33** | `backend/tests/test_billing_segments.py` | 6 | 6/6 passed trong full suite 09/10/2026 | Lưu nguyên đoạn và đơn giá, idempotency, đổi tariff, qua nửa đêm, review và legacy |
 | **API hóa đơn diễn giải S-33** | `backend/tests/test_invoice.py` | 8 | 8/8 passed sau chỉnh sửa ngày 09/10/2026 | Snapshot giá, dòng phí idle, tariff đổi, pending review, RBAC và phiên chưa chốt |
 
-**Bổ sung kiểm chứng ngày 09/10/2026**: Lượt full backend suite hoàn chỉnh đạt **411 passed, 303 warnings** (411 ca thu thập trong 159.16 giây, container Python 3.12). `test_billing_segments.py` có **6/6** và `test_invoice.py` có **8/8 ca passed**; migration S-33 nâng/hạ/nâng đã chạy trên PostgreSQL Compose tạm. Sau điều chỉnh response phí idle legacy, invoice suite vẫn 8/8; full host rerun có 409 passed, 1 skipped và lỗi khởi tạo `tmp_path` do quyền Windows ở test migration.
+**Bổ sung kiểm chứng ngày 10/10/2026**: Full backend suite đạt **437 passed, 307 warnings** trong Docker. Frontend đạt **39 passed** và build thành công (cảnh báo bundle lớn hơn 500 kB). `test_billing_segments.py` và `test_invoice.py` cùng nằm trong lượt full suite; migration S-33 đã được kiểm tra nâng/hạ/nâng trên PostgreSQL Compose tạm. Ruff báo `All checks passed`; có cảnh báo quyền với thư mục pytest tạm cũ.
 
 ---
 
@@ -236,8 +236,8 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
-* **Kiểm thử tự động**: Lượt full suite hoàn chỉnh gần nhất ngày 09/10/2026 đạt 411 passed, 303 warnings; lượt host sau thay đổi cuối gặp một lỗi quyền Windows khi tạo `tmp_path` của test migration, cần lặp lại trong Docker.
-* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; head hiện tại là `d8f56c4a911e`. Migration S-33 đã kiểm chứng nâng/hạ/nâng trên PostgreSQL Compose tạm, chưa áp dụng lên CSDL dự án.
+* **Kiểm thử tự động**: Lượt full suite gần nhất ngày 10/10/2026 đạt 437 passed, 307 warnings trong Docker; frontend đạt 39 passed và build thành công.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; `alembic heads` ngày 10/10/2026 trả một head `e72b461d9ac3`, merge `d8f56c4a911e` và `5f9249bf58da`. Migration S-33 đã kiểm chứng nâng/hạ/nâng trên PostgreSQL Compose tạm, chưa áp dụng lên CSDL dự án.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
@@ -270,7 +270,7 @@ S-30 kiểm thử chia các phiên thành nhiều khung TOU và nội suy tại 
 5. `test_review_session_does_not_persist_or_return_price_segments`: phiên cần xem xét không có rows hoặc số tiền.
 6. `test_legacy_invoice_uses_stored_total_without_backfill`: phiên cũ dùng tổng đã lưu và không tạo snapshot hồi tố.
 
-**Kết quả ngày 09/10/2026**: 6/6 ca passed; full suite 411 passed, 303 warnings.
+**Kết quả ngày 09/10/2026**: 6/6 ca passed; full suite ngày 10/10/2026 đạt 437 passed, 307 warnings.
 
 ### 4.22. Hóa đơn diễn giải theo đoạn — `test_invoice.py` (8 ca)
 1. Hóa đơn có đủ ba đoạn đã snapshot và tổng bằng tổng thành tiền từng đoạn.
@@ -282,7 +282,7 @@ S-30 kiểm thử chia các phiên thành nhiều khung TOU và nội suy tại 
 7. Phiên chưa kết thúc không trả hóa đơn chưa chốt (409).
 8. Kiểm tra response invoice vẫn dùng schema chuyên biệt tại endpoint.
 
-**Kết quả ngày 09/10/2026**: 8/8 ca passed; full suite 411 passed, 303 warnings. Migration `d8f56c4a911e` nâng/hạ/nâng trên PostgreSQL Compose tạm.
+**Kết quả ngày 09/10/2026**: 8/8 ca passed; full suite ngày 10/10/2026 đạt 437 passed, 307 warnings. Migration `d8f56c4a911e` nâng/hạ/nâng trên PostgreSQL Compose tạm.
 
 ---
 

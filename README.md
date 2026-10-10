@@ -9,11 +9,13 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Lượt full suite hoàn chỉnh gần nhất ngày 09/10/2026 đạt **411 passed, 303 warnings** trong container Python 3.12; lượt host sau thay đổi cuối vướng một lỗi quyền Windows ở fixture migration (`tmp_path`), cần chạy lại khi Docker sẵn sàng.
+- **Kiểm thử tự động**: Sau sửa lỗi ngày 10/10/2026, full backend suite trong Docker đạt **437 passed, 307 warnings**; frontend đạt **39 passed** và `npm run build` thành công. Build có cảnh báo bundle JavaScript lớn hơn 500 kB.
 - **Chức năng OCPP**: Bao gồm MeterValues, chống số đo lùi/trùng, khôi phục phiên khi reconnect, RemoteStart/RemoteStop và audit log giới hạn theo quyền sở hữu trạm.
 - **Kiến trúc dữ liệu**: SQLAlchemy khai báo 18 bảng; các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. Bảng mới giữ nguyên giá/kWh và thành tiền của từng đoạn phiên. *(Nguồn: `backend/app/models/`)*
-- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; head duy nhất hiện tại là `d8f56c4a911e`. Migration hóa đơn S-33 đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL Compose tạm; không áp dụng migration lên DB dự án.
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; `alembic heads` ngày 10/10/2026 xác nhận head duy nhất `e72b461d9ac3`, merge hai revision `5f9249bf58da` và `d8f56c4a911e`. Lượt này không chạy migration lên DB dự án.
 - **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
+- **Realtime theo dõi phiên**: ActiveSession nhận dữ liệu qua WebSocket singleton dùng cùng-origin `/ws/telemetry` và ánh xạ tên trường backend (`energy_kwh`, `cost_estimate`, `soc`, `temp_c`) sang giao diện. Đã có test frontend cho mapper và smoke WebSocket runtime `CONNECTED/SUBSCRIBED/PONG`; chưa kiểm tra trực quan qua trình duyệt.
+- **Mô phỏng RemoteStart/RemoteStop**: mặc định tắt (`ALLOW_REMOTE_START_SIMULATION=false`); khi được chủ động bật, chỉ ADMIN dùng được ngoài pytest. `TESTING` mặc định false và không được bật trong triển khai.
 - **Docker & CI/CD**: `docker-compose.yml` chạy stack Backend, Frontend, PostgreSQL và simulator 20 trụ dùng chung cho Sprint 1–4. CI cấu hình tại `.github/workflows/`.
 
 ---
@@ -135,7 +137,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Lượt full suite hoàn chỉnh gần nhất (09/10/2026):** `411 passed, 303 warnings` (411 ca thu thập, 159.16 giây trong container Python 3.12). Sau điều chỉnh metadata phí idle legacy, `test_invoice.py` đạt 8 passed; lượt chạy toàn bộ trên host gặp lỗi quyền Windows khi khởi tạo `tmp_path` cho một test migration (409 passed, 1 skipped, 1 error). Migration S-33 đã thử tiến/lùi/tiến trên PostgreSQL Compose tạm.
+**Lượt full suite gần nhất (10/10/2026):** `437 passed, 307 warnings` trong container Python 3.12. Frontend: `npm test` đạt 39 passed; `npm run build` thành công, có cảnh báo bundle lớn. Ruff báo `All checks passed`; một số thư mục pytest tạm cũ bị từ chối quyền khi quét. Compose health/frontend trả HTTP 200, đăng nhập tài xế và chủ trạm thành công, WebSocket trả `CONNECTED/SUBSCRIBED/PONG`. Migration: `alembic heads` có một head `e72b461d9ac3`; lượt này không chạy migration lên DB dự án. Chưa kiểm tra trực quan UI trên trình duyệt.
 
 ---
 

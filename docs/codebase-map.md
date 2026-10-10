@@ -11,6 +11,7 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 | `backend/app/models/` | Model SQLAlchemy cho trạm, đầu nối, phiên sạc, biểu giá và ví. |
 | `backend/app/services/` | Nghiệp vụ dùng chung như quản lý phiên sạc, biểu giá, ví và billing. |
 | `backend/app/services/billing_segment_service.py` | Chuyển kết quả phân đoạn S-30/S-31 thành snapshot DB khi chốt phiên; không tự commit. |
+| `backend/app/services/scheduler_service.py` | Job định kỳ, gồm gắn cờ phiên OCPP bất thường và hết hạn RemoteStart đang PENDING. |
 | `backend/app/ocpp/handlers/` | Xử lý thông điệp OCPP, gồm trạng thái connector và kết thúc phiên. |
 | `backend/alembic/versions/` | Migration Alembic; cấu hình tại `backend/alembic.ini`. |
 | `backend/tests/` | Kiểm thử backend, bao gồm API, ACID và luồng OCPP. |
@@ -28,6 +29,15 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - Giá điện vẫn dùng `total_kwh × applied_price_per_kwh`; không chia điện năng theo các khung giờ trong thay đổi này.
 - Quyết định S-28: lúc billing chỉ tính phí chiếm trụ nếu đã có cả mốc bắt đầu và mốc `Available`. Nếu phiên đã quyết toán khi chưa có `Available`, không tự trừ tiền; hóa đơn và dòng sổ cái hiện có không bị sửa. Khi `Available` tới muộn, handler chỉ lưu mốc kết thúc và để TODO cho bước tính phí bổ sung.
 - `[CẦN XÁC NHẬN VỚI MENTOR]` Trước khi triển khai phí bổ sung, cần chốt liệu phí sẽ tạo dòng sổ cái thứ hai hay sẽ hoãn trừ ví. Chưa có cơ chế trừ ví lần hai.
+
+## Sửa lỗi theo báo cáo EV CSMS (10/10/2026, code commit `0bb5f67`)
+
+- `frontend/src/services/telemetryClient.js` dùng WebSocket singleton từ `frontend/src/services/websocket.js`; ánh xạ tên telemetry backend sang trường mà ActiveSession hiển thị. Frontend có 39 test passed và build thành công; chưa kiểm tra trực quan qua trình duyệt.
+- `backend/app/ocpp/handlers/stop_transaction.py` lưu `transactionData` hợp lệ vào `MeterValue` đã có. Nếu Available đến trước StopTransaction, phiên được đánh dấu cần xem xét; StopTransaction hợp lệ đến sau mới chốt. Không tự hoàn tất phiên chỉ dựa vào Available.
+- Scheduler chuyển RemoteStart quá hạn từ `PENDING` sang `EXPIRED` mỗi phút. RemoteStop trả HTTP 409 khi trụ offline.
+- `ALLOW_REMOTE_START_SIMULATION` mặc định false; khi bật, mô phỏng chỉ dùng được bởi ADMIN ngoài test pytest đang chạy.
+- Alembic hiện có một head `e72b461d9ac3`, merge `5f9249bf58da` và `d8f56c4a911e` (đã kiểm tra bằng `alembic heads` ngày 10/10/2026; chưa chạy migration).
+- Kiểm chứng ngày 10/10/2026: backend full suite trong Docker **437 passed, 307 warnings**; Ruff báo `All checks passed`; frontend **39 passed**, build thành công (có cảnh báo bundle >500 kB); `docker compose config --quiet` thành công. Runtime smoke: backend/frontend HTTP 200, đăng nhập tài xế và chủ trạm thành công, WebSocket `CONNECTED/SUBSCRIBED/PONG`. Migration heads có một head `e72b461d9ac3`; không chạy migration lên DB dự án. Chưa kiểm tra UI trực quan trên trình duyệt.
 
 ## S-29 — Biểu giá nhiều khung giờ (Backend)
 
@@ -74,5 +84,5 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 - Hợp đồng S-33 trả danh sách `segments`, tiền điện, tổng cộng, quy tắc làm tròn từng đoạn rồi cộng và dòng `idle_fee_line` nếu `idle_amount > 0`. Các field `price_segments`, `daily_groups`, `idle_fee` dạng số và thông tin phiên cũ vẫn được giữ để tương thích màn hình hiện tại.
 - `ChargingSession` lưu thêm `idle_chargeable_minutes`, `idle_fee_per_minute_applied` và `idle_grace_minutes_applied` cùng `idle_amount` khi billing chốt. Hóa đơn đọc các giá trị này thay vì lấy phí/ân hạn từ biểu giá đã bị sửa. `Available` đến sau billing chỉ ghi mốc connector; không cập nhật hóa đơn hay tự trừ ví lần hai.
 - Migration `backend/alembic/versions/5ccaa686da2b_add_session_billing_segments.py` nối revision `37ff169ee686`; chỉ tạo bảng và hai index. Trên PostgreSQL Compose tạm đã xác nhận một head và chu trình upgrade → downgrade → upgrade; không dùng DB dự án.
-- Migration `backend/alembic/versions/d8f56c4a911e_add_idle_fee_invoice_snapshot.py` nối revision `5ccaa686da2b`; lưu chi tiết phí đã áp dụng trên ChargingSession. PostgreSQL Compose tạm đã chạy chu trình upgrade → downgrade → upgrade; head duy nhất là `d8f56c4a911e`; DB dự án không bị migrate.
-- `backend/tests/test_billing_segments.py` có 6 ca về lưu/idempotency/legacy; `backend/tests/test_invoice.py` có 8 ca về response, phí chiếm trụ, giá đóng băng, review, IDOR và phiên chưa chốt. Full backend suite hoàn chỉnh ngày 09/10/2026 đạt **411 passed, 303 warnings** trong 159.16 giây, container Python 3.12. Sau chỉnh sửa metadata phí cho phiên legacy, `test_invoice.py` đạt 8 passed; lượt full suite host đạt 409 passed, 1 skipped nhưng test migration vướng `WinError 5` khi tạo `tmp_path`, cần xác nhận lại trong Docker.
+- Migration `backend/alembic/versions/d8f56c4a911e_add_idle_fee_invoice_snapshot.py` nối revision `5ccaa686da2b`; lưu chi tiết phí đã áp dụng trên ChargingSession. PostgreSQL Compose tạm đã chạy chu trình upgrade → downgrade → upgrade. Sau đó revision `e72b461d9ac3` hợp nhất head này với `5f9249bf58da`; `alembic heads` hiện chỉ ra một head. DB dự án không bị migrate.
+- `backend/tests/test_billing_segments.py` có 6 ca về lưu/idempotency/legacy; `backend/tests/test_invoice.py` có 8 ca về response, phí chiếm trụ, giá đóng băng, review, IDOR và phiên chưa chốt. Full backend suite ngày 10/10/2026 đạt **437 passed, 307 warnings** trong Docker Python 3.12; không còn lỗi fixture migration.
