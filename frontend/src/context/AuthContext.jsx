@@ -1,47 +1,140 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { clearSession, loadStoredSession, performLogin } from '../services/authService'
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from '../services/api';
 
-const AuthContext = createContext(null)
+import { DEMO_USERS } from '../config/roleConfig';
+import { telemetryWs } from '../services/websocket';
 
-export function AuthProvider({ children }) {
-  const [session, setSession] = useState(() => loadStoredSession())
-  const [status, setStatus] = useState('idle')
+const AuthContext = createContext(null);
 
-  const login = useCallback(async (email, password) => {
-    setStatus('loading')
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('ev_csms_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [token, setToken] = useState(() => localStorage.getItem('ev_csms_token'));
+  const [guestName, setGuestName] = useState(() => localStorage.getItem('ev_csms_guest_name') || '');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const verifyUser = async () => {
+      if (token) {
+        try {
+          const res = await api.get('/auth/me');
+          setUser(res.data);
+          localStorage.setItem('ev_csms_user', JSON.stringify(res.data));
+        } catch (err) {
+          // Token hỏng hoặc hết hạn
+          logout();
+        }
+      }
+      setLoading(false);
+    };
+    verifyUser();
+  }, [token]);
+
+  const login = async (username, password) => {
+    const res = await api.post('/auth/login', {
+      username,
+      password,
+    });
+
+    const accessToken = res.data.access_token;
+    localStorage.setItem('ev_csms_token', accessToken);
+    setToken(accessToken);
+
+    const userData = res.data.user;
+    setUser(userData);
+    localStorage.setItem('ev_csms_user', JSON.stringify(userData));
+    return userData;
+  };
+
+  const register = async (userData) => {
+    const res = await api.post('/auth/register', userData);
+    return res.data;
+  };
+
+  const logout = () => {
+    localStorage.removeItem('ev_csms_token');
+    localStorage.removeItem('ev_csms_user');
+    setUser(null);
+    setToken(null);
+    // Đóng WS khi logout để không stream data của user cũ
+    telemetryWs.disconnect();
+  };
+
+  const updateGuestName = (name) => {
+    setGuestName(name);
+    localStorage.setItem('ev_csms_guest_name', name);
+  };
+
+  // Nút 1-click chuyển nhanh vai trò cho buổi bảo vệ đồ án / demo
+  const quickSwitch = async (roleKey) => {
     try {
-      const result = await performLogin(email, password)
-      setSession({ token: result.token, user: result.user })
-      setStatus('idle')
-      return result
+      if (roleKey === 'ADMIN') {
+        await login(DEMO_USERS.ADMIN.username, DEMO_USERS.ADMIN.password);
+      } else if (roleKey === 'OPERATOR' || roleKey === 'OPERATOR_A') {
+        await login(DEMO_USERS.OPERATOR.username, DEMO_USERS.OPERATOR.password);
+      } else if (roleKey === 'OPERATOR_B') {
+        await login('operator', 'OpPass123');
+      } else if (roleKey === 'ACCOUNTANT') {
+        await login(DEMO_USERS.ACCOUNTANT.username, DEMO_USERS.ACCOUNTANT.password);
+      } else if (roleKey === 'CUSTOMER') {
+        await login(DEMO_USERS.CUSTOMER.username, DEMO_USERS.CUSTOMER.password);
+      } else if (roleKey === 'DEBT') {
+        await login('driver_debt', 'DriverPass123');
+      } else {
+        logout();
+      }
     } catch (err) {
-      setStatus('idle')
-      throw err
+      console.warn('Đăng nhập nhanh demo thất bại:', err);
+      throw err;
     }
-  }, [])
+  };
 
-  const logout = useCallback(() => {
-    clearSession()
-    setSession(null)
-  }, [])
+  // Xác định tài khoản demo hiện tại
+  let currentDemoKey = null;
+  if (user) {
+    if (user.role === 'ADMIN') {
+      currentDemoKey = 'ADMIN';
+    } else if (user.role === 'OPERATOR') {
+      currentDemoKey = 'OPERATOR';
+    } else if (user.role === 'ACCOUNTANT') {
+      currentDemoKey = 'ACCOUNTANT';
+    } else if (user.role === 'CUSTOMER') {
+      currentDemoKey = 'CUSTOMER';
+    }
+  }
 
-  const value = useMemo(
-    () => ({
-      user: session?.user ?? null,
-      token: session?.token ?? null,
-      isAuthenticated: Boolean(session?.token),
-      status,
-      login,
-      logout,
-    }),
-    [session, status, login, logout],
-  )
+  // Nếu chưa đăng nhập, mặc định hoạt động dưới vai trò CUSTOMER (Tài xế sạc không cần đăng nhập)
+  const effectiveRole = user?.role || 'CUSTOMER';
+  const effectiveUser = user || {
+    username: 'driver_guest',
+    full_name: guestName || 'Tài xế sạc (Khách)',
+    role: 'CUSTOMER',
+    is_guest: true,
+  };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
+  return (
+    <AuthContext.Provider
+      value={{
+        user: effectiveUser,
+        rawUser: user,
+        token,
+        role: effectiveRole,
+        isGuest: !user,
+        guestName,
+        updateGuestName,
+        loading,
+        login,
+        register,
+        logout,
+        quickSwitch,
+        currentDemoKey,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
 
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
-}
+export const useAuth = () => useContext(AuthContext);

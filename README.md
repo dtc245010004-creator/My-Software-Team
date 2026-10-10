@@ -1,134 +1,239 @@
-<div align="center">
+# EV CSMS — Hệ thống quản lý vận hành trạm sạc xe điện
 
-# Charging-Station-Management-System-CSMS-
-
-Đơn vị vận hành mạng lưới trạm sạc nắm được mọi phiên sạc theo thời gian thực qua giao thức OCPP, tính đúng tiền theo biểu giá nhiều khung, không để trạm vượt công suất, và đối soát được doanh thu khớp với số kWh đã cấp.
-
-</div>
-
-## Quy ước làm việc
-
-> **Áp dụng cho cả nhóm từ Sprint 1.**  
-> Muốn đổi quy ước: nêu trong Daily hoặc Retrospective, rồi cập nhật mục này bằng một Pull Request.
+> **Nguồn xác thực chính**: Mã nguồn thực tế `backend/app/core/config.py`, `backend/app/main.py`, `backend/seed_data.py`, `frontend/package.json` và kết quả thực thi kiểm thử `pytest`.  
+> **Phạm vi**: Quản lý mạng lưới trạm/trụ sạc, phiên sạc, ví và biểu giá; giao tiếp OCPP 1.6J; giám sát telemetry thời gian thực; hỗ trợ điều phối công suất.
 
 ---
 
-## 1. Nguyên tắc chung
+## Trạng thái nhanh
 
-- **Nhánh `main` luôn chạy được:** Không push trực tiếp vào `main`, mọi thay đổi đều đi qua Pull Request (PR).
-- **Một việc trên Jira = một nhánh = một PR:** Việc lớn thì tách nhỏ, PR nhỏ thì review nhanh.
-- **Luôn ghi mã Jira** (ví dụ `GYM-19`) vào tên nhánh, commit và tiêu đề PR để truy vết được.
-- **Không commit bí mật:** mật khẩu, khoá API, chuỗi kết nối cơ sở dữ liệu, file `.env`. Đọc từ biến môi trường và chỉ commit file mẫu `.env.example`.
-
----
-
-## 2. Đặt tên nhánh
-
-**Cú pháp:** `<loại>/<MÃ-JIRA>-<mô-tả-ngắn>`
-
-| Loại | Dùng khi |
-| :--- | :--- |
-| `feature` | Thêm hoặc mở rộng chức năng |
-| `fix` | Sửa lỗi |
-| `docs` | Sửa tài liệu, README |
-| `test` | Thêm hoặc sửa test |
-| `chore` | Cấu hình, dọn dẹp, việc không đổi hành vi |
-
-**Quy tắc:**
-- Chữ thường, không dấu tiếng Việt, nối các từ bằng dấu gạch ngang (`-`).
-- Mô tả tối đa khoảng 5 từ.
-- Mã Jira giữ chữ in hoa.
-
-**Ví dụ đúng:**
-- `feature/GYM-19-form-tao-tram`
-- `fix/GYM-25-loi-khoa-dang-nhap`
-- `docs/GYM-13-quy-uoc-lam-viec`
-
-**Ví dụ sai:** `test1`, `nhanh-cua-an`, `feature/them chuc nang`, `feature/tao-tram` (thiếu mã Jira).
+- **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
+- **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
+- **Kiểm thử tự động**: Lượt full suite hoàn chỉnh gần nhất ngày 09/10/2026 đạt **411 passed, 303 warnings** trong container Python 3.12; lượt host sau thay đổi cuối vướng một lỗi quyền Windows ở fixture migration (`tmp_path`), cần chạy lại khi Docker sẵn sàng.
+- **Chức năng OCPP**: Bao gồm MeterValues, chống số đo lùi/trùng, khôi phục phiên khi reconnect, RemoteStart/RemoteStop và audit log giới hạn theo quyền sở hữu trạm.
+- **Kiến trúc dữ liệu**: SQLAlchemy khai báo 18 bảng; các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. Bảng mới giữ nguyên giá/kWh và thành tiền của từng đoạn phiên. *(Nguồn: `backend/app/models/`)*
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; head duy nhất hiện tại là `d8f56c4a911e`. Migration hóa đơn S-33 đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL Compose tạm; không áp dụng migration lên DB dự án.
+- **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
+- **Docker & CI/CD**: `docker-compose.yml` chạy stack Backend, Frontend, PostgreSQL và simulator 20 trụ dùng chung cho Sprint 1–4. CI cấu hình tại `.github/workflows/`.
 
 ---
 
-## 3. Viết commit
+## 1. Chạy dự án
 
-**Cú pháp:** `<type>(<phạm vi>): <mô tả ngắn> [MÃ-JIRA]`
+### Cách 1: Khởi chạy môi trường phát triển cục bộ (Local Dev)
 
-| Type | Ý nghĩa |
-| :--- | :--- |
-| `feat` | Thêm chức năng |
-| `fix` | Sửa lỗi |
-| `docs` | Thay đổi tài liệu |
-| `refactor` | Viết lại code, không đổi hành vi |
-| `test` | Thêm hoặc sửa test |
-| `chore` | Cấu hình, thư viện, việc lặt vặt |
+#### Bước 1: Khởi động Backend (FastAPI)
+*(Nguồn: `backend/requirements.txt`, `backend/app/main.py:20`)*
 
-**Phạm vi (tùy chọn):** `auth`, `station`, `charge-point`, `db`, `ui`, `readme`,...
-
-**Quy tắc:**
-- Mô tả viết tiếng Việt, bắt đầu bằng động từ (*thêm, sửa, xoá, đổi*), tối đa 72 ký tự, không có dấu chấm cuối câu.
-- Một commit là một thay đổi có ý nghĩa. Commit thường xuyên, không dồn cả ngày làm việc vào một commit.
-
-**Ví dụ đúng:**
-- `feat(station): thêm form tạo trạm sạc [GYM-19]`
-- `fix(auth): sửa lỗi không khoá đăng nhập sau 5 lần sai [GYM-16]`
-- `docs(readme): thêm quy ước làm việc [GYM-13]`
-
-**Ví dụ sai:** `update`, `fix bug`, `done`, `abc`, `sửa nhiều thứ`.
-
----
-
-## 4. Quy trình làm một việc và mở Pull Request
-
-1. Trên **Jira**, kéo thẻ sang `In Progress` và gán tên mình.
-2. Cập nhật `main` rồi tạo nhánh mới:
-   ```bash
-   git checkout main
-   git pull origin main
-   git checkout -b feature/GYM-19-form-tao-tram
-
-```
-
-3. Làm việc và commit theo quy ước ở mục 3.
-4. Trước khi mở PR, lấy code mới nhất của `main` về nhánh của mình, tự xử lý xung đột nếu có, chạy thử ứng dụng trên máy và tự xem lại phần thay đổi:
 ```bash
-git fetch origin
-git merge origin/main
-
+cd backend
+pip install -r requirements.txt
+python seed_data.py                # Khởi tạo CSDL SQLite và nạp dữ liệu mẫu
+uvicorn app.main:app --reload --port 8000
 ```
+- API Swagger UI: `http://localhost:8000/docs`
+- Kiểm tra sức khỏe hệ thống: `http://localhost:8000/api/v1/health`
 
+#### Bước 2: Khởi động Frontend (React + Vite)
+*(Nguồn: `frontend/package.json:6-9`)*
 
-5. Đẩy nhánh và mở PR vào `main` trên GitHub:
 ```bash
-git push -u origin feature/GYM-19-form-tao-tram
+cd frontend
+npm install
+npm run dev
+```
+- Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
 
+### Cách 2: Khởi chạy toàn bộ hệ thống bằng Docker Compose
+
+Mở terminal tại thư mục gốc. Compose tự nhận `docker-compose.yml`; tên project dùng chung `ev-csms` cho toàn bộ Sprint 1–4. Hai volume dữ liệu phát triển hiện có vẫn được giữ nguyên.
+
+```powershell
+docker compose up -d --build
+docker compose ps
 ```
 
+- Giao diện: `http://localhost:8080`
+- API Swagger: `http://localhost:8001/docs`
+- Backend, frontend, PostgreSQL và 20 trụ OCPP ảo dùng chung một cấu hình cho toàn bộ code Sprint 1–4.
+- Tài khoản demo được khởi tạo an toàn khi backend Compose phát triển khởi động.
+- Dừng và giữ dữ liệu: `docker compose down` (không thêm `-v`).
 
-6. **Tiêu đề PR:** `[GYM-19] Thêm form tạo trạm sạc`. Điền đầy đủ mẫu PR và chọn reviewer (mục 5).
-7. Sửa theo góp ý của reviewer, đẩy commit mới lên cùng nhánh.
-8. Khi đã có approve: tác giả bấm **Squash and merge**, xoá nhánh, rồi chuyển thẻ Jira sang `Done`.
+Có thể dùng `py run.py` để build và chạy stack; xem trạng thái bằng `py run.py ps`, xem log bằng `py run.py logs`, và dừng an toàn bằng `py run.py down`.
 
 ---
 
-## 5. Ai review và review thế nào
+## 2. Dùng thử hệ thống
 
-* Mỗi PR cần ít nhất **1 approve** từ một thành viên khác (không phải tác giả), theo Definition of Done.
-* Tác giả chọn reviewer, xoay vòng giữa các thành viên, ưu tiên người hiểu phần việc đó. PR đụng tới cấu trúc cơ sở dữ liệu (*migration*) hoặc phân quyền thì thêm trưởng dev làm reviewer.
-* Reviewer phản hồi trong ngày làm việc. Ai đang chờ review của ai thì nêu trong Daily, Scrum Master theo dõi.
-* **Reviewer kiểm tra:** code chạy đúng tiêu chí chấp nhận (AC) của việc trên Jira, không có bí mật, tên nhánh và commit đúng quy ước, code dễ đọc.
-* Góp ý tập trung vào code, không nhắm vào người viết. Nêu rõ, mang tính xây dựng, và phân biệt "cần sửa" với "gợi ý".
-* Không tự merge khi chưa có approve. Xung đột merge do tác giả tự xử lý, cần giúp thì hỏi trên nhóm chat.
+### Tài khoản demo (có sau khi chạy Compose phát triển)
+*(Nguồn: `backend/app/services/demo_account_service.py` và `frontend/src/config/roleConfig.js`)*
+
+| Vai trò (Role) | Tên đăng nhập | Email | Mật khẩu mặc định | Chức năng chính |
+| :--- | :--- | :--- | :--- | :--- |
+| **Quản trị viên (ADMIN)** | `admin` | `admin@evcsms.vn` | `12345678a` | Quản trị toàn hệ thống |
+| **Quản trị viên dự phòng (ADMIN)** | `admin2` | `admin2@evcsms.vn` | `AdminPass123` | Quản trị viên dự phòng hệ thống |
+| **Chủ trạm (OPERATOR)** | `operator` | `operator@evcsms.vn` | `OpPass123` | Quản lý trạm của Chủ B |
+| **Chủ trạm VinFast (OPERATOR)** | `operator_a` | `cpo_vinfast@evcsms.vn` | `OpPass123` | Quản lý trạm của Chủ A |
+| **Kế toán (ACCOUNTANT)** | `accountant` | `accountant@evcsms.vn` | `AccPass123` | Đối soát doanh thu và nhật ký |
+| **Tài xế chuẩn (CUSTOMER)** | `customer_user` | `driver1@gmail.com` | `CusPass123` | Tài khoản tài xế mẫu |
+| **Tài xế VIP (CUSTOMER)** | `driver_vip` | `driver_vip@gmail.com` | `DriverPass123` | Tài xế số dư lớn |
+| **Tài xế nợ (CUSTOMER)** | `driver_debt` | `driver_debt@gmail.com` | `DriverPass123` | Ví bị khóa nợ; đăng nhập bị từ chối theo quy tắc nghiệp vụ |
+
+Compose đồng bộ các tài khoản demo, ví còn thiếu và thẻ OCPP cho tài xế mà không xóa dữ liệu khác. Tài khoản `driver_debt` bị chặn đăng nhập có chủ đích vì ví demo đang khóa nợ.
+
+### Đăng ký công khai — luôn ra tài khoản Tài xế, không gửi "role"
+*(Nguồn: `backend/app/api/v1/endpoints/auth.py:28-32`)*
+- Endpoint `POST /api/v1/auth/register` bắt buộc gán cứng `role = "CUSTOMER"` để ngăn chặn tấn công leo thang đặc quyền (Privilege Escalation).
+- Quá trình đăng ký bọc trong 1 Transaction nguyên tử (Atomic): Tạo User + Tạo Wallet với số dư ban đầu 0 VND.
+
+### Thử bằng dòng lệnh (không cần giao diện)
+*(Nguồn: `backend/app/api/v1/endpoints/auth.py:53`, `backend/app/api/v1/__init__.py:22`)*
+
+```bash
+# 1. Kiểm tra sức khỏe dịch vụ
+curl -X GET "http://localhost:8000/api/v1/health"
+
+# 2. Đăng nhập lấy Bearer JWT Token
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=operator&password=OpPass123"
+```
+
+### Dữ liệu demo
+*(Nguồn: `backend/seed_data.py:28-360`)*
+- Khi được chạy chủ động, script `backend/seed_data.py` tái tạo bảng và nạp:
+  - 3 trạm sạc quy mô lớn tại Hà Nội (Vincom Smart City, Ecopark, Mỹ Đình).
+  - 9 trụ sạc vật lý (công suất từ 11kW đến 250kW Ultra-Fast).
+  - 18 cổng sạc chuẩn CCS2, Type 2, CHAdeMO.
+  - Biểu giá điện TOU 3 khung giờ (Thấp điểm, Bình thường, Cao điểm).
+  - 62 phiên sạc mẫu có đầy đủ đường cong chỉ số kWh và lịch sử dòng tiền.
 
 ---
 
-## 6. Việc phải đạt trước khi coi là xong
+## 3. Kiểm thử
 
-*(Trích từ Definition of Done của dự án, phần liên quan tới code)*
+*(Nguồn: `backend/pytest.ini:1-6`, `backend/tests/`)*
 
-* [ ] Đã được ít nhất 1 thành viên khác review và approve.
-* [ ] Có unit test cho logic mới. *(Khung test và CI sẽ bổ sung từ Sprint 2)*.
-* [ ] Không có bí mật trong mã nguồn.
-* [ ] README được cập nhật nếu đổi cách chạy hoặc thêm biến môi trường.
-
+```bash
+cd backend
+pytest -v
 ```
 
+Chạy riêng kiểm thử bộ khung OCPP 1.6J:
+
+```bash
+py -m pytest --noconftest -p no:cacheprovider tests/test_ocpp_frames.py
 ```
+
+Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trước khi thêm suite OCPP, không đại diện cho lần hồi quy hiện tại:
+- `test_ai_fallback.py`: 21 passed (Kiểm thử Heuristic Fallback, Mock Gemini, Scheduler)
+- `test_auth.py`: 13 passed (Kiểm thử JWT, Bcrypt rounds=12, RBAC, Đăng ký atomic, Khóa nợ đăng nhập)
+- `test_driver_unauthenticated.py`: 4 passed (Kiểm thử tài xế cắm sạc không cần login)
+- `test_health.py`: 1 passed (Endpoint `/health`)
+- `test_sessions.py`: 5 passed (Vòng đời phiên sạc, chốt chặn cổng)
+- `test_sessions_acid.py`: 9 passed (ACID Concurrency, tranh chấp 409, trừ cước TOU)
+- `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
+- `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
+- `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
+**Lượt full suite hoàn chỉnh gần nhất (09/10/2026):** `411 passed, 303 warnings` (411 ca thu thập, 159.16 giây trong container Python 3.12). Sau điều chỉnh metadata phí idle legacy, `test_invoice.py` đạt 8 passed; lượt chạy toàn bộ trên host gặp lỗi quyền Windows khi khởi tạo `tmp_path` cho một test migration (409 passed, 1 skipped, 1 error). Migration S-33 đã thử tiến/lùi/tiến trên PostgreSQL Compose tạm.
+
+---
+
+## 4. Gặp lỗi thường gặp
+
+*(Nguồn: `backend/app/core/database.py:15-25`, `backend/app/core/config.py:30-43`)*
+
+1. **Lỗi `sqlite3.OperationalError: database is locked`**:
+   - Hệ thống đã bật sẵn chế độ WAL (`PRAGMA journal_mode=WAL;`) và `PRAGMA busy_timeout=5000;` trong `backend/app/core/database.py`. Nếu gặp lỗi khi chạy nhiều tiến trình ngoài, hãy đảm bảo đóng các kết nối treo SQLite Explorer.
+2. **Lỗi `CORS policy` khi gọi API từ trình duyệt**:
+   - Kiểm tra cổng frontend trong `BACKEND_CORS_ORIGINS` tại `backend/app/core/config.py:30`. Mặc định hỗ trợ `http://localhost:5173`, `http://localhost:3000`, `http://127.0.0.1:5173`.
+
+---
+
+## 5. Tổng quan hệ thống
+
+### Kiến trúc thực tế
+*(Nguồn: `backend/app/main.py:20-56`, `backend/app/core/websocket.py:10-50`)*
+- **Docker Compose**: Stack chung chạy backend, frontend Nginx proxy, PostgreSQL và simulator OCPP 20 trụ; giao diện ở cổng host `8080`, API ở `8001`, PostgreSQL ở `5433`. Dữ liệu gắn với named volume để giữ lại khi dừng container.
+- **Dual-Loop**:
+  - *Fast Loop (Telemetry & Heuristic)*: Cập nhật chỉ số sạc mỗi 2 giây (`SIMULATOR_INTERVAL_SECONDS = 2`), phát sóng trực tiếp qua WebSocket `/ws/telemetry`. Tự động ngắt khẩn cấp khi nhiệt độ $> 75^\circ\text{C}$ hoặc pin đầy.
+  - *Slow Loop (AI Engine)*: Lập lịch phân tích phụ tải trạm định kỳ, điều phối chia sẻ công suất thông minh (Dynamic Load Balancing) qua Google Gemini API hoặc chuyển đổi Heuristic Fallback khi mất kết nối mạng.
+- **Ràng buộc tài chính ACID & Khóa nợ**:
+  - Sử dụng khóa bi quan `with_for_update()` khi trừ tiền ví (`backend/app/services/wallet_service.py:35,80`).
+  - **Chính sách khóa nợ âm**: Khi số dư ví rơi xuống dưới ngưỡng `-300,000` VND (`backend/app/core/config.py:23`), hệ thống tự động khóa tài khoản (`is_debt_locked = True`).
+  - **Chặn cứng chống tràn CSDL**: CSDL chỉ cho phép tràn tối đa 200.000 VND sau ngưỡng khóa nợ (`CheckConstraint("balance >= -500000")` tại `backend/app/models/wallet.py:11`, `MAX_SAFE_DEBT_LIMIT = -500000`).
+  - **Cảnh báo đăng nhập**: Khi tài khoản bị khóa do nợ đăng nhập, hệ thống từ chối (HTTP 403) và hiển thị thông báo lỗi lên màn hình: `"tài khoản bị khóa vì - quá 300k"` (`backend/app/api/v1/endpoints/auth.py:129`, `frontend/src/pages/Login.jsx:97`).
+
+### Giao diện — thao tác được ở đâu
+*(Nguồn: `frontend/src/pages/`)*
+- `Login.jsx`: Đăng nhập, phân quyền RBAC và chuyển hướng Workspace.
+- `Dashboard.jsx`: Bảng điều hành tổng quan cho Quản trị viên và CPO.
+- `Stations.jsx`: Quản lý danh mục trạm, gắn trụ sạc, cổng sạc và chế độ xem bản đồ mạng lưới (Leaflet OSM/Esri).
+- `Sessions.jsx`: Theo dõi nhật ký phiên sạc và chi tiết hóa đơn TOU.
+- `Wallet.jsx`: Tra cứu số dư ví, nạp tiền và lịch sử giao dịch ACID.
+- `Simulator.jsx`: Bảng điều khiển giả lập trạm sạc vật lý thời gian thực.
+- `AIAdvisor.jsx`: Trợ lý ảo tư vấn tối ưu vận hành và biểu giá điện.
+
+### API hiện có
+*(Nguồn: `backend/app/api/v1/__init__.py:10-18`)*
+Hệ thống cung cấp 9 nhóm router REST API tại tiền tố `/api/v1`:
+1. `/api/v1/auth`: Đăng ký, đăng nhập JWT, lấy thông tin cá nhân.
+2. `/api/v1/stations`: Quản lý trạm sạc, đo đếm phụ tải trạm.
+3. `/api/v1/chargers`: Quản lý trụ sạc và cổng sạc vật lý.
+4. `/api/v1/tariffs`: Quản lý biểu giá điện TOU 3 khung giờ.
+5. `/api/v1/wallet`: Quản lý ví điện tử, nạp tiền, trừ cước.
+6. `/api/v1/sessions`: Khởi động, dừng phiên sạc, chốt cước ACID.
+7. `/api/v1/simulator`: Điều khiển bộ giả lập và đo đếm Telemetry.
+8. `/api/v1/ai`: Điều phối công suất sạc thông minh và tư vấn vận hành.
+9. `/api/v1/audit-logs`: Tra cứu nhật ký thao tác; Operator chỉ xem bản ghi của trạm mình quản lý.
+
+### Giao tiếp trụ sạc OCPP 1.6J
+
+* Trụ đã đăng ký kết nối qua WebSocket `/ocpp/{charge_point_code}` và thương lượng subprotocol `ocpp1.6`.
+* `BootNotification` lưu thông tin trụ; trạm không hoạt động nhận `Rejected`, trạm hoạt động nhận `Accepted` cùng heartbeat interval từ `HEARTBEAT_INTERVAL_SECONDS`.
+* `Authorize` tra `id_tags`: kiểm tra trạng thái thẻ, thời hạn và trạng thái hoạt động của trạm trước khi trả `Accepted`, `Blocked`, `Expired` hoặc `Invalid`.
+* `MeterValues` chỉ lưu `Energy.Active.Import.Register` theo phiên `CHARGING`, giữ nguyên đơn vị OCPP; nếu không tìm thấy phiên thì ghi payload vào `orphan_messages`. Gateway gửi CALLRESULT trước thao tác DB.
+* MeterValues bỏ qua mẫu có timestamp cũ và ghi cảnh báo, bỏ qua mẫu trùng timestamp+value im lặng. Counter thấp hơn tại timestamp mới vẫn được lưu và bật `charging_sessions.needs_review`; cùng timestamp nhưng value khác được lưu để đối soát.
+* Sau reconnect, `StatusNotification(Charging)` giữ phiên CHARGING đã lưu; StartTransaction gửi lại với cùng thẻ và meterStart nhận lại transactionId cũ. MeterValues gắn theo transactionId DB; StopTransaction đóng phiên ngay cả khi trụ đã offline và dùng timestamp trong tin nhắn.
+* API `GET /api/v1/sessions/current` trả phiên sạc hiện tại cùng số đo mới nhất; `POST /api/v1/sessions/remote-start` gửi lệnh RemoteStartTransaction và có endpoint tra trạng thái yêu cầu.
+* RemoteStopTransaction chờ StopTransaction thật từ trụ để chốt phiên; trường hợp trụ nhận lệnh nhưng không gửi StopTransaction sẽ đánh dấu phiên cần xem xét.
+* Nhật ký thao tác được ghi append-only; quyền Operator bị giới hạn theo trạm sở hữu.
+* Job APScheduler kiểm tra phiên CHARGING mỗi phút. Nếu `last_seen_at` quá `ABNORMAL_SESSION_THRESHOLD_SECONDS` (mặc định 500 giây), job gắn cờ `is_abnormal` và ghi lý do; không tự đóng phiên.
+* Admin/Operator gọi `POST /api/v1/chargers/{code}/reset` với `Soft` hoặc `Hard`; offline trả 409, hết thời gian chờ trả 504. Dispatcher ghép phản hồi CALLRESULT/CALLERROR theo message ID và dùng lại được cho các action máy chủ gửi xuống sau này.
+* Seed demo tạo mã thẻ active `DEMO-<USERNAME>` cho mỗi tài khoản tài xế role `CUSTOMER`.
+* CALL lặp được nhận diện bằng khóa trong bảng `ocpp_messages`; cùng message ID phát lại phản hồi đã lưu, kể cả khi kết nối/session CSDL được tạo mới. Bản ghi cũ hơn 7 ngày được scheduler hiện có dọn mỗi ngày.
+* Kênh OCPP trụ sạc ↔ CSMS độc lập với `/ws/telemetry`, vốn phục vụ dashboard.
+
+---
+
+## 6. Cấu trúc thư mục
+
+*(Nguồn: Khảo sát thực tế cây thư mục dự án ngày 29/09/2026)*
+
+```text
+My-Software-Team/
+├── backend/                           # Dịch vụ máy chủ FastAPI, Models, Services, Tests
+├── frontend/                          # Giao diện người dùng Web React + Vite + Tailwind
+├── docs/                              # Trung tâm tài liệu và tri thức hệ thống chuẩn hóa
+├── tools/ocpp-spike/                  # Simulator OCPP và kịch bản kiểm thử tích hợp
+├── .github/                           # Biểu mẫu kiểm soát chất lượng kho mã nguồn
+├── .env.example                       # Biến môi trường mẫu cho toàn hệ thống
+└── docker-compose.yml                # Stack phát triển Backend, Frontend và simulator
+```
+
+---
+
+## 7. Tài liệu liên quan
+
+- Cổng điều hướng tài liệu toàn hệ thống: [`docs/README.md`](docs/README.md)
+- Bản đồ các khu vực mã nguồn: [`docs/codebase-map.md`](docs/codebase-map.md)
+- Hướng dẫn chi tiết phân hệ Backend: [`backend/README.md`](backend/README.md)
+- Bản đồ cấu trúc và ma trận truy vết: [`docs/architecture/PROJECT_STRUCTURE.md`](docs/architecture/PROJECT_STRUCTURE.md)
+- Sổ tay vận hành kỹ thuật: [`docs/devops/OPERATIONS.md`](docs/devops/OPERATIONS.md)
+- Hiến chương và sổ cái kiểm thử: [`docs/qa/STANDARD.md`](docs/qa/STANDARD.md), [`docs/qa/INVENTORY.md`](docs/qa/INVENTORY.md)
+- Hồ sơ nghiệm thu OCPP S-07: [`docs/qa/stories/S-07.md`](docs/qa/stories/S-07.md)
+- Hồ sơ nghiệm thu BootNotification S-08: [`docs/qa/stories/S-08.md`](docs/qa/stories/S-08.md)
+- Hồ sơ nghiệm thu Authorize/idTag S-15: [`docs/qa/stories/S-15.md`](docs/qa/stories/S-15.md)
+- Hồ sơ nghiệm thu dispatcher/Reset OCPP S-16: [`docs/qa/stories/S-16.md`](docs/qa/stories/S-16.md)
+- Hồ sơ backend biểu giá/phí chiếm trụ S-28: [`docs/qa/stories/S-28.md`](docs/qa/stories/S-28.md)
+- Hồ sơ Backend hóa đơn theo đoạn giá S-33: [`docs/qa/stories/S-33.md`](docs/qa/stories/S-33.md)

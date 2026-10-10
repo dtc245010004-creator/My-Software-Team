@@ -1,2 +1,14 @@
 [tool.ruff]
-extend-exclude = ["migrations"]
+extend-exclude = ["migrations", "alembic"]
+line-length = 88
+
+[tool.ruff.lint]
+ignore = ["TRY003", "TRY300"]
+select = ["E4", "E7", "E9", "F", "I", "BLE", "TRY", "S110"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/schemas/*.py" = ["TRY003"]
+"app/services/rbac_service.py" = ["TRY003"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]

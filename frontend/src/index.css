@@ -1,111 +1,216 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+    --bg-app: #F8FAFC;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F1F5F9;
+    --border-color: #E2E8F0;
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #64748B;
+    --accent-primary: #0284C7;
   }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+  html.dark {
+    --bg-app: #0B0F17;
+    --bg-surface: #151D2A;
+    --bg-subtle: #1E293B;
+    --border-color: #222F44;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+    --accent-primary: #38BDF8;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  /* Số liệu đo lường không bị nhảy rung khi WebSocket cập nhật */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  margin: 0;
+/* Thanh cuộn tối giản hiện đại */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+html.dark .glass-panel {
+  background: rgba(21, 29, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Hiệu ứng xung động 3D cho trạm sạc & vị trí GPS */
+@keyframes ringPulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 14px rgba(2, 132, 199, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(2, 132, 199, 0);
   }
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+
+.pulse-ring-active {
+  animation: ringPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Hiệu ứng 3D Tilt mượt cho Card */
+.tilt-card {
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.tilt-card:hover {
+  transform: translateY(-3px) perspective(1000px);
+}
+
+/* Tùy chỉnh Popup Leaflet chuẩn Modern UI (Sáng & Tối) */
+.leaflet-popup-content-wrapper {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+html.dark .leaflet-popup-content-wrapper {
+  background-color: #151D2A !important;
+  color: #F1F5F9 !important;
+  border: 1px solid #222F44 !important;
+  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.6) !important;
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px !important;
+  line-height: 1.5 !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+}
+
+.leaflet-popup-tip {
+  background-color: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+}
+
+html.dark .leaflet-popup-tip {
+  background-color: #151D2A !important;
+  border: 1px solid #222F44 !important;
+}
+
+.leaflet-popup-close-button {
+  color: #64748B !important;
+  padding: 8px !important;
+}
+
+html.dark .leaflet-popup-close-button {
+  color: #94A3B8 !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #0F172A !important;
+}
+
+html.dark .leaflet-popup-close-button:hover {
+  color: #F1F5F9 !important;
+}
+
+/* Lớp CSS tối ưu làm tối bản đồ OpenStreetMap (Dark Mode Tile Filter) */
+.map-tiles-dark,
+.leaflet-tile-pane .map-tiles-dark {
+  filter: invert(100%) hue-rotate(180deg) brightness(0.9) contrast(0.9) !important;
+}
+
+/* Tự động chuyển đổi màu sắc cho các class kế thừa khi ở Light Mode */
+@layer utilities {
+  html:not(.dark) .bg-obsidian {
+    background-color: #F8FAFC !important;
+  }
+  html:not(.dark) .bg-panel {
+    background-color: #FFFFFF !important;
+  }
+  html:not(.dark) .bg-panel\/70,
+  html:not(.dark) .bg-panel\/50 {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+  }
+  html:not(.dark) .hover\:bg-panel-hover:hover,
+  html:not(.dark) .hover\:bg-panel:hover {
+    background-color: #F1F5F9 !important;
+  }
+  html:not(.dark) .hover\:bg-hairline:hover {
+    background-color: #E2E8F0 !important;
+  }
+  html:not(.dark) .border-hairline,
+  html:not(.dark) .border-hairline\/60 {
+    border-color: #E2E8F0 !important;
+  }
+  html:not(.dark) .text-tech-white {
+    color: #0F172A !important;
+  }
+  html:not(.dark) .text-steel-gray {
+    color: #475569 !important;
+  }
+  
+  /* Thẻ card có bo góc lớn hơn và bóng đổ nhẹ ở mọi nơi */
+  .rounded-sm {
+    border-radius: 0.75rem !important; /* 12px */
+  }
+
+  /* Nút bấm và input có focus-visible nổi bật đạt chuẩn WCAG AA */
+  input:focus-visible,
+  select:focus-visible,
+  button:focus-visible {
+    outline: 2px solid #0284C7 !important;
+    outline-offset: 1px !important;
   }
 }
-p {
-  margin: 0;
-}
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+/* Tắt/giảm animation cho người dùng yêu cầu */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.rbac import roles
 from app.core.security import create_access_token, hash_password, verify_password
+from app.models.id_tag import IdTag
 from app.models.role import Role
 from app.models.user import User
 from app.schemas.auth import (
@@ -34,7 +35,9 @@ def _get_or_create_role(db: Session, role_name: str) -> Role:
     return role
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 @roles("public")
 def register(
     payload: RegisterRequest,
@@ -59,6 +62,8 @@ def register(
     )
     user.roles.append(role)
     db.add(user)
+    db.flush()
+    db.add(IdTag(code=f"REMOTE-{user.id}", user_id=user.id, status="active"))
     db.commit()
     db.refresh(user)
     return user
@@ -73,9 +78,8 @@ def login(
     db: Annotated[Session, Depends(get_db)],
 ) -> Any:
     """Xử lý đăng nhập, khóa tài khoản khi sai 5 lần, tạo cookie phiên httpOnly."""
-    client_ip = (
-        request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or (request.client.host if request.client else "unknown")
+    client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
+        request.client.host if request.client else "unknown"
     )
     now = datetime.now(timezone.utc)
 
@@ -97,9 +101,7 @@ def login(
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
 
-    locked_until = (
-        _as_utc(user.locked_until) if user.locked_until is not None else None
-    )
+    locked_until = _as_utc(user.locked_until) if user.locked_until is not None else None
 
     if locked_until and locked_until > now:
         raise HTTPException(
@@ -137,9 +139,7 @@ def login(
     db.commit()
     db.refresh(user)
 
-    token = create_access_token(
-        data={"sub": str(user.id), "email": user.email}
-    )
+    token = create_access_token(data={"sub": str(user.id), "email": user.email})
     response.set_cookie(
         key=settings.session_cookie_name,
         value=token,

@@ -1,167 +1,93 @@
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from fastapi.routing import iter_route_contexts
-from sqlalchemy.orm import joinedload
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.routing import Match
+from typing import Callable
 
-from app.core.config import settings
-from app.core.database import get_db
-from app.core.security import decode_access_token
-from app.models.user import User
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 
 def roles(*role_names: str):
-    def decorator(func):
-        func.allowed_roles = set(role_names)
+    """
+    Khai báo các role được phép truy cập route.
+
+    Ví dụ:
+        @roles("admin")
+        def my_route():
+            ...
+    """
+    allowed_roles = set(role_names)
+
+    def decorator(func: Callable):
+        func.allowed_roles = allowed_roles
         return func
 
     return decorator
 
 
-def find_endpoint(request: Request):
-    """Tìm endpoint tương ứng với URL hiện tại."""
-
-    for context in iter_route_contexts(request.app.routes):
-        match, _ = context.matches(request.scope)
-
-        if match == Match.FULL:
-            return context.endpoint
-
-    return None
-
-
 class RBACMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware kiểm tra quyền truy cập route.
+
+    Route không khai báo @roles(...) sẽ bị từ chối mặc định.
+    """
 
     async def dispatch(self, request: Request, call_next):
+        path = request.url.path
 
+        # Các endpoint công khai cần cho FastAPI hoạt động
         public_paths = {
             "/",
             "/docs",
-            "/docs/oauth2-redirect",
             "/openapi.json",
             "/redoc",
         }
 
-        if request.url.path in public_paths:
+        if path in public_paths:
             return await call_next(request)
 
-        endpoint = find_endpoint(request)
+        route = request.scope.get("route")
+
+        if route is None:
+            return await call_next(request)
+
+        endpoint = getattr(route, "endpoint", None)
 
         if endpoint is None:
-            return JSONResponse(
-                status_code=404,
-                content={"detail": "Không tìm thấy route"},
-            )
+            return await call_next(request)
 
         allowed_roles = getattr(endpoint, "allowed_roles", None)
 
-        if allowed_roles is None:
+        # Default deny:
+        # route không khai báo quyền -> 403
+        if not allowed_roles:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Route chưa khai báo quyền"},
             )
 
+        # Public route
         if "public" in allowed_roles:
             return await call_next(request)
 
-        token = request.cookies.get(
-            settings.session_cookie_name
-        )
+        # Authenticated route:
+        # quyền xác thực thực tế sẽ được dependency của endpoint kiểm tra.
+        if "authenticated" in allowed_roles:
+            return await call_next(request)
 
-        if not token:
-            auth_header = request.headers.get(
-                "Authorization",
-                "",
-            )
+        # Lấy user đã được xác thực nếu middleware/dependency trước đó đã gắn vào request
+        user = getattr(request.state, "user", None)
 
-            if auth_header.startswith("Bearer "):
-                token = auth_header.split(
-                    " ", 1
-                )[1]
-
-        if not token:
+        if user is None:
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Chưa xác thực"},
             )
 
-        payload = decode_access_token(token)
-
-        if not payload:
-            return JSONResponse(
-                status_code=401,
-                content={
-                    "detail": (
-                        "Phiên đăng nhập không hợp lệ "
-                        "hoặc đã hết hạn"
-                    )
-                },
-            )
-
-        user_id = payload.get("sub")
-
-        if not user_id:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Token không hợp lệ"},
-            )
-
-        try:
-            user_id = int(user_id)
-        except (TypeError, ValueError):
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Token không hợp lệ"},
-            )
-
-        db_gen = get_db()
-        db = next(db_gen)
-
-        try:
-            user = (
-                db.query(User)
-                .options(joinedload(User.roles))
-                .filter(User.id == user_id)
-                .first()
-            )
-        finally:
-            db_gen.close()
-
-        if not user:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Người dùng không tồn tại"},
-            )
-
-        if not user.is_active:
-            return JSONResponse(
-                status_code=401,
-                content={
-                    "detail": (
-                        "Tài khoản đã bị vô hiệu hóa"
-                    )
-                },
-            )
-
-        request.state.user = user
-
-        if "authenticated" in allowed_roles:
-            return await call_next(request)
-
-        user_roles = {
-            role.name
-            for role in user.roles
-        }
+        user_roles = {role.name for role in getattr(user, "roles", [])}
 
         if not user_roles.intersection(allowed_roles):
             return JSONResponse(
                 status_code=403,
-                content={
-                    "detail": (
-                        "Bạn không có quyền thực hiện thao tác này"
-                    )
-                },
+                content={"detail": "Bạn không có quyền truy cập"},
             )
 
         return await call_next(request)

@@ -1,29 +1,466 @@
-from app.core.database import SessionLocal
-from app.models.role import Role
+import os
+import random
+import sys
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
-ROLES = [
-    ("driver", "Tài xế sạc xe điện"),
-    ("station_owner", "Chủ sở hữu trạm sạc"),
-    ("operator", "Vận hành viên kỹ thuật trạm"),
-    ("accountant", "Kế toán đối soát doanh thu"),
-    ("admin", "Quản trị viên toàn hệ thống"),
-]
+# Đảm bảo đường dẫn import
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Cấu hình UTF-8 cho stdout trên Windows console
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError) as exc:
+        print(f"Không thể cấu hình UTF-8 console: {exc}", file=sys.stderr)
+
+import app.models  # noqa: F401
+from app.core.database import Base, SessionLocal, engine
+from app.core.security import get_password_hash
+from app.models.id_tag import IdTag
+from app.models.session import ChargingSession
+from app.models.station import ChargingPoint, Connector, Station
+from app.models.tariff import Tariff
+from app.models.user import User
+from app.models.wallet import Wallet, WalletTransaction
 
 
-def seed_roles() -> None:
-    """Nạp sẵn đúng 5 vai trò vào bảng roles, bỏ qua nếu đã tồn tại."""
+def seed_database():
+    """Script nạp dữ liệu mẫu chân thực, toàn diện phục vụ demo đồ án và bảo vệ trước hội đồng."""
+    print("==================================================================")
+    print("   KHỞI TẠO DỮ LIỆU MẪU CHUẨN EV CSMS (SEED DATA INITIALIZATION)   ")
+    print("==================================================================")
+
+    # 1. Dọn dẹp schema và bảng cũ để đồng bộ cấu trúc mới nhất (hỗ trợ nợ ví -1.000.000đ)
+    print("[-] Đang làm sạch và tái tạo schema CSDL...")
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
     db = SessionLocal()
     try:
-        existing_names = {row.name for row in db.query(Role).filter(Role.name.in_([name for name, _ in ROLES])).all()}
+        # 2. Tạo Tài khoản người dùng (RBAC)
+        print("[+] Đang tạo tài khoản người dùng theo chuẩn phân quyền (RBAC)...")
+        users_to_create = [
+            # Quản trị viên
+            User(
+                username="admin",
+                email="admin@evcsms.vn",
+                full_name="Quản Trị Viên Hệ Thống",
+                password_hash=get_password_hash("12345678a"),
+                role="ADMIN",
+                is_active=True,
+            ),
+            User(
+                username="admin2",
+                email="admin2@evcsms.vn",
+                full_name="Quản Trị Viên Dự Phòng",
+                password_hash=get_password_hash("AdminPass123"),
+                role="ADMIN",
+                is_active=True,
+            ),
+            # Chủ trạm sạc (Role: OPERATOR)
+            User(
+                username="operator",
+                email="operator@evcsms.vn",
+                full_name="Chủ Trạm Sạc Trung Tâm (Chủ B)",
+                password_hash=get_password_hash("OpPass123"),
+                role="OPERATOR",
+                is_active=True,
+            ),
+            User(
+                username="operator_a",
+                email="cpo_vinfast@evcsms.vn",
+                full_name="Chủ Trạm Sạc VinFast (Chủ A)",
+                password_hash=get_password_hash("OpPass123"),
+                role="OPERATOR",
+                is_active=True,
+            ),
+            # Kế toán viên hệ thống (Role: ACCOUNTANT)
+            User(
+                username="accountant",
+                email="accountant@evcsms.vn",
+                full_name="Kế Toán Viên Hệ Thống",
+                password_hash=get_password_hash("AccPass123"),
+                role="ACCOUNTANT",
+                is_active=True,
+            ),
+            # Khách hàng tài xế
+            User(
+                username="customer_user",
+                email="driver1@gmail.com",
+                full_name="Nguyễn Văn Tài (Tài xế VF8)",
+                password_hash=get_password_hash("CusPass123"),
+                role="CUSTOMER",
+                is_active=True,
+            ),
+            User(
+                username="driver_vip",
+                email="driver_vip@gmail.com",
+                full_name="Trần Thị Bích Ngọc (Tài xế VF9)",
+                password_hash=get_password_hash("DriverPass123"),
+                role="CUSTOMER",
+                is_active=True,
+            ),
+            User(
+                username="driver_debt",
+                email="driver_debt@gmail.com",
+                full_name="Lê Hoàng Nam (Tài xế VF5 - Đang nợ)",
+                password_hash=get_password_hash("DriverPass123"),
+                role="CUSTOMER",
+                is_active=True,
+            ),
+        ]
 
-        for name, description in ROLES:
-            if name not in existing_names:
-                db.add(Role(name=name, description=description))
+        # Thêm 5 tài xế taxi điện phụ
+        for i in range(1, 6):
+            users_to_create.append(
+                User(
+                    username=f"taxi_driver_{i}",
+                    email=f"taxi{i}@green-sm.vn",
+                    full_name=f"Tài Xế Taxi Xanh SM #{i}",
+                    password_hash=get_password_hash("Pass1234"),
+                    role="CUSTOMER",
+                    is_active=True,
+                )
+            )
+
+        db.add_all(users_to_create)
+        db.commit()
+
+        # RBAC hiện tại dùng role CUSTOMER cho tài khoản tài xế.
+        driver_users = [user for user in users_to_create if user.role == "CUSTOMER"]
+        db.add_all(
+            [
+                IdTag(
+                    code=f"DEMO-{user.username.upper()}",
+                    user_id=user.id,
+                    status="active",
+                )
+                for user in driver_users
+            ]
+        )
+        db.commit()
+
+        # 3. Tạo Ví tiền điện tử (ACID Wallets cho toàn bộ người dùng)
+        print(
+            "[+] Đang tạo ví tiền điện tử và nạp số dư ban đầu cho toàn bộ người dùng..."
+        )
+        wallets_map = {}
+        for u in users_to_create:
+            if u.username in ("admin", "admin2"):
+                init_balance = Decimal("5000000.00")
+                is_locked = False
+            elif u.username in ("operator", "operator_a"):
+                init_balance = Decimal("2000000.00")
+                is_locked = False
+            elif u.username == "accountant":
+                init_balance = Decimal("1000000.00")
+                is_locked = False
+            elif u.username == "customer_user":
+                init_balance = Decimal("250000.00")
+                is_locked = False
+            elif u.username == "driver_vip":
+                init_balance = Decimal("1500000.00")
+                is_locked = False
+            elif u.username == "driver_debt":
+                init_balance = Decimal(
+                    "-120000.00"
+                )  # Cho nợ hợp lệ trong hạn mức -300k
+                is_locked = True
+            else:
+                init_balance = Decimal(str(random.choice([150000, 300000, 450000])))
+                is_locked = False
+
+            w = Wallet(user_id=u.id, balance=init_balance, is_debt_locked=is_locked)
+            db.add(w)
+            db.commit()
+            wallets_map[u.id] = w
+
+            # Ghi lịch sử giao dịch ban đầu
+            if init_balance > 0:
+                tx = WalletTransaction(
+                    wallet_id=w.id,
+                    transaction_type="TOPUP",
+                    amount=init_balance,
+                    balance_after=init_balance,
+                    note="Nạp số dư ban đầu qua cổng thanh toán VNPay",
+                )
+                db.add(tx)
+            elif init_balance < 0:
+                tx = WalletTransaction(
+                    wallet_id=w.id,
+                    transaction_type="CHARGE_FEE",
+                    amount=init_balance,
+                    balance_after=init_balance,
+                    note="Trừ cước sạc phiên trước (Ghi nợ hợp lệ)",
+                )
+                db.add(tx)
+        db.commit()
+
+        # 4. Tạo Hạ tầng Trạm sạc (ST-1, ST-2 thuộc Chủ A; ST-3 thuộc Chủ B; ST-4 chưa gán chủ)
+        print(
+            "[+] Đang tạo hạ tầng trạm sạc phân quyền (Chủ A, Chủ B, Trạm chưa gán chủ)..."
+        )
+        cpo_a = next(u for u in users_to_create if u.username == "operator_a")
+        cpo_b = next(u for u in users_to_create if u.username == "operator")
+
+        st_hanoi = Station(
+            operator_id=cpo_a.id,
+            name="Trạm Sạc Vincom Center Metropolis",
+            address="29 Liễu Giai, Ba Đình, Hà Nội",
+            latitude=21.0313,
+            longitude=105.8152,
+            total_grid_capacity_kw=250.0,
+            operating_hours="24/7",
+            status="ACTIVE",
+            is_active=True,
+        )
+        st_danang = Station(
+            operator_id=cpo_a.id,
+            name="Trạm Sạc Cầu Rồng - Sơn Trà",
+            address="Võ Văn Kiệt, P. An Hải Bắc, Sơn Trà, Đà Nẵng",
+            latitude=16.0601,
+            longitude=108.2272,
+            total_grid_capacity_kw=180.0,
+            operating_hours="24/7",
+            status="ACTIVE",
+            is_active=True,
+        )
+        st_hcm = Station(
+            operator_id=cpo_b.id,
+            name="Trạm Sạc Landmark 81 - Central Park",
+            address="720A Điện Biên Phủ, P. 22, Bình Thạnh, TP.HCM",
+            latitude=10.7950,
+            longitude=106.7218,
+            total_grid_capacity_kw=300.0,
+            operating_hours="24/7",
+            status="ACTIVE",
+            is_active=True,
+        )
+        st_unassigned = Station(
+            operator_id=None,
+            name="Trạm Sạc An Bình - Hải Dương",
+            address="Khu công nghiệp An Bình, Nam Sách, Hải Dương",
+            latitude=21.584576,
+            longitude=105.807241,
+            total_grid_capacity_kw=150.0,
+            operating_hours="24/7",
+            status="ACTIVE",
+            is_active=True,
+        )
+        db.add_all([st_hanoi, st_danang, st_hcm, st_unassigned])
+        db.commit()
+
+        # 5. Tạo Biểu giá TOU (Time-of-Use)
+        print("[+] Đang tạo biểu giá TOU linh hoạt theo khung giờ...")
+        default_tariff = Tariff(
+            station_id=None,  # Áp dụng chung toàn hệ thống
+            name="Biểu Giá Điện TOU Chuẩn EV CSMS 2026",
+            price_normal=Decimal("3200.00"),
+            price_peak=Decimal("4500.00"),
+            price_offpeak=Decimal("1800.00"),
+            peak_start="09:30",
+            peak_end="11:30",
+            peak_start_2="17:00",
+            peak_end_2="20:00",
+            offpeak_start="22:00",
+            offpeak_end="04:00",
+            is_active=True,
+        )
+        db.add(default_tariff)
+        db.commit()
+
+        # 6. Tạo Trụ sạc (Charging Points) & Cổng sạc (Connectors)
+        print(
+            "[+] Đang cấu hình các trụ sạc EVSE (AC 22kW, DC 60kW, DC 150kW, DC 300kW)..."
+        )
+        stations_list = [st_hcm, st_hanoi, st_danang]
+        all_connectors = []
+
+        for st in stations_list:
+            # Trụ 1: Siêu nhanh DC 150kW (Dual CCS2)
+            cp1 = ChargingPoint(
+                station_id=st.id,
+                code=f"EVSE-{st.id}-01",
+                vendor="ABB Terra HP",
+                model="Terra-154-UL",
+                max_power_kw=150.0,
+                status="AVAILABLE",
+                power_sharing_enabled=True,
+                is_active=True,
+            )
+            # Trụ 2: Nhanh DC 60kW (CCS2 + Type 2)
+            cp2 = ChargingPoint(
+                station_id=st.id,
+                code=f"EVSE-{st.id}-02",
+                vendor="VinFast Power",
+                model="VF-DC-60",
+                max_power_kw=60.0,
+                status="AVAILABLE",
+                power_sharing_enabled=True,
+                is_active=True,
+            )
+            # Trụ 3: Tiêu chuẩn AC 22kW (Dual Type 2)
+            cp3 = ChargingPoint(
+                station_id=st.id,
+                code=f"EVSE-{st.id}-03",
+                vendor="Schneider Electric",
+                model="EVlink Pro AC",
+                max_power_kw=22.0,
+                status="AVAILABLE",
+                power_sharing_enabled=False,
+                is_active=True,
+            )
+            db.add_all([cp1, cp2, cp3])
+            db.commit()
+
+            # Thêm cổng sạc cho từng trụ
+            conn_defs = [
+                # Trụ 1: 2 súng CCS2
+                (cp1.id, 1, "CCS2", 150.0),
+                (cp1.id, 2, "CCS2", 150.0),
+                # Trụ 2: 1 súng CCS2, 1 súng Type 2
+                (cp2.id, 1, "CCS2", 60.0),
+                (cp2.id, 2, "TYPE_2", 22.0),
+                # Trụ 3: 2 súng Type 2
+                (cp3.id, 1, "TYPE_2", 22.0),
+                (cp3.id, 2, "TYPE_2", 22.0),
+            ]
+
+            for cp_id, num, c_type, p_max in conn_defs:
+                c = Connector(
+                    charging_point_id=cp_id,
+                    connector_number=num,
+                    connector_type=c_type,
+                    max_power_kw=p_max,
+                    status="AVAILABLE",
+                    is_active=True,
+                )
+                db.add(c)
+                all_connectors.append(c)
 
         db.commit()
+
+        # 7. Tạo Lịch sử 60+ Phiên sạc phân bố trong 30 ngày qua
+        print("[+] Đang sinh 60+ phiên sạc lịch sử phân bố chân thực trong 30 ngày...")
+        now = datetime.now(timezone.utc)
+        drivers_list = [u for u in users_to_create if u.role == "CUSTOMER"]
+
+        sessions_created = 0
+        for day_offset in range(30, 1, -1):
+            day_time = now - timedelta(days=day_offset)
+            # Mỗi ngày sinh 2 phiên sạc
+            for _ in range(2):
+                driver = random.choice(drivers_list)
+                connector = random.choice(all_connectors)
+
+                # Chọn khung giờ ngẫu nhiên trong ngày
+                hour = random.choice([8, 10, 14, 18, 20, 23])
+                sess_start = day_time.replace(hour=hour, minute=random.randint(0, 50))
+                duration_minutes = random.randint(25, 75)
+                sess_end = sess_start + timedelta(minutes=duration_minutes)
+
+                # Đơn giá theo khung giờ
+                if hour in [10, 18, 20]:
+                    applied_price = Decimal("4500.00")  # Peak
+                elif hour in [23]:
+                    applied_price = Decimal("1800.00")  # Offpeak
+                else:
+                    applied_price = Decimal("3200.00")  # Normal
+
+                kwh = Decimal(str(round(random.uniform(15.0, 55.0), 2)))
+                amount = Decimal(str(round(kwh * applied_price, 2)))
+
+                sess = ChargingSession(
+                    user_id=driver.id,
+                    connector_id=connector.id,
+                    tariff_id=default_tariff.id,
+                    applied_price_per_kwh=applied_price,
+                    start_time=sess_start,
+                    end_time=sess_end,
+                    meter_start_kwh=Decimal("0.00"),
+                    meter_stop_kwh=kwh,
+                    total_kwh=kwh,
+                    total_amount=amount,
+                    current_soc=100.0,
+                    status="COMPLETED",
+                    stop_reason="BATTERY_FULL"
+                    if random.random() > 0.3
+                    else "USER_STOPPED",
+                    created_at=sess_start,
+                )
+                db.add(sess)
+                sessions_created += 1
+
+        db.commit()
+
+        # 7. Tạo Nhật ký kiểm toán mẫu (Audit Logs - S-27 / T-58)
+        print("[+] Đang tạo nhật ký kiểm toán vận hành mẫu (Audit Logs)...")
+        from app.models.audit_log import AuditLog
+        sample_audit_logs = [
+            AuditLog(
+                user_id=1,
+                action="REMOTE_START",
+                object_type="charging_point",
+                object_id="1",
+                data={"result": "SUCCESS", "description": "Khởi động phiên sạc từ xa thành công trên trụ CP-01"},
+                created_at=now - timedelta(hours=2),
+            ),
+            AuditLog(
+                user_id=3,
+                action="RESTART_CHARGER",
+                object_type="charging_point",
+                object_id="2",
+                data={"result": "SUCCESS", "description": "Khởi động lại trụ sạc CP-02 định kỳ"},
+                created_at=now - timedelta(hours=5),
+            ),
+            AuditLog(
+                user_id=1,
+                action="UPDATE_TARIFF",
+                object_type="tariff",
+                object_id="1",
+                data={"result": "SUCCESS", "description": "Cập nhật biểu giá điện TOU giờ cao điểm"},
+                created_at=now - timedelta(days=1),
+            ),
+            AuditLog(
+                user_id=1,
+                action="LOCK_USER",
+                object_type="user",
+                object_id="7",
+                data={"result": "SUCCESS", "description": "Khóa đăng nhập do nợ cước vượt hạn mức"},
+                created_at=now - timedelta(days=2),
+            ),
+        ]
+        db.add_all(sample_audit_logs)
+        db.commit()
+
+        print("==================================================================")
+        print("          NẠP DỮ LIỆU MẪU THÀNH CÔNG RỰC RỠ (SUCCESS)!            ")
+        print("==================================================================")
+        print(f"[*] Tổng số người dùng: {len(users_to_create)} (Admin, CPO, Drivers)")
+        print(f"[*] Tổng số trạm sạc:   {len(stations_list)} (Hà Nội, Đà Nẵng, TP.HCM)")
+        print("[*] Tổng số trụ sạc:    9 trụ EVSE (100% AVAILABLE sẵn sàng)")
+        print("[*] Tổng số cổng sạc:   18 cổng sạc vật lý (CCS2, Type 2)")
+        print(
+            f"[*] Tổng phiên sạc:     {sessions_created} phiên lịch sử quá khứ (ngày hôm nay để trống chờ vận hành thật)"
+        )
+        print("------------------------------------------------------------------")
+        print("THÔNG TIN TÀI KHOẢN ĐĂNG NHẬP NHANH:")
+        print("1. Quản trị viên:    admin / 12345678a")
+        print("2. Đơn vị CPO:       operator_a / OpPass123 (hoặc operator / OpPass123)")
+        print("3. Khách hàng lái xe: customer_user / CusPass123 (Ví có sẵn 250,000 đ)")
+        print("4. Khách hàng VIP:   driver_vip / DriverPass123 (Ví có sẵn 1,500,000 đ)")
+        print("5. Khách nợ tiền:    driver_debt / DriverPass123 (Số dư -120,000 đ)")
+        print("==================================================================")
+
+    except Exception as exc:  # noqa: BLE001 - top-level seed failure must roll back
+        db.rollback()
+        print(f"[!] Lỗi nạp dữ liệu: {exc}")
+        raise
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    seed_roles()
+    seed_database()

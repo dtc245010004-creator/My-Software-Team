@@ -1,0 +1,630 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Zap,
+  Play,
+  Square,
+  AlertTriangle,
+  Sliders,
+  Battery,
+  Thermometer,
+  Activity,
+  DollarSign,
+  Radio,
+  CheckCircle2,
+} from 'lucide-react';
+import api from '../services/api';
+import { telemetryWs } from '../services/websocket';
+import { useAuth } from '../context/AuthContext';
+import { formatVNTime } from '../utils/formatTime';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+
+export default function Simulator() {
+  const { user, token } = useAuth();
+  const [stations, setStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState('');
+  const [selectedConnectorId, setSelectedConnectorId] = useState('');
+
+  // Trạng thái phiên sạc hiện hành
+  const [activeSession, setActiveSession] = useState(null);
+  const [telemetry, setTelemetry] = useState(null);
+  const [chartData, setChartData] = useState([]);
+
+  // Điều khiển
+  const [powerLimitInput, setPowerLimitInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+
+  // Cấu hình xe điện & dung lượng pin
+  const [batteryCapacity, setBatteryCapacity] = useState('60');
+  const [customCapacity, setCustomCapacity] = useState('');
+  const [initialSoc, setInitialSoc] = useState('25');
+
+  const batteryOptions = [
+    { label: '42.0 kWh — VinFast VF 5 / VF e34 / Wuling', value: '42' },
+    { label: '60.0 kWh — VinFast VF 6 / Tesla Model 3 / Ioniq 5 (Mặc định)', value: '60' },
+    { label: '87.7 kWh — VinFast VF 8 / Kia EV6 Long Range', value: '87.7' },
+    { label: '123.0 kWh — VinFast VF 9 / Tesla Model X Plaid', value: '123' },
+    { label: 'Tùy chỉnh (kWh)...', value: 'CUSTOM' },
+  ];
+
+  useEffect(() => {
+    fetchStations();
+    checkExistingActiveSession();
+  }, []);
+
+  // Lắng nghe dữ liệu realtime từ WebSocket
+  useEffect(() => {
+    if (!activeSession) return;
+
+    telemetryWs.subscribeSession(activeSession.id);
+
+    const unsubscribe = telemetryWs.addListener((msg) => {
+      if (msg.event === 'TELEMETRY' && msg.session_id === activeSession.id) {
+        setTelemetry(msg);
+        setChartData((prev) => {
+          const timeLabel = formatVNTime(msg.timestamp, {
+            minute: '2-digit',
+            second: '2-digit',
+          });
+          const next = [...prev, { time: timeLabel, powerKw: msg.power_kw, soc: msg.soc, tempC: msg.temp_c }];
+          return next.slice(-25); // Giữ lại 25 mẫu gần nhất
+        });
+      } else if (
+        (msg.event === 'STOPPED' || msg.event === 'SESSION_STOPPED') &&
+        msg.session_id === activeSession.id
+      ) {
+        setStatusMessage(`Phiên sạc đã kết thúc: ${msg.stop_reason || msg.reason || 'Hoàn tất'}`);
+        setActiveSession(null);
+        telemetryWs.unsubscribeSession(activeSession.id);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      if (activeSession) {
+        telemetryWs.unsubscribeSession(activeSession.id);
+      }
+    };
+  }, [activeSession]);
+
+  const fetchStations = async () => {
+    try {
+      const res = await api.get('/stations');
+      const stData = res.data || [];
+      setStations(stData);
+      const searchParams = new URLSearchParams(window.location.search);
+      const queryStationId = searchParams.get('station_id');
+      if (queryStationId && stData.some((st) => String(st.id) === String(queryStationId))) {
+        setSelectedStationId(String(queryStationId));
+      } else if (stData.length > 0) {
+        setSelectedStationId(String(stData[0].id));
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách trạm:', err);
+    }
+  };
+
+  const checkExistingActiveSession = async () => {
+    try {
+      const res = await api.get('/sessions/me');
+      const active = (res.data || []).find((s) => s.status === 'ACTIVE');
+      if (active) {
+        setActiveSession(active);
+        setStatusMessage(`Đang kết nối lại phiên sạc đang chạy #${active.id}`);
+      }
+    } catch (e) {
+      // Bỏ qua nếu lỗi
+    }
+  };
+
+  // Lấy danh sách cổng sạc của trạm được chọn
+  const currentStation = stations.find((st) => String(st.id) === String(selectedStationId));
+  const availableConnectors = [];
+  if (currentStation?.charging_points) {
+    currentStation.charging_points.forEach((cp) => {
+      (cp.connectors || []).forEach((conn) => {
+        availableConnectors.push({
+          ...conn,
+          chargerCode: cp.code,
+          chargerStatus: cp.status,
+          chargerMaxPower: cp.max_power_kw,
+        });
+      });
+    });
+  }
+
+  // 1. Bắt đầu phiên sạc
+  const handleStartCharging = async () => {
+    if (!selectedConnectorId) {
+      alert('Vui lòng chọn một cổng sạc trước khi bắt đầu.');
+      return;
+    }
+
+    // Kiểm tra tính khả dụng của cổng và trụ sạc được chọn
+    const targetConn = availableConnectors.find((c) => String(c.id) === String(selectedConnectorId));
+    if (targetConn) {
+      if (targetConn.chargerStatus === 'UNAVAILABLE' || targetConn.chargerStatus === 'FAULTED' || targetConn.chargerStatus === 'MAINTENANCE') {
+        alert(`Trụ sạc [${targetConn.chargerCode}] hiện đang trong trạng thái bảo trì/sự cố. Không thể bắt đầu phiên sạc!`);
+        return;
+      }
+      if (targetConn.status !== 'AVAILABLE') {
+        alert(`Cổng sạc hiện không khả dụng (Trạng thái: ${targetConn.status}). Vui lòng chọn cổng sạc khác.`);
+        return;
+      }
+    }
+
+    const finalCapacity = batteryCapacity === 'CUSTOM' ? parseFloat(customCapacity) : parseFloat(batteryCapacity);
+    if (!finalCapacity || finalCapacity <= 0) {
+      alert('Vui lòng chọn hoặc nhập dung lượng pin hợp lệ (> 0 kWh).');
+      return;
+    }
+
+    const finalSoc = parseFloat(initialSoc);
+    if (isNaN(finalSoc) || finalSoc < 0 || finalSoc >= 100) {
+      alert('Vui lòng nhập mức pin hiện có hợp lệ (0% - 99%).');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setStatusMessage('Đang kiểm tra số dư ví & khóa rơ-le cổng sạc...');
+      const res = await api.post('/sessions/start', {
+        connector_id: Number(selectedConnectorId),
+        battery_capacity_kwh: finalCapacity,
+        initial_soc: finalSoc,
+      });
+
+      const session = res.data;
+      setActiveSession(session);
+      setChartData([]);
+      setStatusMessage(
+        `Phiên sạc #${session.id} khởi động: Pin ${finalCapacity} kWh, Bắt đầu từ ${finalSoc}% (Đơn giá: ${Number(
+          session.applied_price_per_kwh
+        ).toLocaleString()} đ/kWh)`
+      );
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message;
+      setStatusMessage(`Không thể bắt đầu sạc: ${detail}`);
+      alert(`Lỗi: ${detail}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Dừng phiên sạc an toàn
+  const handleStopCharging = async () => {
+    if (!activeSession) return;
+
+    try {
+      setLoading(true);
+      setStatusMessage('Đang ngắt rơ-le và quyết toán giao dịch ví tiền ACID...');
+      const res = await api.post(`/sessions/${activeSession.id}/stop`, {
+        meter_stop_kwh: telemetry?.energy_kwh || null,
+      });
+
+      const finished = res.data;
+      setStatusMessage(
+        `Phiên #${finished.id} đã chốt: ${finished.total_kwh} kWh — Tổng tiền: ${Number(finished.total_amount).toLocaleString()} VND`
+      );
+      setActiveSession(null);
+    } catch (err) {
+      alert('Lỗi dừng sạc: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Kích hoạt giả lập sự cố quá nhiệt
+  const handleTriggerOverheat = async () => {
+    if (!activeSession) return;
+
+    try {
+      setStatusMessage('Đang phát lệnh sự cố quá nhiệt cổng sạc > 75°C...');
+      await api.post(`/simulator/sessions/${activeSession.id}/trigger-event`, {
+        event_type: 'OVERHEAT',
+      });
+    } catch (err) {
+      alert('Lỗi kích hoạt sự cố: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // 4. Điều tiết giới hạn công suất trần từ Admin / Chủ trạm
+  const handleSetPowerLimit = async (e) => {
+    e.preventDefault();
+    if (!activeSession || !powerLimitInput) return;
+
+    try {
+      const limit = parseFloat(powerLimitInput);
+      await api.post(`/simulator/sessions/${activeSession.id}/set-power-limit`, {
+        power_limit_kw: limit,
+      });
+      setStatusMessage(`Đã cập nhật công suất trần mới: ${limit} kW`);
+      setPowerLimitInput('');
+    } catch (err) {
+      alert('Lỗi điều tiết công suất: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header Headline */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-tech-white">Bảng Giả Lập Sạc Pin & Giám Sát Telemetry</h1>
+          <p className="text-xs text-steel-gray mt-0.5 font-mono">
+            MÔ PHỎNG ĐƯỜNG CONG SẠC CC-CV, BẢO VỆ RƠ-LE VÀ TRUYỀN PHÁT WEBSOCKET REALTIME
+          </p>
+        </div>
+        {statusMessage && (
+          <div className="bg-obsidian border border-hairline px-3 py-1.5 rounded text-xs font-mono text-electric-cyan">
+            {statusMessage}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Charging Dispatch Controller */}
+        <div className="bg-panel border border-hairline p-5 rounded-sm space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
+            ĐIỀU KHIỂN RƠ-LE SẠC (DISPATCH CONSOLE)
+          </h2>
+
+          {!activeSession ? (
+            <div className="space-y-4 font-mono text-xs">
+              <div>
+                <label className="text-steel-gray block mb-1">CHỌN TRẠM SẠC ĐIỀU PHỐI:</label>
+                <select
+                  value={selectedStationId}
+                  onChange={(e) => setSelectedStationId(e.target.value)}
+                  className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                >
+                  {stations.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.name} ({st.total_grid_capacity_kw} kW)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-steel-gray block mb-1">CHỌN SÚNG SẠC VẬT LÝ:</label>
+                <select
+                  value={selectedConnectorId}
+                  onChange={(e) => setSelectedConnectorId(e.target.value)}
+                  className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan"
+                >
+                  <option value="">-- Chọn cổng sạc sẵn sàng --</option>
+                  {availableConnectors.map((c) => {
+                    const isChargerMaintenance = c.chargerStatus === 'UNAVAILABLE' || c.chargerStatus === 'FAULTED' || c.chargerStatus === 'MAINTENANCE';
+                    const isCharging = c.status === 'CHARGING';
+                    const isConnUnavailable = c.status === 'UNAVAILABLE' || c.status === 'FAULTED';
+                    const isDisabled = isChargerMaintenance || isCharging || isConnUnavailable;
+
+                    let statusTag = `[${c.status}]`;
+                    if (isChargerMaintenance) {
+                      statusTag = '[TRỤ BẢO TRÌ]';
+                    } else if (isCharging) {
+                      statusTag = '[ĐANG CÓ XE SẠC]';
+                    } else if (isConnUnavailable) {
+                      statusTag = '[CỔNG KHÔNG KHẢ DỤNG]';
+                    } else if (c.status === 'AVAILABLE') {
+                      statusTag = '[SẴN SÀNG]';
+                    }
+
+                    return (
+                      <option key={c.id} value={c.id} disabled={isDisabled}>
+                        {statusTag} [{c.chargerCode}] Súng #{c.connector_number} - {c.connector_type} ({c.max_power_kw}kW)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* 3. MỤC CHỌN DUNG LƯỢNG PIN */}
+              <div>
+                <div className="flex items-center justify-between text-steel-gray mb-1">
+                  <label className="text-tech-white font-bold text-[11px]">DUNG LƯỢNG PIN XE (KWH):</label>
+                  <span className="text-electric-cyan font-bold tabular-nums">
+                    {batteryCapacity === 'CUSTOM' ? (customCapacity || '0') : batteryCapacity} kWh
+                  </span>
+                </div>
+                <select
+                  value={batteryCapacity}
+                  onChange={(e) => setBatteryCapacity(e.target.value)}
+                  className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan text-xs"
+                >
+                  {batteryOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                {batteryCapacity === 'CUSTOM' && (
+                  <div className="mt-1.5">
+                    <input
+                      type="number"
+                      min="10"
+                      max="250"
+                      step="1"
+                      placeholder="Nhập dung lượng tùy chỉnh (VD: 75 kWh)..."
+                      value={customCapacity}
+                      onChange={(e) => setCustomCapacity(e.target.value)}
+                      className="w-full bg-obsidian border border-hairline p-1.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* 4. MỤC ĐIỀN MỨC PIN HIỆN CÓ */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-tech-white font-bold text-[11px]">MỨC PIN HIỆN CÓ (SoC %):</label>
+                  <span className="font-bold text-grid-green tabular-nums">{initialSoc}%</span>
+                </div>
+
+                <div className="grid grid-cols-5 gap-1 text-[10px]">
+                  {['10', '20', '35', '50', '70'].map((socVal) => (
+                    <button
+                      key={socVal}
+                      type="button"
+                      onClick={() => setInitialSoc(socVal)}
+                      className={`py-1 rounded border text-center transition-colors ${
+                        initialSoc === socVal
+                          ? 'bg-grid-green text-white border-grid-green font-bold'
+                          : 'bg-obsidian text-steel-gray border-hairline hover:text-tech-white'
+                      }`}
+                    >
+                      {socVal}%
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center space-x-2 pt-0.5">
+                  <input
+                    type="range"
+                    min="5"
+                    max="90"
+                    step="1"
+                    value={initialSoc}
+                    onChange={(e) => setInitialSoc(e.target.value)}
+                    className="w-full accent-grid-green cursor-pointer"
+                  />
+                  <div className="w-14 shrink-0">
+                    <input
+                      type="number"
+                      min="1"
+                      max="95"
+                      value={initialSoc}
+                      onChange={(e) => setInitialSoc(e.target.value)}
+                      className="w-full bg-obsidian border border-hairline p-1 rounded text-center text-tech-white font-bold focus:outline-none focus:border-grid-green tabular-nums text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleStartCharging}
+                  disabled={loading || !selectedConnectorId}
+                  className="w-full flex items-center justify-center space-x-2 py-3 rounded bg-electric-cyan hover:bg-electric-cyan-hover disabled:opacity-50 text-white font-bold transition-all shadow-sm"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>KẾT NỐI & BẬT RƠ-LE SẠC</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 font-mono text-xs">
+              <div className="bg-obsidian border border-electric-cyan/40 p-3 rounded">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-electric-cyan font-bold">PHIÊN SẠC ĐANG CHẠY</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-electric-cyan/20 text-electric-cyan font-bold animate-pulse">
+                    LIVE
+                  </span>
+                </div>
+                <div className="text-steel-gray space-y-1">
+                  <div>Mã phiên: #{activeSession.id}</div>
+                  <div>Cổng sạc ID: #{activeSession.connector_id}</div>
+                  <div>Đơn giá: {Number(activeSession.applied_price_per_kwh).toLocaleString()} đ/kWh</div>
+                  <div>Pin ban đầu: {activeSession.current_soc}%</div>
+                </div>
+              </div>
+
+              {/* Stop Session Button */}
+              <button
+                onClick={handleStopCharging}
+                disabled={loading}
+                className="w-full flex items-center justify-center space-x-2 py-2.5 rounded bg-critical-red hover:bg-red-700 text-white font-bold transition-all"
+              >
+                <Square className="w-4 h-4" />
+                <span>DỪNG SẠC & QUYẾT TOÁN VÍ</span>
+              </button>
+
+              {/* Overheat Simulation Button */}
+              <div className="pt-3 border-t border-hairline">
+                <span className="text-steel-gray text-[11px] block mb-2">THỬ NGHIỆM AN TOÀN HỆ THỐNG:</span>
+                <button
+                  onClick={handleTriggerOverheat}
+                  className="w-full flex items-center justify-center space-x-1.5 py-2 rounded bg-caution-amber/20 border border-caution-amber/40 hover:bg-caution-amber/30 text-caution-amber font-semibold transition-all"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>GIẢ LẬP SỰ CỐ QUÁ NHIỆT &gt;75°C</span>
+                </button>
+              </div>
+
+              {/* Power Limit Override */}
+              <form onSubmit={handleSetPowerLimit} className="pt-3 border-t border-hairline space-y-2">
+                <span className="text-steel-gray text-[11px] block">ĐIỀU TIẾT CÔNG SUẤT TRẦN (AI / CHỦ TRẠM):</span>
+                <div className="flex space-x-2">
+                  <input
+                    type="number"
+                    step="5"
+                    min="10"
+                    placeholder="kW trần"
+                    value={powerLimitInput}
+                    onChange={(e) => setPowerLimitInput(e.target.value)}
+                    className="w-full bg-obsidian border border-hairline p-1.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 rounded bg-hairline hover:bg-panel text-tech-white font-bold shrink-0"
+                  >
+                    GÁN
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {/* Middle & Right Column: Realtime Telemetry Indicators & CC-CV Chart */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Status Indicator Banner */}
+          <div className="flex items-center justify-between bg-panel border border-hairline px-4 py-2.5 rounded-sm font-mono text-xs">
+            <div className="flex items-center space-x-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${activeSession ? 'bg-grid-green animate-pulse' : 'bg-steel-gray'}`} />
+              <span className="text-steel-gray">TRẠNG THÁI RƠ-LE:</span>
+              <span className={`font-bold ${activeSession ? 'text-grid-green' : 'text-caution-amber'}`}>
+                {activeSession ? 'ĐÃ ĐÓNG RƠ-LE — ĐANG TRUYỀN PHÁT DỮ LIỆU SẠC' : 'MỞ (CHỜ BẮT ĐẦU PHIÊN SẠC)'}
+              </span>
+            </div>
+            {activeSession ? (
+              <span className="text-electric-cyan font-bold">
+                MÃ PHIÊN #{activeSession.id} (Chu kỳ đo 2s)
+              </span>
+            ) : (
+              <span className="text-steel-gray text-[11px] hidden sm:inline">
+                Nhấn [KẾT NỐI & BẬT RƠ-LE SẠC] để cấp điện & chạy mô phỏng
+              </span>
+            )}
+          </div>
+
+          {/* Telemetry 4 Metric Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-panel border border-hairline p-3 rounded-sm font-mono">
+              <div className="text-steel-gray text-[11px] flex items-center justify-between mb-1">
+                <span>CÔNG SUẤT TỨC THỜI</span>
+                <Zap className="w-3.5 h-3.5 text-electric-cyan" />
+              </div>
+              <div className="text-xl font-bold text-electric-cyan tabular-nums">
+                {telemetry ? telemetry.power_kw.toFixed(1) : '0.0'} <span className="text-xs text-steel-gray font-normal">kW</span>
+              </div>
+              <div className="text-[10px] text-steel-gray mt-1">
+                {telemetry ? 'Đo đếm theo chu kỳ 2s' : 'Chưa cấp điện tải'}
+              </div>
+            </div>
+
+            <div className="bg-panel border border-hairline p-3 rounded-sm font-mono">
+              <div className="text-steel-gray text-[11px] flex items-center justify-between mb-1">
+                <span>DUNG LƯỢNG PIN (SoC)</span>
+                <Battery className="w-3.5 h-3.5 text-grid-green" />
+              </div>
+              <div className="text-xl font-bold text-grid-green tabular-nums">
+                {telemetry
+                  ? telemetry.soc.toFixed(1)
+                  : activeSession
+                  ? (activeSession.current_soc != null ? Number(activeSession.current_soc).toFixed(1) : '0.0')
+                  : parseFloat(initialSoc || '25').toFixed(1)}{' '}
+                <span className="text-xs text-steel-gray font-normal">%</span>
+              </div>
+              <div className="text-[10px] text-steel-gray mt-1">
+                {telemetry ? 'Ngắt khi đạt 100%' : 'Mức pin xe hiện có'}
+              </div>
+            </div>
+
+            <div className="bg-panel border border-hairline p-3 rounded-sm font-mono">
+              <div className="text-steel-gray text-[11px] flex items-center justify-between mb-1">
+                <span>NHIỆT ĐỘ CỔNG SẠC</span>
+                <Thermometer
+                  className={`w-3.5 h-3.5 ${
+                    telemetry?.temp_c > 75
+                      ? 'text-critical-red animate-ping'
+                      : telemetry?.temp_c > 65
+                      ? 'text-caution-amber'
+                      : 'text-grid-green'
+                  }`}
+                />
+              </div>
+              <div
+                className={`text-xl font-bold tabular-nums ${
+                  telemetry?.temp_c > 75
+                    ? 'text-critical-red'
+                    : telemetry?.temp_c > 65
+                    ? 'text-caution-amber'
+                    : 'text-tech-white'
+                }`}
+              >
+                {telemetry ? telemetry.temp_c.toFixed(1) : '30.0'} <span className="text-xs text-steel-gray font-normal">°C</span>
+              </div>
+              <div className="text-[10px] text-steel-gray mt-1">
+                {telemetry ? 'Ngưỡng ngắt: 75°C' : 'Nhiệt độ môi trường'}
+              </div>
+            </div>
+
+            <div className="bg-panel border border-hairline p-3 rounded-sm font-mono">
+              <div className="text-steel-gray text-[11px] flex items-center justify-between mb-1">
+                <span>ĐIỆN NĂNG & TIỀN</span>
+                <DollarSign className="w-3.5 h-3.5 text-caution-amber" />
+              </div>
+              <div className="text-lg font-bold text-caution-amber tabular-nums">
+                {telemetry ? telemetry.cost_estimate?.toLocaleString() : '0'} <span className="text-xs text-steel-gray font-normal">đ</span>
+              </div>
+              <div className="text-[10px] text-steel-gray mt-1">
+                {telemetry ? `${telemetry.energy_kwh.toFixed(3)} kWh` : '0.000 kWh'}
+              </div>
+            </div>
+          </div>
+
+          {/* Realtime Recharts CC-CV Curve */}
+          <div className="bg-panel border border-hairline p-5 rounded-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-tech-white">Đồ Thị Realtime Đường Cong Sạc Pin CC-CV</h2>
+                <p className="text-xs text-steel-gray font-mono">
+                  Quan sát trực tiếp pha Dòng không đổi (CC: &lt;80% SoC) và pha Áp không đổi (CV: &ge;80% SoC)
+                </p>
+              </div>
+              <div className="flex items-center space-x-4 text-xs font-mono">
+                <span className="flex items-center text-electric-cyan">
+                  <span className="w-2.5 h-0.5 bg-electric-cyan mr-1.5" />
+                  Công suất (kW)
+                </span>
+                <span className="flex items-center text-grid-green">
+                  <span className="w-2.5 h-0.5 bg-grid-green mr-1.5" />
+                  Pin SoC (%)
+                </span>
+              </div>
+            </div>
+
+            <div className="h-72 w-full">
+              {chartData.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-steel-gray font-mono text-xs space-y-2">
+                  <Radio className="w-8 h-8 text-steel-gray/50 animate-pulse" />
+                  <div className="text-tech-white font-medium">Chưa có xung nhịp truyền phát telemetry</div>
+                  <div className="text-[11px] text-steel-gray max-w-sm text-center">
+                    Cổng sạc đang ở trạng thái chờ. Vui lòng bấm <strong className="text-electric-cyan">"KẾT NỐI & BẬT RƠ-LE SẠC"</strong> ở cột bên trái để cấp điện và theo dõi đồ thị thời gian thực.
+                  </div>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#222F44" />
+                    <XAxis dataKey="time" stroke="#94A3B8" fontSize={11} fontFamily="monospace" />
+                    <YAxis yAxisId="left" stroke="#0284C7" fontSize={11} fontFamily="monospace" unit=" kW" />
+                    <YAxis yAxisId="right" orientation="right" stroke="#10B981" fontSize={11} fontFamily="monospace" unit=" %" domain={[0, 100]} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#151D2A', borderColor: '#222F44', borderRadius: '2px' }}
+                      labelStyle={{ color: '#F1F5F9', fontFamily: 'monospace' }}
+                    />
+                    <Line yAxisId="left" type="monotone" dataKey="powerKw" stroke="#0284C7" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    <Line yAxisId="right" type="monotone" dataKey="soc" stroke="#10B981" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,15 +1,16 @@
-
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 
 class LoginRequest(BaseModel):
     """Schema cho request đăng nhập."""
+
     email: str
     password: str
 
 
 class RegisterRequest(BaseModel):
     """Schema cho request đăng ký tài khoản customer/driver."""
+
     email: EmailStr
     password: str
     full_name: str
@@ -32,6 +33,7 @@ class RegisterRequest(BaseModel):
 
 class UserResponse(BaseModel):
     """Schema cho response thông tin người dùng."""
+
     id: int
     email: str
     full_name: str
@@ -49,6 +51,7 @@ class UserResponse(BaseModel):
 
 class LoginResponse(BaseModel):
     """Schema cho response đăng nhập — chuẩn FastAPI Bearer token."""
+
     access_token: str
     token_type: str = "bearer"
     user: UserResponse

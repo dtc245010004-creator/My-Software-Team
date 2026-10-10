@@ -1,66 +1,44 @@
-from datetime import datetime
-from typing import TYPE_CHECKING
-
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    ForeignKey,
-    Integer,
-    String,
-    Table,
-    func,
-)
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+﻿from sqlalchemy import Boolean, Column, DateTime, Integer, String, func
+from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
-if TYPE_CHECKING:
-    from app.models.role import Role
-
-user_roles = Table(
-    "user_roles",
-    Base.metadata,
-    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-)
-
 
 class User(Base):
+    """MÃ´ hÃ¬nh ngÆ°á»i dÃ¹ng há»‡ thá»‘ng EV CSMS (Admin, Operator, Customer)."""
+
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    failed_login_count: Mapped[int] = mapped_column(
-        Integer, default=0, nullable=False
-    )
-    locked_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    last_failed_ip: Mapped[str | None] = mapped_column(
-        String(45), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(100), nullable=True)
+    role = Column(
+        String(20), default="CUSTOMER", nullable=False
+    )  # ADMIN, OPERATOR, CUSTOMER
+    is_active = Column(Boolean, default=True, nullable=False)
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
-    roles: Mapped[list["Role"]] = relationship(
-        "Role",
-        secondary=user_roles,
-        back_populates="users",
-        passive_deletes=True,
+    # Quan há»‡ 1-1 vá»›i VÃ­ Ä‘iá»‡n tá»­: má»—i user cÃ³ Ä‘Ãºng 1 vÃ­
+    wallet = relationship(
+        "Wallet",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
-    @property
-    def role_names(self) -> list[str]:
-        return [role.name for role in (self.roles or [])]
+    def __repr__(self) -> str:
+        return f"<User(id={self.id}, username='{self.username}', role='{self.role}')>"
 
-    def get_role_names(self) -> list[str]:
-        return self.role_names
+

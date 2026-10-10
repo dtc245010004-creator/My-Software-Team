@@ -12,10 +12,7 @@ def require_roles(*allowed_roles: str):
     def checker(
         current_user: Annotated[User, Depends(get_current_user)],
     ) -> User:
-        user_roles = {
-            role.name
-            for role in current_user.roles
-        }
+        user_roles = {role.name for role in current_user.roles}
 
         if not user_roles.intersection(allowed):
             raise HTTPException(

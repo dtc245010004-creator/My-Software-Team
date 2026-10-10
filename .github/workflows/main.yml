@@ -93,3 +93,34 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg2://admin:admin@127.0.0.1:5432/ev_charging_system
         run: pytest tests -v
+
+      - name: Run live 20 charger reconnect integration (T-55/T-56)
+        env:
+          COMPOSE_DATABASE_URL: postgresql+psycopg2://admin:secretpassword@db:5432/ev_csms_db
+          DATABASE_URL: postgresql+psycopg2://admin:secretpassword@127.0.0.1:5433/ev_csms_db
+          POSTGRES_HOST_PORT: "5433"
+          BACKEND_HOST_PORT: "8000"
+          SIMULATOR_CHARGE_POINT_COUNT: "20"
+          OCPP_RECONNECT_CHARGE_POINTS: "5"
+          OCPP_LIVE_TEST: "1"
+          OCPP_LIVE_WS_URL: ws://127.0.0.1:8000/ocpp
+        run: |
+          set -Eeuo pipefail
+          compose=(docker compose --project-name ocpp-integration -f docker-compose.yml)
+          cleanup() {
+            "${compose[@]}" down --volumes --remove-orphans
+          }
+          trap cleanup EXIT
+          "${compose[@]}" up --build --detach db backend ocpp-simulator
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8000/docs >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              "${compose[@]}" logs --no-color
+              exit 1
+            fi
+            sleep 2
+          done
+          python -m pytest tools/ocpp-spike/test_reconnect_scenario.py -v
+          "${compose[@]}" logs --no-color ocpp-simulator
