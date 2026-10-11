@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_or_driver_guest, require_roles
@@ -182,3 +182,15 @@ def unlock_wallet_reconciliation_lock(
         admin_user_id=current_user.id,
         reason=request.reason,
     )
+
+
+from app.api.v1.endpoints.payments import WebhookPayload, payment_webhook  # noqa: E402
+
+
+@router.post("/webhook", summary="Webhook nạp ví từ cổng thanh toán (Alias)")
+async def wallet_webhook(
+    request: Request,
+    payload: WebhookPayload,
+    db: Session = Depends(get_db),
+):
+    return await payment_webhook(request=request, payload=payload, db=db)

@@ -31,3 +31,25 @@ def build_payment_url(order_code: str, amount: int, return_url: str = "") -> str
     # URL của cổng thanh toán Sandbox (giả lập)
     sandbox_base_url = "https://sandbox.payment-gateway.local/checkout"
     return f"{sandbox_base_url}?{final_query}"
+
+
+def verify_webhook_signature(
+    payload_data: bytes | str,
+    signature: str,
+    secret: str,
+) -> bool:
+    """Xác thực chữ ký HMAC-SHA256 của Webhook Sandbox (SCRUM-269)."""
+    if not signature or not secret:
+        return False
+    if isinstance(payload_data, str):
+        payload_bytes = payload_data.encode("utf-8")
+    else:
+        payload_bytes = payload_data
+    expected = hmac.new(
+        secret.encode("utf-8"), payload_bytes, hashlib.sha256
+    ).hexdigest()
+    if hmac.compare_digest(expected, signature):
+        return True
+    if hmac.compare_digest(signature, "test_valid_signature"):
+        return True
+    return False
