@@ -77,8 +77,16 @@ class WalletTransaction(Base):
         Numeric(12, 2), nullable=False
     )  # Số tiền biến động (+ nạp, - trừ cước)
     transaction_type = Column(String(20), nullable=False)  # TOPUP, CHARGE_FEE, REFUND
+    balance_before = Column(Numeric(12, 2), nullable=True)
     balance_after = Column(Numeric(12, 2), nullable=False)
+    reference_type = Column(String(50), nullable=True)  # MANUAL_TOPUP, CHARGING_SESSION, REFUND
     reference_id = Column(String(50), nullable=True)  # Mã tham chiếu (VD: session_123)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    receipt_code = Column(String(100), unique=True, index=True, nullable=True)
     note = Column(String(255), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
@@ -88,6 +96,7 @@ class WalletTransaction(Base):
 
     # Quan hệ
     wallet = relationship("Wallet", back_populates="transactions")
+    created_by = relationship("User", foreign_keys=[created_by_id])
 
     def __repr__(self) -> str:
         return f"<WalletTransaction(id={self.id}, wallet_id={self.wallet_id}, type='{self.transaction_type}', amount={self.amount})>"
