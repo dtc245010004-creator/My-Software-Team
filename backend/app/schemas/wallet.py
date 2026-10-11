@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.datetime_utils import UTCDateTime
 
@@ -99,7 +99,35 @@ class WalletResponse(BaseModel):
     balance: Decimal
     currency: str = "VND"
     is_debt_locked: bool
+    is_reconcile_locked: bool = False
     updated_at: UTCDateTime
     transactions: list[WalletTransactionResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TopupOrderResponse(BaseModel):
+    order_id: str
+    redirect_url: str
+
+
+class TopupOrderStatusResponse(BaseModel):
+    order_code: str
+    amount: Decimal
+    status: str
+    failure_reason: str | None = None
+    created_at: UTCDateTime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WalletReconciliationUnlockRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=255)
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Lý do mở khóa không được để trống.")
+        return cleaned

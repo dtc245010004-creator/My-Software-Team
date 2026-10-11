@@ -23,7 +23,8 @@ from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
-from app.models.wallet import Wallet, WalletTransaction
+from app.models.wallet import Wallet
+from app.services.wallet_service import post_ledger_entry
 
 
 def seed_database():
@@ -172,30 +173,29 @@ def seed_database():
                 init_balance = Decimal(str(random.choice([150000, 300000, 450000])))
                 is_locked = False
 
-            w = Wallet(user_id=u.id, balance=init_balance, is_debt_locked=is_locked)
+            w = Wallet(
+                user_id=u.id,
+                balance=Decimal("0.00"),
+                is_debt_locked=is_locked,
+            )
             db.add(w)
-            db.commit()
+            db.flush()
             wallets_map[u.id] = w
 
-            # Ghi lịch sử giao dịch ban đầu
-            if init_balance > 0:
-                tx = WalletTransaction(
+            if init_balance:
+                is_opening_topup = init_balance > 0
+                post_ledger_entry(
+                    db=db,
                     wallet_id=w.id,
-                    transaction_type="TOPUP",
                     amount=init_balance,
-                    balance_after=init_balance,
-                    note="Nạp số dư ban đầu qua cổng thanh toán VNPay",
+                    transaction_type="TOPUP" if is_opening_topup else "CHARGE_FEE",
+                    reference_id=f"seed_opening_{u.id}",
+                    note=(
+                        "Số dư khởi tạo dữ liệu mẫu"
+                        if is_opening_topup
+                        else "Số dư nợ khởi tạo dữ liệu mẫu"
+                    ),
                 )
-                db.add(tx)
-            elif init_balance < 0:
-                tx = WalletTransaction(
-                    wallet_id=w.id,
-                    transaction_type="CHARGE_FEE",
-                    amount=init_balance,
-                    balance_after=init_balance,
-                    note="Trừ cước sạc phiên trước (Ghi nợ hợp lệ)",
-                )
-                db.add(tx)
         db.commit()
 
         # 4. Tạo Hạ tầng Trạm sạc (ST-1, ST-2 thuộc Chủ A; ST-3 thuộc Chủ B; ST-4 chưa gán chủ)

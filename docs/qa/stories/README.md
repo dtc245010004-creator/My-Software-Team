@@ -30,6 +30,7 @@ Mỗi User Story trong hệ thống phải có một hồ sơ độc lập (`S-x
 | [`S-15`](S-15.md) | Phân quyền sạc OCPP bằng thẻ idTag | `backend/app/models/id_tag.py`, `backend/app/ocpp/handlers/authorize.py` | `test_authorize.py` (6 ca) | **ACCEPTED** — T-32/T-33 hoàn thành; 5 trạng thái Authorize và mã thẻ duy nhất được kiểm chứng |
 | [`S-16`](S-16.md) | Máy chủ gửi lệnh Reset OCPP và chờ phản hồi trụ | `backend/app/ocpp/dispatcher.py`, `backend/app/api/v1/endpoints/chargers.py` | `test_ocpp_reset.py` | **ACCEPTED** — T-34/T-35 hoàn thành; phản hồi tương quan, offline, timeout và quyền được kiểm chứng |
 | [`S-28`](S-28.md) | Khai báo biểu giá kWh và phí chiếm trụ | `backend/app/models/tariff.py`, `backend/app/services/billing.py`, `backend/app/ocpp/handlers/status_notification.py` | `test_billing_idle_fee.py` | **IN_PROGRESS / CONDITIONAL** — Backend SCRUM-188/189/190/192; mentor cần xác nhận cách quyết toán phí bổ sung khi `Available` đến muộn |
+| [`S-33`](S-33.md) | Tài xế xem hóa đơn có diễn giải từng đoạn giá | `backend/app/models/session_billing_segment.py`, `backend/app/services/billing_segment_service.py`, `backend/app/api/v1/endpoints/sessions.py` | `test_billing_segments.py` (6), `test_invoice.py` (8) | **IMPLEMENTED / VERIFICATION PENDING** — SCRUM-222/221/220/223/225; cần chạy lại full suite trong Docker, review/triển khai và xác nhận mentor về phí bổ sung S-28 |
 
 ---
 
@@ -49,5 +50,5 @@ Theo Hiến chương kiểm thử `docs/qa/STANDARD.md`, mỗi hồ sơ Story b�
 * **Tổng số Story của Giai đoạn 1**: 05 Stories.
 * **Đã nghiệm thu hoàn tất (`ACCEPTED`)**: 04 Stories (S-01, S-02, S-03, S-04).
 * **Nghiệm thu có điều kiện / Tạm hoãn 1 phần (`IN_PROGRESS / CONDITIONAL`)**: 01 Story (S-05 — Đạt AC1, AC2, AC4; riêng AC3 kết nối trạm thật qua OCPP được dời sang giai đoạn tiếp theo theo biên bản tham vấn gửi PO).
-* **Sprint 2**: S-07 còn **IN_PROGRESS / PARTIAL**; S-08, S-14, S-15 và S-16 **ACCEPTED** với các AC trong phạm vi đã có test tự động. S-28 Backend đang **IN_PROGRESS / CONDITIONAL**, chờ mentor xác nhận quyết toán phí bổ sung.
+* **Sprint 2**: S-07 còn **IN_PROGRESS / PARTIAL**; S-08, S-14, S-15 và S-16 **ACCEPTED** với các AC trong phạm vi đã có test tự động. S-28 Backend đang **IN_PROGRESS / CONDITIONAL**, chờ mentor xác nhận quyết toán phí bổ sung; Backend S-33 hoàn tất trong phạm vi task và chờ review/triển khai.
 * **Số lỗi nghiêm trọng còn mở**: 0 lỗi.

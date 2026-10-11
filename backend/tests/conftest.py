@@ -15,6 +15,9 @@ if str(BACKEND_DIR) not in sys.path:
 TEST_DB_FILE = Path.cwd() / f".pytest-ev-csms-{uuid4().hex}.db"
 TEST_DATABASE_URL = f"sqlite:///{TEST_DB_FILE.as_posix()}"
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["ALLOW_REMOTE_START_SIMULATION"] = "true"
+os.environ["TESTING"] = "true"
+os.environ["ENABLE_DEMO_ACCOUNTS"] = "false"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -47,11 +50,11 @@ def db_session():
         try:
             Base.metadata.drop_all(bind=test_engine)
         except SQLAlchemyError:
-            logger.exception("Không thể xóa bảng kiểm thử khi dọn fixture.")
+            logger.exception("Could not drop test tables during fixture teardown.")
 
 
 def pytest_unconfigure(config):
-    """Đóng engine và chỉ xóa file CSDL tạm do lượt pytest này tạo."""
+    """Close the engine and remove only this pytest run's temporary database."""
     test_engine.dispose()
     TEST_DB_FILE.unlink(missing_ok=True)
 

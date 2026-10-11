@@ -235,9 +235,9 @@ export default function DriverMap() {
 
       // 2. Lớp Bản đồ tối công nghệ cao (Tương phản cao, tên đường sáng rõ)
       const darkLayer = L.tileLayer(MAP_CONFIG.dark.url, {
-        subdomains: MAP_CONFIG.dark.subdomains || 'abcd',
         maxZoom: MAP_CONFIG.dark.maxZoom,
         attribution: MAP_CONFIG.dark.attribution,
+        className: MAP_CONFIG.dark.className,
       });
 
       // 3. Lớp Ảnh vệ tinh độ nét cao

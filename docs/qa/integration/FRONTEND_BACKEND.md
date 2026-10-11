@@ -84,6 +84,8 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
   * Sau khi dừng sạc: Gọi lại API ví, số dư trên thanh trạng thái Topbar tự động cập nhật giảm đúng bằng số tiền trên hóa đơn sạc.
 * **Kết quả**: **PASS**.
 
+* **Cập nhật S-41 (10/10/2026 - chưa commit)**: Các thay đổi số dư phía backend hiện đi qua `post_ledger_entry`; `GET /api/v1/wallet/me` tiếp tục trả số dư/flag khóa. Admin có endpoint backend `POST /api/v1/wallet/admin/{wallet_id}/reconciliation/unlock` cần lý do và chỉ mở khi tổng sổ khớp. Frontend chưa có giao diện quản lý/mở khóa ví; chưa thực hiện kiểm thử trình duyệt cho endpoint Admin.
+
 ---
 
 ## TC-FB-09: Chặn đăng nhập khi tài khoản nợ quá hạn mức
@@ -97,6 +99,7 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
 * **Luồng tích hợp**: Client kết nối `ws://localhost:8000/ws/telemetry`.
 * **Xác thực Client**: Giao diện `LiveSessions.jsx` nhận gói tin mỗi 2 giây, thanh tiến trình % SoC nhảy liên tục và công suất kW biến thiên theo đường cong CC/CV mà không gây lag trình duyệt.
 * **Kết quả**: **PASS**.
+* **Cập nhật mã nguồn 10/10/2026 (code commit `0bb5f67`)**: `ActiveSession` dùng singleton `telemetryWs` và ánh xạ `energy_kwh`, `cost_estimate`, `soc`, `temp_c` từ backend. Frontend suite đạt 39 passed, build thành công; WebSocket runtime smoke trả `CONNECTED/SUBSCRIBED/PONG`. Chưa kiểm tra trực quan trên trình duyệt.
 
 ---
 
@@ -167,18 +170,25 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
 
 ---
 
+## TC-FB-18: Hóa đơn phiên đã chốt theo từng đoạn giá (S-33)
+* **Hợp đồng API**: `GET /api/v1/sessions/{session_id}/invoice` đọc `session_billing_segments` đã lưu lúc chốt, trả `segments`, `energy_amount`, `total_amount`, `rounding_rule` và `idle_fee_line` nếu có phí. DTO riêng nằm trong `backend/app/schemas/invoice.py`; các trường chi tiết S-30/S-31 cũ được giữ để màn hình đang dùng tiếp tục đọc được.
+* **Phân quyền/trạng thái**: Endpoint yêu cầu xác thực (401 nếu chưa đăng nhập); tài xế chỉ xem phiên mình; Operator xem phiên thuộc trạm mình sở hữu; Admin xem tất cả. Tài xế khác nhận 403, phiên chưa chốt nhận 409, phiên cần xem xét nhận `pending_review` và các trường tiền null. Phiên cũ không có snapshot dùng tổng đã lưu, không dựng lại giá hiện hành.
+* **Bằng chứng kiểm thử backend (09/10/2026, code commit `60e801a` trên `origin/Duong`)**: `test_invoice.py` + `test_pricing_engine.py` đạt **28 passed** sau xác thực endpoint; migration `d8f56c4a911e` đã kiểm tra upgrade → downgrade → upgrade trên PostgreSQL Compose tạm. Full backend suite được chạy lại ngày 10/10/2026 và đạt **437 passed, 307 warnings**.
+
+---
+
 ## Current Summary
 
 ### Đánh giá mức độ tích hợp Frontend ↔ Backend
-* **Mức độ tương thích**: Hoạt động trơn tru trên môi trường tích hợp cục bộ.
-* Toàn bộ 15 ca kiểm thử tích hợp (TC-FB-01 đến TC-FB-15) đều được xác minh đồng bộ.
-* Luồng dữ liệu hai chiều giữa REST API và WebSocket Telemetry được xử lý bất đồng bộ nhịp nhàng, đảm bảo trải nghiệm người dùng liền mạch.
+  * **Mức độ tương thích**: Hợp đồng API có kiểm thử backend tự động; chưa kiểm tra thủ công giao diện trên trình duyệt sau cập nhật hóa đơn S-33.
+* TC-FB-01 đến TC-FB-18 có mô tả hợp đồng; backend suite hiện đạt 437 passed. Telemetry ngày 10/10/2026 đã qua 39 test frontend, build và runtime WebSocket smoke; chưa kiểm tra trực quan trên trình duyệt.
+* Mã nguồn telemetry dùng WebSocket singleton dùng chung; runtime smoke đã kết nối, đăng ký topic và nhận PONG.
 
 ---
 
 ## Current Defects
 
-* **0 lỗi phát hiện trong 15 luồng tích hợp cốt lõi**.
+* Backend và frontend tự động không có test thất bại trong lượt xác minh 10/10/2026; chưa thực hiện kiểm thử E2E trực quan trên trình duyệt.
 * Các vấn đề nhỏ về giao diện (như căn chỉnh lề trên màn hình điện thoại siêu nhỏ) đã được đưa vào danh mục theo dõi của giai đoạn UI polish.
 
 ---

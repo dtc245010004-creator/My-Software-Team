@@ -1,4 +1,5 @@
 import math
+import uuid
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -9,7 +10,9 @@ from app.api.deps import (
     get_current_user_or_driver_guest,
     require_roles,
 )
+from app.core.config import settings
 from app.core.database import get_db
+from app.models.payment import TopupOrder
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
 from app.schemas.wallet import (
@@ -17,11 +20,19 @@ from app.schemas.wallet import (
     AdminManualTopupResponse,
     PaginatedWalletTransactionsResponse,
     StandardizedWalletTransactionResponse,
+    TopupOrderResponse,
+    TopupOrderStatusResponse,
     TopupRequest,
+    WalletReconciliationUnlockRequest,
     WalletResponse,
     WalletTransactionResponse,
 )
-from app.services.wallet_service import admin_manual_topup, topup_wallet
+from app.services.payment_service import build_payment_url
+from app.services.wallet_service import (
+    admin_manual_topup,
+    topup_wallet,
+    unlock_wallet_reconciliation,
+)
 
 router = APIRouter(prefix="/wallet", tags=["Ví điện tử & Giao dịch (Wallet)"])
 
@@ -250,3 +261,95 @@ def topup_my_wallet(
         note=note_text,
     )
     return wallet
+
+
+@router.post(
+    "/topup-requests",
+    response_model=TopupOrderResponse,
+    summary="Tạo giao dịch nạp tiền trạng thái chờ và chuyển hướng sang cổng sandbox",
+)
+def create_topup_request(
+    topup_in: TopupRequest,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    amount_int = int(topup_in.amount)
+    if amount_int < settings.TOPUP_MIN_AMOUNT or amount_int > settings.TOPUP_MAX_AMOUNT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Amount must be between {settings.TOPUP_MIN_AMOUNT} and {settings.TOPUP_MAX_AMOUNT}",
+        )
+
+    order_code = f"ORDER_{uuid.uuid4().hex[:8].upper()}"
+
+    order = TopupOrder(
+        user_id=current_user.id,
+        order_code=order_code,
+        amount=topup_in.amount,
+        status="PENDING",
+    )
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+
+    redirect_url = build_payment_url(order_code=order_code, amount=amount_int)
+
+    return TopupOrderResponse(order_id=order_code, redirect_url=redirect_url)
+
+
+@router.get(
+    "/topup-requests/{order_code}",
+    response_model=TopupOrderStatusResponse,
+    summary="Polling kiểm tra trạng thái giao dịch nạp tiền",
+)
+def get_topup_request_status(
+    order_code: str,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    order = db.query(TopupOrder).filter(TopupOrder.order_code == order_code).first()
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Topup order not found"
+        )
+
+    # Phân quyền: Chỉ user tạo giao dịch mới được xem
+    if order.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this order",
+        )
+
+    return order
+
+
+@router.post(
+    "/admin/{wallet_id}/reconciliation/unlock",
+    response_model=WalletResponse,
+    summary="Admin mở khóa giao dịch ví sau khi xử lý lệch sổ cái",
+)
+def unlock_wallet_reconciliation_lock(
+    wallet_id: int,
+    request: WalletReconciliationUnlockRequest,
+    current_user: User = Depends(require_roles(["ADMIN"])),
+    db: Session = Depends(get_db),
+):
+    return unlock_wallet_reconciliation(
+        db,
+        wallet_id,
+        admin_user_id=current_user.id,
+        reason=request.reason,
+    )
+
+
+from app.api.v1.endpoints.payments import WebhookPayload, payment_webhook  # noqa: E402
+
+
+@router.post("/webhook", summary="Webhook nạp ví từ cổng thanh toán (Alias)")
+async def wallet_webhook(
+    request: Request,
+    payload: WebhookPayload,
+    db: Session = Depends(get_db),
+):
+    return await payment_webhook(request=request, payload=payload, db=db)

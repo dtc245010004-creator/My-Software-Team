@@ -170,7 +170,7 @@ def test_calculate_session_price_segments_crossing_boundary(invoice_env):
 
 
 def test_get_session_invoice_with_idle_fee(db_session, invoice_env):
-    """3. Kiểm thử hóa đơn có phí chiếm trụ (Idle fee) khi sạc đầy (BATTERY_FULL)."""
+    """Hóa đơn legacy dùng phí và tổng tiền đã lưu, không dựng lại dữ liệu cũ."""
     driver = invoice_env["driver"]
     conn = invoice_env["conn"]
     tariff = invoice_env["tariff"]
@@ -188,7 +188,8 @@ def test_get_session_invoice_with_idle_fee(db_session, invoice_env):
         meter_start_kwh=Decimal("0.00"),
         meter_stop_kwh=Decimal("20.00"),
         total_kwh=Decimal("20.00"),
-        total_amount=Decimal("64000.00"),
+        total_amount=Decimal("79000.00"),
+        idle_amount=Decimal("15000.00"),
         status="COMPLETED",
         stop_reason="BATTERY_FULL",  # Sạc đầy pin và chiếm chỗ
     )
@@ -199,11 +200,13 @@ def test_get_session_invoice_with_idle_fee(db_session, invoice_env):
     invoice = get_session_invoice(db=db_session, session_id=session.id, user=driver)
 
     assert invoice["session_id"] == session.id
-    assert invoice["idle_minutes"] == 15
-    assert invoice["idle_rate_per_min"] == Decimal("1000.00")
+    assert invoice["idle_minutes"] == 0
+    assert invoice["idle_rate_per_min"] == Decimal("0.00")
     assert invoice["idle_fee"] == Decimal("15000.00")
-    assert invoice["total_amount"] == invoice["charging_amount"] + invoice["idle_fee"]
-    assert len(invoice["price_segments"]) > 0
+    assert invoice["charging_amount"] == Decimal("64000.00")
+    assert invoice["total_amount"] == Decimal("79000.00")
+    assert invoice["is_legacy"] is True
+    assert invoice["price_segments"] == []
 
 
 def test_get_session_invoice_needs_review_alert(db_session, invoice_env):

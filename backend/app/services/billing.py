@@ -11,15 +11,18 @@ class SessionTotal(NamedTuple):
     energy_amount: Decimal
     idle_amount: Decimal
     total_amount: Decimal
+    idle_chargeable_minutes: int
+    idle_fee_per_minute: Decimal
+    idle_grace_minutes: int
 
 
-def calculate_idle_fee(
+def calculate_idle_fee_details(
     idle_start: datetime,
     idle_end: datetime,
     grace_minutes: int,
     fee_per_minute: Decimal,
-) -> Decimal:
-    """Tính phí sau ân hạn, làm tròn lên và áp trần settings; không truy cập DB/API."""
+) -> tuple[Decimal, int]:
+    """Trả về phí và số phút chịu phí sau khi áp ân hạn, làm tròn lên, áp trần."""
     max_minutes = settings.IDLE_FEE_MAX_MINUTES
     if grace_minutes < 0 or fee_per_minute < 0 or max_minutes < 0:
         raise ValueError("Ân hạn, phí chiếm trụ và trần phút không được âm.")
@@ -36,7 +39,21 @@ def calculate_idle_fee(
         0,
         (excess_microseconds + minute_microseconds - 1) // minute_microseconds,
     )
-    return fee_per_minute * min(max_minutes, chargeable_minutes)
+    chargeable_minutes = min(max_minutes, chargeable_minutes)
+    return fee_per_minute * chargeable_minutes, chargeable_minutes
+
+
+def calculate_idle_fee(
+    idle_start: datetime,
+    idle_end: datetime,
+    grace_minutes: int,
+    fee_per_minute: Decimal,
+) -> Decimal:
+    """Tính phí sau ân hạn, làm tròn lên và áp trần settings; không truy cập DB/API."""
+    amount, _ = calculate_idle_fee_details(
+        idle_start, idle_end, grace_minutes, fee_per_minute
+    )
+    return amount
 
 
 def calculate_session_total(session, tariff) -> SessionTotal:
@@ -46,20 +63,28 @@ def calculate_session_total(session, tariff) -> SessionTotal:
     energy_amount = round(total_kwh * applied_price, 2)
 
     idle_amount = Decimal("0.00")
+    idle_chargeable_minutes = 0
+    idle_fee_per_minute = Decimal("0.00")
+    idle_grace_minutes = 0
     if tariff is not None:
         connector = getattr(session, "connector", None)
         idle_start = getattr(connector, "idle_started_at", None)
         idle_end = getattr(connector, "idle_ended_at", None)
         if idle_start is not None and idle_end is not None:
-            idle_amount = calculate_idle_fee(
+            idle_fee_per_minute = Decimal(str(tariff.idle_fee_per_minute or 0))
+            idle_grace_minutes = int(tariff.idle_grace_minutes or 0)
+            idle_amount, idle_chargeable_minutes = calculate_idle_fee_details(
                 idle_start,
                 idle_end,
-                tariff.idle_grace_minutes,
-                Decimal(str(tariff.idle_fee_per_minute)),
+                idle_grace_minutes,
+                idle_fee_per_minute,
             )
 
     return SessionTotal(
         energy_amount=energy_amount,
         idle_amount=idle_amount,
         total_amount=energy_amount + idle_amount,
+        idle_chargeable_minutes=idle_chargeable_minutes,
+        idle_fee_per_minute=idle_fee_per_minute,
+        idle_grace_minutes=idle_grace_minutes,
     )

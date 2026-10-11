@@ -48,6 +48,10 @@ def _create_user_and_id_tag(
     *,
     status: str = "active",
 ) -> IdTag:
+    from decimal import Decimal
+
+    from app.models.wallet import Wallet
+
     user = User(
         username=f"user_{code.lower()}",
         email=f"user_{code.lower()}@example.test",
@@ -57,6 +61,12 @@ def _create_user_and_id_tag(
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
+
+    wallet = Wallet(
+        user_id=user.id, balance=Decimal("100000.00"), is_debt_locked=False
+    )
+    db_session.add(wallet)
+    db_session.commit()
 
     tag = IdTag(
         code=code,

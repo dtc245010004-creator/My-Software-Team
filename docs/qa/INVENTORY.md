@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 passed, trong khi các tổng hợp khác ghi 89 và 90 ca `[CẦN XÁC NHẬN]`. Full suite mới nhất ngày 08/10/2026 đạt 298 passed, 1 skipped, 302 warnings trên Python 3.14.7; 299 ca được thu thập trong 123.28 giây.
+Căn cứ full suite backend trong Docker ngày 10/10/2026: **451 passed, 307 warnings**. Các tổng baseline lịch sử 84, 89 và 90 ca vẫn mâu thuẫn `[CẦN XÁC NHẬN]`.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -36,7 +36,9 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **Khách vãng lai (Guest Driver)** | `backend/tests/test_driver_unauthenticated.py` | 4 | 100% PASS | Sạc không cần đăng nhập, nạp tiền tự do, cấu hình pin tùy chỉnh |
 | **Vòng đời phiên sạc (Session Lifecycle)** | `backend/tests/test_sessions.py` | 5 | 100% PASS | Bắt đầu sạc, giải phóng đầu nối, kiểm tra idempotent stop |
 | **Giao dịch & Tiền tệ ACID** | `backend/tests/test_sessions_acid.py` | 8 | 100% PASS | Trừ tiền nguyên tử, biểu giá TOU, khóa độc quyền đầu nối, chặn nợ |
-| **Ví điện tử ACID (Wallet ACID)** | `backend/tests/test_wallet_acid.py` | 5 | 100% PASS | Nạp tiền, trừ tiền, giới hạn thấu chi -300k, CheckConstraint -500k |
+| **Ví điện tử ACID (Wallet ACID)** | `backend/tests/test_wallet_acid.py` | 5 | 5/5 passed trong lượt S-41 | Nạp/trừ tiền ACID, giới hạn thấu chi -300k, CheckConstraint -500k |
+| **Sổ cái ví S-41** | `backend/tests/test_wallet_ledger_s41.py` | 13 | 13/13 passed trong lượt chọn lọc S-41 | Append-only, unique reference, giao dịch đồng thời, đối soát/khóa ví, Admin mở khóa có lý do, audit log |
+| **Nâng schema Compose SQLite legacy** | `backend/tests/test_compose_schema_service.py` | 1 | 1/1 passed trong lượt kiểm chứng 10/10/2026 | Thêm cột/index/triggers idempotent vào volume cũ, giữ số dư và lịch sử, từ chối UPDATE/DELETE |
 | **Quản trị Mạng lưới Trạm (Stations)** | `backend/tests/test_stations.py` | 15 | 100% PASS | CRUD trạm, mã trụ duy nhất, phân quyền CPO, IDOR, tìm kiếm khoảng cách |
 | **Mô phỏng sạc (Simulator & Telemetry)** | `backend/tests/test_simulator.py` | 10 | 100% PASS | Đường cong CC/CV, ngắt khi đầy/quá nhiệt/nợ, phục hồi crash |
 | **Trí tuệ nhân tạo (AI Fallback & Scheduler)** | `backend/tests/test_ai_fallback.py` | 18 | 100% PASS | Heuristic fallback, phân tích nhiệt độ, biểu giá động, lập lịch định kỳ |
@@ -49,8 +51,10 @@ Căn cứ lịch sử chạy kiểm thử: ghi nhận ngày 29/09/2026 là 84 pa
 | **OCPP MeterValues Dedup** | `backend/tests/test_meter_values_dedup.py` | 5 | 100% PASS | Timestamp lùi, bản tin trùng, counter giảm, cùng timestamp hiệu chỉnh và đồng thời |
 | **Abnormal Charging Session Job** | `backend/tests/test_abnormal_session_job.py` | 3 | 100% PASS | Đánh dấu heartbeat quá ngưỡng, bỏ qua heartbeat mới, xác minh job mỗi phút chỉ gắn cờ và không đóng phiên |
 | **Biểu giá và phí chiếm trụ S-28** | `backend/tests/test_billing_idle_fee.py` | 20 | 20/20 passed trong full suite 08/10/2026 | Ân hạn, làm tròn, trần phút cấu hình, Available muộn, field tariff và HTTP 422 |
+| **Snapshot đoạn giá hóa đơn S-33** | `backend/tests/test_billing_segments.py` | 6 | 6/6 passed trong full suite 09/10/2026 | Lưu nguyên đoạn và đơn giá, idempotency, đổi tariff, qua nửa đêm, review và legacy |
+| **API hóa đơn diễn giải S-33** | `backend/tests/test_invoice.py` | 8 | 8/8 passed sau chỉnh sửa ngày 09/10/2026 | Snapshot giá, dòng phí idle, tariff đổi, pending review, RBAC và phiên chưa chốt |
 
-**Bổ sung kiểm chứng ngày 08/10/2026**: Full backend suite đạt **298 passed, 1 skipped, 302 warnings** (299 ca thu thập trong 123.28 giây, Python 3.14.7). Riêng S-28 có **20/20 ca passed**; migration nâng/hạ/nâng đã chạy trên SQLite tạm.
+**Bổ sung kiểm chứng ngày 10/10/2026 (code commit `9ceae53`)**: Full backend suite trong Docker đạt **451 passed, 307 warnings**. Nhóm S-41, wallet ACID và helper schema Compose đạt **19 passed**; Ruff báo `All checks passed`. Migration lên head và S-41 nâng/hạ/nâng trên PostgreSQL tạm thành công; trigger chặn UPDATE/DELETE. Backend Compose healthy, database dự án không bị migrate.
 
 ---
 
@@ -234,6 +238,14 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
+* **Kiểm thử tự động**: Lượt full suite backend trong Docker ngày 10/10/2026 đạt 451 passed, 307 warnings; frontend gần nhất có 39 passed và build thành công.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; `alembic heads` ngày 10/10/2026 trả một head `f41a0b7c9d22`. Migration S-41 nâng/hạ/nâng trên PostgreSQL Compose tạm và trigger đã chặn UPDATE/DELETE; không migrate DB ứng dụng.
+* **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
+
+### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
+* **SCRUM-188/189/190/192 thuộc S-28 (08/10/2026 - chưa commit)**: Thêm phí chiếm trụ theo biểu giá và ân hạn, kiểm tra dữ liệu âm ở schema, lưu thời điểm connector báo `Finishing`/`SuspendedEV` và `Available`, tập trung phép tính vào `billing.py`, lưu `idle_amount`, và áp trần số phút từ `IDLE_FEE_MAX_MINUTES` (mặc định 240). Khi `Available` đến sau billing, không sửa hóa đơn/sổ cái và không tự trừ ví lần hai; mentor cần xác nhận cách quyết toán bổ sung. 20 test billing chọn lọc passed; baseline full suite đạt 298 passed, 1 skipped. Hai migration đã kiểm tra nâng/hạ/nâng trên SQLite tạm.
+* **Sửa phân quyền đọc trạm/trụ và hiển thị trạm thiếu GPS (07/10/2026 - chưa commit)**: Dùng chung bộ lọc truy vấn cho API list/detail/tree/grid trạm và list/detail trụ; truy cập ngoài phạm vi trả `404`; chuẩn hóa `Type 2` cũ trong DTO, không ghi DB. 35 test chọn lọc passed, Ruff sạch.
+
 ### 4.19. Suite `test_billing_idle_fee.py` (20 ca)
 1. `test_calculate_idle_fee_within_grace_period`: Không thu phí trong ân hạn.
 2. `test_calculate_idle_fee_rounds_billable_minutes_up_after_grace`: Phần vượt ân hạn được làm tròn lên theo phút.
@@ -243,9 +255,52 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 6. `test_settings_default_idle_fee_cap_is_240_minutes`, `test_calculate_session_total_uses_configured_idle_fee_cap`: Xác minh mặc định và việc đọc trần từ settings.
 7. `test_late_available_only_records_marker_after_session_billing`: `Available` tới sau khi chốt chỉ lưu mốc, không đổi hóa đơn, số dư ví hoặc sổ giao dịch.
 8. `test_create_tariff_defaults_idle_fields_to_zero`, `test_update_tariff_accepts_idle_fields`: Kiểm tra mặc định và lưu các trường phí/ân hạn.
-9. `test_create_tariff_rejects_negative_values`, `test_update_tariff_rejects_negative_values`: Hai test được tham số hóa theo 5 trường giá/phí/ân hạn âm, kiểm tra HTTP 422 và tên trường trong lỗi tiếng Việt.
+9. `test_create_tariff_rejects_negative_values`, `test_update_tariff_rejects_negative_values`: Kiểm tra HTTP 422 và tên trường trong lỗi tiếng Việt.
 
-**Kết quả kiểm thử ngày 08/10/2026**: 20/20 ca passed trong full suite.
+**Kết quả baseline ngày 08/10/2026**: 20/20 ca passed.
+
+### 4.20. Suite biểu giá chia đoạn và qua nửa đêm — `test_pricing_engine.py` (20 ca)
+S-30 kiểm thử chia các phiên thành nhiều khung TOU và nội suy tại ranh giới thiếu số đo; S-31 kiểm thử phiên qua nửa đêm/đa ngày, múi giờ trạm, biểu giá từng ngày và nhóm hóa đơn. Bộ test cũng kiểm tra làm tròn từng đoạn, đầu vào dict, tính thuần và quyền truy cập API/IDOR.
+
+**Kết quả**: 20 ca `test_pricing_engine.py` passed. Snapshot đoạn giá S-33 dùng đúng đầu ra của hàm này khi chốt phiên.
+
+### 4.21. Snapshot đoạn giá phiên — `test_billing_segments.py` (6 ca)
+1. `test_closing_session_persists_segments_once_in_the_close_transaction`: luồng chốt lưu rows và gọi lại không nhân đôi.
+2. `test_three_segments_are_saved_with_frozen_price_and_rounding`: lưu đủ ba đoạn, kWh, giá, thành tiền đã làm tròn và ngày.
+3. `test_invoice_uses_saved_segments_after_tariff_changes`: đổi tariff sau khi chốt không làm thay đổi hóa đơn.
+4. `test_segments_keep_local_date_when_session_crosses_midnight`: lưu đúng `segment_date` theo ngày địa phương.
+5. `test_review_session_does_not_persist_or_return_price_segments`: phiên cần xem xét không có rows hoặc số tiền.
+6. `test_legacy_invoice_uses_stored_total_without_backfill`: phiên cũ dùng tổng đã lưu và không tạo snapshot hồi tố.
+
+**Kết quả ngày 09/10/2026**: 6/6 ca passed; full suite ngày 10/10/2026 đạt 437 passed, 307 warnings.
+
+### 4.22. Hóa đơn diễn giải theo đoạn — `test_invoice.py` (8 ca)
+1. Hóa đơn có đủ ba đoạn đã snapshot và tổng bằng tổng thành tiền từng đoạn.
+2. DTO hóa đơn riêng trả các trường chuẩn cùng thông tin làm tròn.
+3. Có phí chiếm trụ thì trả dòng phí kèm phút tính phí, phí/phút và ân hạn; không có phí thì bỏ dòng.
+4. Đổi biểu giá sau phiên không làm thay đổi giá/tiền đoạn đã lưu hoặc snapshot phí đã áp dụng.
+5. Phiên cần xem xét trả `pending_review` và không lộ trường tiền tạm tính.
+6. Tài xế không thể xem hóa đơn phiên của tài xế khác (403).
+7. Phiên chưa kết thúc không trả hóa đơn chưa chốt (409).
+8. Kiểm tra response invoice vẫn dùng schema chuyên biệt tại endpoint.
+
+**Kết quả ngày 09/10/2026**: 8/8 ca passed; full suite ngày 10/10/2026 đạt 437 passed, 307 warnings. Migration `d8f56c4a911e` nâng/hạ/nâng trên PostgreSQL Compose tạm.
+
+### 4.23. Sổ cái ví append-only — `test_wallet_ledger_s41.py` (13 ca)
+
+* Kiểm tra nạp/trừ chỉ thêm dòng mới, tổng signed `amount` khớp số dư và reference cùng loại không nhân đôi.
+* Kiểm tra reference đã dùng với số tiền khác và dấu `CHARGE_FEE` sai bị từ chối.
+* Chặn UPDATE/DELETE trực tiếp và xóa ví có dòng ledger; kiểm tra hai nạp đồng thời.
+* Đối soát dùng một SELECT nhóm, ghi audit, bật khóa khi phát hiện lệch và chặn nạp/trừ/bắt đầu phiên mới.
+* Kiểm tra Admin mở khóa cần lý do và số dư phải khớp; role khác nhận 403; chu kỳ scheduler lấy từ settings.
+
+**Kết quả chọn lọc ban đầu 10/10/2026**: `test_wallet_ledger_s41.py` và `test_wallet_acid.py` đạt **18 passed**. Lượt full suite host ban đầu có 448 passed, 1 skipped và một lỗi khởi tạo test migration do Windows Access Denied ở thư mục tạm; lượt full suite Docker hoàn chỉnh sau đó đạt 451 passed, 307 warnings.
+
+### 4.24. Nâng schema Compose SQLite cũ — `test_compose_schema_service.py` (1 ca)
+
+Kiểm tra volume SQLite cũ nhận cột khóa đối soát, chỉ mục duy nhất và trigger append-only theo cách idempotent; số dư/dòng ledger cũ được giữ nguyên, UPDATE/DELETE bị từ chối.
+
+**Kết quả 10/10/2026 (code commit `9ceae53`)**: 1/1 passed; full suite backend Docker đạt **451 passed, 307 warnings**.
 
 ---
 
