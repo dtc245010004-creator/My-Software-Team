@@ -38,9 +38,24 @@ class WalletResponse(BaseModel):
     balance: Decimal
     currency: str = "VND"
     is_debt_locked: bool
-    is_reconcile_locked: bool
+    is_reconcile_locked: bool = False
     updated_at: UTCDateTime
     transactions: list[WalletTransactionResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TopupOrderResponse(BaseModel):
+    order_id: str
+    redirect_url: str
+
+
+class TopupOrderStatusResponse(BaseModel):
+    order_code: str
+    amount: Decimal
+    status: str
+    failure_reason: str | None = None
+    created_at: UTCDateTime
 
     model_config = ConfigDict(from_attributes=True)
 

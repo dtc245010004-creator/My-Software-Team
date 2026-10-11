@@ -15,6 +15,7 @@ from app.api.v1.endpoints import (
     stations,
     tariffs,
     wallet,
+    payments,
 )
 from app.core.config import settings
 from app.core.database import get_db
@@ -29,6 +30,7 @@ api_router.include_router(sessions.router)
 api_router.include_router(simulator.router)
 api_router.include_router(ai.router)
 api_router.include_router(audit_logs.router)
+api_router.include_router(payments.router)
 
 
 @api_router.get("/health", summary="Kiểm tra trạng thái hệ thống")
