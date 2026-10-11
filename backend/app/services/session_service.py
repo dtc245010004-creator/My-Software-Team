@@ -21,7 +21,7 @@ from app.models.wallet import Wallet
 from app.services.audit_service import ghi_nhat_ky
 from app.services.billing import calculate_session_total
 from app.services.billing_segment_service import persist_session_billing_segments
-from app.services.wallet_service import deduct_charging_fee
+from app.services.wallet_service import auto_deduct_session_payment, deduct_charging_fee
 
 logger = logging.getLogger("ev_csms.session_service")
 
@@ -398,12 +398,11 @@ def stop_charging_session(
     total_amount = billing_total.total_amount
 
     try:
-        # 4. Trừ tiền ví ACID
-        wallet, tx, debt_locked = deduct_charging_fee(
+        # 4. Trừ tiền ví ACID (S-37)
+        wallet, tx, debt_locked = auto_deduct_session_payment(
             db=db,
-            user_id=session.user_id,
-            session_id=session.id,
-            amount=total_amount,
+            session=session,
+            invoice_amount=total_amount,
         )
 
         # 5. Cập nhật phiên sạc

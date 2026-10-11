@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.models.session import ChargingSession
 from app.models.wallet import Wallet, WalletTransaction
 from app.services.audit_service import ghi_nhat_ky
 
@@ -44,7 +45,11 @@ def post_ledger_entry(
     transaction ACID.
     """
     signed_amount = Decimal(str(amount))
-    if transaction_type not in {"TOPUP", "CHARGE_FEE", "REFUND"}:
+    if transaction_type == "SESSION_PAYMENT":
+        transaction_type = "CHARGE_FEE"
+        if signed_amount > 0:
+            signed_amount = -signed_amount
+    elif transaction_type not in {"TOPUP", "CHARGE_FEE", "REFUND"}:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Loại giao dịch ví không hợp lệ.",
@@ -191,6 +196,52 @@ def deduct_charging_fee(
         transaction_type="CHARGE_FEE",
         reference_id=f"session_{session_id}",
         note=f"Thanh toán cước phiên sạc #{session_id}",
+    )
+
+
+def auto_deduct_session_payment(
+    db: Session,
+    session: ChargingSession,
+    invoice_amount: Decimal | None = None,
+) -> tuple[Wallet, WalletTransaction, bool]:
+    """Tự động trừ ví và ghi sổ cái append-only khi phiên sạc kết thúc (S-37).
+
+    - Đồng bộ hoá đơn và trừ tiền ví trong cùng một transaction CSDL.
+    - Khóa ví bi quan với with_for_update() trên ví ngăn chặn race condition khi nhiều phiên của tài xế chốt cùng lúc.
+    - Ghi bản ghi sổ cái (WalletTransaction/LedgerEntry) với session_id, amount âm, balance_after.
+    - Cho phép số dư âm và gắn cờ nợ (is_debt=True, debt_status='IN_DEBT').
+    - Đảm bảo tính Idempotency: không trừ tiền 2 lần khi gọi lặp trên cùng 1 phiên sạc.
+    - Trả về tuple: (Wallet, WalletTransaction, debt_locked: bool).
+    """
+    user_id = getattr(session, "user_id", None) or getattr(session, "driver_id", None)
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phiên sạc không có thông tin tài xế để trừ tiền ví.",
+        )
+
+    session_id = getattr(session, "id", None) or getattr(session, "transaction_id", None)
+    if session_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phiên sạc không có mã định danh hợp lệ.",
+        )
+
+    if invoice_amount is None:
+        if getattr(session, "total_amount", None) is not None:
+            invoice_amount = Decimal(str(session.total_amount))
+        else:
+            from app.services.session_service import calculate_session_total
+
+            billing_total = calculate_session_total(session, getattr(session, "tariff", None))
+            invoice_amount = billing_total.total_amount
+            session.total_amount = invoice_amount
+
+    return deduct_charging_fee(
+        db=db,
+        user_id=user_id,
+        session_id=session_id,
+        amount=Decimal(str(invoice_amount)),
     )
 
 
