@@ -48,8 +48,9 @@ npm run dev
 - Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
 
 ### Cách 2: Khởi chạy toàn bộ hệ thống bằng Docker Compose
+`link tải docker desktop: https://www.docker.com/products/docker-desktop/`
 
-Mở terminal tại thư mục gốc. Compose tự nhận `docker-compose.yml`; tên project dùng chung `ev-csms` cho toàn bộ Sprint 1–4. Hai volume dữ liệu phát triển hiện có vẫn được giữ nguyên.
+Mở terminal tại thư mục gốc. Compose tự nhận `docker-compose.yml`; tên project dùng chung `ev-csms` cho toàn bộ Sprint 1–4(maybe). Hai volume dữ liệu phát triển hiện có vẫn được giữ nguyên.
 
 ```powershell
 docker compose up -d --build
