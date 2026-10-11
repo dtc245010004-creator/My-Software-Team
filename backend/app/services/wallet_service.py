@@ -381,3 +381,95 @@ def unlock_wallet_reconciliation(
     db.commit()
     db.refresh(wallet)
     return wallet
+
+
+class WalletInsufficientBalanceException(HTTPException):
+    """Ngoại lệ khi số dư ví dưới ngưỡng tối thiểu để bắt đầu phiên sạc (S-38 / SCRUM-264)."""
+
+    def __init__(
+        self,
+        current_balance: Decimal | int | float,
+        required_balance: Decimal | int | float,
+        detail: str | None = None,
+    ):
+        cur_int = (
+            int(current_balance)
+            if float(current_balance).is_integer()
+            else float(current_balance)
+        )
+        req_int = (
+            int(required_balance)
+            if float(required_balance).is_integer()
+            else float(required_balance)
+        )
+        msg = (
+            detail
+            or f"Số dư ví ({Decimal(str(current_balance)):,.0f} VNĐ) không đủ hạn mức tối thiểu {Decimal(str(required_balance)):,.0f} VNĐ để bắt đầu sạc."
+        )
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=msg,
+        )
+        self.error_code = "WALLET_INSUFFICIENT_BALANCE"
+        self.current_balance = cur_int
+        self.required_balance = req_int
+        self.suggest_topup = True
+
+
+class WalletNegativeBalanceException(HTTPException):
+    """Ngoại lệ khi ví có số dư âm (S-38 / HTTP 402 Payment Required)."""
+
+    def __init__(
+        self,
+        current_balance: Decimal | int | float,
+        required_balance: Decimal | int | float,
+        detail: str | None = None,
+    ):
+        cur_int = (
+            int(current_balance)
+            if float(current_balance).is_integer()
+            else float(current_balance)
+        )
+        req_int = (
+            int(required_balance)
+            if float(required_balance).is_integer()
+            else float(required_balance)
+        )
+        msg = (
+            detail
+            or f"Tài khoản đang có số dư âm ({Decimal(str(current_balance)):,.0f} VNĐ). Vui lòng nạp tiền để tiếp tục sạc."
+        )
+        super().__init__(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=msg,
+        )
+        self.error_code = "WALLET_INSUFFICIENT_BALANCE"
+        self.current_balance = cur_int
+        self.required_balance = req_int
+        self.suggest_topup = True
+
+
+def validate_wallet_balance_for_session(
+    db: Session, user_id: int
+) -> tuple[bool, str, Decimal, Decimal]:
+    """Thẩm định số dư ví cho phiên sạc (Quy tắc chung SCRUM-265 cho cả OCPP và REST API).
+
+    Trả về: (is_valid: bool, error_code: str, current_balance: Decimal, required_threshold: Decimal)
+    Logic so sánh:
+        current_balance >= settings.MIN_START_BALANCE -> Cho phép: (True, "", current_balance, threshold)
+        current_balance < settings.MIN_START_BALANCE  -> Từ chối: (False, "WALLET_INSUFFICIENT_BALANCE", current_balance, threshold)
+    """
+    threshold = Decimal(str(settings.MIN_START_BALANCE))
+    wallet = db.query(Wallet).filter(Wallet.user_id == user_id).first()
+    if wallet is None:
+        current_balance = Decimal("0.00")
+    else:
+        current_balance = Decimal(str(wallet.balance))
+
+    if wallet and wallet.is_reconcile_locked:
+        return False, "WALLET_RECONCILE_LOCKED", current_balance, threshold
+
+    if current_balance < threshold:
+        return False, "WALLET_INSUFFICIENT_BALANCE", current_balance, threshold
+
+    return True, "", current_balance, threshold

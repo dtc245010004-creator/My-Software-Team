@@ -3,14 +3,19 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.websocket import ws_manager
 from app.ocpp.gateway import router as ocpp_router
 from app.routers.admin_users import router as admin_users_router
+from app.services.wallet_service import (
+    WalletInsufficientBalanceException,
+    WalletNegativeBalanceException,
+)
 
 # Thiết lập ghi log
 logging.basicConfig(
@@ -111,6 +116,39 @@ if settings.BACKEND_CORS_ORIGINS:
 app.include_router(api_router)
 app.include_router(admin_users_router, prefix="/api/v1")
 app.include_router(ocpp_router)
+
+
+# Xử lý ngoại lệ chuẩn hóa cho S-38: Từ chối phiên khi ví không đủ số dư
+@app.exception_handler(WalletInsufficientBalanceException)
+async def wallet_insufficient_balance_handler(
+    request: Request, exc: WalletInsufficientBalanceException
+):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "error_code": exc.error_code,
+            "current_balance": exc.current_balance,
+            "required_balance": exc.required_balance,
+            "suggest_topup": exc.suggest_topup,
+        },
+    )
+
+
+@app.exception_handler(WalletNegativeBalanceException)
+async def wallet_negative_balance_handler(
+    request: Request, exc: WalletNegativeBalanceException
+):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "error_code": exc.error_code,
+            "current_balance": exc.current_balance,
+            "required_balance": exc.required_balance,
+            "suggest_topup": exc.suggest_topup,
+        },
+    )
 
 
 @app.get("/", summary="Trang chủ API")

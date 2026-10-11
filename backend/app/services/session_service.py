@@ -21,7 +21,13 @@ from app.models.wallet import Wallet
 from app.services.audit_service import ghi_nhat_ky
 from app.services.billing import calculate_session_total
 from app.services.billing_segment_service import persist_session_billing_segments
-from app.services.wallet_service import auto_deduct_session_payment, deduct_charging_fee
+from app.services.wallet_service import (
+    WalletInsufficientBalanceException,
+    WalletNegativeBalanceException,
+    auto_deduct_session_payment,
+    deduct_charging_fee,
+    validate_wallet_balance_for_session,
+)
 
 logger = logging.getLogger("ev_csms.session_service")
 
@@ -203,17 +209,38 @@ def start_charging_session(
             detail="Ví đang bị khóa giao dịch do số dư không khớp sổ cái. Vui lòng liên hệ quản trị viên.",
         )
 
-    if wallet.balance < Decimal(0):
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=f"Tài khoản đang có số dư âm ({wallet.balance:,.0f} VNĐ). Vui lòng nạp tiền để tiếp tục sạc.",
+    # S-38 / SCRUM-265: Thẩm định số dư ví theo quy tắc dùng chung
+    is_valid, error_code, current_balance, threshold = validate_wallet_balance_for_session(
+        db, user.id
+    )
+    if not is_valid:
+        connector_row = db.query(Connector).filter(Connector.id == connector_id).first()
+        cp_id = connector_row.charging_point_id if connector_row else None
+        ghi_nhat_ky(
+            db=db,
+            user_id=user.id,
+            action="SESSION_BLOCKED_INSUFFICIENT_BALANCE",
+            object_type="wallet",
+            object_id=wallet.id,
+            data={
+                "user_id": user.id,
+                "wallet_id": wallet.id,
+                "current_balance": str(current_balance),
+                "required_threshold": str(threshold),
+                "charge_point_id": cp_id,
+                "reason": "Số dư ví dưới ngưỡng tối thiểu",
+            },
         )
+        db.commit()
 
-    min_start = Decimal(str(settings.MIN_START_BALANCE))
-    if wallet.balance < min_start:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Số dư ví ({wallet.balance:,.0f} VNĐ) không đủ hạn mức tối thiểu {min_start:,.0f} VNĐ để bắt đầu sạc.",
+        if current_balance < Decimal(0):
+            raise WalletNegativeBalanceException(
+                current_balance=current_balance,
+                required_balance=threshold,
+            )
+        raise WalletInsufficientBalanceException(
+            current_balance=current_balance,
+            required_balance=threshold,
         )
 
     # 2. Kiểm tra tài xế có đang có phiên ACTIVE không
@@ -916,6 +943,41 @@ async def remote_start_charging_session(
     # Ca 3 của S-24: Đầu nối bận
     if condition == "BUSY" or connector.status != "AVAILABLE":
         raise HTTPException(status_code=409, detail="Đầu nối đang bận hoặc không khả dụng.")
+
+    # S-38 / SCRUM-265: Thẩm định số dư ví theo quy tắc dùng chung
+    is_valid, error_code, current_balance, threshold = validate_wallet_balance_for_session(
+        db, user.id
+    )
+    if not is_valid:
+        wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
+        wallet_id = wallet.id if wallet else None
+        cp_id = connector.charging_point_id if connector else None
+        ghi_nhat_ky(
+            db=db,
+            user_id=user.id,
+            action="SESSION_BLOCKED_INSUFFICIENT_BALANCE",
+            object_type="wallet",
+            object_id=wallet_id,
+            data={
+                "user_id": user.id,
+                "wallet_id": wallet_id,
+                "current_balance": str(current_balance),
+                "required_threshold": str(threshold),
+                "charge_point_id": cp_id,
+                "reason": "Số dư ví dưới ngưỡng tối thiểu",
+            },
+        )
+        db.commit()
+
+        if current_balance < Decimal(0):
+            raise WalletNegativeBalanceException(
+                current_balance=current_balance,
+                required_balance=threshold,
+            )
+        raise WalletInsufficientBalanceException(
+            current_balance=current_balance,
+            required_balance=threshold,
+        )
 
     # Kiểm tra kết nối OCPP chỉ khi không phải chế độ mô phỏng
     if not condition:
