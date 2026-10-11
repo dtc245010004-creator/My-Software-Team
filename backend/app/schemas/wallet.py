@@ -23,11 +23,72 @@ class WalletTransactionResponse(BaseModel):
     amount: Decimal
     transaction_type: str
     balance_after: Decimal
+    balance_before: Decimal | None = None
+    reference_type: str | None = None
     reference_id: str | None = None
+    receipt_code: str | None = None
     note: str | None = None
     created_at: UTCDateTime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class StandardizedWalletTransactionResponse(BaseModel):
+    """Lịch sử giao dịch ví chuẩn hoá cho tài xế (SCRUM-280)."""
+
+    id: int
+    transaction_type: str
+    amount: Decimal
+    balance_after: Decimal
+    created_at: UTCDateTime
+    note: str | None = None
+    reference_type: str | None = None
+    reference_id: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedWalletTransactionsResponse(BaseModel):
+    """Phân trang danh sách lịch sử giao dịch ví (SCRUM-281)."""
+
+    items: list[StandardizedWalletTransactionResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class AdminManualTopupRequest(BaseModel):
+    """Yêu cầu nạp tay vào ví tài xế dành cho Quản trị viên (SCRUM-246)."""
+
+    driver_id: int | None = Field(
+        default=None, description="ID của tài xế (User.id)", ge=1
+    )
+    wallet_id: int | None = Field(
+        default=None, description="ID của ví điện tử (Wallet.id)", ge=1
+    )
+    amount: Decimal = Field(
+        ..., gt=0, description="Số tiền nạp (VND), bắt buộc phải lớn hơn 0"
+    )
+    receipt_code: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Mã phiếu thu duy nhất chống nạp trùng",
+    )
+    note: str | None = Field(
+        default=None, max_length=255, description="Ghi chú nạp tiền"
+    )
+
+
+class AdminManualTopupResponse(BaseModel):
+    """Kết quả nạp tay vào ví tài xế cho Quản trị viên (SCRUM-246)."""
+
+    transaction_id: int
+    wallet_id: int
+    new_balance: Decimal
+    receipt_code: str
+    created_at: UTCDateTime
 
 
 class WalletResponse(BaseModel):
