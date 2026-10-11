@@ -1,8 +1,8 @@
-import pytest
+from app.api.deps import get_current_user_or_driver_guest
+from app.main import app as fastapi_app
 from app.models.payment import TopupOrder
 from app.models.wallet import Wallet
-from app.main import app as fastapi_app
-from app.api.deps import get_current_user_or_driver_guest
+
 
 def test_payment_return_url(client, db_session):
     # Tạo user và order

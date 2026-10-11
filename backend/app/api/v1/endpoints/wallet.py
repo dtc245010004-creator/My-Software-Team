@@ -1,13 +1,23 @@
+import uuid
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_or_driver_guest
+from app.core.config import settings
 from app.core.database import get_db
+from app.models.payment import TopupOrder
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
-from app.schemas.wallet import TopupRequest, WalletResponse, WalletTransactionResponse
+from app.schemas.wallet import (
+    TopupOrderResponse,
+    TopupOrderStatusResponse,
+    TopupRequest,
+    WalletResponse,
+    WalletTransactionResponse,
+)
+from app.services.payment_service import build_payment_url
 from app.services.wallet_service import topup_wallet
 
 router = APIRouter(prefix="/wallet", tags=["Ví điện tử & Giao dịch (Wallet)"])
@@ -92,12 +102,7 @@ def topup_my_wallet(
     )
     return wallet
 
-from fastapi import HTTPException, status
-from app.core.config import settings
-from app.models.payment import TopupOrder
-from app.services.payment_service import build_payment_url
-from app.schemas.wallet import TopupOrderResponse
-import uuid
+
 
 @router.post(
     "/topup-requests",
@@ -132,7 +137,7 @@ def create_topup_request(
     
     return TopupOrderResponse(order_id=order_code, redirect_url=redirect_url)
 
-from app.schemas.wallet import TopupOrderStatusResponse
+
 
 @router.get(
     "/topup-requests/{order_code}",

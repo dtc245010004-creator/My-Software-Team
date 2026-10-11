@@ -1,9 +1,9 @@
-import pytest
 import urllib.parse
-from app.models.payment import TopupOrder
-from app.core.config import settings
+
 from app.api.deps import get_current_user_or_driver_guest
 from app.main import app as fastapi_app
+from app.models.payment import TopupOrder
+
 
 def test_create_topup_request_success(client, db_session):
     from app.models.user import User

@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 
 from pydantic import Field, field_validator
@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     TOPUP_MIN_AMOUNT: int = 10000
     TOPUP_MAX_AMOUNT: int = 50000000
     SANDBOX_PAYMENT_SECRET: str = "sandbox_secret"
+    PAYMENT_WEBHOOK_SECRET: str = "sandbox_secret"
 
     # C s d liu: SQLite local (Giai on 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"

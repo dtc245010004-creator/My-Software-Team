@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
+
 class TopupOrder(Base):
     """Mô hình đơn nạp tiền qua cổng thanh toán Sandbox (S-35)."""
     __tablename__ = "topup_orders"

@@ -1,13 +1,14 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, Request, status
+import hashlib
+import hmac
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-import hmac
-import hashlib
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.payment import TopupOrder
-from app.models.wallet import Wallet, WalletTransaction
 from app.services.wallet_service import topup_wallet
 
 router = APIRouter(prefix="/payments", tags=["Thanh toán"])
@@ -19,10 +20,14 @@ class WebhookPayload(BaseModel):
     signature: str
 
 def verify_signature(payload: WebhookPayload) -> bool:
-    secret_key = b"sandbox_secret"
-    data = f"{payload.order_code}|{payload.status}".encode('utf-8')
+    secret_key = settings.PAYMENT_WEBHOOK_SECRET.encode("utf-8")
+    data = f"{payload.order_code}|{payload.status}".encode("utf-8")
     expected_sig = hmac.new(secret_key, data, hashlib.sha256).hexdigest()
-    return payload.signature == expected_sig or payload.signature == "test_valid_signature"
+    if hmac.compare_digest(payload.signature, expected_sig):
+        return True
+    if hmac.compare_digest(payload.signature, "test_valid_signature"):
+        return True
+    return False
 
 @router.post("/webhook", summary="Xử lý Webhook từ cổng thanh toán")
 def payment_webhook(payload: WebhookPayload, db: Session = Depends(get_db)):
@@ -62,7 +67,7 @@ def payment_webhook(payload: WebhookPayload, db: Session = Depends(get_db)):
             
     return {"message": "Ignored"}
 
-from fastapi.responses import RedirectResponse
+
 
 @router.get("/return", summary="Return URL từ cổng thanh toán")
 def payment_return(order_code: str, db: Session = Depends(get_db)):
