@@ -1,6 +1,7 @@
 from app.models.audit_log import AuditLog
 from app.models.id_tag import IdTag
 from app.models.meter_value import MeterValue
+from app.models.payment import TopupOrder
 from app.models.ocpp_message import OcppMessage
 from app.models.orphan_message import OrphanMessage
 from app.models.remote_start_request import RemoteStartRequest
@@ -27,6 +28,7 @@ __all__ = [
     "StationPowerMetric",
     "Tariff",
     "TariffPeriod",
+    "TopupOrder",
     "User",
     "Wallet",
     "WalletTransaction",
