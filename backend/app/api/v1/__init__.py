@@ -10,12 +10,12 @@ from app.api.v1.endpoints import (
     audit_logs,
     auth,
     chargers,
+    payments,
     sessions,
     simulator,
     stations,
     tariffs,
     wallet,
-    payments,
 )
 from app.core.config import settings
 from app.core.database import get_db
