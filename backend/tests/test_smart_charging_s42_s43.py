@@ -7,6 +7,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocket
@@ -20,6 +21,7 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.ocpp.dispatcher import OcppCallError
 from app.ocpp.frames import build_call
+from app.schemas.station import ConnectorUpdate, StationPowerLimitUpdate
 from app.services.smart_charging import (
     applied_session_limits,
     calculate_fair_share_targets,
@@ -79,6 +81,7 @@ def auth_users(db_session: Session):
         "token_admin": create_access_token({"sub": str(admin.id), "role": admin.role}),
         "token_op_a": create_access_token({"sub": str(op_a.id), "role": op_a.role}),
         "token_op_b": create_access_token({"sub": str(op_b.id), "role": op_b.role}),
+        "token_driver": create_access_token({"sub": str(driver.id), "role": driver.role}),
     }
 
 
@@ -145,15 +148,7 @@ def test_s42_set_power_limit_success_and_rbac(client, db_session: Session, auth_
     assert res_admin.status_code == 200
     assert res_admin.json()["total_grid_capacity_kw"] == 200.0
 
-    # 4. Chủ trạm B (không sở hữu trạm này) cập nhật -> Bị từ chối 403 Forbidden
-    res_op_b = client.put(
-        f"/api/v1/stations/{station.id}/power-limit",
-        json={"max_power_kw": 250.0},
-        headers={"Authorization": f"Bearer {auth_users['token_op_b']}"},
-    )
-    assert res_op_b.status_code == 403
-
-    # 5. Trạm không tồn tại -> 404
+    # 4. Trạm không tồn tại -> 404
     res_404 = client.put(
         "/api/v1/stations/99999/power-limit",
         json={"max_power_kw": 100.0},
@@ -162,92 +157,24 @@ def test_s42_set_power_limit_success_and_rbac(client, db_session: Session, auth_
     assert res_404.status_code == 404
 
 
-def test_s42_set_power_limit_rejects_negative_or_zero(
+def test_s42_persistence_and_retrieval_get_matching(
     client, db_session: Session, auth_users
 ):
-    """S-42: Giá trị max_power_kw <= 0 bị từ chối với mã lỗi 422 Unprocessable Entity."""
+    """S-42 (Tiêu chí 1): Lưu và GET lại trạm và đầu nối, đối chiếu giá trị (có rated_power_kw == max_power_kw)."""
     op_a = auth_users["op_a"]
     station = Station(
         operator_id=op_a.id,
-        name="Trạm Test Zero Power",
-        address="Hà Nội",
+        name="Trạm S42 Đối Chiếu",
+        address="123 Lê Lợi, Q1",
         total_grid_capacity_kw=80.0,
-    )
-    db_session.add(station)
-    db_session.commit()
-
-    # Giá trị bằng 0
-    res_zero = client.put(
-        f"/api/v1/stations/{station.id}/power-limit",
-        json={"max_power_kw": 0},
-        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
-    )
-    assert res_zero.status_code == 422
-
-    # Giá trị âm
-    res_neg = client.put(
-        f"/api/v1/stations/{station.id}/power-limit",
-        json={"max_power_kw": -25.5},
-        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
-    )
-    assert res_neg.status_code == 422
-
-
-def test_s42_oversubscription_warning_calculation(
-    client, db_session: Session, auth_users
-):
-    """S-42: Trạm 50 kW có 3 trụ 22 kW = 66 kW -> is_oversubscribed=True, ratio=1.32, warning=OVER_SUBSCRIPTION_WARNING."""
-    op_a = auth_users["op_a"]
-    station = Station(
-        operator_id=op_a.id,
-        name="Trạm 50kW Quá Tải",
-        address="Đà Nẵng",
-        total_grid_capacity_kw=50.0,
-    )
-    db_session.add(station)
-    db_session.commit()
-
-    # Thêm 3 trụ sạc 22 kW
-    cp1 = ChargingPoint(
-        station_id=station.id, code="CP-OS-01", max_power_kw=22.0, is_active=True
-    )
-    cp2 = ChargingPoint(
-        station_id=station.id, code="CP-OS-02", max_power_kw=22.0, is_active=True
-    )
-    cp3 = ChargingPoint(
-        station_id=station.id, code="CP-OS-03", max_power_kw=22.0, is_active=True
-    )
-    db_session.add_all([cp1, cp2, cp3])
-    db_session.commit()
-
-    res = client.get(
-        f"/api/v1/stations/{station.id}",
-        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
-    )
-    assert res.status_code == 200
-    data = res.json()
-    assert data["total_installed_power_kw"] == 66.0
-    assert data["oversubscription_ratio"] == 1.32  # 66 / 50 = 1.32
-    assert data["is_oversubscribed"] is True
-    assert data["warning"] == "OVER_SUBSCRIPTION_WARNING"
-
-
-def test_s42_connector_rated_power_update_and_rbac(
-    client, db_session: Session, auth_users
-):
-    """S-42: Cập nhật rated_power_kw (>0) của đầu nối có kiểm soát quyền sở hữu."""
-    op_a = auth_users["op_a"]
-    station = Station(
-        operator_id=op_a.id,
-        name="Trạm Cổng Sạc",
-        address="Cần Thơ",
-        total_grid_capacity_kw=100.0,
+        status="ACTIVE",
+        is_active=True,
     )
     db_session.add(station)
     db_session.commit()
 
     cp = ChargingPoint(
-        station_id=station.id, code="CP-CONN-01", max_power_kw=50.0, is_active=True
+        station_id=station.id, code="CP-DC-01", max_power_kw=50.0, is_active=True
     )
     db_session.add(cp)
     db_session.commit()
@@ -261,31 +188,245 @@ def test_s42_connector_rated_power_update_and_rbac(
     db_session.add(conn)
     db_session.commit()
 
-    # 1. Owner cập nhật rated_power_kw = 30 kW thành công
-    res_update = client.put(
-        f"/api/v1/connectors/{conn.id}",
-        json={"rated_power_kw": 30.0},
+    # 1. Cập nhật hạn mức trạm = 150 kW
+    res_st = client.put(
+        f"/api/v1/stations/{station.id}/power-limit",
+        json={"max_power_kw": 150.0},
         headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
     )
-    assert res_update.status_code == 200
-    assert res_update.json()["max_power_kw"] == 30.0
-    assert res_update.json()["rated_power_kw"] == 30.0
+    assert res_st.status_code == 200
 
-    # 2. Cập nhật <= 0 bị từ chối 422
-    res_zero = client.put(
+    # 2. Cập nhật công suất đầu nối = 45 kW
+    res_cn = client.put(
         f"/api/v1/connectors/{conn.id}",
-        json={"rated_power_kw": 0.0},
+        json={"rated_power_kw": 45.0},
         headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
     )
-    assert res_zero.status_code == 422
+    assert res_cn.status_code == 200
 
-    # 3. Operator khác cập nhật bị chặn 403
-    res_op_b = client.put(
-        f"/api/v1/connectors/{conn.id}",
-        json={"rated_power_kw": 40.0},
+    # 3. GET lại trạm và đối chiếu giá trị
+    res_get = client.get(
+        f"/api/v1/stations/{station.id}",
+        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+    )
+    assert res_get.status_code == 200
+    st_data = res_get.json()
+    assert st_data["max_power_kw"] == 150.0
+    assert st_data["total_grid_capacity_kw"] == 150.0
+
+    # Đối chiếu đầu nối bên trong trạm: có rated_power_kw và bằng max_power_kw
+    c_data = st_data["charging_points"][0]["connectors"][0]
+    assert c_data["rated_power_kw"] == 45.0
+    assert c_data["max_power_kw"] == 45.0
+
+
+def test_s42_oversubscription_warning_calculation(
+    client, db_session: Session, auth_users
+):
+    """S-42 (Tiêu chí 2): Tính quá tải theo đầu nối, trả warning_message, và PUT /connectors trả kèm trạng thái trạm."""
+    op_a = auth_users["op_a"]
+    station = Station(
+        operator_id=op_a.id,
+        name="Trạm 50kW Quá Tải",
+        address="Đà Nẵng",
+        total_grid_capacity_kw=50.0,
+    )
+    db_session.add(station)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=station.id, code="CP-OS-01", max_power_kw=60.0, is_active=True
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    conn1 = Connector(
+        charging_point_id=cp.id, connector_number=1, max_power_kw=22.0, is_active=True
+    )
+    conn2 = Connector(
+        charging_point_id=cp.id, connector_number=2, max_power_kw=22.0, is_active=True
+    )
+    db_session.add_all([conn1, conn2])
+    db_session.commit()
+
+    # Ban đầu: 22 + 22 = 44 kW <= 50 kW -> Chưa quá tải
+    res_init = client.get(
+        f"/api/v1/stations/{station.id}",
+        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+    )
+    assert res_init.json()["is_oversubscribed"] is False
+    assert res_init.json()["warning"] is None
+    assert res_init.json()["warning_message"] is None
+
+    # Nâng conn2 lên 35 kW (tổng 22 + 35 = 57 kW > 50 kW)
+    res_update_conn = client.put(
+        f"/api/v1/connectors/{conn2.id}",
+        json={"rated_power_kw": 35.0},
+        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+    )
+    assert res_update_conn.status_code == 200
+    conn_data = res_update_conn.json()
+    # (c) Response PUT /connectors/{id} trả kèm trạng thái quá đăng ký của trạm chứa nó
+    assert conn_data["station_is_oversubscribed"] is True
+    assert conn_data["station_warning"] == "OVER_SUBSCRIPTION_WARNING"
+    assert conn_data["station_warning_message"] == "Trạm đang quá đăng ký"
+
+    # GET lại trạm kiểm tra (a) & (b)
+    res_get = client.get(
+        f"/api/v1/stations/{station.id}",
+        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+    )
+    data = res_get.json()
+    assert data["total_installed_power_kw"] == 57.0  # Cộng theo đầu nối 22 + 35 = 57 kW
+    assert data["oversubscription_ratio"] == 1.14  # 57 / 50 = 1.14
+    assert data["is_oversubscribed"] is True
+    assert data["warning"] == "OVER_SUBSCRIPTION_WARNING"
+    assert data["warning_message"] == "Trạm đang quá đăng ký"
+
+
+def test_s42_power_limit_validation_all_invalid_cases(
+    client, db_session: Session, auth_users
+):
+    """S-42 (Tiêu chí 3): Âm, 0, chuỗi chữ, NaN, Infinity đều bị từ chối 422 với thông báo tiếng Việt."""
+    op_a = auth_users["op_a"]
+    station = Station(
+        operator_id=op_a.id,
+        name="Trạm Test Validation",
+        address="Hà Nội",
+        total_grid_capacity_kw=80.0,
+    )
+    db_session.add(station)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=station.id, code="CP-VAL-01", max_power_kw=50.0, is_active=True
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    conn = Connector(
+        charging_point_id=cp.id, connector_number=1, max_power_kw=22.0, is_active=True
+    )
+    db_session.add(conn)
+    db_session.commit()
+
+    invalid_values = [-10.0, 0, "abc", "NaN", "Infinity", "-Infinity"]
+
+    # 1. Kiểm tra trên endpoint trạm: PUT /stations/{id}/power-limit qua HTTP json
+    for val in invalid_values:
+        res = client.put(
+            f"/api/v1/stations/{station.id}/power-limit",
+            json={"max_power_kw": val},
+            headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+        )
+        assert res.status_code == 422
+        assert "Công suất phải là số lớn hơn 0" in str(res.json())
+
+    # Raw non-standard JSON literals (NaN, Infinity)
+    for raw_val in [b'{"max_power_kw": NaN}', b'{"max_power_kw": Infinity}']:
+        res_raw = client.put(
+            f"/api/v1/stations/{station.id}/power-limit",
+            content=raw_val,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {auth_users['token_op_a']}",
+            },
+        )
+        assert res_raw.status_code == 422
+        assert "Công suất phải là số lớn hơn 0" in str(res_raw.json())
+
+    # 2. Kiểm tra trên endpoint đầu nối: PUT /connectors/{id}
+    for val in invalid_values:
+        res_conn = client.put(
+            f"/api/v1/connectors/{conn.id}",
+            json={"rated_power_kw": val},
+            headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+        )
+        assert res_conn.status_code == 422
+        assert "Công suất phải là số lớn hơn 0" in str(res_conn.json())
+
+    for raw_val in [b'{"rated_power_kw": NaN}', b'{"rated_power_kw": Infinity}']:
+        res_raw_conn = client.put(
+            f"/api/v1/connectors/{conn.id}",
+            content=raw_val,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {auth_users['token_op_a']}",
+            },
+        )
+        assert res_raw_conn.status_code == 422
+        assert "Công suất phải là số lớn hơn 0" in str(res_raw_conn.json())
+
+    # 3. Kiểm tra trực tiếp Pydantic schema với float('nan') và float('inf')
+    for float_val in [float("nan"), float("inf"), -1.0, 0.0]:
+        with pytest.raises(ValidationError) as exc_st:
+            StationPowerLimitUpdate.model_validate({"max_power_kw": float_val})
+        assert "Công suất phải là số lớn hơn 0" in str(exc_st.value)
+
+        with pytest.raises(ValidationError) as exc_cn:
+            ConnectorUpdate.model_validate({"rated_power_kw": float_val})
+        assert "Công suất phải là số lớn hơn 0" in str(exc_cn.value)
+
+
+def test_s42_rbac_strict_403_for_other_operator_and_driver(
+    client, db_session: Session, auth_users
+):
+    """S-42 (Tiêu chí 4): Assert ĐÚNG 403 (không 404) cho chủ trạm khác và tài xế ở cả hai endpoint."""
+    op_a = auth_users["op_a"]
+    station = Station(
+        operator_id=op_a.id,
+        name="Trạm RBAC Strict",
+        address="Huế",
+        total_grid_capacity_kw=100.0,
+    )
+    db_session.add(station)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=station.id, code="CP-RBAC-01", max_power_kw=50.0, is_active=True
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    conn = Connector(
+        charging_point_id=cp.id, connector_number=1, max_power_kw=22.0, is_active=True
+    )
+    db_session.add(conn)
+    db_session.commit()
+
+    # 1. Endpoint trạm: PUT /stations/{id}/power-limit
+    # Chủ trạm B (khác chủ) -> 403
+    res_st_op_b = client.put(
+        f"/api/v1/stations/{station.id}/power-limit",
+        json={"max_power_kw": 120.0},
         headers={"Authorization": f"Bearer {auth_users['token_op_b']}"},
     )
-    assert res_op_b.status_code == 403
+    assert res_st_op_b.status_code == 403
+
+    # Tài xế (Customer) -> 403
+    res_st_driver = client.put(
+        f"/api/v1/stations/{station.id}/power-limit",
+        json={"max_power_kw": 120.0},
+        headers={"Authorization": f"Bearer {auth_users['token_driver']}"},
+    )
+    assert res_st_driver.status_code == 403
+
+    # 2. Endpoint đầu nối: PUT /connectors/{id}
+    # Chủ trạm B (khác chủ) -> 403
+    res_cn_op_b = client.put(
+        f"/api/v1/connectors/{conn.id}",
+        json={"rated_power_kw": 30.0},
+        headers={"Authorization": f"Bearer {auth_users['token_op_b']}"},
+    )
+    assert res_cn_op_b.status_code == 403
+
+    # Tài xế (Customer) -> 403
+    res_cn_driver = client.put(
+        f"/api/v1/connectors/{conn.id}",
+        json={"rated_power_kw": 30.0},
+        headers={"Authorization": f"Bearer {auth_users['token_driver']}"},
+    )
+    assert res_cn_driver.status_code == 403
 
 
 # ==============================================================================
@@ -607,29 +748,178 @@ def test_s43_timeout_retry_success():
     assert res["status"] == "Accepted"
 
 
-def test_s43_timeout_retry_failure_only_warns_session_kept(caplog):
-    """S-43: Trụ timeout cả 2 lần -> Ghi WARNING, phiên sạc của khách KHÔNG bị dừng."""
-    async def mock_always_timeout(code, action, payload, timeout_seconds=None):
-        raise TimeoutError("Vẫn timeout")
+def test_s43_timeout_treated_as_rejected_triggers_remote_stop(
+    db_session: Session, auth_users
+):
+    """S-43 (Tiêu chí 1): Timeout được xử lý đúng như Rejected: kích hoạt RemoteStopTransaction ngoài khóa trạm."""
+    op = auth_users["op_a"]
+    driver = auth_users["driver"]
+
+    st = Station(
+        operator_id=op.id,
+        name="Trạm Timeout Test",
+        address="Hải Phòng",
+        total_grid_capacity_kw=30.0,
+    )
+    db_session.add(st)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=st.id, code="CP-TIMEOUT-01", max_power_kw=60.0, is_active=True
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    conn1 = Connector(
+        charging_point_id=cp.id, connector_number=1, max_power_kw=22.0, is_active=True
+    )
+    conn2 = Connector(
+        charging_point_id=cp.id, connector_number=2, max_power_kw=22.0, is_active=True
+    )
+    db_session.add_all([conn1, conn2])
+    db_session.commit()
+
+    # 2 phiên đang sạc, tổng 44 kW > 30 kW -> cần gửi profile hạ tải
+    sess1 = ChargingSession(
+        connector_id=conn1.id, driver_id=driver.id, status="CHARGING", meter_start=0
+    )
+    sess2 = ChargingSession(
+        connector_id=conn2.id, driver_id=driver.id, status="CHARGING", meter_start=0
+    )
+    db_session.add_all([sess1, sess2])
+    db_session.commit()
+
+    tx1 = sess1.transaction_id
+    tx2 = sess2.transaction_id
+
+    remote_stops_sent = []
+
+    async def mock_dispatch(charge_point_code, connector_number, transaction_id, limit_w):
+        # Giả lập timeout sau retry
+        return {
+            "status": "TIMEOUT",
+            "transaction_id": transaction_id,
+            "charge_point_code": charge_point_code,
+            "limit_W": limit_w,
+        }
+
+    async def mock_remote_stop(charge_point_code, transaction_id, *args, **kwargs):
+        remote_stops_sent.append((charge_point_code, transaction_id))
+
+    with (
+        patch("app.services.smart_charging._dispatch_single_profile", side_effect=mock_dispatch),
+        patch("app.services.smart_charging._execute_remote_stop_outside_lock", side_effect=mock_remote_stop),
+    ):
+        asyncio.run(
+            rebalance_station_power(st.id, session_factory=TestingSessionLocal)
+        )
+
+    # Xác nhận cả 2 phiên timeout đều được kích hoạt gửi RemoteStopTransaction (xử lý như Rejected)
+    stopped_tx_ids = [item[1] for item in remote_stops_sent]
+    assert tx1 in stopped_tx_ids
+    assert tx2 in stopped_tx_ids
+
+
+def test_s43_remote_stop_failure_marks_session_abnormal(
+    db_session: Session, auth_users
+):
+    """S-43 (Tiêu chí 1): Nếu RemoteStopTransaction cũng timeout/thất bại -> Đánh dấu phiên ABNORMAL."""
+    op = auth_users["op_a"]
+    driver = auth_users["driver"]
+
+    st = Station(
+        operator_id=op.id, name="Trạm Abnormal Test", address="Hà Nội", total_grid_capacity_kw=50.0
+    )
+    db_session.add(st)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=st.id, code="CP-ABNORMAL-01", max_power_kw=60.0, is_active=True
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    conn = Connector(
+        charging_point_id=cp.id, connector_number=1, max_power_kw=22.0, is_active=True
+    )
+    db_session.add(conn)
+    db_session.commit()
+
+    sess = ChargingSession(
+        connector_id=conn.id, driver_id=driver.id, status="CHARGING", meter_start=0
+    )
+    db_session.add(sess)
+    db_session.commit()
+
+    tx_id = sess.transaction_id
+
+    async def mock_remote_stop_timeout(code, action, payload, timeout_seconds=None):
+        raise TimeoutError("Mất liên lạc hoàn toàn với trụ khi gửi RemoteStop")
+
+    from app.services.smart_charging import _execute_remote_stop_outside_lock
+
+    with patch(
+        "app.services.smart_charging.send_call_and_wait",
+        side_effect=mock_remote_stop_timeout,
+    ):
+        asyncio.run(
+            _execute_remote_stop_outside_lock(
+                "CP-ABNORMAL-01", tx_id, session_factory=TestingSessionLocal
+            )
+        )
+
+    # Kiểm tra CSDL: Phiên đã được đánh dấu ABNORMAL
+    db = TestingSessionLocal()
+    updated_sess = (
+        db.query(ChargingSession)
+        .filter(ChargingSession.transaction_id == tx_id)
+        .first()
+    )
+    assert updated_sess.status == "ABNORMAL"
+    assert updated_sess.is_abnormal is True
+    assert updated_sess.stop_reason == "RebalanceStopFailed"
+    assert updated_sess.stop_time is not None
+    assert "CP-ABNORMAL-01" in updated_sess.abnormal_reason
+    db.close()
+
+
+def test_s43_info_log_format_and_no_id_tag(caplog):
+    """S-43 (Tiêu chí 3): Ghi log INFO chuẩn mỗi lần gửi SetChargingProfile; tuyệt đối KHÔNG log mã thẻ idTag."""
+    async def mock_send_call(code, action, payload, timeout_seconds=None):
+        return {"status": "Accepted"}
 
     from app.services.smart_charging import _dispatch_single_profile
 
     with (
-        patch("app.services.smart_charging.active_ocpp_connections", {"CP-TIMEOUT-FAIL": object()}),
-        patch("app.services.smart_charging.send_call_and_wait", side_effect=mock_always_timeout),
-        caplog.at_level(logging.WARNING, logger="ev_csms.smart_charging"),
+        patch(
+            "app.services.smart_charging.active_ocpp_connections",
+            {"CP-INFO-01": object()},
+        ),
+        patch(
+            "app.services.smart_charging.send_call_and_wait",
+            side_effect=mock_send_call,
+        ),
+        caplog.at_level(logging.INFO, logger="ev_csms.smart_charging"),
     ):
         res = asyncio.run(
             _dispatch_single_profile(
-                charge_point_code="CP-TIMEOUT-FAIL",
+                charge_point_code="CP-INFO-01",
                 connector_number=1,
-                transaction_id=302,
-                limit_w=15000,
+                transaction_id=555,
+                limit_w=12500,
             )
         )
 
-    assert res["status"] == "TIMEOUT"
-    assert "WARNING: Charger CP-TIMEOUT-FAIL unreachable for profile update" in caplog.text
+    assert res["status"] == "Accepted"
+    # Kiểm tra đúng format: mã trụ, connector_number, transactionId, chargingProfileId, limit_W, kết quả
+    expected_part = (
+        "SetChargingProfile: charger=CP-INFO-01, connector=1, transaction_id=555, "
+        "profile_id=555, limit_W=12500, result=Accepted"
+    )
+    assert expected_part in caplog.text
+    # Tuyệt đối không log mã thẻ idTag
+    assert "idTag" not in caplog.text
+    assert "id_tag" not in caplog.text
 
 
 def test_s43_not_supported_callerror_logged_session_kept(caplog):
@@ -876,3 +1166,213 @@ def test_s43_cache_cleanup_when_session_ends(db_session: Session, auth_users):
 def test_s43_simulation_r08_scenario():
     """Giả lập kịch bản Epic E-08 (R-08): Chạy trên mô hình giả lập (mock simulation), chưa nghiệm thu trên trụ thật."""
     assert True
+
+
+def test_s42_no_warning_when_total_power_less_than_or_equal_to_limit(
+    client, db_session: Session, auth_users
+):
+    """S-42: Trạm có tổng danh định bằng hoặc nhỏ hơn hạn mức thì warning, warning_message là null và is_oversubscribed là false."""
+    op = auth_users["op_a"]
+    station = Station(
+        operator_id=op.id,
+        name="Trạm Hạn Mức An Toàn",
+        address="Đà Nẵng",
+        total_grid_capacity_kw=100.0,
+    )
+    db_session.add(station)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=station.id, code="CP-SAFE-01", max_power_kw=100.0, is_active=True
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    conn1 = Connector(
+        charging_point_id=cp.id, connector_number=1, max_power_kw=40.0, is_active=True
+    )
+    conn2 = Connector(
+        charging_point_id=cp.id, connector_number=2, max_power_kw=40.0, is_active=True
+    )
+    db_session.add_all([conn1, conn2])
+    db_session.commit()
+
+    # 1. Trường hợp NHỎ HƠN hạn mức: 40 + 40 = 80 kW < 100 kW
+    res_lt = client.get(
+        f"/api/v1/stations/{station.id}",
+        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+    )
+    assert res_lt.status_code == 200
+    data_lt = res_lt.json()
+    assert data_lt["total_installed_power_kw"] == 80.0
+    assert data_lt["is_oversubscribed"] is False
+    assert data_lt["warning"] is None
+    assert data_lt["warning_message"] is None
+
+    # 2. Trường hợp ĐÚNG BẰNG hạn mức: nâng conn2 lên 60 kW (40 + 60 = 100 kW == 100 kW)
+    res_update = client.put(
+        f"/api/v1/connectors/{conn2.id}",
+        json={"rated_power_kw": 60.0},
+        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+    )
+    assert res_update.status_code == 200
+    conn_data = res_update.json()
+    assert conn_data["station_is_oversubscribed"] is False
+    assert conn_data["station_warning"] is None
+    assert conn_data["station_warning_message"] is None
+
+    res_eq = client.get(
+        f"/api/v1/stations/{station.id}",
+        headers={"Authorization": f"Bearer {auth_users['token_op_a']}"},
+    )
+    assert res_eq.status_code == 200
+    data_eq = res_eq.json()
+    assert data_eq["total_installed_power_kw"] == 100.0
+    assert data_eq["is_oversubscribed"] is False
+    assert data_eq["warning"] is None
+    assert data_eq["warning_message"] is None
+
+
+def test_s43_telemetry_alert_broadcast_on_rejected_and_timeout(
+    db_session: Session, auth_users
+):
+    """S-43 (Tiêu chí 3): Phát sự kiện cảnh báo qua /ws/telemetry khi trụ từ chối hoặc timeout hạ tải.
+
+    Phủ CẢ HAI trường hợp:
+    (a) Trụ trả Rejected -> lý do "trụ từ chối giới hạn công suất".
+    (b) Trụ timeout -> lý do "trụ không phản hồi giới hạn công suất".
+    Dù RemoteStopTransaction thành công hay thất bại: sự kiện đều được phát, không có idTag, ghi nhận lý do vào session.
+    """
+    op = auth_users["op_a"]
+    driver = auth_users["driver"]
+
+    station = Station(
+        operator_id=op.id,
+        name="Trạm Alert Telemetry Test",
+        address="Cần Thơ",
+        total_grid_capacity_kw=30.0,
+    )
+    db_session.add(station)
+    db_session.commit()
+
+    cp = ChargingPoint(
+        station_id=station.id, code="CP-ALERT-01", max_power_kw=60.0, is_active=True
+    )
+    db_session.add(cp)
+    db_session.commit()
+
+    conn1 = Connector(
+        charging_point_id=cp.id, connector_number=1, max_power_kw=22.0, is_active=True
+    )
+    conn2 = Connector(
+        charging_point_id=cp.id, connector_number=2, max_power_kw=22.0, is_active=True
+    )
+    db_session.add_all([conn1, conn2])
+    db_session.commit()
+
+    # 2 phiên sạc
+    sess1 = ChargingSession(
+        connector_id=conn1.id, driver_id=driver.id, status="CHARGING", meter_start=0
+    )
+    sess2 = ChargingSession(
+        connector_id=conn2.id, driver_id=driver.id, status="CHARGING", meter_start=0
+    )
+    db_session.add_all([sess1, sess2])
+    db_session.commit()
+
+    tx1 = sess1.transaction_id
+    tx2 = sess2.transaction_id
+
+    broadcast_events = []
+
+    async def mock_ws_broadcast(event_dict):
+        broadcast_events.append(event_dict)
+
+    # (a) Trường hợp trụ trả REJECTED (và RemoteStopTransaction thành công)
+    from app.services.smart_charging import _execute_remote_stop_outside_lock
+
+    with (
+        patch("app.core.websocket.ws_manager.broadcast", side_effect=mock_ws_broadcast),
+        patch("app.services.smart_charging.send_call_and_wait", return_value={"status": "Accepted"}),
+    ):
+        asyncio.run(
+            _execute_remote_stop_outside_lock(
+                charge_point_code="CP-ALERT-01",
+                transaction_id=tx1,
+                station_id=station.id,
+                reason="trụ từ chối giới hạn công suất",
+                session_factory=TestingSessionLocal,
+            )
+        )
+
+    assert len(broadcast_events) == 1
+    ev_reject = broadcast_events[0]
+    assert ev_reject["event"] == "ALERT"
+    assert ev_reject["alert_type"] == "LOAD_SHEDDING_ALERT"
+    assert ev_reject["station_id"] == station.id
+    assert ev_reject["charge_point_code"] == "CP-ALERT-01"
+    assert ev_reject["transaction_id"] == tx1
+    assert ev_reject["reason"] == "trụ từ chối giới hạn công suất"
+    assert "timestamp" in ev_reject
+    # Tuyệt đối không chứa idTag hay id_tag
+    assert "idTag" not in ev_reject
+    assert "id_tag" not in ev_reject
+
+    # Kiểm tra lý do đã được lưu vào phiên
+    db = TestingSessionLocal()
+    updated_sess1 = db.query(ChargingSession).filter(ChargingSession.transaction_id == tx1).first()
+    assert updated_sess1.abnormal_reason == "trụ từ chối giới hạn công suất"
+
+    # (b) Trường hợp trụ bị TIMEOUT (và RemoteStopTransaction thất bại)
+    broadcast_events.clear()
+
+    async def mock_remote_stop_fail(*args, **kwargs):
+        raise TimeoutError("Trụ không phản hồi lệnh dừng")
+
+    with (
+        patch("app.core.websocket.ws_manager.broadcast", side_effect=mock_ws_broadcast),
+        patch("app.services.smart_charging.send_call_and_wait", side_effect=mock_remote_stop_fail),
+    ):
+        asyncio.run(
+            _execute_remote_stop_outside_lock(
+                charge_point_code="CP-ALERT-01",
+                transaction_id=tx2,
+                station_id=station.id,
+                reason="trụ không phản hồi giới hạn công suất",
+                session_factory=TestingSessionLocal,
+            )
+        )
+
+    # Sự kiện cảnh báo VẪN ĐƯỢC PHÁT dù RemoteStop thất bại
+    assert len(broadcast_events) == 1
+    ev_timeout = broadcast_events[0]
+    assert ev_timeout["event"] == "ALERT"
+    assert ev_timeout["alert_type"] == "LOAD_SHEDDING_ALERT"
+    assert ev_timeout["station_id"] == station.id
+    assert ev_timeout["charge_point_code"] == "CP-ALERT-01"
+    assert ev_timeout["transaction_id"] == tx2
+    assert ev_timeout["reason"] == "trụ không phản hồi giới hạn công suất"
+    assert "timestamp" in ev_timeout
+    assert "idTag" not in ev_timeout
+    assert "id_tag" not in ev_timeout
+
+    # Kiểm tra phiên bị đánh dấu ABNORMAL khi RemoteStop thất bại
+    db = TestingSessionLocal()
+    updated_sess2 = db.query(ChargingSession).filter(ChargingSession.transaction_id == tx2).first()
+    assert updated_sess2.status == "ABNORMAL"
+    assert updated_sess2.is_abnormal is True
+    assert "trụ không phản hồi giới hạn công suất" in updated_sess2.abnormal_reason
+    assert updated_sess2.stop_reason == "RebalanceStopFailed"
+
+
+def test_root_endpoint_returns_200_and_expected_payload(client):
+    """Xác nhận GET / trả về 200 với đầy đủ nội dung thông tin dịch vụ như cũ."""
+    res = client.get("/")
+    assert res.status_code == 200
+    data = res.json()
+    assert "Chào mừng đến với" in data["message"]
+    assert "version" in data
+    assert data["docs"] == "/docs"
+    assert data["health"] == "/api/v1/health"
+    assert data["websocket"] == "/ws/telemetry"
+

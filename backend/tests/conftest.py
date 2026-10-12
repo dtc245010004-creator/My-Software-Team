@@ -56,7 +56,10 @@ def db_session():
 def pytest_unconfigure(config):
     """Close the engine and remove only this pytest run's temporary database."""
     test_engine.dispose()
-    TEST_DB_FILE.unlink(missing_ok=True)
+    try:
+        TEST_DB_FILE.unlink(missing_ok=True)
+    except PermissionError:
+        pass
 
 
 @pytest.fixture(scope="function")

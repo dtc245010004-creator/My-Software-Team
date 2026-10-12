@@ -757,7 +757,7 @@ def validate_and_apply_station_power_limit(
     if max_power_kw <= 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Hạn mức công suất nguồn trạm (max_power_kw) phải lớn hơn 0.",
+            detail="Công suất phải là số lớn hơn 0",
         )
     if current_user.role != "ADMIN":
         if station.operator_id is None or station.operator_id != current_user.id:

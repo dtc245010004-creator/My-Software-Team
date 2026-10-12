@@ -172,7 +172,22 @@ def enrich_station_response(station: Station) -> StationResponse:
     chargers_resp = [
         enrich_charger_response(cp) for cp in station.charging_points if cp.is_active
     ]
-    total_installed_power = round(sum(cp.max_power_kw for cp in chargers_resp), 2)
+    # S-42: Tính tổng công suất lắp đặt theo các ĐẦU NỐI (Connectors). Nếu trụ chưa khai báo đầu nối thì lấy theo trụ.
+    total_power = 0.0
+    for cp in chargers_resp:
+        active_conns = [conn for conn in cp.connectors if conn.is_active]
+        if active_conns:
+            total_power += sum(
+                (
+                    conn.rated_power_kw
+                    if conn.rated_power_kw is not None
+                    else conn.max_power_kw
+                )
+                for conn in active_conns
+            )
+        else:
+            total_power += float(cp.max_power_kw or 0.0)
+    total_installed_power = round(total_power, 2)
     oversubscription_ratio = (
         round(total_installed_power / station.total_grid_capacity_kw, 2)
         if station.total_grid_capacity_kw > 0
@@ -189,8 +204,10 @@ def enrich_station_response(station: Station) -> StationResponse:
     resp.is_oversubscribed = is_oversubscribed
     if is_oversubscribed:
         resp.warning = "OVER_SUBSCRIPTION_WARNING"
+        resp.warning_message = "Trạm đang quá đăng ký"
     else:
         resp.warning = None
+        resp.warning_message = None
     return resp
 
 

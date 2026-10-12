@@ -26,6 +26,7 @@ from app.services.station_service import (
     atomic_soft_delete_charger,
     broadcast_status_change,
     enrich_charger_response,
+    enrich_station_response,
     filter_station_access,
     verify_charger_ownership,
     verify_station_ownership,
@@ -508,5 +509,13 @@ def update_connector(
     db.refresh(connector)
     resp = ConnectorResponse.model_validate(connector)
     resp.rated_power_kw = connector.max_power_kw
+
+    # 2(c): Trả kèm trạng thái quá đăng ký của trạm chứa đầu nối
+    if connector.charging_point and connector.charging_point.station:
+        st_resp = enrich_station_response(connector.charging_point.station)
+        resp.station_is_oversubscribed = st_resp.is_oversubscribed
+        resp.station_warning = st_resp.warning
+        resp.station_warning_message = st_resp.warning_message
+
     return resp
 

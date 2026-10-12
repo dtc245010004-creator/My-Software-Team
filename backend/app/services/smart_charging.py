@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from app.models.session import ChargingSession
@@ -103,13 +104,22 @@ async def _dispatch_single_profile(
     limit_w: int,
 ) -> dict[str, Any]:
     """Gửi bản tin SetChargingProfile OCPP 1.6J tới một trụ với timeout 5s và retry đúng 1 lần."""
+    charging_profile_id = int(transaction_id)
     if charge_point_code not in active_ocpp_connections:
         logger.warning(
             "WARNING: Charger %s unreachable (no websocket connection) for profile update",
             charge_point_code,
         )
+        logger.info(
+            "SetChargingProfile: charger=%s, connector=%s, transaction_id=%s, profile_id=%s, limit_W=%s, result=timeout",
+            charge_point_code,
+            connector_number,
+            transaction_id,
+            charging_profile_id,
+            limit_w,
+        )
         return {
-            "status": "UNREACHABLE",
+            "status": "TIMEOUT",
             "transaction_id": transaction_id,
             "charge_point_code": charge_point_code,
             "limit_W": limit_w,
@@ -118,7 +128,7 @@ async def _dispatch_single_profile(
     payload = {
         "connectorId": int(connector_number),
         "csChargingProfiles": {
-            "chargingProfileId": int(transaction_id),
+            "chargingProfileId": charging_profile_id,
             "stackLevel": 1,
             "chargingProfilePurpose": "TxProfile",
             "chargingProfileKind": "Relative",
@@ -140,8 +150,18 @@ async def _dispatch_single_profile(
         res = await send_call_and_wait(
             charge_point_code, "SetChargingProfile", payload, timeout_seconds=5.0
         )
+        status_str = res.get("status", "Accepted")
+        logger.info(
+            "SetChargingProfile: charger=%s, connector=%s, transaction_id=%s, profile_id=%s, limit_W=%s, result=%s",
+            charge_point_code,
+            connector_number,
+            transaction_id,
+            charging_profile_id,
+            limit_w,
+            status_str,
+        )
         return {
-            "status": res.get("status", "Accepted"),
+            "status": status_str,
             "transaction_id": transaction_id,
             "charge_point_code": charge_point_code,
             "limit_W": limit_w,
@@ -160,6 +180,14 @@ async def _dispatch_single_profile(
             exc.description,
             exc.error_code,
         )
+        logger.info(
+            "SetChargingProfile: charger=%s, connector=%s, transaction_id=%s, profile_id=%s, limit_W=%s, result=CALLERROR",
+            charge_point_code,
+            connector_number,
+            transaction_id,
+            charging_profile_id,
+            limit_w,
+        )
         return {
             "status": "CALLERROR",
             "error_code": exc.error_code,
@@ -169,13 +197,23 @@ async def _dispatch_single_profile(
             "limit_W": limit_w,
         }
 
-    # Thử lại (retry) đúng 1 lần với timeout 5s
+    # Thử lại (retry) đúng 1 lần với timeout 5s (CÙNG chargingProfileId)
     try:
         res = await send_call_and_wait(
             charge_point_code, "SetChargingProfile", payload, timeout_seconds=5.0
         )
+        status_str = res.get("status", "Accepted")
+        logger.info(
+            "SetChargingProfile: charger=%s, connector=%s, transaction_id=%s, profile_id=%s, limit_W=%s, result=%s",
+            charge_point_code,
+            connector_number,
+            transaction_id,
+            charging_profile_id,
+            limit_w,
+            status_str,
+        )
         return {
-            "status": res.get("status", "Accepted"),
+            "status": status_str,
             "transaction_id": transaction_id,
             "charge_point_code": charge_point_code,
             "limit_W": limit_w,
@@ -186,6 +224,14 @@ async def _dispatch_single_profile(
             charge_point_code,
             exc.description,
             exc.error_code,
+        )
+        logger.info(
+            "SetChargingProfile: charger=%s, connector=%s, transaction_id=%s, profile_id=%s, limit_W=%s, result=CALLERROR",
+            charge_point_code,
+            connector_number,
+            transaction_id,
+            charging_profile_id,
+            limit_w,
         )
         return {
             "status": "CALLERROR",
@@ -201,6 +247,14 @@ async def _dispatch_single_profile(
             charge_point_code,
             exc,
         )
+        logger.info(
+            "SetChargingProfile: charger=%s, connector=%s, transaction_id=%s, profile_id=%s, limit_W=%s, result=timeout",
+            charge_point_code,
+            connector_number,
+            transaction_id,
+            charging_profile_id,
+            limit_w,
+        )
         return {
             "status": "TIMEOUT",
             "exception": exc,
@@ -213,12 +267,68 @@ async def _dispatch_single_profile(
 async def _execute_remote_stop_outside_lock(
     charge_point_code: str,
     transaction_id: int,
+    station_id: int | None = None,
+    reason: str = "trụ từ chối giới hạn công suất",
+    session_factory: Callable[[], Any] | None = None,
 ) -> None:
-    """Gửi RemoteStopTransaction ở tác vụ độc lập sau khi đã nhả khóa trạm (Timeout 30s)."""
+    """Gửi RemoteStopTransaction ở tác vụ độc lập sau khi đã nhả khóa trạm (Timeout 30s).
+
+    1. Phát sự kiện cảnh báo qua kênh /ws/telemetry cho chủ trạm/vận hành viên (dù stop thành công hay thất bại).
+    2. Ghi lý do vào phiên sạc trong CSDL bằng trường có sẵn (abnormal_reason).
+    3. Nếu RemoteStopTransaction bị từ chối hoặc timeout/không kết nối:
+       - Ghi cảnh báo nghiêm trọng (CRITICAL).
+       - Đánh dấu phiên bất thường (ABNORMAL) theo cơ chế sẵn có trong repo.
+    """
+    now_dt = datetime.now(timezone.utc)
+
+    # 1. Phát sự kiện cảnh báo qua kênh /ws/telemetry (không có idTag)
+    alert_event = {
+        "event": "ALERT",
+        "alert_type": "LOAD_SHEDDING_ALERT",
+        "station_id": station_id,
+        "charge_point_code": charge_point_code,
+        "transaction_id": int(transaction_id),
+        "reason": reason,
+        "timestamp": now_dt.isoformat(),
+    }
+    try:
+        from app.core.websocket import ws_manager
+
+        await ws_manager.broadcast(alert_event)
+    except Exception as ws_err:  # noqa: BLE001
+        logger.warning(
+            "Không thể phát cảnh báo WebSocket qua /ws/telemetry: %s", ws_err
+        )
+
+    # 2. Ghi nhận lý do vào phiên bằng trường có sẵn nếu tìm thấy
+    if session_factory is None:
+        from app.core.database import SessionLocal
+
+        session_factory = SessionLocal
+
+    try:
+        with session_factory() as db:
+            sess = (
+                db.query(ChargingSession)
+                .filter(ChargingSession.transaction_id == transaction_id)
+                .first()
+            )
+            if sess:
+                sess.abnormal_reason = reason
+                sess.stop_reason = "RebalanceStop"
+                db.commit()
+    except Exception as db_err:  # noqa: BLE001
+        logger.warning(
+            "Không thể lưu lý do dừng tải vào phiên #%s: %s", transaction_id, db_err
+        )
+
+    # 3. Gửi RemoteStopTransaction tới trụ
+    is_failed = False
+    fail_reason = ""
     try:
         logger.critical(
-            "CRITICAL: Trụ %s từ chối hạ tải (SetChargingProfile Rejected). Đang gửi RemoteStopTransaction cho transactionId=%s để bảo vệ trạm...",
-            charge_point_code,
+            "CRITICAL: %s (SetChargingProfile). Đang gửi RemoteStopTransaction cho transactionId=%s để bảo vệ trạm...",
+            reason,
             transaction_id,
         )
         res = await send_call_and_wait(
@@ -228,11 +338,14 @@ async def _execute_remote_stop_outside_lock(
             timeout_seconds=30.0,
         )
         if str(res.get("status", "")).lower() != "accepted":
+            is_failed = True
+            fail_reason = (
+                f"RemoteStopTransaction bị từ chối bởi trụ {charge_point_code}: {res}"
+            )
             logger.critical(
-                "CRITICAL: RemoteStopTransaction bị từ chối bởi trụ %s cho transactionId=%s: %s",
-                charge_point_code,
+                "CRITICAL: %s cho transactionId=%s",
+                fail_reason,
                 transaction_id,
-                res,
             )
         else:
             logger.info(
@@ -241,18 +354,61 @@ async def _execute_remote_stop_outside_lock(
                 transaction_id,
             )
     except (TimeoutError, ConnectionError, OSError, RuntimeError, OcppCallError) as exc:
+        is_failed = True
+        fail_reason = f"Lỗi/Timeout khi gửi RemoteStopTransaction tới trụ {charge_point_code}: {exc}"
         logger.critical(
-            "CRITICAL: Lỗi/Timeout khi gửi RemoteStopTransaction tới trụ %s cho transactionId=%s: %s",
-            charge_point_code,
+            "CRITICAL: %s cho transactionId=%s",
+            fail_reason,
             transaction_id,
-            exc,
         )
 
+    if is_failed:
+        # Đánh dấu phiên bất thường ABNORMAL trong CSDL theo cơ chế sẵn có:
+        # app/ocpp/handlers/start_transaction.py:184-188 & app/services/scheduler_service.py:381-382
+        try:
+            with session_factory() as db:
+                sess = (
+                    db.query(ChargingSession)
+                    .filter(ChargingSession.transaction_id == transaction_id)
+                    .first()
+                )
+                if sess:
+                    sess.status = "ABNORMAL"
+                    sess.is_abnormal = True
+                    sess.abnormal_reason = f"{reason} - {fail_reason}"
+                    sess.stop_reason = "RebalanceStopFailed"
+                    now_err_dt = datetime.now(timezone.utc)
+                    sess.stop_time = now_err_dt
+                    sess.end_time = now_err_dt
+                    db.commit()
+                    logger.critical(
+                        "CRITICAL: Đã đánh dấu phiên #%s sang trạng thái ABNORMAL do trụ không phản hồi lệnh dừng tải.",
+                        transaction_id,
+                    )
+        except Exception as exc:  # noqa: BLE001
+            logger.critical(
+                "CRITICAL: Không thể cập nhật trạng thái ABNORMAL cho phiên #%s: %s",
+                transaction_id,
+                exc,
+            )
 
-def launch_remote_stop_task(charge_point_code: str, transaction_id: int) -> asyncio.Task:
+
+def launch_remote_stop_task(
+    charge_point_code: str,
+    transaction_id: int,
+    station_id: int | None = None,
+    reason: str = "trụ từ chối giới hạn công suất",
+    session_factory: Callable[[], Any] | None = None,
+) -> asyncio.Task:
     """Khởi tạo tác vụ riêng gửi RemoteStopTransaction ngoài khóa trạm."""
     task = asyncio.create_task(
-        _execute_remote_stop_outside_lock(charge_point_code, transaction_id)
+        _execute_remote_stop_outside_lock(
+            charge_point_code=charge_point_code,
+            transaction_id=transaction_id,
+            station_id=station_id,
+            reason=reason,
+            session_factory=session_factory,
+        )
     )
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
@@ -395,20 +551,32 @@ async def rebalance_station_power(
                         tx_id,
                     )
                     if tx_id is not None:
-                        rejected_sessions_to_stop.append((cp_code, tx_id))
+                        rejected_sessions_to_stop.append(
+                            (cp_code, tx_id, "trụ từ chối giới hạn công suất")
+                        )
                 elif status_resp == "CALLERROR":
                     # Đã được ghi nhận log ERROR tại _dispatch_single_profile; giữ nguyên phiên sạc
                     pass
                 elif status_resp in ("TIMEOUT", "UNREACHABLE"):
                     logger.warning(
-                        "WARNING: Charger %s unreachable for profile update: status=%s",
+                        "WARNING: Charger %s unreachable/timeout for profile update: status=%s (xử lý như Rejected)",
                         cp_code,
                         status_resp,
                     )
+                    if tx_id is not None:
+                        rejected_sessions_to_stop.append(
+                            (cp_code, tx_id, "trụ không phản hồi giới hạn công suất")
+                        )
 
-    # 3. Kích hoạt RemoteStopTransaction ngoài khóa trạm cho các phiên bị Rejected
-    for cp_code, tx_id in rejected_sessions_to_stop:
-        launch_remote_stop_task(cp_code, tx_id)
+    # 3. Kích hoạt RemoteStopTransaction ngoài khóa trạm cho các phiên bị Rejected / Timeout
+    for cp_code, tx_id, reason_text in rejected_sessions_to_stop:
+        launch_remote_stop_task(
+            charge_point_code=cp_code,
+            transaction_id=tx_id,
+            station_id=station_id,
+            reason=reason_text,
+            session_factory=session_factory,
+        )
 
 
 def trigger_rebalance_background(
