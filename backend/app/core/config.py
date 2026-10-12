@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Cáº¥u hÃ¬nh á»©ng dá»¥ng EV CSMS náº¡p tá»« biáº¿n mÃ´i trÆ°á»ng."""
+    """Cấu hình ứng dụng EV CSMS nạp từ biến môi trường."""
 
     PROJECT_NAME: str = "EV Charging Station Management System"
     VERSION: str = "1.0.0"
@@ -17,30 +17,32 @@ class Settings(BaseSettings):
         "supersecret_ev_csms_key_for_development_jwt_auth_change_in_production"
     )
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 giá»
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 giờ
     BCRYPT_ROUNDS: int = 12
 
-    # KhÃ³a táº¡m khi Ä‘Äƒng nháº­p sai nhiá»u láº§n (Brute-Force Protection)
-    MAX_FAILED_LOGIN_ATTEMPTS: int = 5  # Sá»‘ láº§n Ä‘Äƒng nháº­p sai tá»‘i Ä‘a trÆ°á»›c khi khÃ³a
-    LOCKOUT_DURATION_MINUTES: int = 15  # Thá»i gian khÃ³a táº¡m thá»i (phÃºt)
+    # Khóa tạm khi đăng nhập sai nhiều lần (Brute-Force Protection)
+    MAX_FAILED_LOGIN_ATTEMPTS: int = 5  # Số lần đăng nhập sai tối đa trước khi khóa
+    LOCKOUT_DURATION_MINUTES: int = 15  # Thời gian khóa tạm thời (phút)
 
-    # VÃ­ tiá»n & RÃ ng buá»™c tÃ i chÃ­nh (ACID)
-    MIN_START_BALANCE: int = 50000  # 50,000 VND Ä‘á»ƒ báº¯t Ä‘áº§u sáº¡c
-    NEGATIVE_BALANCE_LIMIT: int = -300000  # -300,000 VND háº¡n má»©c cho ná»£
-    MAX_SAFE_DEBT_LIMIT: int = (
-        -500000
-    )  # -500,000 VND cho CheckConstraint CSDL (khÃ³a á»Ÿ -300k, chá»‰ cho trÃ n tá»‘i Ä‘a 200k)
+    # Ví tiền & Ràng buộc tài chính (ACID)
+    MIN_START_BALANCE: int = 50000  # 50,000 VND để bắt đầu sạc
+    MIN_WALLET_BALANCE_TO_START_SESSION: int = 50000  # Ngưỡng số dư ví tối thiểu (S-38 / SCRUM-261)
+    NEGATIVE_BALANCE_LIMIT: int = -300000  # -300,000 VND hạn mức cho nợ
+    MAX_SAFE_DEBT_LIMIT: int = -500000  # -500,000 VND cho CheckConstraint CSDL
+    RECONCILE_INTERVAL_MINUTES: int = Field(default=15, gt=0)
     IDLE_FEE_MAX_MINUTES: int = Field(
         default=240, ge=0
-    )  # Tráº§n sá»‘ phÃºt Ä‘Æ°á»£c tÃ­nh phÃ­ chiáº¿m trá»¥ má»—i phiÃªn
+    )  # Trần số phút được tính phí chiếm trụ mỗi phiên
+    ALLOW_REMOTE_START_SIMULATION: bool = False
+    TESTING: bool = False
 
-    # CÆ¡ sá»Ÿ dá»¯ liá»‡u: SQLite local (Giai Ä‘oáº¡n 1 MVP)
+    # Cổng thanh toán Sandbox & Webhook (S-35)
     TOPUP_MIN_AMOUNT: int = 10000
     TOPUP_MAX_AMOUNT: int = 50000000
     SANDBOX_PAYMENT_SECRET: str = "sandbox_secret"
     PAYMENT_WEBHOOK_SECRET: str = "sandbox_secret"
 
-    # C s d liu: SQLite local (Giai on 1 MVP)
+    # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"
 
     # CORS
@@ -63,7 +65,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     AI_MODEL_NAME: str = "gemini-1.5-flash"
 
-    # MÃ´ phá»ng sáº¡c (Simulator)
+    # Mô phỏng sạc (Simulator)
     SIMULATOR_INTERVAL_SECONDS: int = 2
 
     # OCPP 1.6J
@@ -82,4 +84,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

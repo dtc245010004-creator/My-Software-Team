@@ -16,6 +16,7 @@ Giao diện người dùng hiện tại được xây dựng trên nền tảng 
    * [CẦN XÁC NHẬN: tài liệu này ghi tên file `StationsManagement.jsx`, nhưng mã nguồn thực tế chỉ có `frontend/src/pages/Stations.jsx`]
 4. **Theo dõi Phiên sạc Trực tiếp (`LiveSessions.jsx`)**: Kết nối kênh WebSocket `ws://localhost:8000/ws/telemetry` để cập nhật trạng thái sạc theo thời gian thực (SoC %, công suất kW, nhiệt độ, tiền điện tạm tính).
 5. **Cổng Khách hàng / Tài xế sạc (`DriverPortal.jsx`)**: Cho phép tài xế chọn đầu nối, nhập % pin ban đầu, cấu hình dung lượng pin xe (kWh), theo dõi quá trình sạc và dừng sạc.
+   * Cập nhật 10/10/2026 (code commit `0bb5f67`): ở trang phiên sạc, tài xế không còn gặp thông báo rỗng chung chung khi chưa có phiên phù hợp; có nút **Tìm trạm sạc** dẫn tới bản đồ. Frontend 39 test passed và build thành công; chưa kiểm tra trực quan qua trình duyệt.
 6. **Trợ lý AI & Khuyến nghị (`AIAdvisor.jsx`)**: Màn hình cố vấn điều hành thông minh, hiển thị cảnh báo bảo trì dự đoán, gợi ý phân bổ phụ tải và khuyến nghị giá bán điện TOU.
 
 ---

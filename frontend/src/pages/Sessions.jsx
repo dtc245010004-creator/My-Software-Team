@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Loader2,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatVNDateTime } from '../utils/formatTime';
@@ -654,7 +655,19 @@ export default function Sessions() {
             </div>
           ) : filteredSessions.length === 0 ? (
             <div className="text-xs text-steel-gray text-center py-12 font-mono">
-              Không tìm thấy phiên sạc nào phù hợp với bộ lọc.
+              {role === 'CUSTOMER' ? (
+                <div className="flex flex-col items-center gap-3">
+                  <span>Bạn chưa có phiên sạc nào phù hợp với bộ lọc.</span>
+                  <Link
+                    to="/map"
+                    className="inline-flex items-center gap-2 rounded bg-electric-cyan px-4 py-2 font-bold text-obsidian hover:bg-electric-cyan-hover"
+                  >
+                    Tìm trạm sạc <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              ) : (
+                'Không tìm thấy phiên sạc nào phù hợp với bộ lọc.'
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">

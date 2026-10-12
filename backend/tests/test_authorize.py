@@ -11,6 +11,10 @@ from app.ocpp.handlers.authorize import handle_authorize
 
 
 def _create_user(db_session: Session, username: str) -> User:
+    from decimal import Decimal
+
+    from app.models.wallet import Wallet
+
     user = User(
         username=username,
         email=f"{username}@example.test",
@@ -20,6 +24,13 @@ def _create_user(db_session: Session, username: str) -> User:
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
+
+    wallet = Wallet(
+        user_id=user.id, balance=Decimal("100000.00"), is_debt_locked=False
+    )
+    db_session.add(wallet)
+    db_session.commit()
+
     return user
 
 

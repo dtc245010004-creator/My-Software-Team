@@ -11,7 +11,7 @@ from app.models.station import ChargingPoint, Connector, Station, StationPowerMe
 from app.models.tariff import Tariff
 from app.models.tariff_period import TariffPeriod
 from app.models.user import User
-from app.models.wallet import Wallet, WalletTransaction
+from app.models.wallet import Ledger, LedgerEntry, Wallet, WalletTransaction
 
 __all__ = [
     "AuditLog",
@@ -19,6 +19,8 @@ __all__ = [
     "ChargingSession",
     "Connector",
     "IdTag",
+    "Ledger",
+    "LedgerEntry",
     "MeterValue",
     "OcppMessage",
     "OrphanMessage",
