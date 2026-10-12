@@ -11,7 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
 )
-from sqlalchemy.orm import relationship, synonym
+from sqlalchemy.orm import backref, relationship, synonym
 
 from app.core.database import Base
 
@@ -47,12 +47,9 @@ class Station(Base):
 
     # Relationships
     operator = relationship("User", foreign_keys=[operator_id], lazy="joined")
-    charging_points = relationship(
-        "ChargingPoint",
-        back_populates="station",
-        cascade="all, delete-orphan",
-        lazy="select",
-    )
+    # charging_points được khai báo tự động bằng backref ở ChargingPoint.station
+    # (để tránh SQLAlchemy 2.x không resolve được khi có 2 class cùng map
+    # bảng "charging_points": ChargingPoint + ChargePoint trong charge_point.py)
     power_metrics = relationship(
         "StationPowerMetric",
         back_populates="station",
@@ -71,15 +68,14 @@ class ChargingPoint(Base):
         CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     station_id = Column(
         Integer,
         ForeignKey("stations.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
-    charge_point_id = Column(String(100), nullable=True, index=True)
-    code = Column(String(100), nullable=True, unique=True, index=True)
+    charge_point_id = Column(String(100), nullable=True)
+    code = Column(String(100), nullable=True, unique=True)
     vendor = Column(String(100), nullable=True, default="Generic")
     model = Column(String(100), nullable=True)
 
@@ -105,11 +101,15 @@ class ChargingPoint(Base):
         nullable=True,
     )
 
-    station = relationship("Station", back_populates="charging_points")
+    station = relationship(
+        "Station",
+        backref=backref("charging_points", cascade="all, delete-orphan", lazy="select"),
+        primaryjoin="ChargingPoint.station_id == Station.id",
+    )
     connectors = relationship(
         "Connector",
         back_populates="charging_point",
-        primaryjoin="ChargingPoint.id == Connector.charge_point_id",
+        primaryjoin="and_(ChargingPoint.id == foreign(Connector.charge_point_id))",
         cascade="all, delete-orphan",
     )
 
