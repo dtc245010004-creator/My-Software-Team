@@ -32,6 +32,7 @@ class Station(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     total_grid_capacity_kw = Column(Float, nullable=True, default=100.0)
+    max_power_kw = synonym("total_grid_capacity_kw")
     operating_hours = Column(String(100), nullable=True, default="24/7")
     status = Column(String(50), nullable=False, default=StationStatus.ACTIVE.value)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -172,6 +173,7 @@ class Connector(Base):
     idle_ended_at = Column(DateTime(timezone=True), nullable=True)
     max_kw = Column(Float, nullable=True, default=22.0)
     max_power_kw = Column(Float, nullable=True, default=22.0)
+    rated_power_kw = synonym("max_power_kw")
     type = Column(String(50), nullable=True, default="Type 2")
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(

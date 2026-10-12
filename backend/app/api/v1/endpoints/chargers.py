@@ -18,6 +18,7 @@ from app.schemas.station import (
     ChargingPointUpdate,
     ConnectorCreate,
     ConnectorResponse,
+    ConnectorUpdate,
 )
 from app.services.audit_service import ghi_nhat_ky
 from app.services.station_service import (
@@ -25,6 +26,7 @@ from app.services.station_service import (
     atomic_soft_delete_charger,
     broadcast_status_change,
     enrich_charger_response,
+    enrich_station_response,
     filter_station_access,
     verify_charger_ownership,
     verify_station_ownership,
@@ -457,4 +459,60 @@ def add_connector(
     db.add(new_conn)
     db.commit()
     db.refresh(new_conn)
-    return ConnectorResponse.model_validate(new_conn)
+    resp = ConnectorResponse.model_validate(new_conn)
+    resp.rated_power_kw = new_conn.max_power_kw
+    return resp
+
+
+@router.put(
+    "/connectors/{connector_id}",
+    response_model=ConnectorResponse,
+    summary="Cập nhật công suất danh định / thông số đầu nối (S-42)",
+)
+def update_connector(
+    connector_id: int,
+    conn_in: ConnectorUpdate,
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    db: Session = Depends(get_db),
+):
+    """Cập nhật thông số đầu nối: Chỉ Admin hoặc Chủ trạm sở hữu mới có quyền."""
+    connector = db.query(Connector).filter(Connector.id == connector_id).first()
+    if not connector:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đầu nối."
+        )
+
+    verify_charger_ownership(connector.charging_point, current_user)
+
+    new_power = (
+        conn_in.rated_power_kw
+        if conn_in.rated_power_kw is not None
+        else conn_in.max_power_kw
+    )
+    if new_power is not None:
+        if new_power <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Công suất danh định đầu nối phải lớn hơn 0.",
+            )
+        connector.max_power_kw = float(new_power)
+        connector.max_kw = float(new_power)
+
+    if conn_in.connector_type:
+        connector.connector_type = conn_in.connector_type
+        connector.type = conn_in.connector_type
+
+    db.commit()
+    db.refresh(connector)
+    resp = ConnectorResponse.model_validate(connector)
+    resp.rated_power_kw = connector.max_power_kw
+
+    # 2(c): Trả kèm trạng thái quá đăng ký của trạm chứa đầu nối
+    if connector.charging_point and connector.charging_point.station:
+        st_resp = enrich_station_response(connector.charging_point.station)
+        resp.station_is_oversubscribed = st_resp.is_oversubscribed
+        resp.station_warning = st_resp.warning
+        resp.station_warning_message = st_resp.warning_message
+
+    return resp
+

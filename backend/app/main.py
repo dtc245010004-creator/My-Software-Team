@@ -1,9 +1,12 @@
 import json
 import logging
+import math
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -148,6 +151,27 @@ async def wallet_negative_balance_handler(
             "required_balance": exc.required_balance,
             "suggest_topup": exc.suggest_topup,
         },
+    )
+
+
+def _sanitize_validation_errors(val):
+    if isinstance(val, dict):
+        return {k: _sanitize_validation_errors(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_sanitize_validation_errors(item) for item in val]
+    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+        return str(val)
+    return val
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(
+    request: Request, exc: RequestValidationError
+):
+    sanitized = _sanitize_validation_errors(exc.errors())
+    return JSONResponse(
+        status_code=422,
+        content={"detail": jsonable_encoder(sanitized)},
     )
 
 
