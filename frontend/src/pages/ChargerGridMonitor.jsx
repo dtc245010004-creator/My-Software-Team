@@ -23,6 +23,8 @@ import {
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { telemetryWs } from '../services/websocket';
+import AlertBanner from '../components/ui/AlertBanner';
+import { MOCK_CHARGER_ALERTS } from '../config/chargerAlertConfig';
 
 // Định nghĩa cấu hình trạng thái: Nhãn chữ, Icon và Mã ký hiệu trợ năng WCAG
 const STATUS_CONFIG = {
@@ -350,6 +352,36 @@ export default function ChargerGridMonitor() {
           </button>
         </div>
       </div>
+
+      {/* SCRUM-320: Banner cảnh báo đầu màn hình theo dõi trụ sạc */}
+      <AlertBanner
+        faultedChargers={MOCK_CHARGER_ALERTS.faulted}
+        offlineChargers={MOCK_CHARGER_ALERTS.offline}
+        onSelectCharger={(alertItem) => {
+          if (!alertItem) return;
+          // Tìm trụ tương ứng trong danh sách để mở modal chi tiết
+          const targetCharger = chargers.find(
+            (c) => c.id === alertItem.id || c.code === alertItem.code
+          );
+          if (targetCharger) {
+            setSelectedCharger(targetCharger);
+          } else {
+            // Mở modal với dữ liệu mô phỏng nếu chưa có trong DB
+            setSelectedCharger({
+              id: alertItem.id,
+              code: alertItem.code,
+              station_name: alertItem.station_name,
+              status: alertItem.consecutive_faults ? 'FAULTED' : 'UNAVAILABLE',
+              vendor: 'VinFast / ABB',
+              model: 'FastCharger 150kW',
+              max_power_kw: 150,
+              firmware_version: '1.2.0',
+              power_sharing_enabled: true,
+              connectors: [],
+            });
+          }
+        }}
+      />
 
       {/* 2. Dải KPI Thống Kê Nhanh (KPI Summary Strip) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">

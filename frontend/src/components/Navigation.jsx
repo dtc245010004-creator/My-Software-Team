@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
+  LayoutGrid,
   BatteryCharging,
   Gauge,
   Wallet,
@@ -20,6 +21,7 @@ export default function Navigation() {
 
   const navItems = [
     { to: '/', label: 'Bảng Điều Khiển', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
+    { to: '/charger-grid', label: 'Lưới Trụ Sạc', icon: LayoutGrid, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/map', label: 'Bản Đồ', icon: MapPin, roles: ['CUSTOMER'] },
     { to: '/stations', label: 'Hạ Tầng Trạm Sạc', icon: BatteryCharging, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/tariffs', label: 'Biểu Giá', icon: Clock, roles: ['ADMIN', 'OPERATOR', 'CPO'] },
