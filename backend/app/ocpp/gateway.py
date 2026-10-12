@@ -330,6 +330,11 @@ async def ocpp_endpoint(
             await websocket.send_text(response)
             if frame.action == "BootNotification" and result.get("status") == "Accepted":
                 is_booted = True
+            elif frame.action == "StartTransaction" and result.get("transactionId", 0) > 0:
+                from app.services.smart_charging import trigger_rebalance_background
+
+                if charging_point.station_id:
+                    trigger_rebalance_background(charging_point.station_id)
     except WebSocketDisconnect:
         pass
     except (ConnectionResetError, OSError):

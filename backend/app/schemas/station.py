@@ -40,8 +40,16 @@ class ConnectorResponse(ConnectorBase):
     status: str
     is_active: bool
     created_at: UTCDateTime
+    rated_power_kw: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ConnectorUpdate(BaseModel):
+    max_power_kw: Optional[float] = Field(default=None, gt=0, description="Công suất tối đa (kW)")
+    rated_power_kw: Optional[float] = Field(default=None, gt=0, description="Công suất danh định (kW)")
+    connector_type: Optional[str] = Field(default=None, description="Chuẩn sạc: CCS2, TYPE_2, CHADEMO")
+
 
 
 # ==========================================
@@ -183,6 +191,7 @@ class StationUpdate(BaseModel):
     latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
     longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
     total_grid_capacity_kw: Optional[float] = Field(default=None, gt=0)
+    max_power_kw: Optional[float] = Field(default=None, gt=0)
     operating_hours: Optional[str] = None
     status: Optional[str] = None
     operator_id: Optional[int] = Field(
@@ -202,6 +211,10 @@ class StationUpdate(BaseModel):
         return v
 
 
+class StationPowerLimitUpdate(BaseModel):
+    max_power_kw: float = Field(..., gt=0, description="Hạn mức công suất trạm (kW)")
+
+
 class StationResponse(StationBase):
     id: int
     operator_id: Optional[int] = None
@@ -212,9 +225,11 @@ class StationResponse(StationBase):
     charging_points: List[ChargingPointResponse] = Field(default_factory=list)
 
     # Chỉ số tính toán tại tầng Station (Station vs Chargers - Oversubscription)
+    max_power_kw: Optional[float] = None
     total_installed_power_kw: float = 0.0
     oversubscription_ratio: float = 0.0
     is_oversubscribed: bool = False
+    warning: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

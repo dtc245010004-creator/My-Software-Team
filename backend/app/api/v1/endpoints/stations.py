@@ -18,6 +18,7 @@ from app.schemas.station import (
     StationCreate,
     StationDistanceResponse,
     StationGridItem,
+    StationPowerLimitUpdate,
     StationResponse,
     StationTreeItem,
     StationUpdate,
@@ -743,6 +744,30 @@ def create_station(
     return enrich_station_response(new_station)
 
 
+def validate_and_apply_station_power_limit(
+    station: Station,
+    max_power_kw: float,
+    current_user: User,
+) -> None:
+    """Kiểm tra quyền và áp dụng hạn mức công suất nguồn trạm (S-42):
+    - max_power_kw phải là số dương (> 0).
+    - Phân quyền (RBAC): Chỉ Admin hoặc Chủ trạm sở hữu trạm đó mới được phép cập nhật.
+    - Chủ trạm khác bị 403 Forbidden.
+    """
+    if max_power_kw <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Hạn mức công suất nguồn trạm (max_power_kw) phải lớn hơn 0.",
+        )
+    if current_user.role != "ADMIN":
+        if station.operator_id is None or station.operator_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền thao tác trên trạm sạc này.",
+            )
+    station.total_grid_capacity_kw = float(max_power_kw)
+
+
 @router.put(
     "/{station_id}",
     response_model=StationResponse,
@@ -754,7 +779,7 @@ def update_station(
     current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
     db: Session = Depends(get_db),
 ):
-    """Cập nhật trạm sạc: Kiểm tra quyền sở hữu (Owner hoặc Admin). Chỉ Admin được đổi chủ trạm, công suất lưới, địa chỉ. Chủ trạm chỉ được cập nhật operating_hours."""
+    """Cập nhật trạm sạc: Kiểm tra quyền sở hữu (Owner hoặc Admin). Chỉ Admin được đổi chủ trạm, địa chỉ. Cả Admin và Chủ trạm sở hữu đều được sửa max_power_kw."""
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
         raise HTTPException(
@@ -766,10 +791,13 @@ def update_station(
     update_data = station_in.model_dump(exclude_unset=True)
 
     if current_user.role != "ADMIN":
-        # Chặn thay đổi công suất lưới nếu không phải ADMIN
+        # Chặn thay đổi công suất lưới nếu không phải ADMIN trên endpoint tổng quát này
         if (
             "total_grid_capacity_kw" in update_data
             and update_data["total_grid_capacity_kw"] != station.total_grid_capacity_kw
+        ) or (
+            "max_power_kw" in update_data
+            and update_data["max_power_kw"] != station.max_power_kw
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -786,9 +814,41 @@ def update_station(
             )
         update_data.pop("operator_id", None)
 
+    # Nếu có cập nhật max_power_kw hoặc total_grid_capacity_kw -> Dùng hàm dùng chung (S-42)
+    new_power_limit = update_data.pop("max_power_kw", None)
+    if new_power_limit is None and "total_grid_capacity_kw" in update_data:
+        new_power_limit = update_data.pop("total_grid_capacity_kw")
+
+    if new_power_limit is not None:
+        validate_and_apply_station_power_limit(station, new_power_limit, current_user)
+
     for field, value in update_data.items():
         setattr(station, field, value)
 
+    db.commit()
+    db.refresh(station)
+    return enrich_station_response(station)
+
+
+@router.put(
+    "/{station_id}/power-limit",
+    response_model=StationResponse,
+    summary="Khai báo / Cập nhật hạn mức công suất nguồn trạm (S-42)",
+)
+def set_station_power_limit(
+    station_id: int,
+    power_in: StationPowerLimitUpdate,
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    db: Session = Depends(get_db),
+):
+    """Cập nhật hạn mức công suất trạm (S-42): Admin hoặc Chủ trạm sở hữu trạm đó."""
+    station = db.query(Station).filter(Station.id == station_id).first()
+    if not station:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
+        )
+
+    validate_and_apply_station_power_limit(station, power_in.max_power_kw, current_user)
     db.commit()
     db.refresh(station)
     return enrich_station_response(station)

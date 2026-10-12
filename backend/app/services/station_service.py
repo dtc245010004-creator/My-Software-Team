@@ -131,6 +131,8 @@ def enrich_charger_response(charger: ChargingPoint) -> ChargingPointResponse:
     connectors_resp = [
         ConnectorResponse.model_validate(c) for c in charger.connectors if c.is_active
     ]
+    for c_resp, c_model in zip(connectors_resp, [c for c in charger.connectors if c.is_active]):
+        c_resp.rated_power_kw = c_model.max_power_kw
     total_connector_power = round(sum(c.max_power_kw for c in connectors_resp), 2)
     is_power_sharing = charger.power_sharing_enabled and (
         total_connector_power > charger.max_power_kw
@@ -181,9 +183,14 @@ def enrich_station_response(station: Station) -> StationResponse:
     resp = StationResponse.model_validate(station)
     resp.owner_id = resp.operator_id
     resp.charging_points = chargers_resp
+    resp.max_power_kw = station.total_grid_capacity_kw
     resp.total_installed_power_kw = total_installed_power
     resp.oversubscription_ratio = oversubscription_ratio
     resp.is_oversubscribed = is_oversubscribed
+    if is_oversubscribed:
+        resp.warning = "OVER_SUBSCRIPTION_WARNING"
+    else:
+        resp.warning = None
     return resp
 
 
