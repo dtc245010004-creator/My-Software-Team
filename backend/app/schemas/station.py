@@ -251,6 +251,39 @@ class StationPowerLimitUpdate(BaseModel):
         return val
 
 
+class StationPowerLimitCreate(BaseModel):
+    start_time: str
+    end_time: str
+    power_limit_kw: float = Field(
+        ..., gt=0, allow_inf_nan=False, description="Hạn mức công suất theo khung (kW)"
+    )
+    sort_order: int = 0
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_time(cls, value: str, info):
+        from app.services.tariff_validation import time_to_minutes
+
+        try:
+            time_to_minutes(value, allow_day_end=info.field_name == "end_time")
+        except ValueError as exc:
+            raise ValueError(f"Trường {info.field_name}: {exc}") from exc
+        return value
+
+
+class StationPowerLimitResponse(StationPowerLimitCreate):
+    id: int
+    station_id: int
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StationPowerLimitsUpdate(BaseModel):
+    limits: List[StationPowerLimitCreate]
+
+
 class StationResponse(StationBase):
     id: int
     operator_id: Optional[int] = None
