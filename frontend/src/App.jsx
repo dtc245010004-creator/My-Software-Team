@@ -21,6 +21,7 @@ import AuditLogs from './pages/AuditLogs';
 import TariffForm from './components/TariffForm';
 import ChargerDetail from './pages/ChargerDetail';
 import InvoiceDetail from './pages/InvoiceDetail';
+import Reservations from './pages/Reservations';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -85,6 +86,8 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
             }
           />
+          {/* Lịch sử đặt chỗ và phí quá hạn giữ chỗ (S-50 / SCRUM-354 / SCRUM-378) */}
+          <Route path="/reservations" element={<Reservations />} />
           <Route path="/sessions" element={<Sessions />} />
           {/* Danh sách phiên bất thường trên màn hình vận hành (SCRUM-52 / SCRUM-148): Chỉ Vận hành viên (OPERATOR) và Kế toán (ACCOUNTANT) */}
           <Route
