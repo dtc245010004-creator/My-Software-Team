@@ -16,7 +16,10 @@ import {
   Search,
   Filter,
   RefreshCw,
-  Play
+  Play,
+  Clock,
+  Trash2,
+  Save
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -24,6 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRestartChargePoint } from '../hooks/useRestartChargePoint';
 import StationLocationPicker from '../components/StationLocationPicker';
 import StationsMapView from '../components/StationsMapView';
+import { validatePowerLimitSlots } from '../utils/tariffValidation';
 
 export default function Stations() {
   const navigate = useNavigate();
@@ -53,6 +57,14 @@ export default function Stations() {
   const [chargerError, setChargerError] = useState(null);
   // Lỗi hiển thị trực tiếp tại ô nhập "Mã trụ" (trùng mã / sai định dạng)
   const [chargerCodeError, setChargerCodeError] = useState(null);
+
+  // State cho màn hình Cấu hình hạn mức công suất theo khung giờ (SCRUM-294 / SCRUM-314)
+  const [powerLimitStation, setPowerLimitStation] = useState(null);
+  const [powerLimitSlots, setPowerLimitSlots] = useState([]);
+  const [powerLimitLoading, setPowerLimitLoading] = useState(false);
+  const [powerLimitSaving, setPowerLimitSaving] = useState(false);
+  const [powerLimitServerError, setPowerLimitServerError] = useState('');
+  const [powerLimitSubmitted, setPowerLimitSubmitted] = useState(false);
 
   // Form thêm đầu nối (connector) vào trụ sạc đã có
   const [showAddConnectorModal, setShowAddConnectorModal] = useState(false);
@@ -573,6 +585,122 @@ export default function Stations() {
     }
   };
 
+  // ============================================================================
+  // LOGIC MÀN HÌNH CẤU HÌNH HẠN MỨC CÔNG SUẤT THEO KHUNG GIỜ (SCRUM-294 / SCRUM-314)
+  // ============================================================================
+  const powerLimitValidation = useMemo(
+    () => validatePowerLimitSlots(powerLimitSlots),
+    [powerLimitSlots]
+  );
+
+  const handleOpenPowerLimitModal = async (station) => {
+    setPowerLimitStation(station);
+    setPowerLimitServerError('');
+    setPowerLimitSubmitted(false);
+    setPowerLimitLoading(true);
+
+    const baseKw = Number(station.total_grid_capacity_kw) || 150;
+    const defaultSlots = [
+      { startTime: '00:00', endTime: '08:00', maxPowerKw: baseKw },
+      { startTime: '08:00', endTime: '17:00', maxPowerKw: baseKw },
+      { startTime: '17:00', endTime: '22:00', maxPowerKw: Math.max(20, Math.round(baseKw * 0.7)) },
+      { startTime: '22:00', endTime: '24:00', maxPowerKw: baseKw },
+    ];
+
+    try {
+      const res = await api.get(`/stations/${station.id}/power-limits`);
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setPowerLimitSlots(
+          res.data.map((item) => ({
+            startTime: item.start_time,
+            endTime: item.end_time,
+            maxPowerKw: Number(item.power_limit_kw),
+          }))
+        );
+      } else {
+        setPowerLimitSlots(defaultSlots);
+      }
+    } catch {
+      setPowerLimitSlots(defaultSlots);
+    } finally {
+      setPowerLimitLoading(false);
+    }
+  };
+
+  const handleAddPowerLimitSlot = () => {
+    const last = powerLimitSlots[powerLimitSlots.length - 1];
+    const nextStart =
+      last && last.endTime && last.endTime !== '24:00' ? last.endTime : '08:00';
+    setPowerLimitSlots((prev) => [
+      ...prev,
+      {
+        startTime: nextStart,
+        endTime: '24:00',
+        maxPowerKw: Number(powerLimitStation?.total_grid_capacity_kw) || 100,
+      },
+    ]);
+    setPowerLimitServerError('');
+  };
+
+  const handleUpdatePowerLimitSlot = (index, field, value) => {
+    setPowerLimitSlots((prev) =>
+      prev.map((slot, idx) => {
+        if (idx !== index) return slot;
+        if (field === 'maxPowerKw') {
+          return { ...slot, maxPowerKw: value === '' ? '' : Number(value) };
+        }
+        return { ...slot, [field]: value };
+      })
+    );
+    setPowerLimitServerError('');
+  };
+
+  const handleRemovePowerLimitSlot = (index) => {
+    setPowerLimitSlots((prev) => prev.filter((_, idx) => idx !== index));
+    setPowerLimitServerError('');
+  };
+
+  const handleSavePowerLimits = async (e) => {
+    if (e) e.preventDefault();
+    setPowerLimitSubmitted(true);
+    setPowerLimitServerError('');
+
+    const check = validatePowerLimitSlots(powerLimitSlots);
+    if (!check.isValid || !powerLimitStation) {
+      return;
+    }
+
+    try {
+      setPowerLimitSaving(true);
+      const limitsPayload = powerLimitSlots.map((slot, idx) => ({
+        start_time: slot.startTime.trim(),
+        end_time: slot.endTime.trim(),
+        power_limit_kw: Number(slot.maxPowerKw),
+        sort_order: idx,
+      }));
+
+      await api.put(`/stations/${powerLimitStation.id}/power-limits`, {
+        limits: limitsPayload,
+      });
+
+      showToast(
+        'success',
+        'ĐÃ LƯU HẠN MỨC KHUNG GIỜ',
+        `Cập nhật thành công ${limitsPayload.length} khung giờ hạn mức công suất cho trạm "${powerLimitStation.name}".`
+      );
+      setPowerLimitStation(null);
+      await fetchStations();
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      const errText = Array.isArray(detail)
+        ? detail.map((d) => (typeof d === 'string' ? d : d.msg || JSON.stringify(d))).join(' | ')
+        : detail || err.message || 'Lỗi khi lưu hạn mức công suất theo khung giờ.';
+      setPowerLimitServerError(errText);
+    } finally {
+      setPowerLimitSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6 relative">
       {/* Toast Notification Banner */}
@@ -845,17 +973,32 @@ export default function Stations() {
                     <MapIcon className="w-4 h-4" />
                   </button>
                   {(role === 'ADMIN' || role === 'OPERATOR') && (
-                    <button
-                      type="button"
-                      title="Sửa cấu hình & vị trí trạm sạc"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEditStation(st);
-                      }}
-                      className="p-1.5 rounded hover:bg-obsidian text-steel-gray hover:text-electric-cyan border border-hairline transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        data-testid={`btn-power-limits-station-${st.id}`}
+                        title="Cấu hình hạn mức công suất theo khung giờ (SCRUM-294 / SCRUM-314)"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenPowerLimitModal(st);
+                        }}
+                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded bg-obsidian hover:bg-electric-cyan/15 text-electric-cyan border border-electric-cyan/40 text-[11px] font-mono font-bold transition-colors"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Hạn mức khung giờ</span>
+                      </button>
+                      <button
+                        type="button"
+                        title="Sửa cấu hình & vị trí trạm sạc"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditStation(st);
+                        }}
+                        className="p-1.5 rounded hover:bg-obsidian text-steel-gray hover:text-electric-cyan border border-hairline transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </>
                   )}
                   {isExpanded ? <ChevronDown className="w-5 h-5 text-steel-gray" /> : <ChevronRight className="w-5 h-5 text-steel-gray" />}
                 </div>
@@ -1838,6 +1981,292 @@ export default function Stations() {
                 ĐỒNG Ý
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================
+          MODAL MÀN HÌNH CẤU HÌNH HẠN MỨC CÔNG SUẤT THEO KHUNG GIỜ (SCRUM-294 / SCRUM-314)
+         ============================================================================ */}
+      {powerLimitStation && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-panel border border-electric-cyan/50 max-w-3xl w-full rounded-sm p-6 space-y-5 font-mono text-xs shadow-2xl max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-hairline pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 rounded bg-electric-cyan/20 border border-electric-cyan/40 text-electric-cyan">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-tech-white font-sans">
+                    Cấu hình hạn mức công suất theo khung giờ
+                  </h2>
+                  <p className="text-[11px] text-steel-gray mt-0.5">
+                    Trạm áp dụng:{' '}
+                    <span className="text-electric-cyan font-bold">
+                      {powerLimitStation.name} (ST-{powerLimitStation.id})
+                    </span>{' '}
+                    • Công suất nguồn hiện tại: {powerLimitStation.total_grid_capacity_kw} kW
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPowerLimitStation(null)}
+                className="p-1.5 rounded text-steel-gray hover:text-tech-white hover:bg-hairline transition-colors"
+                title="Đóng"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {powerLimitLoading ? (
+              <div className="py-12 flex items-center justify-center text-steel-gray space-x-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Đang tải cấu hình khung giờ hạn mức...</span>
+              </div>
+            ) : (
+              <form onSubmit={handleSavePowerLimits} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-steel-gray">
+                    Quy tắc: <strong className="text-tech-white">startTime &lt; endTime</strong>,{' '}
+                    <strong className="text-tech-white">maxPowerKw &gt; 0</strong>, không đè/trùng
+                    khung giờ (Overlap).
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="btn-add-power-limit-slot"
+                    onClick={handleAddPowerLimitSlot}
+                    className="inline-flex items-center space-x-1 px-3 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white font-bold text-xs transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Thêm khung giờ</span>
+                  </button>
+                </div>
+
+                {powerLimitSubmitted &&
+                  !powerLimitValidation.isValid &&
+                  powerLimitValidation.globalError && (
+                    <div className="p-3 rounded bg-critical-red/10 border border-critical-red/40 text-critical-red flex items-center space-x-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{powerLimitValidation.globalError}</span>
+                    </div>
+                  )}
+
+                {powerLimitServerError && (
+                  <div className="p-3 rounded bg-critical-red/10 border border-critical-red/40 text-critical-red flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{powerLimitServerError}</span>
+                  </div>
+                )}
+
+                {/* Danh sách khung giờ (Dynamic Form Array) */}
+                <div className="space-y-3">
+                  {powerLimitSlots.length === 0 ? (
+                    <div className="text-center py-8 border border-dashed border-hairline rounded text-steel-gray">
+                      Chưa có khung giờ nào. Bấm &ldquo;Thêm khung giờ&rdquo; để bắt đầu.
+                    </div>
+                  ) : (
+                    powerLimitSlots.map((slot, idx) => {
+                      const rowErr = powerLimitValidation.errorsByIndex[idx];
+                      const hasError = Boolean(rowErr);
+
+                      return (
+                        <div
+                          key={idx}
+                          data-testid={`power-limit-slot-row-${idx}`}
+                          className={`p-3.5 rounded border transition-colors ${
+                            hasError
+                              ? 'bg-critical-red/5 border-critical-red/50'
+                              : 'bg-obsidian border-hairline'
+                          }`}
+                        >
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                            <div className="sm:col-span-1 flex items-center sm:pt-6">
+                              <span className="px-2 py-0.5 rounded bg-panel border border-hairline text-steel-gray font-bold">
+                                #{idx + 1}
+                              </span>
+                            </div>
+
+                            {/* startTime */}
+                            <div className="sm:col-span-3">
+                              <label className="block text-[10px] text-steel-gray mb-1">
+                                GIỜ BẮT ĐẦU (startTime)
+                              </label>
+                              <input
+                                type="time"
+                                data-testid={`input-start-time-${idx}`}
+                                value={slot.startTime}
+                                onChange={(e) =>
+                                  handleUpdatePowerLimitSlot(idx, 'startTime', e.target.value)
+                                }
+                                className={`w-full p-2 rounded bg-panel border text-tech-white focus:outline-none ${
+                                  rowErr?.startTime || rowErr?.timeRange || rowErr?.overlap
+                                    ? 'border-critical-red'
+                                    : 'border-hairline focus:border-electric-cyan'
+                                }`}
+                              />
+                              {rowErr?.startTime && (
+                                <p className="text-[10px] text-critical-red mt-1">
+                                  {rowErr.startTime}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* endTime */}
+                            <div className="sm:col-span-4">
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-[10px] text-steel-gray">
+                                  GIỜ KẾT THÚC (endTime)
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdatePowerLimitSlot(idx, 'endTime', '24:00')
+                                  }
+                                  className="text-[10px] text-electric-cyan hover:underline"
+                                >
+                                  Đặt 24:00
+                                </button>
+                              </div>
+                              {slot.endTime === '24:00' ? (
+                                <div className="flex items-center space-x-1.5">
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    data-testid={`input-end-time-${idx}`}
+                                    value="24:00"
+                                    className="w-full p-2 rounded bg-panel border border-electric-cyan/50 text-electric-cyan font-bold"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdatePowerLimitSlot(idx, 'endTime', '22:00')
+                                    }
+                                    className="px-2 py-2 rounded bg-panel border border-hairline text-steel-gray hover:text-tech-white text-[10px]"
+                                  >
+                                    Đổi
+                                  </button>
+                                </div>
+                              ) : (
+                                <input
+                                  type="time"
+                                  data-testid={`input-end-time-${idx}`}
+                                  value={slot.endTime}
+                                  onChange={(e) =>
+                                    handleUpdatePowerLimitSlot(idx, 'endTime', e.target.value)
+                                  }
+                                  className={`w-full p-2 rounded bg-panel border text-tech-white focus:outline-none ${
+                                    rowErr?.endTime || rowErr?.timeRange || rowErr?.overlap
+                                      ? 'border-critical-red'
+                                      : 'border-hairline focus:border-electric-cyan'
+                                  }`}
+                                />
+                              )}
+                              {rowErr?.endTime && (
+                                <p className="text-[10px] text-critical-red mt-1">
+                                  {rowErr.endTime}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* maxPowerKw */}
+                            <div className="sm:col-span-3">
+                              <label className="block text-[10px] text-steel-gray mb-1">
+                                HẠN MỨC CÔNG SUẤT (kW)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                data-testid={`input-max-power-${idx}`}
+                                value={slot.maxPowerKw}
+                                onChange={(e) =>
+                                  handleUpdatePowerLimitSlot(idx, 'maxPowerKw', e.target.value)
+                                }
+                                placeholder="VD: 120"
+                                className={`w-full p-2 rounded bg-panel border text-tech-white tabular-nums focus:outline-none ${
+                                  rowErr?.maxPowerKw
+                                    ? 'border-critical-red'
+                                    : 'border-hairline focus:border-electric-cyan'
+                                }`}
+                              />
+                              {rowErr?.maxPowerKw && (
+                                <p className="text-[10px] text-critical-red mt-1">
+                                  {rowErr.maxPowerKw}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Xóa dòng */}
+                            <div className="sm:col-span-1 flex items-center justify-end sm:pt-5">
+                              <button
+                                type="button"
+                                data-testid={`btn-remove-slot-${idx}`}
+                                onClick={() => handleRemovePowerLimitSlot(idx)}
+                                className="p-2 rounded text-steel-gray hover:text-critical-red hover:bg-critical-red/10 transition-colors"
+                                title="Xóa dòng này"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Lỗi khoảng thời gian & chồng lấp (Overlap) */}
+                          {(rowErr?.timeRange || rowErr?.overlap) && (
+                            <div className="mt-2 pt-2 border-t border-critical-red/20 space-y-1 text-[11px] text-critical-red">
+                              {rowErr.timeRange && (
+                                <div className="flex items-center space-x-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{rowErr.timeRange}</span>
+                                </div>
+                              )}
+                              {rowErr.overlap && (
+                                <div className="flex items-center space-x-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{rowErr.overlap}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Nút Hủy & Lưu cấu hình */}
+                <div className="flex items-center justify-end space-x-3 pt-4 border-t border-hairline">
+                  <button
+                    type="button"
+                    data-testid="btn-cancel-power-limits"
+                    disabled={powerLimitSaving}
+                    onClick={() => setPowerLimitStation(null)}
+                    className="px-4 py-2 rounded bg-obsidian hover:bg-hairline border border-hairline text-steel-gray hover:text-tech-white font-bold transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    data-testid="btn-save-power-limits"
+                    disabled={powerLimitSaving || !powerLimitValidation.isValid}
+                    className="inline-flex items-center space-x-1.5 px-5 py-2 rounded bg-grid-green hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold transition-colors shadow-md"
+                  >
+                    {powerLimitSaving ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Đang lưu...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Lưu cấu hình</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
