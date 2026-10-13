@@ -39,6 +39,8 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - Giao dịch trừ có tham chiếu `session_{id}`; lặp cùng tham chiếu/loại/số tiền trả lại dòng hiện có, tham chiếu trùng với số tiền khác bị từ chối. Mọi đường cập nhật số dư trong mã ứng dụng đã được rà soát; phép gán số dư duy nhất nằm trong `post_ledger_entry`.
 - Job `reconcile_wallet_ledger_job` chạy theo `RECONCILE_INTERVAL_MINUTES` (mặc định 15), dùng một truy vấn nhóm, ghi log và audit log khi phát hiện lệch, rồi bật cờ khóa đối soát. Nạp, trừ và bắt đầu phiên mới bị chặn khi ví đang khóa.
 - `POST /api/v1/wallet/admin/{wallet_id}/reconciliation/unlock` yêu cầu role `ADMIN` và lý do; chỉ mở khi tổng sổ cái đã khớp số dư. Mỗi lần mở khóa được ghi log và audit log.
+- S-56 bổ sung audit cho nạp ví thường, nạp tay Admin, callback nạp thanh toán, phát hiện/khóa ví lệch và mở khóa. Log thành công được flush trong cùng transaction với thay đổi ledger/số dư/cờ khóa; thất bại nạp tay ghi `ADMIN_MANUAL_TOPUP_FAILED` trong session riêng sau rollback. Trường chuẩn gồm actor, driver_id, wallet_id, amount (nếu có), reason, status và ip (nếu có).
+- `GET /api/v1/audit-logs` nhận `driver_id` để lọc log ví qua subquery bảng Wallet; vẫn kết hợp được actor `user_id`, khoảng thời gian `from`/`to` và phân trang. Chỉ ADMIN/ACCOUNTANT được xem log ví; OPERATOR chỉ xem loại log trạm/phiên/connector thuộc trạm của họ.
 - Migration `backend/alembic/versions/f41a0b7c9d22_wallet_ledger_append_only.py` thêm cờ, chỉ mục duy nhất và trigger append-only. Do `wallet_transactions.wallet_id` và `wallets.user_id` dùng `ON DELETE CASCADE`, trigger cũng làm thao tác xóa ví/người dùng có giao dịch thất bại; giữ lịch sử bằng soft delete. Migration cố REVOKE UPDATE/DELETE cho role kết nối nếu role tồn tại, nhưng quyền của table owner/superuser không thể bị loại bỏ bằng REVOKE; trigger vẫn chặn DML thông thường.
 - Ví cũ thiếu dòng sổ sẽ được job phát hiện và khóa. Chưa backfill số dư đầu kỳ; cần phê duyệt riêng trước khi tạo dữ liệu opening-balance.
 - `[CẦN XÁC NHẬN]` S-37 cho phép phát sinh số dư âm, trong khi DB hiện chặn dưới `-500000` và tầng ứng dụng đặt ngưỡng khóa nợ `-300000`; chưa thay đổi hai ngưỡng này.
@@ -51,14 +53,21 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - SCRUM-290: thêm `backend/tests/test_wallet_ledger_s41.py` và test nâng schema Compose SQLite cũ. Full backend suite Docker đạt **451 passed, 307 warnings**; migration tiến/lùi/tiến trên PostgreSQL tạm thành công, trigger đã chặn UPDATE/DELETE. Database tạm đã xóa; database dự án không bị migrate.
 - Lỗi khởi động Compose ngày 10/10: backend dùng volume SQLite cũ thiếu `wallets.is_reconcile_locked`; `compose_schema_service` đã được bổ sung nâng schema idempotent. Sau khi build lại, backend healthy, `/docs` trả 200 và toàn stack Compose đã được khởi động.
 
+### Đã thay đổi S-56 (13/10/2026)
+
+- S-56 chuẩn hóa dữ liệu audit cho nạp tay, nạp ví thường/callback, reconcile và mở khóa. Thêm `WalletReconciliationLocked` khi ví chuyển từ chưa khóa sang khóa; giữ các action cũ.
+- Mở rộng `GET /audit-logs` bằng `driver_id`, chỉ cho ADMIN/OPERATOR/ACCOUNTANT gọi; bộ lọc OPERATOR không trả log ví. Lý do mở khóa rỗng/khoảng trắng bị từ chối; audit thành công cùng transaction nghiệp vụ, audit thất bại nạp tay dùng session riêng sau rollback.
+- Không tìm thấy endpoint/service điều chỉnh số dư riêng; không tự tạo chức năng này. Không có migration/config mới.
+- `backend/tests/test_wallet_audit_s56.py`: 11 ca; full backend **557 passed, 1 skipped, 320 warnings**, Ruff đạt. Test chạy trên Windows host/Python 3.14.7; không chạy trong Docker ở lượt này.
+
 ## Sửa lỗi theo báo cáo EV CSMS (10/10/2026, code commit `0bb5f67`)
 
 - `frontend/src/services/telemetryClient.js` dùng WebSocket singleton từ `frontend/src/services/websocket.js`; ánh xạ tên telemetry backend sang trường mà ActiveSession hiển thị. Frontend có 39 test passed và build thành công; chưa kiểm tra trực quan qua trình duyệt.
 - `backend/app/ocpp/handlers/stop_transaction.py` lưu `transactionData` hợp lệ vào `MeterValue` đã có. Nếu Available đến trước StopTransaction, phiên được đánh dấu cần xem xét; StopTransaction hợp lệ đến sau mới chốt. Không tự hoàn tất phiên chỉ dựa vào Available.
 - Scheduler chuyển RemoteStart quá hạn từ `PENDING` sang `EXPIRED` mỗi phút. RemoteStop trả HTTP 409 khi trụ offline.
 - `ALLOW_REMOTE_START_SIMULATION` mặc định false; khi bật, mô phỏng chỉ dùng được bởi ADMIN ngoài test pytest đang chạy.
-- Trước migration S-41, Alembic có head `e72b461d9ac3`; hiện có một head `f41a0b7c9d22`. Toàn bộ migration lên head, rồi migration mới nhất lùi một revision và nâng lại, đã chạy trên PostgreSQL tạm; database tạm được xóa sau kiểm thử và DB dự án không bị migrate.
-- Kiểm chứng gần nhất ngày 10/10/2026: backend full suite trong Docker **451 passed, 307 warnings**; PostgreSQL trigger chặn UPDATE/DELETE; backend `/docs` trả 200 và backend/DB/frontend/OCPP simulator đều được Compose khởi động. Chưa kiểm tra UI trực quan trên trình duyệt.
+- Trước migration S-41, Alembic có head `e72b461d9ac3`; migration S-41 tạo head `f41a0b7c9d22`. Sau pull `origin/main` ngày 13/10/2026, `alembic heads` trả một head hiện tại `c316a2b4d6e8`. Các lượt upgrade/downgrade/upgrade PostgreSQL nêu trong lịch sử được chạy trên database tạm; database ứng dụng không bị migrate.
+- Kiểm chứng Docker ngày 10/10/2026: backend full suite **451 passed, 307 warnings**; PostgreSQL trigger chặn UPDATE/DELETE; backend `/docs` trả 200 và backend/DB/frontend/OCPP simulator đều được Compose khởi động. Lượt kiểm thử backend mới nhất sau S-56 ngày 13/10/2026 chạy trên Windows host/Python 3.14.7: **557 passed, 1 skipped, 320 warnings**; Ruff đạt. Chưa kiểm tra UI trực quan trên trình duyệt trong lượt này.
 
 ## S-29 — Biểu giá nhiều khung giờ (Backend)
 

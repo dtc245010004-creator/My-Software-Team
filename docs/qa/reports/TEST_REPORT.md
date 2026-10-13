@@ -10,8 +10,9 @@
 
 * **Lệnh**: `pytest tests -q` trong thư mục backend; test migration dùng fixture `tmp_path` được chuyển vào thư mục workspace đã tạo sẵn do Windows chặn thư mục tạm mặc định.
 * **Môi trường**: Windows host, Python 3.14.7. Docker Desktop không khởi động trong lượt xác minh.
-* **Kết quả**: **546 passed, 1 skipped, 320 warnings**. `ruff check .` đạt; `docker compose config --quiet` đạt.
+* **Kết quả**: **557 passed, 1 skipped, 320 warnings**; `pytest tests --collect-only -q` thu thập 558 tests. `ruff check .` đạt.
 * **S-47**: `test_station_nearby_s47.py` có 8 ca về tìm GPS/tên/địa chỉ, trạng thái đầu nối, giới hạn công khai, giá TOU và phân trang; cả 8 passed.
+* **S-56**: `test_wallet_audit_s56.py` có 11 ca về log nạp tay/thường, lỗi rollback, reconcile lock/unlock, lọc tài xế và RBAC; cả 11 passed. Nhóm S-56 cùng S-36/S-41/payment đạt 38 passed.
 * Không có migration mới; `alembic heads` trả duy nhất `c316a2b4d6e8` sau khi pull `origin/main`.
 
 ## Lần chạy hoàn chỉnh trước S-47 (09/10/2026)

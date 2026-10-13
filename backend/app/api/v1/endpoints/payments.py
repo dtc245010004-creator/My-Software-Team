@@ -119,7 +119,14 @@ async def payment_webhook(
             db.flush()
 
             note = f"Nạp tiền từ giao dịch {order.order_code}"
-            topup_wallet(db=db, user_id=order.user_id, amount=order.amount, note=note)
+            topup_wallet(
+                db=db,
+                user_id=order.user_id,
+                amount=order.amount,
+                note=note,
+                actor_type="SYSTEM",
+                client_ip=request.client.host if request.client else None,
+            )
 
             return {
                 "status": "SUCCESS",

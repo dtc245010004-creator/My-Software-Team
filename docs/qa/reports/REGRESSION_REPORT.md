@@ -166,3 +166,9 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 * Bộ mới `test_station_nearby_s47.py`: **8 passed**; nhóm S-47 cùng test stations, ownership RBAC và tariff versioning đạt **46 passed** trước lần đổi giới hạn thành cấu hình.
 * Sau khi chuyển default/max page size thành settings, nhóm S-47 và `test_stations.py` đạt **25 passed**; full backend suite đạt **546 passed, 1 skipped, 320 warnings**.
 * `ruff check .` đạt. Suite chạy trên Windows/Python 3.14.7, với thư mục tạm migration nằm trong workspace do ACL Windows chặn pytest temp mặc định. Docker Compose cấu hình hợp lệ; Docker daemon không hoạt động nên không chạy suite trong container.
+
+## S-56 — Audit thao tác ví và lọc nhật ký theo tài xế (13/10/2026, chưa commit)
+
+* `test_wallet_audit_s56.py`: **11 passed**; nhóm S-56 + S-36 + S-41 + payment regression: **38 passed**.
+* Full backend suite: **557 passed, 1 skipped, 320 warnings** trong 224.36 giây; 558 tests được thu thập. Môi trường Windows host/Python 3.14.7; không chạy Docker ở lượt này.
+* `ruff check .`: **All checks passed**. Không có migration mới; Alembic chỉ có head `c316a2b4d6e8`.

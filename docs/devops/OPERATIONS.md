@@ -125,7 +125,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
 Căn cứ theo `backend/pytest.ini`, `backend/tests/` và `frontend/package.json:9`:
 
 ### Kiểm thử Backend (Pytest)
-Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Tổng lịch sử cũ 84/89/90 vẫn mâu thuẫn `[CẦN XÁC NHẬN]`; lần chạy mới nhất ngày 05/10/2026 đạt 263 passed, 1 skipped, 181 warnings (đã gồm 53 ca OCPP):
+Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Lượt xác minh mới nhất ngày 13/10/2026 trên Windows/Python 3.14.7 thu thập 558 tests và đạt **557 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Những con số 84/89/90 và kết quả 263 passed ngày 05/10/2026 là các snapshot lịch sử, không đại diện cho tổng hiện tại:
 ```powershell
 cd backend
 pytest

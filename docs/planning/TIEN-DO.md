@@ -61,7 +61,8 @@
 | 2026-10-09 | S-33 Backend — SCRUM-222/221/220/223/225 | Lưu snapshot và cung cấp hóa đơn diễn giải từng đoạn | Đã commit `60e801a`, push lên `origin/Duong`; chờ chạy lại full suite trong Docker | `backend/app/models/session_billing_segment.py`, `backend/app/services/billing_segment_service.py`, `backend/app/schemas/invoice.py`, `backend/app/api/v1/endpoints/sessions.py`, migration `d8f56c4a911e`, `backend/tests/test_invoice.py`, hồ sơ `docs/qa/stories/S-33.md` | Full suite hoàn chỉnh trước chỉnh sửa legacy: 411 passed, 303 warnings; sau chỉnh sửa `test_invoice.py`: 8 passed. Full host rerun: 409 passed, 1 skipped, 1 lỗi khởi tạo `tmp_path` do WinError 5; cần chạy lại trong Docker. Migration PostgreSQL Compose tạm đã kiểm tra nâng/hạ/nâng; DB dự án chưa migrate. |
 | 2026-10-09 | S-34 — SCRUM-226/231 | Phiên giữ nguyên biểu giá đã áp dụng dù biểu giá trạm được sửa sau đó | Hoàn thành / đã tích hợp | `backend/app/models/tariff.py`, logic phiên bản tariff, `test_tariff_versioning_s34.py` | Implementation có trong commit `5cda3ca`; giá mới áp dụng cho phiên bắt đầu sau, hóa đơn/đoạn giá phiên trước giữ snapshot cũ. |
 | 2026-10-12 | S-44 Backend — SCRUM-283–290 | Chia lại công suất khi xe rời hoặc chuyển SuspendedEV | Hoàn thành Backend | `backend/app/services/smart_charging.py`, `backend/app/ocpp/gateway.py`, `backend/app/services/scheduler_service.py`, config Compose, `test_smart_charging_s44.py` | Hook sau commit/CALLRESULT; phiên bất thường và SuspendedEV không tham gia phép chia; debounce trailing theo trạm. Ruff đạt, full backend suite **525 passed, 318 warnings**. Không cần migration. |
-| 2026-10-13 | S-47 Backend — tìm trạm gần và đầu nối rảnh | Endpoint công khai tìm theo GPS/tên/địa chỉ, trạng thái đầu nối và giá TOU | Hoàn thành Backend; chưa làm UI theo phạm vi | `backend/app/api/v1/endpoints/stations.py`, `backend/app/schemas/station.py`, `backend/app/services/station_discovery_service.py`, `backend/app/core/config.py`, `backend/tests/test_station_nearby_s47.py`, `.env.example`, `docker-compose.yml` | Test mới 8 passed; full backend **546 passed, 1 skipped, 320 warnings**; Ruff đạt. Compose config hợp lệ; Docker Desktop không khởi động được. Không cần migration. Thay đổi hiện chưa commit. |
+| 2026-10-13 | S-47 Backend — tìm trạm gần và đầu nối rảnh | Endpoint công khai tìm theo GPS/tên/địa chỉ, trạng thái đầu nối và giá TOU | Hoàn thành Backend; đã đẩy lên `Duong`; chưa làm UI theo phạm vi | `backend/app/api/v1/endpoints/stations.py`, `backend/app/schemas/station.py`, `backend/app/services/station_discovery_service.py`, `backend/app/core/config.py`, `backend/tests/test_station_nearby_s47.py`, `.env.example`, `docker-compose.yml` | Test mới 8 passed; full backend **546 passed, 1 skipped, 320 warnings**; Ruff đạt. Compose config hợp lệ; Docker Desktop không khởi động được. Không cần migration. Commit `3d98b39`. |
+| 2026-10-13 | S-56 Backend — nhật ký thao tác ví | Audit nạp ví, đối soát/mở khóa và lọc nhật ký theo tài xế | Hoàn thành Backend; đã đẩy lên `Duong` | `backend/app/services/wallet_service.py`, `backend/app/api/v1/endpoints/{wallet.py,payments.py,audit_logs.py}`, `backend/tests/test_wallet_audit_s56.py` | 11 test mới; full backend **557 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Không migration/config mới. Commit `38dd323`. Không có chức năng điều chỉnh ví riêng trong code hiện tại. |
 
 ---
 
@@ -219,7 +220,7 @@
 
 ---
 
-#### 14. Ngày 2026-10-09 | Người thực hiện: Codex theo yêu cầu người dùng
+#### 14. Ngày 2026-10-09 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** Hoàn thiện Backend S-33 — SCRUM-222/221/220/223/225: lưu snapshot giá/tiền các đoạn S-30/S-31 khi chốt phiên và trả hóa đơn đọc từ snapshot.
 * **Nội dung thực hiện:** Thêm metadata snapshot phí chiếm trụ vào phiên; endpoint hóa đơn dùng schema riêng, kiểm tra quyền driver/operator/admin, không trả số tiền tạm khi cần xem xét, trả tổng legacy cho phiên cũ không backfill, và có dòng phí chiếm trụ khi số tiền đã được chốt. Không sửa thuật toán chia đoạn S-30/S-31 và không thêm lần trừ ví thứ hai.
 * **Xác minh:** `test_billing_segments.py` 6 passed; `test_invoice.py` 8 passed. Full backend suite hoàn chỉnh trước chỉnh sửa legacy đạt 411 passed, 303 warnings trong 159.16 giây (container Python 3.12). Sau chỉnh sửa, lượt host full suite đạt 409 passed, 1 skipped nhưng có một lỗi môi trường `WinError 5` khi tạo fixture tạm của test migration; cần chạy lại full suite trong Docker. Migration PostgreSQL Compose tạm `upgrade → downgrade → upgrade`; một Alembic head `d8f56c4a911e`. Mã nguồn đã commit `60e801a` và push lên `origin/Duong`.
@@ -231,15 +232,15 @@
 
 ---
 
-#### 15. Ngày 2026-10-09 | Người thực hiện: Codex theo yêu cầu người dùng
+#### 15. Ngày 2026-10-09 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** Ghi nhận tiến độ Backend Sprint 4 từ S-28 đến S-34 trong ma trận và nhật ký.
 * **Nội dung:** S-28/S-29 đã hoàn thành các thay đổi biểu giá và backend phí chiếm trụ; S-30/S-31 được tích hợp từ `origin/quocdung`; S-32/S-34 đã tích hợp logic breakdown/làm tròn và versioning tariff; S-33 đã lưu snapshot đoạn và cung cấp API hóa đơn.
 * **Trạng thái xác minh:** Các test theo story đã được ghi nhận trong những lượt trước; full suite sau thay đổi legacy S-33 còn cần chạy lại trong Docker. Quyết định mentor về cách thu phí bổ sung S-28 vẫn đang chờ.
-* **Tài liệu/điều phối:** Cập nhật `README.md` và xóa hướng dẫn sử dụng hai cấu hình Compose đã bỏ; cập nhật CI và tài liệu vận hành để dùng Compose chung. Các thay đổi tài liệu/xóa file hiện chưa commit.
+* **Tài liệu/điều phối:** Cập nhật `README.md` và xóa hai cấu hình Compose staging cũ; CI và tài liệu vận hành dùng Compose chung. Các thay đổi đã được tích hợp vào nhánh `Duong`.
 
 ---
 
-#### 16. Ngày 2026-10-12 | Người thực hiện: Codex theo yêu cầu người dùng
+#### 16. Ngày 2026-10-12 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** Backend S-44 — SCRUM-283/284/285/286/287/288/289/290: chia lại công suất trạm khi xe rời, tạm ngưng, hoặc scheduler đánh dấu phiên bất thường.
 * **Nội dung thực hiện cụ thể:** Thêm cấu hình `REBALANCE_MIN_INTERVAL_SECONDS` (mặc định 5 giây) vào settings, `.env.example` và biến môi trường backend trong Compose. `trigger_rebalance_background` điều phối riêng theo trạm, gom nhiều sự kiện thành tối đa một lượt chạy chờ; lượt chờ đọc trạng thái mới nhất từ DB và không giữ station lock trong thời gian đợi. Không sửa thuật toán fair-share.
 * **Hook OCPP và scheduler:** Gateway gọi rebalance sau commit và gửi CALLRESULT cho StopTransaction có thay đổi phiên; tin trùng đi qua nhánh idempotency và không kích hoạt lại. StatusNotification chỉ hook khi trạng thái đổi vào/ra `SuspendedEV`. Job gắn cờ `is_abnormal` gọi rebalance sau commit cho mỗi trạm bị ảnh hưởng, đồng thời giữ nguyên status phiên CHARGING.
@@ -249,9 +250,16 @@
 
 ---
 
-#### 17. Ngày 2026-10-13 | Người thực hiện: Codex theo yêu cầu người dùng
+#### 17. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** Backend S-47 — API công khai giúp tài xế tìm trạm gần và xem đầu nối rảnh, loại đầu nối cùng đơn giá hiện hành.
 * **Nội dung cụ thể:** Thêm `GET /api/v1/stations/nearby` với GPS hoặc `q` tên/địa chỉ, radius, loại connector, limit/offset; chỉ trả trạm active và dùng DTO công khai riêng. Tính khoảng cách Haversine; trạm thiếu GPS vẫn tìm bằng từ khóa và xếp cuối trong kết quả GPS. Quy tắc rảnh yêu cầu cổng/trụ active, heartbeat còn hạn theo config và hai trạng thái nội bộ/OCPP khớp. Response có số cổng rảnh/tổng, loại, công suất/trạng thái tóm tắt và giá TOU đang hiệu lực dạng Decimal. Lấy trạm/trụ/cổng và biểu giá theo lô; không thêm migration.
 * **Kiểm chứng:** `test_station_nearby_s47.py`: **8 passed**; hồi quy stations/RBAC/versioning tariff: **46 passed**; sau khi đưa giới hạn trang vào config, S-47 cùng `test_stations.py` đạt **25 passed**. Full backend **546 passed, 1 skipped, 320 warnings** trong 224.61 giây trên Windows Python 3.14.7. Test migration cũ dùng thư mục tạm workspace do Windows chặn `tmp_path` mặc định. `ruff check .`: đạt; `docker compose config --quiet`: đạt; Docker Desktop không khởi động nên không chạy suite trong container. `alembic heads` trả duy nhất `c316a2b4d6e8 (head)`.
-* **Giới hạn/đề xuất:** `q` phân biệt hoa thường bằng Unicode casefold nhưng chưa tìm không dấu; endpoint sắp xếp khoảng cách trong ứng dụng sau khi tải danh sách trạm hoạt động; nếu dữ liệu lớn, cân nhắc chỉ mục không gian. Chưa làm frontend, bản đồ, chỉ đường, đặt chỗ hoặc cache giá. Các thay đổi hiện chưa commit.
+* **Giới hạn/đề xuất:** `q` phân biệt hoa thường bằng Unicode casefold nhưng chưa tìm không dấu; endpoint sắp xếp khoảng cách trong ứng dụng sau khi tải danh sách trạm hoạt động; nếu dữ liệu lớn, cân nhắc chỉ mục không gian. Chưa làm frontend, bản đồ, chỉ đường, đặt chỗ hoặc cache giá. Thay đổi đã được đẩy trong commit `3d98b39` trên `Duong`.
+
+#### 18. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Backend S-56 — lưu dấu vết ai thực hiện thao tác nạp/mở khóa ví và truy vấn nhật ký theo tài xế.
+* **Nội dung cụ thể:** Bổ sung reason, actor/driver/wallet và status vào audit nạp tay; log FAILED sau rollback bằng session riêng. Ghi audit trong cùng transaction cho nạp ví thường và callback thanh toán; bổ sung actor, driver, wallet, reason, status, IP cho mở khóa; reconcile ghi log/audit phát hiện lệch và `WalletReconciliationLocked` khi thực sự chuyển sang trạng thái khóa. `/audit-logs` có bộ lọc `driver_id` qua ownership ví, giữ bộ lọc actor/thời gian/trang và giới hạn quyền cho ADMIN/OPERATOR/ACCOUNTANT; OPERATOR không thấy log ví. Không có luồng điều chỉnh ví riêng, không tạo chức năng này và không cần migration.
+* **Kiểm chứng:** `test_wallet_audit_s56.py`: 11 passed; test chọn lọc S-36/S-41/payment: 38 passed; full backend **557 passed, 1 skipped, 320 warnings** trong 224.36 giây trên Windows/Python 3.14.7; `ruff check .` đạt. `alembic heads` sau `git pull origin main` trả một head `c316a2b4d6e8`.
+* **Trạng thái:** Đã commit và đẩy lên `origin/Duong` bằng commit `38dd323`.
+* **Đề xuất:** Mentor chốt thời gian lưu audit theo yêu cầu kế toán; cân nhắc endpoint điều chỉnh ví nếu nghiệp vụ cần; cân nhắc index cho `wallet_id`/thời điểm truy vấn. Chưa thêm job xóa log.
 

@@ -72,6 +72,8 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 | **Simulator** | `/api/v1/simulator` | Kích hoạt mô phỏng sạc pin CC-CV, tăng tốc thời gian, ngắt sạc an toàn |
 | **AI** | `/api/v1/ai` | Điều phối chia sẻ công suất sạc thông minh, Heuristic Fallback khi mất mạng |
 
+`GET /api/v1/audit-logs` hỗ trợ lọc event ví bằng `driver_id` (kết hợp được với `user_id`, `from`/`to`, `page`/`limit`). ADMIN và ACCOUNTANT xem log ví; OPERATOR không nhận object type `wallet`, CUSTOMER không được gọi endpoint. Event nạp/mở khóa/reconcile thành công được ghi cùng transaction nghiệp vụ.
+
 ### Kết nối trụ sạc OCPP 1.6J
 
 * WebSocket `/ocpp/{charge_point_code}` dành cho mã trụ đã đăng ký và subprotocol `ocpp1.6`.
@@ -101,7 +103,7 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 
 *(Nguồn: `backend/pytest.ini`, `backend/tests/`)*
 
-Thực thi backend suite bằng `pytest` trong môi trường ảo backend. Lần chạy ngày 01/10/2026 đạt 163 passed, 1 warning:
+Thực thi backend suite bằng `pytest` trong môi trường ảo backend. Lượt xác minh gần nhất ngày 13/10/2026 trên Windows/Python 3.14.7 thu thập 558 tests, đạt 557 passed, 1 skipped, 320 warnings; `ruff check .` đạt. Lượt chạy 163 passed ngày 01/10/2026 bên dưới là kết quả lịch sử:
 
 ```bash
 cd backend

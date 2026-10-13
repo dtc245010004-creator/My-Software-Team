@@ -184,11 +184,19 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
 
 ---
 
+## TC-FB-20: Nhật ký thao tác ví theo tài xế (S-56, Backend)
+* **Hợp đồng API**: `GET /api/v1/audit-logs?driver_id={user_id}&from={datetime}&to={datetime}&page={n}&limit={n}` lọc log ví theo các Wallet thuộc tài xế, có thể kết hợp thời gian, actor `user_id` và phân trang.
+* **Phân quyền**: ADMIN và ACCOUNTANT xem log ví; OPERATOR chỉ nhận log charging point/session/connector thuộc trạm của mình và không nhận object type `wallet`; CUSTOMER bị chặn endpoint.
+* **Tính toàn vẹn**: Log thành công của nạp ví/mở khóa/reconcile cùng transaction với thay đổi nghiệp vụ. Nạp tay thất bại ghi FAILED bằng session mới sau rollback, không ghi SUCCESS giả.
+* **Bằng chứng kiểm thử backend (13/10/2026, chưa commit)**: `test_wallet_audit_s56.py` đạt **11 passed**; full backend suite đạt **557 passed, 1 skipped, 320 warnings**. Chưa kiểm tra thủ công giao diện; không thay đổi frontend.
+
+---
+
 ## Current Summary
 
 ### Đánh giá mức độ tích hợp Frontend ↔ Backend
   * **Mức độ tương thích**: Hợp đồng API có kiểm thử backend tự động; chưa kiểm tra thủ công giao diện trên trình duyệt sau cập nhật hóa đơn S-33.
-* TC-FB-01 đến TC-FB-19 có mô tả hợp đồng; backend suite ngày 13/10/2026 đạt 546 passed, 1 skipped. Telemetry ngày 10/10/2026 đã qua 39 test frontend, build và runtime WebSocket smoke; chưa kiểm tra trực quan trên trình duyệt.
+* TC-FB-01 đến TC-FB-20 có mô tả hợp đồng; backend suite ngày 13/10/2026 đạt 557 passed, 1 skipped. Telemetry ngày 10/10/2026 đã qua 39 test frontend, build và runtime WebSocket smoke; chưa kiểm tra trực quan trên trình duyệt.
 * Mã nguồn telemetry dùng WebSocket singleton dùng chung; runtime smoke đã kết nối, đăng ký topic và nhận PONG.
 
 ---

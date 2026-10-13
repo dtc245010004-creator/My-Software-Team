@@ -233,6 +233,7 @@ def get_my_wallet_transactions(
 )
 def topup_my_wallet(
     topup_in: TopupRequest,
+    request: Request,
     current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
@@ -259,6 +260,9 @@ def topup_my_wallet(
         user_id=current_user.id,
         amount=topup_in.amount,
         note=note_text,
+        actor_id=current_user.id,
+        actor_type="USER",
+        client_ip=request.client.host if request.client else None,
     )
     return wallet
 
@@ -351,6 +355,7 @@ def get_topup_request_status(
 def unlock_wallet_reconciliation_lock(
     wallet_id: int,
     request: WalletReconciliationUnlockRequest,
+    http_request: Request,
     current_user: User = Depends(require_roles(["ADMIN"])),
     db: Session = Depends(get_db),
 ):
@@ -359,6 +364,7 @@ def unlock_wallet_reconciliation_lock(
         wallet_id,
         admin_user_id=current_user.id,
         reason=request.reason,
+        client_ip=http_request.client.host if http_request.client else None,
     )
 
 

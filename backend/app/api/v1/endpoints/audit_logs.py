@@ -4,12 +4,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import String, and_, cast, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
+from app.models.wallet import Wallet
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
@@ -20,15 +21,16 @@ def list_audit_logs(
     user_id: int | None = Query(None, description="Lọc theo người thực hiện"),
     from_time: datetime | None = Query(None),
     to_time: datetime | None = Query(None),
-    from_param: str | None = Query(None, alias="from"),
-    to_param: str | None = Query(None, alias="to"),
+    from_param: datetime | None = Query(None, alias="from"),
+    to_param: datetime | None = Query(None, alias="to"),
+    driver_id: int | None = Query(None, ge=1, description="Lọc log ví theo tài xế"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=50),
     page_size: int | None = Query(None, ge=1, le=50),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR", "ACCOUNTANT"])),
     db: Session = Depends(get_db),
 ):
-    """S-27/T-58: lọc nhật ký theo trạm, người thực hiện, thời gian và phân trang."""
+    """S-27/S-56: lọc nhật ký theo trạm, người thực hiện, tài xế, thời gian và trang."""
     query = db.query(AuditLog)
 
     if current_user.role == "OPERATOR":
@@ -103,12 +105,23 @@ def list_audit_logs(
             )
         )
 
+    if driver_id is not None:
+        driver_wallet_ids = select(cast(Wallet.id, String)).where(
+            Wallet.user_id == driver_id
+        )
+        query = query.filter(
+            AuditLog.object_type == "wallet",
+            AuditLog.object_id.in_(driver_wallet_ids),
+        )
+
     if user_id is not None:
         query = query.filter(AuditLog.user_id == user_id)
-    if from_time is not None:
-        query = query.filter(AuditLog.created_at >= from_time)
-    if to_time is not None:
-        query = query.filter(AuditLog.created_at <= to_time)
+    start_time = from_time if from_time is not None else from_param
+    end_time = to_time if to_time is not None else to_param
+    if start_time is not None:
+        query = query.filter(AuditLog.created_at >= start_time)
+    if end_time is not None:
+        query = query.filter(AuditLog.created_at <= end_time)
 
     total = query.count()
     rows = (

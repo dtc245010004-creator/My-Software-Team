@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ full suite backend trong Docker ngày 10/10/2026: **451 passed, 307 warnings**. Các tổng baseline lịch sử 84, 89 và 90 ca vẫn mâu thuẫn `[CẦN XÁC NHẬN]`.
+Căn cứ `pytest tests --collect-only -q` và full run ngày 13/10/2026 trên Windows/Python 3.14.7: **558 tests collected, 557 passed, 1 skipped, 320 warnings**. Lượt Docker ngày 10/10/2026 trước đó đạt 451 passed, 307 warnings. Các số 84, 89 và 90 trong baseline là snapshot lịch sử từ các giai đoạn khác nhau, không phải tổng kiểm thử hiện tại.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -239,8 +239,8 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
 * **Kiểm thử tự động**: Lượt full suite backend trong Docker ngày 10/10/2026 đạt 451 passed, 307 warnings; frontend gần nhất có 39 passed và build thành công.
-* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; `alembic heads` ngày 10/10/2026 trả một head `f41a0b7c9d22`. Migration S-41 nâng/hạ/nâng trên PostgreSQL Compose tạm và trigger đã chặn UPDATE/DELETE; không migrate DB ứng dụng.
-* **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; sau pull `origin/main`, `alembic heads` ngày 13/10/2026 trả một head `c316a2b4d6e8`. Migration S-41 nâng/hạ/nâng trên PostgreSQL Compose tạm và trigger đã chặn UPDATE/DELETE; không migrate DB ứng dụng.
+* **Đóng gói & CI/CD**: Stack dùng chung Sprint 1–4 chạy bằng `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline `.github/workflows/ci.yml`. Hai file `docker-compose.staging.yml` và `docker-compose.env.example` đã bị gỡ; không dùng chúng để khởi chạy project.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
 * **SCRUM-188/189/190/192 thuộc S-28 (08/10/2026 - chưa commit)**: Thêm phí chiếm trụ theo biểu giá và ân hạn, kiểm tra dữ liệu âm ở schema, lưu thời điểm connector báo `Finishing`/`SuspendedEV` và `Available`, tập trung phép tính vào `billing.py`, lưu `idle_amount`, và áp trần số phút từ `IDLE_FEE_MAX_MINUTES` (mặc định 240). Khi `Available` đến sau billing, không sửa hóa đơn/sổ cái và không tự trừ ví lần hai; mentor cần xác nhận cách quyết toán bổ sung. 20 test billing chọn lọc passed; baseline full suite đạt 298 passed, 1 skipped. Hai migration đã kiểm tra nâng/hạ/nâng trên SQLite tạm.
@@ -310,7 +310,16 @@ Kiểm tra volume SQLite cũ nhận cột khóa đối soát, chỉ mục duy nh
 * Kiểm tra loại trừ trạm ngừng, tìm tên/địa chỉ không phân biệt hoa thường, yêu cầu đủ tọa độ hoặc từ khóa, và validation tọa độ.
 * Kiểm tra giá TOU theo thời điểm/phiên bản hiệu lực, giá null khi chưa có tariff, trang giới hạn 50 và trạm thiếu tọa độ vẫn có thể tìm bằng `q`.
 
-**Kết quả ngày 13/10/2026 (chưa commit)**: 8/8 ca passed; full backend suite đạt **546 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7.
+**Kết quả ngày 13/10/2026**: 8/8 ca passed; full backend suite đạt **546 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7. Code đã đẩy lên nhánh `Duong` trong commit `3d98b39`.
+
+### 4.26. Nhật ký thao tác ví S-56 — `test_wallet_audit_s56.py` (11 ca)
+
+* Kiểm tra audit thành công khi Admin nạp tay, nạp ví thường/callback; dữ liệu actor, tài xế, ví, số tiền, lý do/mã phiếu, số dư trước/sau và IP.
+* Kiểm tra nạp tay lỗi do trùng mã phiếu chỉ ghi FAILED sau rollback, không đổi số dư/ledger và không có SUCCESS.
+* Kiểm tra mở khóa có actor/driver/wallet/reason/IP; lý do rỗng, ví vẫn lệch hoặc role không đủ quyền không tạo log SUCCESS.
+* Kiểm tra reconcile ghi audit phát hiện lệch/khóa ví; `driver_id` kết hợp khoảng thời gian, actor và phân trang; ADMIN/ACCOUNTANT có quyền xem, OPERATOR/CUSTOMER không xem log ví.
+
+**Kết quả ngày 13/10/2026**: 11/11 ca passed; toàn bộ backend thu thập **558 tests**, kết quả chạy **557 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7.
 
 ## 5. Historical Tests
 
@@ -355,7 +364,7 @@ Khi sửa các file cấu hình nền tảng (`app/core/config.py`, `app/core/da
 
 ## 9. Inventory Verification Metadata
 
-* **Ngày kiểm chứng**: 30/09/2026.
-* **Môi trường thực thi**: Python 3.14 / pytest 8.x, SQLite 3.
-* **Kết quả lịch sử 30/09/2026**: 89 passed; không bao gồm suite OCPP bổ sung ngày 01/10/2026.
+* **Ngày kiểm chứng gần nhất**: 13/10/2026.
+* **Môi trường thực thi**: Windows host, Python 3.14.7; suite dùng DB kiểm thử và thư mục migration tạm trong workspace.
+* **Kết quả gần nhất**: `pytest tests --collect-only -q` thu thập 558 tests; full run **557 passed, 1 skipped, 320 warnings**. `ruff check .` đạt.
 * **Người xác thực**: AI Assistant phối hợp cùng Tech Lead dự án.
