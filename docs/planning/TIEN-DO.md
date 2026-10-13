@@ -253,8 +253,8 @@
 * **Nội dung thực hiện cụ thể:**
   1. Xây dựng component `ReservationConflictModal.jsx`: Modal thông báo xung đột bằng tiếng Việt chuẩn "Trụ này vừa được người khác đặt", hiển thị danh sách trụ/đầu nối khả dụng gợi ý trong cùng trạm sạc, giữ nguyên giờ tới người dùng đã chọn trước đó, hỗ trợ phím Esc, focus trap, aria, responsive mobile và dark mode.
   2. Xây dựng dịch vụ `src/services/reservationApi.js`: Ghi rõ hợp đồng API đặt chỗ, kết nối `POST /api/v1/reservations`, `GET /api/v1/reservations/my` và `POST /api/v1/reservations/{id}/cancel`.
-  3. Xây dựng bộ tiện ích `src/utils/reservationUtils.js`: Hàm thuần `mapReservationError` chuẩn hóa lỗi 409 Conflict (`RESERVATION_CONFLICT`), 401, 403, 404/501 ("Chức năng chưa sẵn sàng"), 504 và lỗi mạng. Hàm `normalizeSuggestions` tương thích linh hoạt cả 2 định dạng `suggestions` và `suggested_connectors`. Hàm `createSingleFlightHandler` chống bấm đôi (anti-double-click).
-  4. Viết bộ kiểm thử đơn vị `src/utils/reservationUtils.test.js` với 15 ca test vitest bao phủ toàn diện.
+  3. Xây dựng bộ tiện ích `src/utils/reservationConflictUtils.js`: Hàm thuần `mapReservationError` chuẩn hóa lỗi 409 Conflict (`RESERVATION_CONFLICT`), 401, 403, 404/501 ("Chức năng chưa sẵn sàng"), 504 và lỗi mạng. Hàm `normalizeSuggestions` tương thích linh hoạt cả 2 định dạng `suggestions` và `suggested_connectors`. Hàm `createSingleFlightHandler` chống bấm đôi (anti-double-click).
+  4. Viết bộ kiểm thử đơn vị `src/utils/reservationConflictUtils.test.js` với 15 ca test vitest bao phủ toàn diện.
 * **Xác minh kiểm thử:** Vitest full suite đạt **71/71 passed** (100%); Vite build `npm run build` thành công trong 31.53s (0 lỗi).
 * **Ghi chú tiến độ:** Do hộp thoại đặt chỗ ban đầu (Story S-48) chưa tồn tại trên Frontend, component xử lý xung đột đã được chuẩn hóa độc lập nhận dữ liệu qua props, sẵn sàng gắn kết nối ngay khi Story S-48 được tích hợp.
 

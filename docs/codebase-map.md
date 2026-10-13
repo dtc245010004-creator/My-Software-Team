@@ -120,6 +120,6 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 
 - `frontend/src/components/reservation/ReservationConflictModal.jsx`: Modal thông báo "Trụ này vừa được người khác đặt" khi nhận mã lỗi 409 Conflict (RESERVATION_CONFLICT). Hiển thị danh sách gợi ý trụ khả dụng cùng trạm, hỗ trợ phím Esc, focus trap, anti-double-click, responsive mobile và dark mode.
 - `frontend/src/services/reservationApi.js`: API service kết nối endpoint `POST /api/v1/reservations` với đầy đủ hợp đồng API đặt chỗ, danh sách đặt chỗ của tôi `GET /api/v1/reservations/my` và hủy đặt chỗ `POST /api/v1/reservations/{id}/cancel`.
-- `frontend/src/utils/reservationUtils.js`: Hàm thuần `mapReservationError` (chuẩn hóa lỗi 409 Conflict, 401, 403, 404/501 "Chức năng chưa sẵn sàng", 504, network error), `normalizeSuggestions` (hỗ trợ cả schema `suggestions` và `suggested_connectors`), `createSingleFlightHandler` (chống bấm đôi) và `formatSuggestionAvailableTime`.
-- `frontend/src/utils/reservationUtils.test.js`: Bộ kiểm thử đơn vị Vitest gồm 15 ca kiểm thử bao phủ toàn bộ các trường hợp lỗi xung đột, danh sách gợi ý rỗng/hợp lệ và chống gửi trùng request.
+- `frontend/src/utils/reservationConflictUtils.js`: Hàm thuần `mapReservationError` (chuẩn hóa lỗi 409 Conflict, 401, 403, 404/501 "Chức năng chưa sẵn sàng", 504, network error), `normalizeSuggestions` (hỗ trợ cả schema `suggestions` và `suggested_connectors`), `createSingleFlightHandler` (chống bấm đôi) và `formatSuggestionAvailableTime`.
+- `frontend/src/utils/reservationConflictUtils.test.js`: Bộ kiểm thử đơn vị Vitest gồm 15 ca kiểm thử bao phủ toàn bộ các trường hợp lỗi xung đột, danh sách gợi ý rỗng/hợp lệ và chống gửi trùng request.
 

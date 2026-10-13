@@ -62,7 +62,7 @@
  */
 
 import api from './api';
-import { mapReservationError } from '../utils/reservationUtils';
+import { mapReservationError } from '../utils/reservationConflictUtils';
 
 /**
  * Gửi yêu cầu đặt chỗ trước đầu nối sạc

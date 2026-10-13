@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
-import { formatSuggestionAvailableTime } from '../../utils/reservationUtils';
+import { formatSuggestionAvailableTime } from '../../utils/reservationConflictUtils';
 import { formatVNTime, formatVNDateTime, parseToDate } from '../../utils/formatTime';
 
 /**

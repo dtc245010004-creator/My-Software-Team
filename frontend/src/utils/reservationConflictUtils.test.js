@@ -4,9 +4,9 @@ import {
   mapReservationError,
   formatSuggestionAvailableTime,
   createSingleFlightHandler,
-} from './reservationUtils';
+} from './reservationConflictUtils';
 
-describe('reservationUtils - normalizeSuggestions', () => {
+describe('reservationConflictUtils - normalizeSuggestions', () => {
   it('trả về mảng rỗng khi input không phải mảng hoặc null/undefined', () => {
     expect(normalizeSuggestions(null)).toEqual([]);
     expect(normalizeSuggestions(undefined)).toEqual([]);
@@ -81,7 +81,7 @@ describe('reservationUtils - normalizeSuggestions', () => {
   });
 });
 
-describe('reservationUtils - mapReservationError', () => {
+describe('reservationConflictUtils - mapReservationError', () => {
   it('xử lý lỗi 409 Conflict với code RESERVATION_CONFLICT và danh sách gợi ý', () => {
     const conflictError = {
       response: {
@@ -197,7 +197,7 @@ describe('reservationUtils - mapReservationError', () => {
   });
 });
 
-describe('reservationUtils - formatSuggestionAvailableTime', () => {
+describe('reservationConflictUtils - formatSuggestionAvailableTime', () => {
   it('trả về mặc định khi input rỗng hoặc không hợp lệ', () => {
     expect(formatSuggestionAvailableTime(null)).toBe('Đang có sẵn ngay');
     expect(formatSuggestionAvailableTime('')).toBe('Đang có sẵn ngay');
@@ -212,7 +212,7 @@ describe('reservationUtils - formatSuggestionAvailableTime', () => {
   });
 });
 
-describe('reservationUtils - createSingleFlightHandler (chống bấm đôi)', () => {
+describe('reservationConflictUtils - createSingleFlightHandler (chống bấm đôi)', () => {
   it('chỉ gửi 1 request khi bấm liên tiếp nhiều lần trong lúc request trước đang thực thi', async () => {
     let callCount = 0;
     let resolvePromise;
