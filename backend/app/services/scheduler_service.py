@@ -341,7 +341,7 @@ def cleanup_old_ocpp_messages_job(db: Session = None) -> int:
             db.close()
 
 
-def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
+async def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
     """Chỉ đánh dấu phiên CHARGING khi lần liên lạc cuối đã quá ngưỡng."""
 
     should_close = False
@@ -352,6 +352,7 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
     threshold_seconds = settings.ABNORMAL_SESSION_THRESHOLD_SECONDS
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=threshold_seconds)
     flagged_count = 0
+    stations_to_rebalance: set[int] = set()
     try:
         rows = (
             db.query(ChargingSession, ChargingPoint)
@@ -381,6 +382,8 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
                 session.is_abnormal = True
                 session.abnormal_reason = reason
                 flagged_count += 1
+                if charging_point.station_id is not None:
+                    stations_to_rebalance.add(charging_point.station_id)
                 logger.warning(
                     "Phiên sạc bất thường session_id=%s charge_point=%s last_seen_at=%s reason=%s",
                     session.transaction_id,
@@ -391,6 +394,10 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
 
         if flagged_count:
             db.commit()
+            from app.services.smart_charging import trigger_rebalance_background
+
+            for station_id in stations_to_rebalance:
+                trigger_rebalance_background(station_id)
         return flagged_count
     except SQLAlchemyError:
         db.rollback()

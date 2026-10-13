@@ -53,7 +53,7 @@ npm run dev
 Mở terminal tại thư mục gốc. Compose tự nhận `docker-compose.yml`; tên project dùng chung `ev-csms` cho toàn bộ Sprint 1–4(maybe). Hai volume dữ liệu phát triển hiện có vẫn được giữ nguyên.
 
 ```powershell
-docker compose up -d --build
+
 docker compose ps
 ```
 

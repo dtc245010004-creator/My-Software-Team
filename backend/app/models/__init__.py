@@ -1,10 +1,11 @@
 from app.models.audit_log import AuditLog
 from app.models.id_tag import IdTag
 from app.models.meter_value import MeterValue
-from app.models.payment import TopupOrder
 from app.models.ocpp_message import OcppMessage
 from app.models.orphan_message import OrphanMessage
+from app.models.payment import TopupOrder
 from app.models.remote_start_request import RemoteStartRequest
+from app.models.reservation import Reservation, ReservationStatus
 from app.models.session import ChargingSession
 from app.models.session_billing_segment import SessionBillingSegment
 from app.models.station import (
@@ -33,6 +34,8 @@ __all__ = [
     "OcppMessage",
     "OrphanMessage",
     "RemoteStartRequest",
+    "Reservation",
+    "ReservationStatus",
     "SessionBillingSegment",
     "Station",
     "StationPowerLimit",
@@ -44,3 +47,4 @@ __all__ = [
     "Wallet",
     "WalletTransaction",
 ]
+

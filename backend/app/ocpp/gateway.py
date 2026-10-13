@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.models.ocpp_message import OcppMessage
-from app.models.station import ChargingPoint
+from app.models.session import ChargingSession
+from app.models.station import ChargingPoint, Connector
 from app.ocpp.dispatcher import (
     OcppCallError,
     pending_responses,
@@ -311,7 +312,58 @@ async def ocpp_endpoint(
                 )
                 continue
 
+            stop_session_before = None
+            stop_session_status_before = None
+            status_connector_before = None
+            status_connector_status_before = None
+
+            if frame.action == "StopTransaction":
+                transaction_id = frame.payload.get("transactionId")
+                if transaction_id is not None:
+                    stop_session_before = (
+                        db.query(ChargingSession)
+                        .join(Connector, ChargingSession.connector_id == Connector.id)
+                        .filter(
+                            ChargingSession.transaction_id == transaction_id,
+                            Connector.charge_point_id == charging_point.id,
+                        )
+                        .first()
+                    )
+                    if stop_session_before is not None:
+                        stop_session_status_before = stop_session_before.status
+            elif frame.action == "StatusNotification":
+                connector_number = frame.payload.get("connectorId", 0)
+                if connector_number:
+                    status_connector_before = (
+                        db.query(Connector)
+                        .filter(
+                            Connector.charging_point_id == charging_point.id,
+                            Connector.connector_number == connector_number,
+                        )
+                        .first()
+                    )
+                    if status_connector_before is not None:
+                        status_connector_status_before = (
+                            status_connector_before.ocpp_status
+                        )
+
             result = handler(db, charging_point, frame.payload)
+            status_rebalance_station_id = None
+            if (
+                status_connector_before is not None
+                and status_connector_before.ocpp_status
+                != status_connector_status_before
+                and (
+                    status_connector_before.ocpp_status == "SuspendedEV"
+                    or status_connector_status_before == "SuspendedEV"
+                )
+            ):
+                status_rebalance_station_id = charging_point.station_id
+
+            stop_transaction_changed = (
+                stop_session_before is not None
+                and stop_session_before.status != stop_session_status_before
+            )
             response = build_call_result(frame.message_id, result)
             db.add(
                 OcppMessage(
@@ -335,6 +387,15 @@ async def ocpp_endpoint(
 
                 if charging_point.station_id:
                     trigger_rebalance_background(charging_point.station_id)
+            elif frame.action == "StopTransaction" and stop_transaction_changed:
+                from app.services.smart_charging import trigger_rebalance_background
+
+                if charging_point.station_id:
+                    trigger_rebalance_background(charging_point.station_id)
+            elif frame.action == "StatusNotification" and status_rebalance_station_id:
+                from app.services.smart_charging import trigger_rebalance_background
+
+                trigger_rebalance_background(status_rebalance_station_id)
     except WebSocketDisconnect:
         pass
     except (ConnectionResetError, OSError):

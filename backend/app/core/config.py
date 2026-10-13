@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     )  # Trần số phút được tính phí chiếm trụ mỗi phiên
     ALLOW_REMOTE_START_SIMULATION: bool = False
     TESTING: bool = False
+    ENVIRONMENT: str = "development"
 
     # Cổng thanh toán Sandbox & Webhook (S-35)
     TOPUP_MIN_AMOUNT: int = 10000
@@ -72,6 +73,7 @@ class Settings(BaseSettings):
     HEARTBEAT_INTERVAL_SECONDS: int = 300
     OCPP_CALL_TIMEOUT_SECONDS: float = 30.0
     ABNORMAL_SESSION_THRESHOLD_SECONDS: int = 500
+    REBALANCE_MIN_INTERVAL_SECONDS: int = Field(default=5, gt=0)
 
     # Cảnh báo trạm & trụ sạc (Story 2: SCRUM-317, SCRUM-319)
     CHARGER_OFFLINE_ALERT_MINUTES: int = 15

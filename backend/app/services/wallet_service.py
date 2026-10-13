@@ -150,9 +150,25 @@ def topup_wallet(
     user_id: int,
     amount: Decimal,
     note: str | None = None,
+    reference_id: str | None = None,
+    reference_type: str = "TOPUP",
+    auto_commit: bool = True,
 ) -> Wallet:
     """Nạp tiền qua sổ cái append-only rồi commit dòng sổ và số dư cùng nhau."""
-    wallet = db.query(Wallet).filter(Wallet.user_id == user_id).first()
+    if db.get_bind().dialect.name == "sqlite":
+        db.execute(
+            update(Wallet)
+            .where(Wallet.user_id == user_id)
+            .values(updated_at=func.now())
+        )
+
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.user_id == user_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if wallet is None:
         wallet = Wallet(
             user_id=user_id,
@@ -163,16 +179,21 @@ def topup_wallet(
         db.add(wallet)
         db.flush()
 
+
     wallet, _, _ = post_ledger_entry(
         db=db,
         wallet_id=wallet.id,
         amount=amount,
         transaction_type="TOPUP",
-        reference_type="TOPUP",
+        reference_type=reference_type,
+        reference_id=reference_id,
         note=note or "Nạp tiền vào ví điện tử",
     )
-    db.commit()
-    db.refresh(wallet)
+    if auto_commit:
+        db.commit()
+        db.refresh(wallet)
+    else:
+        db.flush()
     return wallet
 
 
