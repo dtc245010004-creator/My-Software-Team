@@ -755,6 +755,57 @@ export default function Wallet() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const balance = wallet ? Number(wallet.balance) : 0;
+  const currentAmountNum = parseFloat(topupAmount) || 100000;
+  const transferContent = `EVCSMS NAP ${payerName.trim() || 'TAI XE'}`;
+  const vietQrUrl = `https://api.vietqr.io/image/970422-999988886666-compact2.png?amount=${currentAmountNum}&addInfo=${encodeURIComponent(
+    transferContent
+  )}&accountName=EV%20CSMS%20CHARGING`;
+
+  // SCRUM-378: Lọc giao dịch theo loại (Tất cả, Nạp tiền, Cước sạc, Phí quá hạn)
+  const penaltyTxs = useMemo(
+    () => (Array.isArray(transactions) ? transactions.filter(isPenaltyTransaction) : []),
+    [transactions]
+  );
+  const totalPenaltyAmount = useMemo(() => {
+    return penaltyTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.amount || 0)), 0);
+  }, [penaltyTxs]);
+
+  const topupTxsCount = useMemo(
+    () =>
+      Array.isArray(transactions)
+        ? transactions.filter((tx) => tx.transaction_type === 'TOPUP').length
+        : 0,
+    [transactions]
+  );
+  const chargeTxsCount = useMemo(
+    () =>
+      Array.isArray(transactions)
+        ? transactions.filter(
+            (tx) => tx.transaction_type === 'CHARGE_FEE' && !isPenaltyTransaction(tx)
+          ).length
+        : 0,
+    [transactions]
+  );
+
+  const filteredTransactions = useMemo(() => {
+    if (!Array.isArray(transactions)) return [];
+    if (txFilter === 'TOPUP') return transactions.filter((tx) => tx.transaction_type === 'TOPUP');
+    if (txFilter === 'CHARGE_FEE')
+      return transactions.filter(
+        (tx) => tx.transaction_type === 'CHARGE_FEE' && !isPenaltyTransaction(tx)
+      );
+    if (txFilter === 'PENALTY') return penaltyTxs;
+    return transactions;
+  }, [transactions, txFilter, penaltyTxs]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE) || 1;
+  const currentTransactions = filteredTransactions.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12 text-steel-gray">
@@ -793,48 +844,6 @@ export default function Wallet() {
       </div>
     );
   }
-
-  const balance = wallet ? Number(wallet.balance) : 0;
-  const currentAmountNum = parseFloat(topupAmount) || 100000;
-  const transferContent = `EVCSMS NAP ${payerName.trim() || 'TAI XE'}`;
-  const vietQrUrl = `https://api.vietqr.io/image/970422-999988886666-compact2.png?amount=${currentAmountNum}&addInfo=${encodeURIComponent(
-    transferContent
-  )}&accountName=EV%20CSMS%20CHARGING`;
-
-  // SCRUM-378: Lọc giao dịch theo loại (Tất cả, Nạp tiền, Cước sạc, Phí quá hạn)
-  const penaltyTxs = useMemo(() => transactions.filter(isPenaltyTransaction), [transactions]);
-  const totalPenaltyAmount = useMemo(() => {
-    return penaltyTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.amount || 0)), 0);
-  }, [penaltyTxs]);
-
-  const topupTxsCount = useMemo(
-    () => transactions.filter((tx) => tx.transaction_type === 'TOPUP').length,
-    [transactions]
-  );
-  const chargeTxsCount = useMemo(
-    () =>
-      transactions.filter(
-        (tx) => tx.transaction_type === 'CHARGE_FEE' && !isPenaltyTransaction(tx)
-      ).length,
-    [transactions]
-  );
-
-  const filteredTransactions = useMemo(() => {
-    if (txFilter === 'TOPUP') return transactions.filter((tx) => tx.transaction_type === 'TOPUP');
-    if (txFilter === 'CHARGE_FEE')
-      return transactions.filter(
-        (tx) => tx.transaction_type === 'CHARGE_FEE' && !isPenaltyTransaction(tx)
-      );
-    if (txFilter === 'PENALTY') return penaltyTxs;
-    return transactions;
-  }, [transactions, txFilter, penaltyTxs]);
-
-  // Pagination logic
-  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE) || 1;
-  const currentTransactions = filteredTransactions.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
 
   // Render Badge cho trạng thái đơn nạp tiền Sandbox (SCRUM-245)
   const renderOrderStatusBadge = (status) => {
