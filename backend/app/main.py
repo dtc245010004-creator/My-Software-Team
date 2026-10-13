@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.websocket import ws_manager
 from app.ocpp.gateway import router as ocpp_router
 from app.routers.admin_users import router as admin_users_router
+from app.services.reservation_service import ReservationConflictException
 from app.services.wallet_service import (
     WalletInsufficientBalanceException,
     WalletNegativeBalanceException,
@@ -150,6 +151,19 @@ async def wallet_negative_balance_handler(
             "current_balance": exc.current_balance,
             "required_balance": exc.required_balance,
             "suggest_topup": exc.suggest_topup,
+        },
+    )
+
+
+@app.exception_handler(ReservationConflictException)
+async def reservation_conflict_handler(
+    request: Request, exc: ReservationConflictException
+):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "suggested_connectors": exc.suggested_connectors,
         },
     )
 

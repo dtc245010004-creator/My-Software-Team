@@ -298,6 +298,25 @@ def create_topup_request(
 
 
 @router.get(
+    "/topup-requests",
+    response_model=list[TopupOrderStatusResponse],
+    summary="Xem danh sách các giao dịch nạp tiền qua cổng Sandbox của tôi (SCRUM-245)",
+)
+def list_my_topup_requests(
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    orders = (
+        db.query(TopupOrder)
+        .filter(TopupOrder.user_id == current_user.id)
+        .order_by(TopupOrder.created_at.desc(), TopupOrder.id.desc())
+        .limit(20)
+        .all()
+    )
+    return orders
+
+
+@router.get(
     "/topup-requests/{order_code}",
     response_model=TopupOrderStatusResponse,
     summary="Polling kiểm tra trạng thái giao dịch nạp tiền",

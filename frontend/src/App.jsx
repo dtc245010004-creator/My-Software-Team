@@ -15,6 +15,7 @@ import AIAdvisor from './pages/AIAdvisor';
 import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import DriverMap from './pages/DriverMap';
+import DriverStationsList from './pages/DriverStationsList';
 import AbnormalSessions from './pages/AbnormalSessions';
 import AuditLogs from './pages/AuditLogs';
 import TariffForm from './components/TariffForm';
@@ -48,14 +49,16 @@ function AppLayout() {
           <Route
             path="/"
             element={
-              role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <Dashboard />
+              role === 'CUSTOMER' ? <Navigate to="/driver/stations" replace /> : <Dashboard />
             }
           />
+          {/* Màn hình tìm trạm và thấy đầu nối rảnh cho Tài xế (SCRUM-351 / SCRUM-359 / SCRUM-360) */}
+          <Route path="/driver/stations" element={<DriverStationsList />} />
           <Route path="/map" element={<DriverMap />} />
           <Route
             path="/stations"
             element={
-              role === 'CUSTOMER' ? <Navigate to="/map" replace /> : <Stations />
+              role === 'CUSTOMER' ? <Navigate to="/driver/stations" replace /> : <Stations />
             }
           />
           <Route
@@ -72,6 +75,13 @@ function AppLayout() {
           />
           <Route
             path="/wallet"
+            element={
+              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
+            }
+          />
+          {/* Return URL / Callback từ cổng thanh toán Sandbox (SCRUM-239 & SCRUM-240) */}
+          <Route
+            path="/wallet/topup/result"
             element={
               role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
             }
