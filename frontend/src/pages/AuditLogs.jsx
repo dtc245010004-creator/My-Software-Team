@@ -4,11 +4,20 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import AuditFilters from '../components/audit/AuditFilters';
 import AuditTable from '../components/audit/AuditTable';
+import { buildAuditQueryParams, extractDriverList } from '../utils/auditUtils';
 
 /** AC T-58: phân trang cố định 50 dòng mỗi trang. */
 const PAGE_SIZE = 50;
 
-const EMPTY_DRAFT = { chargerId: '', userId: '', from: '', to: '', fromLocal: '', toLocal: '' };
+const EMPTY_DRAFT = {
+  chargerId: '',
+  userId: '',
+  driverId: '',
+  from: '',
+  to: '',
+  fromLocal: '',
+  toLocal: '',
+};
 
 /**
  * Màn hình Tra cứu nhật ký (T-58).
@@ -51,7 +60,12 @@ export default function AuditLogs() {
   // Bộ lọc nháp: người dùng đang chọn, CHƯA gửi lên API.
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   // Bộ lọc đã áp dụng: đúng tham số đã dùng cho request gần nhất.
-  const [applied, setApplied] = useState({ ...EMPTY_DRAFT, chargerLabel: '', userLabel: '' });
+  const [applied, setApplied] = useState({
+    ...EMPTY_DRAFT,
+    chargerLabel: '',
+    userLabel: '',
+    driverLabel: '',
+  });
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -64,6 +78,9 @@ export default function AuditLogs() {
   // Chống phản hồi cũ ghi đè phản hồi mới khi người dùng đổi bộ lọc liên tục.
   const requestSeq = useRef(0);
 
+  // Danh mục tài xế trích xuất từ người dùng hệ thống (SCRUM-412)
+  const drivers = useMemo(() => extractDriverList(users), [users]);
+
   // Nhãn hiển thị lấy từ danh sách tham chiếu đã tải.
   const chargerLabel = useMemo(
     () => chargers.find((c) => String(c.id) === String(draft.chargerId))?.code || draft.chargerId,
@@ -73,6 +90,10 @@ export default function AuditLogs() {
     const u = users.find((x) => String(x.id) === String(draft.userId));
     return u ? u.fullName || u.username : draft.userId;
   }, [users, draft.userId]);
+  const driverLabel = useMemo(() => {
+    const d = drivers.find((x) => String(x.id) === String(draft.driverId));
+    return d ? d.label : (draft.driverId ? `#${draft.driverId}` : '');
+  }, [drivers, draft.driverId]);
 
   // Tải danh sách tham chiếu: trụ sạc (từ /stations) và người dùng (từ /admin/users).
   useEffect(() => {
@@ -94,7 +115,7 @@ export default function AuditLogs() {
         if (!cancelled) setReferenceError('Không tải được danh sách trụ sạc.');
       }
 
-      // Danh sách người thực hiện: Chỉ ADMIN mới có quyền truy cập /admin/users
+      // Danh sách người thực hiện & tài xế: Chỉ ADMIN mới có quyền truy cập /admin/users
       if (role === 'ADMIN') {
         try {
           const res = await api.get('/admin/users');
@@ -104,6 +125,7 @@ export default function AuditLogs() {
                 id: u.id,
                 username: u.username,
                 fullName: u.full_name,
+                role: u.role,
               }))
             );
           }
@@ -131,11 +153,8 @@ export default function AuditLogs() {
       setLoading(true);
       setErrorMessage(null);
 
-      const params = { page: targetPage, page_size: PAGE_SIZE };
-      if (filters.chargerId) params.charger_id = filters.chargerId;
-      if (filters.userId) params.user_id = filters.userId;
-      if (filters.from) params.from = filters.from;
-      if (filters.to) params.to = filters.to;
+      // SCRUM-412: Đóng gói tham số bao gồm driver_id
+      const params = buildAuditQueryParams(filters, targetPage, PAGE_SIZE);
 
       try {
         const res = await api.get('/audit-logs', { params });
@@ -172,7 +191,7 @@ export default function AuditLogs() {
 
   // Áp dụng bộ lọc nháp: đặt về trang 1 rồi gọi API với điều kiện mới.
   const handleSearch = () => {
-    const next = { ...draft, chargerLabel, userLabel };
+    const next = { ...draft, chargerLabel, userLabel, driverLabel };
     setApplied(next);
     setPage(1);
     fetchLogs(draft, 1);
@@ -181,7 +200,7 @@ export default function AuditLogs() {
   // Đặt lại: xóa bộ lọc và tải lại không còn điều kiện nào.
   const handleReset = () => {
     setDraft(EMPTY_DRAFT);
-    setApplied({ ...EMPTY_DRAFT, chargerLabel: '', userLabel: '' });
+    setApplied({ ...EMPTY_DRAFT, chargerLabel: '', userLabel: '', driverLabel: '' });
     setPage(1);
     fetchLogs(EMPTY_DRAFT, 1);
   };
@@ -234,6 +253,7 @@ export default function AuditLogs() {
       <AuditFilters
         chargers={chargers}
         users={users}
+        drivers={drivers}
         draft={draft}
         applied={applied}
         onChange={setDraft}
