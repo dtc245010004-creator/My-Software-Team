@@ -193,6 +193,9 @@ async def request_validation_exception_handler(
 def root():
     """Thông tin tổng quan dịch vụ."""
     return {
+        "status": "ok",
+        "service": "ev-csms-backend",
+
         "message": f"Chào mừng đến với {settings.PROJECT_NAME}",
         "version": settings.VERSION,
         "docs": "/docs",
@@ -202,6 +205,18 @@ def root():
 
 
 @app.websocket("/ws/telemetry")
+async def websocket_telemetry(websocket: WebSocket):
+    """Stub WebSocket endpoint cho telemetry trụ sạc ảo.
+    Echo lại message từ client + ping định kỳ để giữ kết nối.
+    """
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await websocket.send_text(f"echo: {data}")
+    except WebSocketDisconnect:
+        pass
+
 async def websocket_telemetry_endpoint(websocket: WebSocket):
     """Kênh WebSocket truyền phát telemetry sạc xe thời gian thực."""
     await ws_manager.connect(websocket)

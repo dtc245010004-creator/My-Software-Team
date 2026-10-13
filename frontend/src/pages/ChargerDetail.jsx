@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Zap,
@@ -15,9 +15,11 @@ import {
   WifiOff,
   ArrowRight,
   SlidersHorizontal,
+  CalendarClock,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ReservationModal from '../components/ReservationModal';
 
 export default function ChargerDetail() {
   const { id } = useParams();
@@ -28,6 +30,47 @@ export default function ChargerDetail() {
   const [charger, setCharger] = useState(null);
   const [loadingCharger, setLoadingCharger] = useState(true);
   const [selectedConnectorId, setSelectedConnectorId] = useState(null);
+
+  // ─── Đặt chỗ trạm sạc (S-48 / S-49) ─────────────────────────
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [resModalConnector, setResModalConnector] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null);
+
+  // Load số dư ví khi CUSTOMER mở modal
+  useEffect(() => {
+    if (showReservationModal && role === 'CUSTOMER') {
+      api.get('/wallet/me')
+        .then((r) => setWalletBalance(r.data?.balance ?? null))
+        .catch(() => setWalletBalance(null));
+    }
+    if (!showReservationModal) {
+      setResModalConnector(null);
+    }
+  }, [showReservationModal, role]);
+
+  // Mở modal đặt chỗ cho connector đã chọn (S-48 / S-49)
+  const handleOpenReservationModal = useCallback(() => {
+    if (!selectedConnectorId || !charger) return;
+    const conn = charger.connectors?.find((c) => c.id === selectedConnectorId);
+    if (!conn) return;
+    setResModalConnector({
+      id: conn.id,
+      connector_number: conn.connector_number,
+      max_power_kw: conn.max_power_kw,
+      status: conn.status,
+      charge_point_code: charger.code || `CP-${charger.id}`,
+      charge_point_id: charger.id,
+      charge_point_name: conn.connector_type || '',
+      station_name: charger.station_name || 'Trạm sạc',
+      station_id: charger.station_id || charger.id,
+    });
+    setShowReservationModal(true);
+  }, [selectedConnectorId, charger]);
+
+  const handleReservationSuccess = useCallback(() => {
+    setShowReservationModal(false);
+    // TODO: refresh charger status
+  }, []);
 
   // Trạng thái yêu cầu bắt đầu sạc từ xa (S-24 / T-52)
   const [isStarting, setIsStarting] = useState(false);
@@ -152,7 +195,7 @@ export default function ChargerDetail() {
 
   // Xử lý bấm nút "BẮT ĐẦU SẠC" (S-24 / T-52)
   const handleStartCharging = async () => {
-    if (!selectedConnectorId) {
+    if (!resModalConnectorId) {
       setAlertInfo({
         type: 'warning',
         title: 'CHƯA CHỌN CỔNG SẠC',
@@ -161,7 +204,7 @@ export default function ChargerDetail() {
       return;
     }
 
-    const selectedConn = charger?.connectors?.find((c) => c.id === selectedConnectorId);
+    const selectedConn = charger?.connectors?.find((c) => c.id === resModalConnectorId);
 
     // Ca 3: Kiểm tra đầu nối bận tại client
     if (selectedConn && selectedConn.status !== 'AVAILABLE' && simulateCondition !== 'BUSY') {
@@ -184,7 +227,7 @@ export default function ChargerDetail() {
 
     try {
       const payload = {
-        connector_id: selectedConnectorId,
+        connector_id: resModalConnectorId,
       };
 
       if (simulateCondition && simulateCondition !== 'AUTO') {
@@ -337,7 +380,6 @@ export default function ChargerDetail() {
   }
 
   const isChargerAvailable = charger.status === 'AVAILABLE';
-  const selectedConnector = (charger.connectors || []).find((c) => c.id === selectedConnectorId);
 
   return (
     <div className="max-w-xl mx-auto pb-8 font-sans">
@@ -520,7 +562,7 @@ export default function ChargerDetail() {
 
         <div className="space-y-2">
           {(charger.connectors || []).map((conn) => {
-            const isSelected = selectedConnectorId === conn.id;
+            const isSelected = resModalConnectorId === conn.id;
             const isAvailable = conn.status === 'AVAILABLE';
 
             return (
@@ -577,6 +619,32 @@ export default function ChargerDetail() {
                     <div className="text-[10px] text-electric-cyan font-mono mt-1 font-bold">
                       ✓ ĐÃ CHỌN
                     </div>
+                  )}
+                  {/* Nút Đặt chỗ — chỉ khi AVAILABLE + role = CUSTOMER */}
+                  {conn.status === 'AVAILABLE' && role === 'CUSTOMER' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedConnectorId(conn.id);
+                        setShowReservationModal(true);
+                        // Populate resModalConnector
+                        setSelectedConnector({
+                          id: conn.id,
+                          connector_number: conn.connector_number,
+                          max_power_kw: conn.max_power_kw,
+                          status: conn.status,
+                          charge_point_code: charger.code || `CP-${charger.id}`,
+                          charge_point_id: charger.id,
+                          charge_point_name: conn.connector_type || '',
+                          station_name: charger.station_name || 'Trạm sạc',
+                          station_id: charger.station_id || charger.id,
+                        });
+                      }}
+                      className="mt-2 w-full flex items-center justify-center gap-1 px-2 py-1 rounded border border-electric-cyan/40 bg-electric-cyan/10 text-electric-cyan text-[10px] font-bold hover:bg-electric-cyan/20 transition-colors"
+                    >
+                      <CalendarClock className="w-3 h-3" />
+                      Đặt chỗ
+                    </button>
                   )}
                 </div>
               </div>
@@ -646,12 +714,12 @@ export default function ChargerDetail() {
         <button
           type="button"
           id="remote-start-submit-btn"
-          disabled={isStarting || !selectedConnectorId}
+          disabled={isStarting || !resModalConnectorId}
           onClick={handleStartCharging}
           className={`w-full py-4 rounded font-mono font-bold text-sm uppercase tracking-wider flex items-center justify-center space-x-2 shadow-lg transition-all ${
             isStarting
               ? 'bg-hairline text-steel-gray cursor-not-allowed opacity-60'
-              : selectedConnector?.status === 'AVAILABLE' || simulateCondition !== 'AUTO'
+              : resModalConnector?.status === 'AVAILABLE' || simulateCondition !== 'AUTO'
               ? 'bg-gradient-to-r from-electric-cyan to-blue-600 hover:from-electric-cyan-hover hover:to-blue-700 text-tech-white active:scale-[0.99] shadow-electric-cyan/20'
               : 'bg-obsidian border border-hairline text-steel-gray hover:text-tech-white'
           }`}
@@ -670,11 +738,20 @@ export default function ChargerDetail() {
         </button>
 
         <p className="text-center text-[11px] text-steel-gray font-mono">
-          {selectedConnector
-            ? `Đã chọn: Súng #${selectedConnector.connector_number} (${selectedConnector.connector_type} • ${selectedConnector.max_power_kw} kW)`
+          {resModalConnector
+            ? `Đã chọn: Súng #${resModalConnector.connector_number} (${resModalConnector.connector_type} • ${resModalConnector.max_power_kw} kW)`
             : 'Vui lòng chọn một đầu nối súng sạc ở trên'}
         </p>
       </div>
+
+      {/* ── Modal đặt chỗ trạm sạc (S-48 / S-49) — chỉ khi CUSTOMER ─── */}
+      <ReservationModal
+        isOpen={showReservationModal}
+        onClose={() => setShowReservationModal(false)}
+        connector={resModalConnector}
+        walletBalance={walletBalance}
+        onSuccess={handleReservationSuccess}
+      />
     </div>
   );
 }

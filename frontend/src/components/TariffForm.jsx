@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, AlertCircle, Clock, CheckCircle } from 'lucide-react';
 import Button from './ui/Button';
 import { validateTariffPeriods, minutesToTime, timeToMinutes } from '../utils/tariffValidation';
@@ -54,14 +54,14 @@ export default function TariffForm({ stationId = 1 }) {
             setTimeout(() => setSaveStatus(null), 3000);
         } catch (error) {
             setSaveStatus('error');
-            setServerError(error.message || 'Lỗi khi lưu biểu giá từ server');
+            setServerError(error.message || 'Lß╗ùi khi l╞░u biß╗âu gi├í tß╗½ server');
         } finally {
             setIsSaving(false);
         }
     };
 
     if (isLoading) {
-        return <div className="p-4 text-gray-500">Đang tải cấu hình biểu giá...</div>;
+        return <div className="p-4 text-gray-500">─Éang tß║úi cß║Ñu h├¼nh biß╗âu gi├í...</div>;
     }
 
     const totalCovered = validation.segments.reduce((acc, seg) => acc + (seg.end - seg.start), 0) - 
@@ -69,29 +69,29 @@ export default function TariffForm({ stationId = 1 }) {
     const coveragePercentage = Math.min(100, (totalCovered / 1440) * 100);
 
     const calculateCoverageStr = () => {
-        if (validation.isValid) return "Đã phủ kín 24/24h (Hợp lệ)";
-        return `Độ phủ: ${coveragePercentage.toFixed(1)}%`;
+        if (validation.isValid) return "─É├ú phß╗º k├¡n 24/24h (Hß╗úp lß╗ç)";
+        return `─Éß╗Ö phß╗º: ${coveragePercentage.toFixed(1)}%`;
     };
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 dark:bg-[#151D2A] max-w-4xl mx-auto">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Khai báo biểu giá linh hoạt (Tariff)</h2>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Khai b├ío biß╗âu gi├í linh hoß║ít (Tariff)</h2>
                     <p className="text-sm text-slate-500 mt-1">
-                        Thiết lập các khung giờ không chồng lấn và phải phủ kín 24 giờ.
+                        Thiß║┐t lß║¡p c├íc khung giß╗¥ kh├┤ng chß╗ông lß║Ñn v├á phß║úi phß╗º k├¡n 24 giß╗¥.
                     </p>
                 </div>
                 <Button onClick={handleAddPeriod} className="flex items-center gap-2">
-                    <Plus size={18} /> Thêm khung giờ
+                    <Plus size={18} /> Th├¬m khung giß╗¥
                 </Button>
             </div>
 
-            {/* Danh sách khung giờ */}
+            {/* Danh s├ích khung giß╗¥ */}
             <div className="mb-6">
                 {periods.length === 0 ? (
                     <div className="text-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-slate-500">
-                        Chưa có khung giờ nào được thiết lập. Vui lòng thêm khung giờ mới.
+                        Ch╞░a c├│ khung giß╗¥ n├áo ─æ╞░ß╗úc thiß║┐t lß║¡p. Vui l├▓ng th├¬m khung giß╗¥ mß╗¢i.
                     </div>
                 ) : (
                     <div className="space-y-4">
@@ -105,7 +105,7 @@ export default function TariffForm({ stationId = 1 }) {
                                 <div key={index} className={`p-4 rounded-xl border ${isError ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' : 'border-slate-200 bg-slate-50 dark:border-slate-700/50 dark:bg-slate-800/50'}`}>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1.5" htmlFor={`start-${index}`}>Giờ bắt đầu (HH:mm)</label>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1.5" htmlFor={`start-${index}`}>Giß╗¥ bß║»t ─æß║ºu (HH:mm)</label>
                                             <input 
                                                 id={`start-${index}`}
                                                 type="time" 
@@ -117,7 +117,7 @@ export default function TariffForm({ stationId = 1 }) {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1.5" htmlFor={`end-${index}`}>Giờ kết thúc (HH:mm)</label>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1.5" htmlFor={`end-${index}`}>Giß╗¥ kß║┐t th├║c (HH:mm)</label>
                                             <input 
                                                 id={`end-${index}`}
                                                 type="time" 
@@ -127,7 +127,7 @@ export default function TariffForm({ stationId = 1 }) {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1.5" htmlFor={`price-${index}`}>Giá (VND/kWh)</label>
+                                            <label className="block text-xs font-medium text-slate-500 mb-1.5" htmlFor={`price-${index}`}>Gi├í (VND/kWh)</label>
                                             <div className="flex items-center gap-2">
                                                 <input 
                                                     id={`price-${index}`}
@@ -140,8 +140,8 @@ export default function TariffForm({ stationId = 1 }) {
                                                 <button 
                                                     onClick={() => handleRemovePeriod(index)}
                                                     className="p-2.5 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg flex-shrink-0 transition-colors"
-                                                    title="Xóa khung giờ"
-                                                    aria-label="Xóa khung giờ"
+                                                    title="X├│a khung giß╗¥"
+                                                    aria-label="X├│a khung giß╗¥"
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>
@@ -152,7 +152,7 @@ export default function TariffForm({ stationId = 1 }) {
                                     {isOvernight && !isError && (
                                         <div className="mt-3 flex items-center gap-1.5 text-xs text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 px-2.5 py-1.5 rounded-lg inline-flex">
                                             <Clock size={14} />
-                                            <span>Khung giờ qua nửa đêm (Hệ thống sẽ ghi nhận thành {period.start}–24:00 và 00:00–{period.end})</span>
+                                            <span>Khung giß╗¥ qua nß╗¡a ─æ├¬m (Hß╗ç thß╗æng sß║╜ ghi nhß║¡n th├ánh {period.start}ΓÇô24:00 v├á 00:00ΓÇô{period.end})</span>
                                         </div>
                                     )}
 
@@ -169,10 +169,10 @@ export default function TariffForm({ stationId = 1 }) {
                 )}
             </div>
 
-            {/* Thanh tóm tắt độ phủ 24 giờ */}
+            {/* Thanh t├│m tß║»t ─æß╗Ö phß╗º 24 giß╗¥ */}
             <div className="mb-6 p-5 bg-slate-50 dark:bg-[#0B0F17] border border-slate-200 dark:border-slate-800 rounded-xl">
                 <div className="flex justify-between items-end mb-3">
-                    <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">Độ phủ 24 giờ</h4>
+                    <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">─Éß╗Ö phß╗º 24 giß╗¥</h4>
                     <span className={`text-sm font-bold ${validation.isValid ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                         {calculateCoverageStr()}
                     </span>
@@ -188,7 +188,7 @@ export default function TariffForm({ stationId = 1 }) {
                                 left: `${(gap.start / 1440) * 100}%`, 
                                 width: `${((gap.end - gap.start) / 1440) * 100}%` 
                             }}
-                            title={`Khoảng trống: ${minutesToTime(gap.start)} - ${minutesToTime(gap.end)}`}
+                            title={`Khoß║úng trß╗æng: ${minutesToTime(gap.start)} - ${minutesToTime(gap.end)}`}
                         />
                     ))}
                     
@@ -214,7 +214,7 @@ export default function TariffForm({ stationId = 1 }) {
                                 left: `${(overlap.start / 1440) * 100}%`, 
                                 width: `${((overlap.end - overlap.start) / 1440) * 100}%` 
                             }}
-                            title={`Chồng lấn: ${minutesToTime(overlap.start)} - ${minutesToTime(overlap.end)}`}
+                            title={`Chß╗ông lß║Ñn: ${minutesToTime(overlap.start)} - ${minutesToTime(overlap.end)}`}
                         />
                     ))}
                 </div>
@@ -231,7 +231,7 @@ export default function TariffForm({ stationId = 1 }) {
                 {validation.gaps.length > 0 && (
                     <div className="mt-3 text-sm text-red-600 dark:text-red-400 flex items-start gap-1.5 font-medium">
                         <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                        <span>Thiếu khung giờ cho các khoảng: {validation.gaps.map(g => `${minutesToTime(g.start)}–${minutesToTime(g.end)}`).join(', ')}.</span>
+                        <span>Thiß║┐u khung giß╗¥ cho c├íc khoß║úng: {validation.gaps.map(g => `${minutesToTime(g.start)}ΓÇô${minutesToTime(g.end)}`).join(', ')}.</span>
                     </div>
                 )}
             </div>
@@ -244,12 +244,12 @@ export default function TariffForm({ stationId = 1 }) {
                     className="min-w-[140px]"
                     icon={Save}
                 >
-                    {isSaving ? 'Đang lưu...' : 'Lưu biểu giá'}
+                    {isSaving ? '─Éang l╞░u...' : 'L╞░u biß╗âu gi├í'}
                 </Button>
                 
                 {saveStatus === 'success' && (
                     <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 text-sm font-medium animate-in fade-in">
-                        <CheckCircle size={18} /> Lưu thành công!
+                        <CheckCircle size={18} /> L╞░u th├ánh c├┤ng!
                     </span>
                 )}
                 
