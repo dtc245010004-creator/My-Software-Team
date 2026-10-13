@@ -91,7 +91,7 @@ def prepare_live_points(engine, count: int):
                 user_id=tag.user_id,
                 amount=target_balance - current_balance,
                 note="Số dư fixture cho kiểm thử OCPP reconnect.",
-                reference_id=f"ocpp-reconnect-fixture-{uuid.uuid4().hex}",
+                reference_id=f"ocpp-fixture-{uuid.uuid4().hex[:16]}",
                 reference_type="TEST_FIXTURE",
                 auto_commit=False,
             )
