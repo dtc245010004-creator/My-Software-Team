@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.websocket import ws_manager
 from app.models.ocpp_message import OcppMessage
+from app.models.remote_start_request import RemoteStartRequest
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.services.ai_service import AIService, latest_smart_charging_cache
@@ -68,6 +69,23 @@ def reset_cumulative_energy_cache():
     """Reset bộ nhớ lũy kế năng lượng (phục vụ kiểm thử cô lập)."""
     global _last_station_cumulative_energy
     _last_station_cumulative_energy.clear()
+
+
+def reconcile_wallet_ledger_job():
+    """Đối soát sổ cái ví định kỳ và khóa các ví có tổng tiền không khớp."""
+    from app.services.wallet_service import reconcile_wallet_ledger
+
+    try:
+        result = reconcile_wallet_ledger()
+        logger.info(
+            "Wallet ledger reconciliation complete: checked=%s mismatched=%s",
+            result["checked"],
+            result["mismatched"],
+        )
+        return result
+    except SQLAlchemyError:
+        logger.exception("Lỗi CSDL khi chạy đối soát sổ cái ví")
+        return {"checked": 0, "mismatched": 0}
 
 
 async def calculate_and_broadcast_smart_charging(
@@ -323,7 +341,7 @@ def cleanup_old_ocpp_messages_job(db: Session = None) -> int:
             db.close()
 
 
-def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
+async def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
     """Chỉ đánh dấu phiên CHARGING khi lần liên lạc cuối đã quá ngưỡng."""
 
     should_close = False
@@ -334,6 +352,7 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
     threshold_seconds = settings.ABNORMAL_SESSION_THRESHOLD_SECONDS
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=threshold_seconds)
     flagged_count = 0
+    stations_to_rebalance: set[int] = set()
     try:
         rows = (
             db.query(ChargingSession, ChargingPoint)
@@ -349,6 +368,10 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
 
         reason = f"Mất liên lạc với trụ quá {threshold_seconds} giây"
         for session, charging_point in rows:
+            if session.abnormal_reason == (
+                "StatusNotificationAvailableWithoutStopTransaction"
+            ):
+                continue
             last_seen_at = charging_point.last_seen_at
             if last_seen_at.tzinfo is None:
                 last_seen_at = last_seen_at.replace(tzinfo=timezone.utc)
@@ -359,6 +382,8 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
                 session.is_abnormal = True
                 session.abnormal_reason = reason
                 flagged_count += 1
+                if charging_point.station_id is not None:
+                    stations_to_rebalance.add(charging_point.station_id)
                 logger.warning(
                     "Phiên sạc bất thường session_id=%s charge_point=%s last_seen_at=%s reason=%s",
                     session.transaction_id,
@@ -369,11 +394,159 @@ def flag_abnormal_charging_sessions_job(db: Session = None) -> int:
 
         if flagged_count:
             db.commit()
+            from app.services.smart_charging import trigger_rebalance_background
+
+            for station_id in stations_to_rebalance:
+                trigger_rebalance_background(station_id)
         return flagged_count
     except SQLAlchemyError:
         db.rollback()
         logger.exception("Lỗi quét phiên sạc bất thường")
         return 0
+    finally:
+        if should_close:
+            db.close()
+
+
+def expire_pending_remote_start_requests_job(db: Session = None) -> int:
+    """Chuyển request RemoteStart quá hạn sang EXPIRED mà không cần client poll."""
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    try:
+        expired_count = (
+            db.query(RemoteStartRequest)
+            .filter(
+                RemoteStartRequest.status == "PENDING",
+                RemoteStartRequest.expires_at <= datetime.now(timezone.utc),
+            )
+            .update(
+                {RemoteStartRequest.status: "EXPIRED"},
+                synchronize_session=False,
+            )
+        )
+        if expired_count:
+            db.commit()
+        return expired_count
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Lỗi dọn yêu cầu RemoteStart đã hết hạn")
+        return 0
+    finally:
+        if should_close:
+            db.close()
+
+
+def check_station_power_limits_boundary_job(
+    db: Session = None, current_time: datetime | None = None
+) -> int:
+    """Tác vụ chạy mỗi 1 phút (SCRUM-313): Kiểm tra ranh giới khung giờ và chia lại công suất.
+
+    - Xác định khung giờ hiện tại theo giờ Việt Nam.
+    - So sánh hạn mức công suất của khung hiện tại với station.total_grid_capacity_kw.
+    - Nếu đến ranh giới khung giờ hoặc hạn mức thay đổi: Cập nhật hạn mức và kích hoạt rebalance_station_power.
+    - Idempotent: Nếu hạn mức không đổi và không ở mốc ranh giới mới, không phát sinh cập nhật thừa.
+    """
+    from app.core.datetime_utils import get_vn_now
+    from app.models.station import StationPowerLimit
+    from app.services.smart_charging import trigger_rebalance_background
+    from app.services.tariff_validation import normalize_periods
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    triggered_stations = 0
+    try:
+        now_vn = current_time or get_vn_now()
+        cur_minute = now_vn.hour * 60 + now_vn.minute
+
+        stations = (
+            db.query(Station)
+            .join(StationPowerLimit, Station.id == StationPowerLimit.station_id)
+            .filter(Station.is_active.is_(True))
+            .distinct()
+            .all()
+        )
+
+        for station in stations:
+            if not station.power_limits:
+                continue
+
+            normalized = normalize_periods(
+                station.power_limits, value_field="power_limit_kw"
+            )
+            current_seg = next(
+                (
+                    s
+                    for s in normalized
+                    if s.start_minute <= cur_minute < s.end_minute
+                ),
+                None,
+            )
+            if not current_seg or current_seg.power_limit_kw is None:
+                continue
+
+            target_limit = float(current_seg.power_limit_kw)
+            is_boundary_minute = cur_minute == current_seg.start_minute
+            limit_changed = float(station.total_grid_capacity_kw or 0.0) != target_limit
+
+            if limit_changed or is_boundary_minute:
+                if limit_changed:
+                    logger.info(
+                        "Ranh giới khung giờ trạm #%s (%s): Đổi hạn mức từ %s kW -> %s kW",
+                        station.id,
+                        station.name,
+                        station.total_grid_capacity_kw,
+                        target_limit,
+                    )
+                    station.total_grid_capacity_kw = target_limit
+                    db.commit()
+
+                # Chia lại công suất qua Fair-Share S-43
+                try:
+                    trigger_rebalance_background(station.id)
+                    triggered_stations += 1
+                except Exception:
+                    logger.exception(
+                        "Lỗi kích hoạt rebalance trạm #%s tại ranh giới khung giờ",
+                        station.id,
+                    )
+        return triggered_stations
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Lỗi thực thi check_station_power_limits_boundary_job")
+        return 0
+    finally:
+        if should_close:
+            db.close()
+
+
+def scan_and_create_charger_alerts_job(db: Session = None) -> dict:
+    """Tác vụ định kỳ mỗi 1 phút: Quét trụ ngoại tuyến và lỗi liên tục để tạo cảnh báo (SCRUM-317)."""
+    from app.services.alert_service import (
+        check_connector_errors_burst_and_alert,
+        check_offline_chargers_and_alert,
+    )
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    try:
+        offline_alerts = check_offline_chargers_and_alert(db)
+        burst_alerts = check_connector_errors_burst_and_alert(db)
+        return {
+            "offline_alerts_created": len(offline_alerts),
+            "burst_alerts_created": len(burst_alerts),
+        }
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Lỗi quét cảnh báo trụ ngoại tuyến và lỗi liên tục")
+        return {"offline_alerts_created": 0, "burst_alerts_created": 0}
     finally:
         if should_close:
             db.close()
@@ -414,9 +587,41 @@ def start_scheduler():
             id="flag_abnormal_charging_sessions",
             replace_existing=True,
         )
+        scheduler.add_job(
+            expire_pending_remote_start_requests_job,
+            "interval",
+            minutes=1,
+            id="expire_pending_remote_start_requests",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            reconcile_wallet_ledger_job,
+            "interval",
+            minutes=settings.RECONCILE_INTERVAL_MINUTES,
+            id="reconcile_wallet_ledger",
+            replace_existing=True,
+        )
+        # Job kiểm tra ranh giới khung giờ và chia lại công suất (SCRUM-313)
+        scheduler.add_job(
+            check_station_power_limits_boundary_job,
+            "interval",
+            minutes=1,
+            id="check_station_power_limits_boundary",
+            replace_existing=True,
+        )
+        # Job kiểm tra trụ ngoại tuyến và lỗi liên tục để tạo cảnh báo (SCRUM-317)
+        scheduler.add_job(
+            scan_and_create_charger_alerts_job,
+            "interval",
+            minutes=1,
+            id="scan_and_create_charger_alerts",
+            replace_existing=True,
+        )
         scheduler.start()
         logger.info(
-            "Đã khởi động APScheduler cho các tác vụ định kỳ (Smart Charging 3p, Power Metrics 1p và kiểm tra phiên bất thường 1p)."
+            "Đã khởi động APScheduler cho Smart Charging (3p), Power Metrics (1p), "
+            "phiên bất thường (1p), dọn RemoteStart (1p), đối soát ví (%sp), ranh giới khung giờ (1p) và cảnh báo trụ (1p).",
+            settings.RECONCILE_INTERVAL_MINUTES,
         )
 
 

@@ -3,6 +3,9 @@
 from sqlalchemy import Engine, inspect, text
 
 SQLITE_COLUMN_ADDITIONS = {
+    "wallets": {
+        "is_reconcile_locked": "BOOLEAN NOT NULL DEFAULT 0",
+    },
     "tariffs": {
         "effective_from": "DATETIME NOT NULL DEFAULT '2000-01-01 00:00:00+00'",
         "idle_fee_per_minute": (
@@ -31,7 +34,7 @@ SQLITE_COLUMN_ADDITIONS = {
 
 
 def upgrade_compose_sqlite_schema(engine: Engine) -> list[str]:
-    """Chỉ thêm các cột S-28/S-34 còn thiếu; không xóa hay thay dữ liệu hiện có."""
+    """Bổ sung schema Compose còn thiếu mà không đổi số dư hoặc dòng ledger cũ."""
     if engine.dialect.name != "sqlite":
         return []
 
@@ -67,6 +70,44 @@ def upgrade_compose_sqlite_schema(engine: Engine) -> list[str]:
                 text(
                     "CREATE INDEX IF NOT EXISTS ix_tariffs_effective_from "
                     "ON tariffs (effective_from)"
+                )
+            )
+
+        if "wallet_transactions" in existing_tables:
+            index_names = {
+                index["name"]
+                for index in inspect(connection).get_indexes("wallet_transactions")
+            }
+            if "uq_wallet_transactions_wallet_reference_type" not in index_names:
+                connection.execute(
+                    text(
+                        "CREATE UNIQUE INDEX "
+                        "uq_wallet_transactions_wallet_reference_type "
+                        "ON wallet_transactions "
+                        "(wallet_id, reference_id, transaction_type)"
+                    )
+                )
+
+            connection.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS trg_wallet_transactions_no_update
+                    BEFORE UPDATE ON wallet_transactions
+                    BEGIN
+                        SELECT RAISE(ABORT, 'wallet_transactions is append-only');
+                    END;
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS trg_wallet_transactions_no_delete
+                    BEFORE DELETE ON wallet_transactions
+                    BEGIN
+                        SELECT RAISE(ABORT, 'wallet_transactions is append-only');
+                    END;
+                    """
                 )
             )
 

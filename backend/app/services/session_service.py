@@ -1,10 +1,11 @@
 import asyncio
 import logging
+import os
 from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import text
+from sqlalchemy import func, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -20,9 +21,35 @@ from app.models.wallet import Wallet
 from app.services.audit_service import ghi_nhat_ky
 from app.services.billing import calculate_session_total
 from app.services.billing_segment_service import persist_session_billing_segments
-from app.services.wallet_service import deduct_charging_fee
+from app.services.wallet_service import (
+    WalletInsufficientBalanceException,
+    WalletNegativeBalanceException,
+    auto_deduct_session_payment,
+    deduct_charging_fee,
+    validate_wallet_balance_for_session,
+)
 
 logger = logging.getLogger("ev_csms.session_service")
+
+
+def _ensure_simulation_allowed(user: User, condition: str) -> None:
+    """Chỉ cho mô phỏng hoạt động khi bật cờ và gọi từ ADMIN.
+
+    Ngoại lệ cho tài khoản test chỉ có hiệu lực trong một test pytest đang chạy.
+    """
+    if not condition:
+        return
+    if not settings.ALLOW_REMOTE_START_SIMULATION:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chế độ mô phỏng chưa được bật trên môi trường này.",
+        )
+    running_pytest = settings.TESTING and "PYTEST_CURRENT_TEST" in os.environ
+    if not running_pytest and user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ quản trị viên được dùng chế độ mô phỏng.",
+        )
 
 
 def parse_time_str(time_str: str) -> time:
@@ -34,10 +61,28 @@ def parse_time_str(time_str: str) -> time:
 def determine_tou_rate(tariff: Tariff, check_time: time) -> Decimal:
     """
     Xác định đơn giá điện TOU theo khung giờ:
-    - Giờ cao điểm (PEAK): 09:30 - 11:30 hoặc 17:00 - 20:00
-    - Giờ thấp điểm (OFFPEAK): 22:00 - 04:00 (vắt qua nửa đêm)
-    - Giờ bình thường (NORMAL): Các khung giờ còn lại
+    - Nếu biểu giá có danh sách khung giờ linh hoạt (tariff.periods): ưu tiên khớp theo khung giờ.
+    - Ngược lại fallback về 3 khung giờ mặc định (PEAK / OFFPEAK / NORMAL).
     """
+    periods = getattr(tariff, "periods", None)
+    if periods:
+        cur_min = check_time.hour * 60 + check_time.minute
+        for period in periods:
+            s_parts = period.start_time.split(":")
+            e_parts = period.end_time.split(":")
+            s_min = int(s_parts[0]) * 60 + int(s_parts[1])
+            e_min = (
+                1440
+                if period.end_time == "24:00"
+                else int(e_parts[0]) * 60 + int(e_parts[1])
+            )
+            if e_min > s_min:
+                if s_min <= cur_min < e_min:
+                    return Decimal(str(period.price_per_kwh))
+            elif e_min < s_min:
+                if cur_min >= s_min or cur_min < e_min:
+                    return Decimal(str(period.price_per_kwh))
+
     t = check_time
     peak1_s = parse_time_str(tariff.peak_start)
     peak1_e = parse_time_str(tariff.peak_end)
@@ -61,6 +106,7 @@ def determine_tou_rate(tariff: Tariff, check_time: time) -> Decimal:
 
     # 3. Giờ bình thường
     return tariff.price_normal
+
 
 
 def get_or_create_default_tariff(
@@ -160,25 +206,60 @@ def start_charging_session(
     3. Khóa cổng sạc độc quyền chống Race Condition bằng Atomic Conditional Update.
     4. Chốt đơn giá điện TOU 1 lần tại thời điểm cắm sạc.
     """
-    # 1. Kiểm tra ví người dùng
-    wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
+    # Khóa ví để kiểm tra reconcile lock tuần tự với job đối soát và các giao dịch.
+    wallet_query = db.query(Wallet).filter(Wallet.user_id == user.id)
+    if db.get_bind().dialect.name == "sqlite":
+        # SQLite không hỗ trợ SELECT FOR UPDATE; lấy quyền ghi trước khi đọc.
+        db.execute(
+            update(Wallet)
+            .where(Wallet.user_id == user.id)
+            .values(updated_at=func.now())
+        )
+    wallet = wallet_query.with_for_update().populate_existing().first()
     if not wallet:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy ví tiền người dùng.",
         )
 
-    if wallet.balance < Decimal(0):
+    if wallet.is_reconcile_locked:
         raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=f"Tài khoản đang có số dư âm ({wallet.balance:,.0f} VNĐ). Vui lòng nạp tiền để tiếp tục sạc.",
+            status_code=status.HTTP_423_LOCKED,
+            detail="Ví đang bị khóa giao dịch do số dư không khớp sổ cái. Vui lòng liên hệ quản trị viên.",
         )
 
-    min_start = Decimal(str(settings.MIN_START_BALANCE))
-    if wallet.balance < min_start:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Số dư ví ({wallet.balance:,.0f} VNĐ) không đủ hạn mức tối thiểu {min_start:,.0f} VNĐ để bắt đầu sạc.",
+    # S-38 / SCRUM-265: Thẩm định số dư ví theo quy tắc dùng chung
+    is_valid, error_code, current_balance, threshold = validate_wallet_balance_for_session(
+        db, user.id
+    )
+    if not is_valid:
+        connector_row = db.query(Connector).filter(Connector.id == connector_id).first()
+        cp_id = connector_row.charging_point_id if connector_row else None
+        ghi_nhat_ky(
+            db=db,
+            user_id=user.id,
+            action="SESSION_BLOCKED_INSUFFICIENT_BALANCE",
+            object_type="wallet",
+            object_id=wallet.id,
+            data={
+                "user_id": user.id,
+                "wallet_id": wallet.id,
+                "current_balance": str(current_balance),
+                "required_threshold": str(threshold),
+                "charge_point_id": cp_id,
+                "reason": "Số dư ví dưới ngưỡng tối thiểu",
+            },
+        )
+        db.commit()
+
+        if current_balance < Decimal(0):
+            raise WalletNegativeBalanceException(
+                current_balance=current_balance,
+                required_balance=threshold,
+            )
+        raise WalletInsufficientBalanceException(
+            current_balance=current_balance,
+            required_balance=threshold,
         )
 
     # 2. Kiểm tra tài xế có đang có phiên ACTIVE không
@@ -363,12 +444,11 @@ def stop_charging_session(
     total_amount = billing_total.total_amount
 
     try:
-        # 4. Trừ tiền ví ACID
-        wallet, tx, debt_locked = deduct_charging_fee(
+        # 4. Trừ tiền ví ACID (S-37)
+        wallet, tx, debt_locked = auto_deduct_session_payment(
             db=db,
-            user_id=session.user_id,
-            session_id=session.id,
-            amount=total_amount,
+            session=session,
+            invoice_amount=total_amount,
         )
 
         # 5. Cập nhật phiên sạc
@@ -585,6 +665,7 @@ def remote_stop_charging_session(
 
     # 5. Xử lý các ca lỗi của S-23
     condition = (simulate_condition or "").upper().strip()
+    _ensure_simulation_allowed(user, condition)
 
     # Ca 1: Trụ sạc ngoại tuyến (Offline)
     is_offline = condition == "OFFLINE"
@@ -598,7 +679,7 @@ def remote_stop_charging_session(
         ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Offline"})
         db.commit()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa, vui lòng kiểm tra kết nối mạng của trụ.",
         )
 
@@ -865,6 +946,7 @@ async def remote_start_charging_session(
     from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
 
     condition = (simulate_condition or "").upper().strip()
+    _ensure_simulation_allowed(user, condition)
 
     connector = (
         db.query(Connector)
@@ -880,6 +962,41 @@ async def remote_start_charging_session(
     # Ca 3 của S-24: Đầu nối bận
     if condition == "BUSY" or connector.status != "AVAILABLE":
         raise HTTPException(status_code=409, detail="Đầu nối đang bận hoặc không khả dụng.")
+
+    # S-38 / SCRUM-265: Thẩm định số dư ví theo quy tắc dùng chung
+    is_valid, error_code, current_balance, threshold = validate_wallet_balance_for_session(
+        db, user.id
+    )
+    if not is_valid:
+        wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
+        wallet_id = wallet.id if wallet else None
+        cp_id = connector.charging_point_id if connector else None
+        ghi_nhat_ky(
+            db=db,
+            user_id=user.id,
+            action="SESSION_BLOCKED_INSUFFICIENT_BALANCE",
+            object_type="wallet",
+            object_id=wallet_id,
+            data={
+                "user_id": user.id,
+                "wallet_id": wallet_id,
+                "current_balance": str(current_balance),
+                "required_threshold": str(threshold),
+                "charge_point_id": cp_id,
+                "reason": "Số dư ví dưới ngưỡng tối thiểu",
+            },
+        )
+        db.commit()
+
+        if current_balance < Decimal(0):
+            raise WalletNegativeBalanceException(
+                current_balance=current_balance,
+                required_balance=threshold,
+            )
+        raise WalletInsufficientBalanceException(
+            current_balance=current_balance,
+            required_balance=threshold,
+        )
 
     # Kiểm tra kết nối OCPP chỉ khi không phải chế độ mô phỏng
     if not condition:
@@ -1044,7 +1161,7 @@ async def remote_stop_charging_session_ocpp(
             raise HTTPException(status_code=400, detail=f"Phiên sạc không ở trạng thái đang sạc (trạng thái hiện tại: {session.status}).")
     code = connector.charging_point.code if connector and connector.charging_point else None
     if not code or code not in active_ocpp_connections:
-        raise HTTPException(status_code=400, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.")
+        raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.")
 
     waiter = register_stop_transaction_waiter(session.transaction_id)
     try:
@@ -1054,7 +1171,7 @@ async def remote_stop_charging_session_ocpp(
             )
         except ConnectionError as exc:
             # Không gửi được lệnh -> không ghi "result từ trụ".
-            raise HTTPException(status_code=400, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.") from exc
+            raise HTTPException(status_code=409, detail="Trụ sạc đang ngoại tuyến (Offline). Không thể gửi lệnh dừng từ xa.") from exc
         except TimeoutError as exc:
             session.needs_review = True
             ghi_nhat_ky(db, user_id=user.id, action="RemoteStopTransaction", object_type="charging_session", object_id=session.id, data={"result": "Timeout"})

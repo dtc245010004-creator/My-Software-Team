@@ -15,6 +15,9 @@ if str(BACKEND_DIR) not in sys.path:
 TEST_DB_FILE = Path.cwd() / f".pytest-ev-csms-{uuid4().hex}.db"
 TEST_DATABASE_URL = f"sqlite:///{TEST_DB_FILE.as_posix()}"
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["ALLOW_REMOTE_START_SIMULATION"] = "true"
+os.environ["TESTING"] = "true"
+os.environ["ENABLE_DEMO_ACCOUNTS"] = "false"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -53,7 +56,10 @@ def db_session():
 def pytest_unconfigure(config):
     """Close the engine and remove only this pytest run's temporary database."""
     test_engine.dispose()
-    TEST_DB_FILE.unlink(missing_ok=True)
+    try:
+        TEST_DB_FILE.unlink(missing_ok=True)
+    except PermissionError:
+        pass
 
 
 @pytest.fixture(scope="function")

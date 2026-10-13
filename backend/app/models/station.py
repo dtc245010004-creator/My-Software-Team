@@ -8,10 +8,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
+    text,
 )
-from sqlalchemy.orm import relationship, synonym
+from sqlalchemy.orm import backref, relationship, synonym
 
 from app.core.database import Base
 
@@ -32,6 +34,7 @@ class Station(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     total_grid_capacity_kw = Column(Float, nullable=True, default=100.0)
+    max_power_kw = synonym("total_grid_capacity_kw")
     operating_hours = Column(String(100), nullable=True, default="24/7")
     status = Column(String(50), nullable=False, default=StationStatus.ACTIVE.value)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -47,17 +50,21 @@ class Station(Base):
 
     # Relationships
     operator = relationship("User", foreign_keys=[operator_id], lazy="joined")
-    charging_points = relationship(
-        "ChargingPoint",
-        back_populates="station",
-        cascade="all, delete-orphan",
-        lazy="select",
-    )
+    # charging_points được khai báo tự động bằng backref ở ChargingPoint.station
+    # (để tránh SQLAlchemy 2.x không resolve được khi có 2 class cùng map
+    # bảng "charging_points": ChargingPoint + ChargePoint trong charge_point.py)
     power_metrics = relationship(
         "StationPowerMetric",
         back_populates="station",
         cascade="all, delete-orphan",
         lazy="select",
+    )
+    power_limits = relationship(
+        "StationPowerLimit",
+        back_populates="station",
+        cascade="all, delete-orphan",
+        lazy="select",
+        order_by="StationPowerLimit.sort_order",
     )
 
     def __init__(self, **kwargs):
@@ -71,15 +78,14 @@ class ChargingPoint(Base):
         CheckConstraint("max_power_kw > 0", name="ck_charger_max_power_positive"),
     )
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     station_id = Column(
         Integer,
         ForeignKey("stations.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
-    charge_point_id = Column(String(100), nullable=True, index=True)
-    code = Column(String(100), nullable=True, unique=True, index=True)
+    charge_point_id = Column(String(100), nullable=True)
+    code = Column(String(100), nullable=True, unique=True)
     vendor = Column(String(100), nullable=True, default="Generic")
     model = Column(String(100), nullable=True)
 
@@ -105,11 +111,20 @@ class ChargingPoint(Base):
         nullable=True,
     )
 
-    station = relationship("Station", back_populates="charging_points")
+    station = relationship(
+        "Station",
+        backref=backref("charging_points", cascade="all, delete-orphan", lazy="select"),
+        primaryjoin="ChargingPoint.station_id == Station.id",
+    )
     connectors = relationship(
         "Connector",
         back_populates="charging_point",
-        primaryjoin="ChargingPoint.id == Connector.charge_point_id",
+        primaryjoin="and_(ChargingPoint.id == foreign(Connector.charge_point_id))",
+        cascade="all, delete-orphan",
+    )
+    alerts = relationship(
+        "ChargerAlert",
+        back_populates="charging_point",
         cascade="all, delete-orphan",
     )
 
@@ -172,6 +187,7 @@ class Connector(Base):
     idle_ended_at = Column(DateTime(timezone=True), nullable=True)
     max_kw = Column(Float, nullable=True, default=22.0)
     max_power_kw = Column(Float, nullable=True, default=22.0)
+    rated_power_kw = synonym("max_power_kw")
     type = Column(String(50), nullable=True, default="Type 2")
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(
@@ -266,3 +282,82 @@ class StationPowerMetric(Base):
         ):
             kwargs["active_sessions_count"] = kwargs["active_chargers_count"]
         super().__init__(**kwargs)
+
+
+class StationPowerLimit(Base):
+    __tablename__ = "station_power_limits"
+    __table_args__ = (
+        CheckConstraint(
+            "power_limit_kw > 0", name="ck_station_power_limit_positive"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    station_id = Column(
+        Integer,
+        ForeignKey("stations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    start_time = Column(String(5), nullable=False)
+    end_time = Column(String(5), nullable=False)
+    power_limit_kw = Column(Float, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    station = relationship("Station", back_populates="power_limits")
+
+
+class ChargerAlert(Base):
+    __tablename__ = "charger_alerts"
+    __table_args__ = (
+        Index(
+            "uq_charger_alert_open",
+            "charging_point_id",
+            "alert_type",
+            unique=True,
+            postgresql_where=text("status = 'OPEN'"),
+            sqlite_where=text("status = 'OPEN'"),
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    charging_point_id = Column(
+        Integer,
+        ForeignKey("charging_points.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    station_id = Column(
+        Integer,
+        ForeignKey("stations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    alert_type = Column(String(50), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="OPEN", index=True)
+    severity = Column(String(20), nullable=False, default="WARNING")
+    message = Column(String(500), nullable=False)
+    detail_info = Column(String(1000), nullable=True)
+    opened_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_reason = Column(String(255), nullable=True)
+    resolved_by_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    email_sent_at = Column(DateTime(timezone=True), nullable=True)
+
+    charging_point = relationship("ChargingPoint", back_populates="alerts")
+    station = relationship("Station")
+    resolved_by = relationship("User", foreign_keys=[resolved_by_user_id])

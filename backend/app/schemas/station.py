@@ -1,4 +1,5 @@
-from typing import List, Optional
+import math
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -14,7 +15,7 @@ class ConnectorBase(BaseModel):
     )
     connector_type: str = Field(..., description="Chuẩn sạc: CCS2, TYPE_2, CHADEMO")
     max_power_kw: float = Field(
-        ..., gt=0, description="Công suất tối đa của cổng sạc (kW)"
+        ..., gt=0, allow_inf_nan=False, description="Công suất tối đa của cổng sạc (kW)"
     )
 
     @field_validator("connector_type")
@@ -40,8 +41,38 @@ class ConnectorResponse(ConnectorBase):
     status: str
     is_active: bool
     created_at: UTCDateTime
+    rated_power_kw: Optional[float] = None
+    station_is_oversubscribed: Optional[bool] = None
+    station_warning: Optional[str] = None
+    station_warning_message: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ConnectorUpdate(BaseModel):
+    max_power_kw: Optional[float] = Field(
+        default=None, gt=0, allow_inf_nan=False, description="Công suất tối đa (kW)"
+    )
+    rated_power_kw: Optional[float] = Field(
+        default=None, gt=0, allow_inf_nan=False, description="Công suất danh định (kW)"
+    )
+    connector_type: Optional[str] = Field(
+        default=None, description="Chuẩn sạc: CCS2, TYPE_2, CHADEMO"
+    )
+
+    @field_validator("max_power_kw", "rated_power_kw", mode="before")
+    @classmethod
+    def validate_power_value(cls, v: Any) -> Optional[float]:
+        if v is None:
+            return None
+        try:
+            val = float(v)
+        except (ValueError, TypeError):
+            raise ValueError("Công suất phải là số lớn hơn 0") from None
+        if math.isnan(val) or math.isinf(val) or val <= 0:
+            raise ValueError("Công suất phải là số lớn hơn 0")
+        return val
+
 
 
 # ==========================================
@@ -183,6 +214,7 @@ class StationUpdate(BaseModel):
     latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
     longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
     total_grid_capacity_kw: Optional[float] = Field(default=None, gt=0)
+    max_power_kw: Optional[float] = Field(default=None, gt=0)
     operating_hours: Optional[str] = None
     status: Optional[str] = None
     operator_id: Optional[int] = Field(
@@ -202,6 +234,56 @@ class StationUpdate(BaseModel):
         return v
 
 
+class StationPowerLimitUpdate(BaseModel):
+    max_power_kw: float = Field(
+        ..., gt=0, allow_inf_nan=False, description="Hạn mức công suất trạm (kW)"
+    )
+
+    @field_validator("max_power_kw", mode="before")
+    @classmethod
+    def validate_power_value(cls, v: Any) -> float:
+        try:
+            val = float(v)
+        except (ValueError, TypeError):
+            raise ValueError("Công suất phải là số lớn hơn 0") from None
+        if math.isnan(val) or math.isinf(val) or val <= 0:
+            raise ValueError("Công suất phải là số lớn hơn 0")
+        return val
+
+
+class StationPowerLimitCreate(BaseModel):
+    start_time: str
+    end_time: str
+    power_limit_kw: float = Field(
+        ..., gt=0, allow_inf_nan=False, description="Hạn mức công suất theo khung (kW)"
+    )
+    sort_order: int = 0
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_time(cls, value: str, info):
+        from app.services.tariff_validation import time_to_minutes
+
+        try:
+            time_to_minutes(value, allow_day_end=info.field_name == "end_time")
+        except ValueError as exc:
+            raise ValueError(f"Trường {info.field_name}: {exc}") from exc
+        return value
+
+
+class StationPowerLimitResponse(StationPowerLimitCreate):
+    id: int
+    station_id: int
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StationPowerLimitsUpdate(BaseModel):
+    limits: List[StationPowerLimitCreate]
+
+
 class StationResponse(StationBase):
     id: int
     operator_id: Optional[int] = None
@@ -212,9 +294,12 @@ class StationResponse(StationBase):
     charging_points: List[ChargingPointResponse] = Field(default_factory=list)
 
     # Chỉ số tính toán tại tầng Station (Station vs Chargers - Oversubscription)
+    max_power_kw: Optional[float] = None
     total_installed_power_kw: float = 0.0
     oversubscription_ratio: float = 0.0
     is_oversubscribed: bool = False
+    warning: Optional[str] = None
+    warning_message: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -344,7 +344,7 @@ class TestSessionLifecycle:
                 session_id=session.id,
                 simulate_condition="OFFLINE",
             )
-        assert exc_offline.value.status_code == 400
+        assert exc_offline.value.status_code == 409
         assert "ngoại tuyến" in exc_offline.value.detail.lower()
 
         # Ca 2: Trụ từ chối (Rejected)

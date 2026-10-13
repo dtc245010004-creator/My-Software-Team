@@ -113,7 +113,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-`backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; head hiện tại là `d8f56c4a911e`. Các migration S-33 (`session_billing_segments` và snapshot chi tiết phí idle) đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL Compose tạm. DB dự án chưa được migrate. Trước khi nâng cấp môi trường thật, sao lưu cơ sở dữ liệu đích theo đúng loại backend.
+`backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; `alembic heads` ngày 10/10/2026 trả một head `e72b461d9ac3`, nối `5f9249bf58da` và `d8f56c4a911e`. Lượt kiểm tra này chỉ liệt kê head, không chạy upgrade/downgrade. DB dự án không bị migrate. Trước khi nâng cấp môi trường thật, sao lưu cơ sở dữ liệu đích theo đúng loại backend.
 
 ---
 
@@ -173,6 +173,7 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `LOCKOUT_DURATION_MINUTES` | Integer | `15` | Thời gian khóa tạm thời tài khoản tính theo phút |
 | `NEGATIVE_BALANCE_LIMIT` | Integer | `-300000` | Ngưỡng số dư ví kích hoạt khóa tài khoản (-300.000 VND) |
 | `MAX_SAFE_DEBT_LIMIT` | Integer | `-500000` | Hạn mức CSDL CheckConstraint chặn cứng chống tràn (-500.000 VND) |
+| `RECONCILE_INTERVAL_MINUTES` | Integer | `15` | Chu kỳ job so sánh tổng sổ cái với số dư từng ví; ví lệch bị khóa giao dịch mới |
 | `BACKEND_CORS_ORIGINS` | JSON List | `["http://localhost:5173", ...]` | Danh sách origin trình duyệt được phép gọi API |
 | `ENABLE_DEMO_ACCOUNTS` | Boolean | Compose phát triển: `true`; staging: không bật | Đồng bộ tài khoản demo chỉ cho stack phát triển; không bật trên staging |
 | `GEMINI_API_KEY` | String | `""` | Khóa API dịch vụ AI Google Gemini (tùy chọn) |
@@ -181,6 +182,8 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `OCPP_CALL_TIMEOUT_SECONDS` | Float | `30.0` | Thời gian chờ CALL do CSMS gửi xuống trụ khi không truyền timeout riêng (giây) |
 | `ABNORMAL_SESSION_THRESHOLD_SECONDS` | Integer | `500` | Ngưỡng thời gian không nhận liên lạc trước khi job gắn cờ phiên đang sạc bất thường (giây); job không tự đóng phiên |
 | `IDLE_FEE_MAX_MINUTES` | Integer | `240` | Trần số phút chịu phí chiếm trụ trong một phiên, sau khi trừ thời gian ân hạn |
+| `ALLOW_REMOTE_START_SIMULATION` | Boolean | `false` | Tắt mô phỏng RemoteStart/RemoteStop theo mặc định; chỉ ADMIN có thể dùng khi chủ động bật cấu hình |
+| `TESTING` | Boolean | `false` | Cờ kiểm thử; không tự mở mô phỏng nếu không có một test pytest đang chạy; không bật trong triển khai |
 
 ---
 

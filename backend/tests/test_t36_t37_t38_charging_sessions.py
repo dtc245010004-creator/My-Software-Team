@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
 from app.models.id_tag import IdTag
+from app.models.meter_value import MeterValue
 from app.models.orphan_message import OrphanMessage
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
@@ -324,7 +326,7 @@ def test_t37_start_transaction_concurrency_abnormal_closure(db_session: Session)
         .one()
     )
     assert s1.status == "ABNORMAL"
-    assert s1.stop_reason == "EmergencyStop"
+    assert s1.stop_reason == "Other"
     assert s1.stop_time is not None
 
     # Phiên 2 đang CHARGING
@@ -507,6 +509,93 @@ def test_t38_stop_transaction_idempotent(db_session: Session):
     # Vẫn giữ nguyên kết quả của lần stop đầu tiên
     assert float(session.total_kwh) == 10.0
     assert session.meter_stop == 20000
+
+
+def test_t38_stop_transaction_persists_transaction_data_once(db_session: Session):
+    """StopTransaction lưu mẫu số đo hợp lệ và không nhân đôi khi phát lại."""
+    fx = _create_test_fixture(db_session)
+    started = handle_start_transaction(
+        db_session,
+        fx["cp"],
+        {
+            "connectorId": 1,
+            "idTag": "TAG-VALID-01",
+            "meterStart": 10000,
+            "timestamp": "2026-10-04T10:00:00Z",
+        },
+    )
+    transaction_id = started["transactionId"]
+    payload = {
+        "transactionId": transaction_id,
+        "meterStop": 11000,
+        "timestamp": "2026-10-04T11:00:00Z",
+        "transactionData": [
+            {
+                "timestamp": "2026-10-04T10:30:00Z",
+                "sampledValue": [
+                    {
+                        "value": "10.500000000",
+                        "measurand": "Energy.Active.Import.Register",
+                        "unit": "kWh",
+                    }
+                ],
+            }
+        ],
+    }
+
+    handle_stop_transaction(db_session, fx["cp"], payload)
+    handle_stop_transaction(db_session, fx["cp"], payload)
+
+    readings = (
+        db_session.query(MeterValue)
+        .filter(MeterValue.session_id == transaction_id)
+        .all()
+    )
+    assert len(readings) == 1
+    assert readings[0].measurand == "Energy.Active.Import.Register"
+    assert readings[0].value == Decimal("10.500000000")
+    assert readings[0].unit == "kWh"
+
+
+def test_t38_stop_transaction_preserves_other_review_flags(db_session: Session):
+    """StopTransaction không tự xóa cờ review có nguyên nhân khác."""
+    fx = _create_test_fixture(db_session)
+    started = handle_start_transaction(
+        db_session,
+        fx["cp"],
+        {
+            "connectorId": 1,
+            "idTag": "TAG-VALID-01",
+            "meterStart": 10000,
+            "timestamp": "2026-10-04T10:00:00Z",
+        },
+    )
+    transaction_id = started["transactionId"]
+    session = (
+        db_session.query(ChargingSession)
+        .filter(ChargingSession.transaction_id == transaction_id)
+        .one()
+    )
+    session.needs_review = True
+    session.is_abnormal = True
+    session.abnormal_reason = "MeterValuesInconsistent"
+    db_session.commit()
+
+    handle_stop_transaction(
+        db_session,
+        fx["cp"],
+        {
+            "transactionId": transaction_id,
+            "meterStop": 11000,
+            "timestamp": "2026-10-04T11:00:00Z",
+        },
+    )
+
+    db_session.refresh(session)
+    assert session.status == "COMPLETED"
+    assert session.needs_review is True
+    assert session.is_abnormal is True
+    assert session.abnormal_reason == "MeterValuesInconsistent"
 
 
 # =====================================================================

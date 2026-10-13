@@ -1,22 +1,29 @@
 from datetime import datetime, timedelta, timezone
- 
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
- 
+
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.core.datetime_utils import VIETNAM_TZ, get_vn_now, to_vn_time
+from app.models.session import ChargingSession
 from app.models.station import Station
 from app.models.tariff import Tariff
 from app.models.tariff_period import TariffPeriod
 from app.models.user import User
 from app.schemas.tariff import TariffCreate, TariffResponse, TariffUpdate
+from app.services.session_service import (
+    determine_tou_rate,
+    get_or_create_default_tariff,
+)
 from app.services.station_service import verify_station_ownership
 from app.services.tariff_validation import validate_periods
- 
+
 router = APIRouter(prefix="/tariffs", tags=["Biểu giá điện linh hoạt (Tariffs)"])
- 
- 
+
+
 def _build_periods(periods) -> list[TariffPeriod]:
     errors = validate_periods(periods)
     if errors:
@@ -30,8 +37,8 @@ def _build_periods(periods) -> list[TariffPeriod]:
         )
         for index, period in enumerate(periods)
     ]
- 
- 
+
+
 def _clone_periods(periods) -> list[TariffPeriod]:
     """Sao chép khung giờ của phiên bản cũ sang phiên bản biểu giá mới."""
     columns = [
@@ -43,8 +50,19 @@ def _clone_periods(periods) -> list[TariffPeriod]:
         TariffPeriod(**{col: getattr(period, col) for col in columns})
         for period in periods
     ]
- 
- 
+
+
+class LiveTariffPeriodItem(BaseModel):
+    start: str
+    end: str
+    price: float
+
+
+class LiveTariffConfigPayload(BaseModel):
+    station_id: int | None = None
+    periods: list[LiveTariffPeriodItem]
+
+
 @router.get(
     "",
     response_model=list[TariffResponse],
@@ -64,8 +82,117 @@ def list_tariffs(
             (Tariff.station_id == station_id) | Tariff.station_id.is_(None)
         )
     return query.all()
- 
- 
+
+
+@router.get(
+    "/live-config",
+    summary="Lấy cấu hình biểu giá nhiều khung giờ đang áp dụng thực tế",
+)
+def get_live_tariff_config(
+    station_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    tariff = get_or_create_default_tariff(db, station_id=station_id)
+    if tariff and tariff.periods:
+        ordered = sorted(tariff.periods, key=lambda p: (p.sort_order, p.id or 0))
+        return {
+            "station_id": tariff.station_id or station_id or 1,
+            "periods": [
+                {
+                    "start": p.start_time,
+                    "end": p.end_time,
+                    "price": float(p.price_per_kwh),
+                }
+                for p in ordered
+            ],
+        }
+
+    base_normal = float(tariff.price_normal) if tariff else 3200.0
+    base_peak = float(tariff.price_peak) if tariff else 4500.0
+    base_offpeak = float(tariff.price_offpeak) if tariff else 2500.0
+    return {
+        "station_id": station_id or 1,
+        "periods": [
+            {"start": "00:00", "end": "06:00", "price": base_offpeak},
+            {"start": "06:00", "end": "18:00", "price": base_normal},
+            {"start": "18:00", "end": "24:00", "price": base_peak},
+        ],
+    }
+
+
+@router.put(
+    "/live-config",
+    summary="Cập nhật trực tiếp biểu giá nhiều khung giờ và đồng bộ ngay cho phiên sạc",
+)
+def update_live_tariff_config(
+    payload: LiveTariffConfigPayload,
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    db: Session = Depends(get_db),
+):
+    if not payload.periods:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phải có ít nhất 1 khung giờ biểu giá.",
+        )
+
+    # Cập nhật trên biểu giá mặc định toàn hệ thống (và biểu giá riêng của trạm nếu có)
+    target_tariffs = (
+        db.query(Tariff)
+        .options(selectinload(Tariff.periods))
+        .filter(Tariff.is_active.is_(True))
+        .all()
+    )
+    if not target_tariffs:
+        default_t = get_or_create_default_tariff(db, station_id=None)
+        target_tariffs = [default_t]
+
+    vn_now_time = get_vn_now().time()
+
+    for t in target_tariffs:
+        if payload.station_id is not None and t.station_id not in (None, payload.station_id):
+            continue
+        db.query(TariffPeriod).filter(TariffPeriod.tariff_id == t.id).delete(
+            synchronize_session=False
+        )
+        new_periods = []
+        for idx, item in enumerate(payload.periods):
+            p_obj = TariffPeriod(
+                tariff_id=t.id,
+                start_time=item.start.strip(),
+                end_time=item.end.strip(),
+                price_per_kwh=Decimal(str(item.price)),
+                sort_order=idx,
+            )
+            db.add(p_obj)
+            new_periods.append(p_obj)
+        t.periods = new_periods
+        db.flush()
+
+        # Tính đơn giá tại đúng thời điểm hiện tại theo khung giờ vừa lưu
+        active_rate = determine_tou_rate(t, vn_now_time)
+        t.price_normal = active_rate
+
+    # Cập nhật luôn applied_price_per_kwh cho các phiên sạc đang chạy (ACTIVE) để Tài xế thấy đổi ngay
+    primary_tariff = get_or_create_default_tariff(db, station_id=payload.station_id)
+    current_rate = determine_tou_rate(primary_tariff, vn_now_time)
+    active_sessions = (
+        db.query(ChargingSession).filter(ChargingSession.status == "ACTIVE").all()
+    )
+    for sess in active_sessions:
+        sess.applied_price_per_kwh = current_rate
+
+    db.commit()
+
+    return {
+        "station_id": payload.station_id or 1,
+        "applied_price_now": float(current_rate),
+        "periods": [
+            {"start": item.start, "end": item.end, "price": item.price}
+            for item in payload.periods
+        ],
+    }
+
+
 @router.get(
     "/{tariff_id}",
     response_model=TariffResponse,

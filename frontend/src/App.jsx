@@ -75,6 +75,13 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
             }
           />
+          {/* Return URL / Callback từ cổng thanh toán Sandbox (SCRUM-239 & SCRUM-240) */}
+          <Route
+            path="/wallet/topup/result"
+            element={
+              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
+            }
+          />
           <Route path="/sessions" element={<Sessions />} />
           {/* Danh sách phiên bất thường trên màn hình vận hành (SCRUM-52 / SCRUM-148): Chỉ Vận hành viên (OPERATOR) và Kế toán (ACCOUNTANT) */}
           <Route

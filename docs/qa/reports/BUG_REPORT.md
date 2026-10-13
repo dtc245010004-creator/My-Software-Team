@@ -49,15 +49,26 @@
 
 ### BUG-07: Migration lịch sử tạo trùng cột `charging_points.last_seen_at` khi nâng cấp DB trống
 * **Mức độ nghiêm trọng**: Severity 2 (Major / Migration Blocker).
-* **Mô tả**: Chạy Alembic upgrade toàn chuỗi trên SQLite DB trống thất bại ở revision `5ba0e05433d7` với `sqlite3.OperationalError: duplicate column name: last_seen_at`; cột đã được thêm trước đó trong chuỗi migration. Do đó chưa thể xác nhận nâng cấp mới từ DB trống bằng đường chạy chuẩn.
-* **Bằng chứng / phạm vi**: Tái hiện trên DB tạm ngày 05/10/2026; không chạy trên DB dự án. Migration MeterValues `4a0a1107f87d` đã xác nhận upgrade/downgrade trên DB tạm được stamp tại head hiện tại.
-* **Trạng thái**: **OPEN / REPRODUCED**.
+* **Mô tả**: Lượt chạy ngày 05/10/2026 từng thất bại ở revision `5ba0e05433d7` do trùng `last_seen_at` với `c0062f725df9`.
+* **Trạng thái hiện tại (10/10/2026)**: **SOURCE FIX PRESENT / FRESH-DATABASE UPGRADE NOT VERIFIED**. `c0062f725df9` là migration thêm cột; `5ba0e05433d7` hiện là no-op để giữ lịch sử revision mà không thêm cột lần nữa. `alembic heads` trả một head `e72b461d9ac3`. Chưa chạy chuỗi nâng cấp từ DB trống trong lượt này, nên chưa khẳng định runtime.
+
+### Đối chiếu báo cáo EV CSMS — các lỗi đã sửa trong mã nguồn (10/10/2026, code commit `0bb5f67`)
+
+* **DEFECT-11 — Telemetry màn hình phiên đang sạc**: `frontend/src/services/telemetryClient.js` dùng singleton WebSocket dùng chung thay vì tự mở một socket riêng, nhận sự kiện `TELEMETRY` và ánh xạ `energy_kwh`, `cost_estimate`, `soc`, `temp_c` sang các trường UI đang đọc. **Đã sửa; 39 test frontend passed, build thành công, runtime WebSocket smoke trả `CONNECTED/SUBSCRIBED/PONG`; chưa kiểm tra UI trực quan trên trình duyệt.**
+* **StopTransaction và transactionData**: `backend/app/ocpp/handlers/stop_transaction.py` lưu các mẫu `transactionData` hợp lệ vào bảng `meter_values` hiện có, bỏ qua dữ liệu lặp, và khi StopTransaction hợp lệ đến sau cảnh báo `Available` không có StopTransaction thì xóa đúng cờ review liên quan rồi chốt phiên. Không thêm bảng/migration. **Đã sửa; có kiểm thử hồi quy và toàn bộ backend suite đạt 437 passed.**
+* **Available không có StopTransaction**: `status_notification.py` đánh dấu phiên đang mở cần xem xét thay vì tự chốt hoặc tự lập hóa đơn; job heartbeat giữ nguyên lý do review này. Một StopTransaction hợp lệ đến muộn mới hoàn tất phiên. **Đã sửa; kiểm thử StatusNotification/StopTransaction và full backend suite đạt.**
+* **RemoteStart hết hạn và RemoteStop offline**: scheduler cập nhật request `PENDING` quá hạn thành `EXPIRED` mỗi phút; lỗi đầu nối offline ở RemoteStop trả HTTP 409. **Đã sửa; test chọn lọc và full backend suite đạt.**
+* **Bảo vệ mô phỏng RemoteStart/RemoteStop**: mặc định tắt bằng `ALLOW_REMOTE_START_SIMULATION=false`; khi bật, chỉ ADMIN được dùng ngoài một test đang chạy. `TESTING` không tự nó mở quyền mô phỏng. **Đã sửa; có kiểm thử role/cấu hình và default Compose vẫn tắt mô phỏng.**
+* **Hành vi phụ trợ**: StartTransaction đóng phiên cũ bị phát hiện là `ABNORMAL` với lý do trung tính `Other`; màn hình phiên trống của tài xế có đường dẫn sang bản đồ; Docker Compose gắn tag cho image simulator. **Đã sửa; backend/frontend tests và build, Compose health smoke đều đạt.**
+* **Không áp dụng đề xuất tạo phiên giả cho idTag không hợp lệ**: handler hiện từ chối giao dịch không hợp lệ; tạo transaction/session giả sẽ làm sai dữ liệu phiên và tài chính. Chưa có yêu cầu giao thức được xác minh để đổi hành vi này.
+* **Audit log append-only**: migration có sẵn trigger cho PostgreSQL và SQLite; không tạo migration trùng. Chưa kiểm tra trạng thái migration của DB đang chạy.
+* **Kiểm chứng tổng thể**: Full backend suite trong Docker đạt **437 passed, 307 warnings**; frontend đạt **39 passed**, build thành công (cảnh báo bundle >500 kB); Compose health/frontend HTTP 200 và WebSocket smoke thành công. Ruff báo `All checks passed` nhưng gặp cảnh báo quyền khi quét một số thư mục pytest tạm cũ.
 
 ---
 
 ## 2. Rào cản kỹ thuật & môi trường (Environment Blockers)
 
-1. **Thiếu kịch bản tự động hóa 1-lệnh (Run Script Orchestration)**: Chưa có file `docker-compose.yml` hoặc script PowerShell/Bash ở thư mục gốc để tự động dựng cả backend, frontend và database trong một lệnh duy nhất.
+1. **Kịch bản khởi chạy 1-lệnh**: **ĐÃ KHẮC PHỤC VÀ KIỂM TRA**. `docker-compose.yml` và `run.py` chạy stack phát triển Sprint 1–4; `docker compose config --quiet`, build và khởi động stack thành công ngày 10/10/2026.
 2. **Hạ tầng Staging Cloud chưa thiết lập**: Chưa có cấu hình Infrastructure as Code (`render.yaml`) để tự động đồng bộ mã nguồn lên môi trường chạy thử đám mây.
 3. **Phụ thuộc API Key bên ngoài của AI**: Mô hình phân tích Gemini phụ thuộc vào `GEMINI_API_KEY`. (Hệ thống đã có cơ chế Heuristic Fallback tự động khi không có key, nên không gây gián đoạn hệ thống).
 

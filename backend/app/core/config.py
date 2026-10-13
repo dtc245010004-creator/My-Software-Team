@@ -26,13 +26,21 @@ class Settings(BaseSettings):
 
     # Ví tiền & Ràng buộc tài chính (ACID)
     MIN_START_BALANCE: int = 50000  # 50,000 VND để bắt đầu sạc
+    MIN_WALLET_BALANCE_TO_START_SESSION: int = 50000  # Ngưỡng số dư ví tối thiểu (S-38 / SCRUM-261)
     NEGATIVE_BALANCE_LIMIT: int = -300000  # -300,000 VND hạn mức cho nợ
-    MAX_SAFE_DEBT_LIMIT: int = (
-        -500000
-    )  # -500,000 VND cho CheckConstraint CSDL (khóa ở -300k, chỉ cho tràn tối đa 200k)
+    MAX_SAFE_DEBT_LIMIT: int = -500000  # -500,000 VND cho CheckConstraint CSDL
+    RECONCILE_INTERVAL_MINUTES: int = Field(default=15, gt=0)
     IDLE_FEE_MAX_MINUTES: int = Field(
         default=240, ge=0
     )  # Trần số phút được tính phí chiếm trụ mỗi phiên
+    ALLOW_REMOTE_START_SIMULATION: bool = False
+    TESTING: bool = False
+
+    # Cổng thanh toán Sandbox & Webhook (S-35)
+    TOPUP_MIN_AMOUNT: int = 10000
+    TOPUP_MAX_AMOUNT: int = 50000000
+    SANDBOX_PAYMENT_SECRET: str = "sandbox_secret"
+    PAYMENT_WEBHOOK_SECRET: str = "sandbox_secret"
 
     # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"
@@ -64,6 +72,19 @@ class Settings(BaseSettings):
     HEARTBEAT_INTERVAL_SECONDS: int = 300
     OCPP_CALL_TIMEOUT_SECONDS: float = 30.0
     ABNORMAL_SESSION_THRESHOLD_SECONDS: int = 500
+    REBALANCE_MIN_INTERVAL_SECONDS: int = Field(default=5, gt=0)
+
+    # Cảnh báo trạm & trụ sạc (Story 2: SCRUM-317, SCRUM-319)
+    CHARGER_OFFLINE_ALERT_MINUTES: int = 15
+    CONNECTOR_ERROR_ALERT_THRESHOLD: int = 5
+    CONNECTOR_ERROR_WINDOW_MINUTES: int = 15
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = True
+    ALERT_EMAIL_FROM: str = "alerts@evcsms.vn"
+    ALERT_EMAIL_ADMINS: str = "admin@evcsms.vn"
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(

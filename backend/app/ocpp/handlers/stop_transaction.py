@@ -3,11 +3,12 @@
 import json
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.models.meter_value import MeterValue
 from app.models.orphan_message import OrphanMessage
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
@@ -34,6 +35,78 @@ def parse_timestamp_safe(ts_val: Any) -> datetime | None:
         return dt
     except (ValueError, TypeError):
         return None
+
+
+def _persist_transaction_data(
+    db: Session, session: ChargingSession, transaction_data: Any
+) -> None:
+    """Lưu các mẫu số đo đi kèm StopTransaction vào bảng MeterValue hiện có."""
+    if not isinstance(transaction_data, list):
+        return
+
+    seen: set[tuple[datetime, str, Decimal, str | None]] = set()
+    for meter_value in transaction_data:
+        if not isinstance(meter_value, dict):
+            continue
+        recorded_at = parse_timestamp_safe(meter_value.get("timestamp"))
+        sampled_values = meter_value.get("sampledValue")
+        if recorded_at is None or not isinstance(sampled_values, list):
+            continue
+
+        for sampled_value in sampled_values:
+            if not isinstance(sampled_value, dict):
+                continue
+            measurand = sampled_value.get("measurand")
+            if (
+                not isinstance(measurand, str)
+                or not measurand
+                or len(measurand) > 100
+            ):
+                continue
+            try:
+                value = Decimal(str(sampled_value["value"]))
+            except (KeyError, InvalidOperation, TypeError, ValueError):
+                continue
+            if not value.is_finite():
+                continue
+            try:
+                stored_value = value.quantize(Decimal("0.000000001"))
+            except InvalidOperation:
+                continue
+            if stored_value != value or abs(value) >= Decimal("1000000000000000"):
+                continue
+
+            unit = sampled_value.get("unit")
+            unit = unit if isinstance(unit, str) else None
+            if unit is not None and len(unit) > 20:
+                continue
+            key = (recorded_at, measurand, value, unit)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            existing_query = db.query(MeterValue.id).filter(
+                MeterValue.session_id == session.id,
+                MeterValue.measurand == measurand,
+                MeterValue.value == value,
+                MeterValue.recorded_at == recorded_at,
+            )
+            if unit is None:
+                existing_query = existing_query.filter(MeterValue.unit.is_(None))
+            else:
+                existing_query = existing_query.filter(MeterValue.unit == unit)
+            if existing_query.first() is not None:
+                continue
+
+            db.add(
+                MeterValue(
+                    session_id=session.id,
+                    measurand=measurand,
+                    value=stored_value,
+                    unit=unit,
+                    recorded_at=recorded_at,
+                )
+            )
 
 
 def handle_stop_transaction(
@@ -88,12 +161,15 @@ def handle_stop_transaction(
         db.commit()
         return {"idTagInfo": {"status": "Accepted"}}
 
+    _persist_transaction_data(db, session, payload.get("transactionData"))
+
     # 3. Idempotency: Nếu phiên đã COMPLETED trước đó thì trả kết quả ngay
     if session.status == "COMPLETED":
         logger.info(
             "StopTransaction lặp lại trên phiên đã hoàn tất: transactionId=%s",
             transaction_id,
         )
+        db.commit()
         return {"idTagInfo": {"status": "Accepted"}}
 
     # 4. Tính toán điện năng tiêu thụ (Task T-39)
@@ -120,6 +196,14 @@ def handle_stop_transaction(
     else:
         # Số đo hợp lệ
         session.status = "COMPLETED"
+        had_available_without_stop_review = (
+            session.abnormal_reason
+            == "StatusNotificationAvailableWithoutStopTransaction"
+        )
+        if had_available_without_stop_review:
+            session.is_abnormal = False
+            session.abnormal_reason = None
+            session.needs_review = False
         decimal_kwh = Decimal(str(kwh))
         session.total_kwh = decimal_kwh
         session.meter_stop = meter_stop_val

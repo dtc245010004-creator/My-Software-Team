@@ -131,6 +131,8 @@ def enrich_charger_response(charger: ChargingPoint) -> ChargingPointResponse:
     connectors_resp = [
         ConnectorResponse.model_validate(c) for c in charger.connectors if c.is_active
     ]
+    for c_resp, c_model in zip(connectors_resp, [c for c in charger.connectors if c.is_active]):
+        c_resp.rated_power_kw = c_model.max_power_kw
     total_connector_power = round(sum(c.max_power_kw for c in connectors_resp), 2)
     is_power_sharing = charger.power_sharing_enabled and (
         total_connector_power > charger.max_power_kw
@@ -170,7 +172,22 @@ def enrich_station_response(station: Station) -> StationResponse:
     chargers_resp = [
         enrich_charger_response(cp) for cp in station.charging_points if cp.is_active
     ]
-    total_installed_power = round(sum(cp.max_power_kw for cp in chargers_resp), 2)
+    # S-42: Tính tổng công suất lắp đặt theo các ĐẦU NỐI (Connectors). Nếu trụ chưa khai báo đầu nối thì lấy theo trụ.
+    total_power = 0.0
+    for cp in chargers_resp:
+        active_conns = [conn for conn in cp.connectors if conn.is_active]
+        if active_conns:
+            total_power += sum(
+                (
+                    conn.rated_power_kw
+                    if conn.rated_power_kw is not None
+                    else conn.max_power_kw
+                )
+                for conn in active_conns
+            )
+        else:
+            total_power += float(cp.max_power_kw or 0.0)
+    total_installed_power = round(total_power, 2)
     oversubscription_ratio = (
         round(total_installed_power / station.total_grid_capacity_kw, 2)
         if station.total_grid_capacity_kw > 0
@@ -181,9 +198,16 @@ def enrich_station_response(station: Station) -> StationResponse:
     resp = StationResponse.model_validate(station)
     resp.owner_id = resp.operator_id
     resp.charging_points = chargers_resp
+    resp.max_power_kw = station.total_grid_capacity_kw
     resp.total_installed_power_kw = total_installed_power
     resp.oversubscription_ratio = oversubscription_ratio
     resp.is_oversubscribed = is_oversubscribed
+    if is_oversubscribed:
+        resp.warning = "OVER_SUBSCRIPTION_WARNING"
+        resp.warning_message = "Trạm đang quá đăng ký"
+    else:
+        resp.warning = None
+        resp.warning_message = None
     return resp
 
 

@@ -46,7 +46,36 @@ def handle_authorize(
         elif not charging_point.station.is_active:
             status = "Blocked"
         else:
-            status = "Accepted"
+            # S-38 / SCRUM-265: Thẩm định số dư ví theo quy tắc dùng chung
+            from app.models.wallet import Wallet
+            from app.services.audit_service import ghi_nhat_ky
+            from app.services.wallet_service import validate_wallet_balance_for_session
+
+            is_valid, error_code, current_balance, threshold = (
+                validate_wallet_balance_for_session(db, id_tag.user_id)
+            )
+            if not is_valid:
+                status = "Blocked"
+                wallet = db.query(Wallet).filter(Wallet.user_id == id_tag.user_id).first()
+                wallet_id = wallet.id if wallet else None
+                ghi_nhat_ky(
+                    db=db,
+                    user_id=id_tag.user_id,
+                    action="SESSION_BLOCKED_INSUFFICIENT_BALANCE",
+                    object_type="wallet",
+                    object_id=wallet_id,
+                    data={
+                        "user_id": id_tag.user_id,
+                        "wallet_id": wallet_id,
+                        "current_balance": str(current_balance),
+                        "required_threshold": str(threshold),
+                        "charge_point_id": charging_point.id,
+                        "reason": "Số dư ví dưới ngưỡng tối thiểu",
+                    },
+                )
+                db.commit()
+            else:
+                status = "Accepted"
 
     id_tag_info: dict[str, Any] = {"status": status}
     if id_tag is not None and id_tag.expiry_date is not None:

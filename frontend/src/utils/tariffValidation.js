@@ -99,3 +99,113 @@ export const validateTariffPeriods = (periods) => {
   return { isValid, errorsByIndex, gaps, overlaps, segments };
 };
 
+/**
+ * Kiểm tra 2 khung giờ [startA, endA) và [startB, endB) có bị chồng lấp (overlap) không (SCRUM-294 / SCRUM-314).
+ * Hỗ trợ cả trường hợp startTime < endTime trong cùng ngày.
+ */
+export const isTimeOverlapping = (slotA, slotB) => {
+  if (!slotA?.startTime || !slotA?.endTime || !slotB?.startTime || !slotB?.endTime) {
+    return false;
+  }
+
+  const startA = timeToMinutes(slotA.startTime);
+  const endA = slotA.endTime === '24:00' ? 1440 : timeToMinutes(slotA.endTime);
+  const startB = timeToMinutes(slotB.startTime);
+  const endB = slotB.endTime === '24:00' ? 1440 : timeToMinutes(slotB.endTime);
+
+  if ([startA, endA, startB, endB].some((v) => Number.isNaN(v))) {
+    return false;
+  }
+
+  if (startA >= endA || startB >= endB) {
+    return false;
+  }
+
+  return startA < endB && startB < endA;
+};
+
+/**
+ * Kiểm tra danh sách khung giờ hạn mức công suất (SCRUM-294 / SCRUM-314):
+ * 1. startTime < endTime trong cùng một dòng.
+ * 2. maxPowerKw > 0.
+ * 3. Không cho phép các khoảng thời gian bị đè/trùng lên nhau (isTimeOverlapping).
+ */
+export const validatePowerLimitSlots = (slots = []) => {
+  const errorsByIndex = {};
+  let isValid = true;
+
+  if (!Array.isArray(slots) || slots.length === 0) {
+    return {
+      isValid: false,
+      errorsByIndex,
+      globalError: 'Vui lòng thêm ít nhất 1 khung giờ hạn mức công suất.',
+    };
+  }
+
+  slots.forEach((slot, idx) => {
+    const rowErr = {};
+    if (!slot.startTime) {
+      rowErr.startTime = 'Vui lòng chọn giờ bắt đầu.';
+      isValid = false;
+    }
+    if (!slot.endTime) {
+      rowErr.endTime = 'Vui lòng chọn giờ kết thúc.';
+      isValid = false;
+    }
+
+    if (slot.startTime && slot.endTime) {
+      const startMin = timeToMinutes(slot.startTime);
+      const endMin = slot.endTime === '24:00' ? 1440 : timeToMinutes(slot.endTime);
+      if (startMin >= endMin) {
+        rowErr.timeRange = 'Giờ bắt đầu phải nhỏ hơn giờ kết thúc trong cùng một dòng.';
+        isValid = false;
+      }
+    }
+
+    const powerVal = Number(slot.maxPowerKw);
+    if (
+      slot.maxPowerKw === '' ||
+      slot.maxPowerKw === null ||
+      slot.maxPowerKw === undefined ||
+      Number.isNaN(powerVal) ||
+      powerVal <= 0
+    ) {
+      rowErr.maxPowerKw = 'Hạn mức công suất (kW) phải lớn hơn 0.';
+      isValid = false;
+    }
+
+    if (Object.keys(rowErr).length > 0) {
+      errorsByIndex[idx] = rowErr;
+    }
+  });
+
+  for (let i = 0; i < slots.length; i++) {
+    for (let j = i + 1; j < slots.length; j++) {
+      if (isTimeOverlapping(slots[i], slots[j])) {
+        isValid = false;
+        errorsByIndex[i] = {
+          ...(errorsByIndex[i] || {}),
+          overlap: `Khung giờ (${slots[i].startTime} - ${slots[i].endTime}) bị đè lên khung giờ dòng #${
+            j + 1
+          } (${slots[j].startTime} - ${slots[j].endTime}).`,
+        };
+        errorsByIndex[j] = {
+          ...(errorsByIndex[j] || {}),
+          overlap: `Khung giờ (${slots[j].startTime} - ${slots[j].endTime}) bị đè lên khung giờ dòng #${
+            i + 1
+          } (${slots[i].startTime} - ${slots[i].endTime}).`,
+        };
+      }
+    }
+  }
+
+  return {
+    isValid,
+    errorsByIndex,
+    globalError: isValid
+      ? null
+      : 'Vui lòng sửa các lỗi khung giờ hạn mức công suất bên dưới trước khi lưu.',
+  };
+};
+
+
