@@ -720,3 +720,40 @@ def test_station_coordinates_nullable_and_crud(client, db_session, test_users):
         "/api/v1/stations?user_lat=21.0&user_lon=105.8&radius_km=50"
     )
     assert res_distance.status_code == 200
+
+
+def test_list_stations_returns_current_price_per_kwh(client, db_session, test_users):
+    """SCRUM-351 / SCRUM-360: API trả về đơn giá điện hiện tại (current_price_per_kwh)."""
+    st = Station(
+        operator_id=test_users["op_a"].id,
+        name="Trạm Sạc Giá Chuẩn",
+        address="100 Hoàng Quốc Việt, Cầu Giấy, Hà Nội",
+        latitude=21.0450,
+        longitude=105.7950,
+        total_grid_capacity_kw=120.0,
+        status="ACTIVE",
+        is_active=True,
+    )
+    db_session.add(st)
+    db_session.commit()
+
+    # 1. Gọi thường không GPS
+    res = client.get("/api/v1/stations?status=ACTIVE")
+    assert res.status_code == 200
+    data = res.json()
+    matched = [s for s in data if s["id"] == st.id]
+    assert len(matched) == 1
+    assert "current_price_per_kwh" in matched[0]
+    assert matched[0]["current_price_per_kwh"] is not None
+    assert matched[0]["current_price_per_kwh"] > 0
+
+    # 2. Gọi có GPS
+    res_gps = client.get("/api/v1/stations?user_lat=21.04&user_lon=105.79&status=ACTIVE")
+    assert res_gps.status_code == 200
+    data_gps = res_gps.json()
+    matched_gps = [s for s in data_gps if s["id"] == st.id]
+    assert len(matched_gps) == 1
+    assert "current_price_per_kwh" in matched_gps[0]
+    assert matched_gps[0]["current_price_per_kwh"] is not None
+    assert matched_gps[0]["distance_km"] is not None
+

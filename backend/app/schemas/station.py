@@ -295,6 +295,7 @@ class StationResponse(StationBase):
 
     # Chỉ số tính toán tại tầng Station (Station vs Chargers - Oversubscription)
     max_power_kw: Optional[float] = None
+    current_price_per_kwh: Optional[float] = None
     total_installed_power_kw: float = 0.0
     oversubscription_ratio: float = 0.0
     is_oversubscribed: bool = False

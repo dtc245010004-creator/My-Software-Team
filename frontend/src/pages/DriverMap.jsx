@@ -622,6 +622,16 @@ export default function DriverMap() {
           >
             Định vị lại
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={Search}
+            onClick={() => navigate('/driver/stations')}
+            title="Xem danh sách trạm sạc dạng thẻ"
+            className="rounded-full"
+          >
+            Xem dạng danh sách
+          </Button>
         </div>
       </Card>
 
