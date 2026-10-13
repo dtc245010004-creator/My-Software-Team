@@ -582,9 +582,18 @@ async def rebalance_station_power(
 def trigger_rebalance_background(
     station_id: int,
     session_factory: Callable[[], Any] | None = None,
-) -> asyncio.Task:
+) -> asyncio.Task | None:
     """Kích hoạt rebalance trong tác vụ nền với quản lý tham chiếu an toàn."""
-    task = asyncio.create_task(_safe_rebalance_runner(station_id, session_factory))
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        logger.debug(
+            "Không có running asyncio event loop, bỏ qua trigger_rebalance_background cho trạm #%s",
+            station_id,
+        )
+        return None
+
+    task = loop.create_task(_safe_rebalance_runner(station_id, session_factory))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task

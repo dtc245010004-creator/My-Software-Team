@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import math
 from datetime import timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
@@ -12,12 +13,15 @@ from app.api.deps import get_optional_current_user, require_roles
 from app.core.database import get_db
 from app.core.datetime_utils import get_vn_now, to_vn_time
 from app.models.session import ChargingSession
-from app.models.station import ChargingPoint, Connector, Station
+from app.models.station import ChargingPoint, Connector, Station, StationPowerLimit
 from app.models.user import User
 from app.schemas.station import (
     StationCreate,
     StationDistanceResponse,
     StationGridItem,
+    StationPowerLimitCreate,
+    StationPowerLimitResponse,
+    StationPowerLimitsUpdate,
     StationPowerLimitUpdate,
     StationResponse,
     StationTreeItem,
@@ -36,6 +40,8 @@ from app.services.station_service import (
     verify_station_ownership,
 )
 from app.simulator.charging_simulator import simulator_manager
+
+logger = logging.getLogger("ev_csms.stations")
 
 router = APIRouter(prefix="/stations", tags=["Quản lý Trạm sạc (Stations)"])
 
@@ -852,6 +858,108 @@ def set_station_power_limit(
     db.commit()
     db.refresh(station)
     return enrich_station_response(station)
+
+
+@router.get(
+    "/{station_id}/power-limits",
+    response_model=List[StationPowerLimitResponse],
+    summary="Xem danh sách hạn mức công suất theo khung giờ của trạm (SCRUM-312)",
+)
+def get_station_power_limits(
+    station_id: int,
+    db: Session = Depends(get_db),
+):
+    """Lấy danh sách các khung giờ hạn mức công suất đã cài đặt cho trạm."""
+    station = db.query(Station).filter(Station.id == station_id).first()
+    if not station:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
+        )
+    return (
+        db.query(StationPowerLimit)
+        .filter(StationPowerLimit.station_id == station_id)
+        .order_by(StationPowerLimit.sort_order, StationPowerLimit.id)
+        .all()
+    )
+
+
+@router.put(
+    "/{station_id}/power-limits",
+    response_model=List[StationPowerLimitResponse],
+    summary="Cài đặt / Cập nhật hạn mức công suất theo khung giờ của trạm (SCRUM-312)",
+)
+def set_station_power_limits(
+    station_id: int,
+    limits_in: Union[StationPowerLimitsUpdate, List[StationPowerLimitCreate]],
+    current_user: User = Depends(require_roles(["ADMIN", "OPERATOR"])),
+    db: Session = Depends(get_db),
+):
+    """Cập nhật các khung giờ hạn mức công suất cho trạm (phủ kín 24h, không chồng lấn)."""
+    from app.services.smart_charging import trigger_rebalance_background
+    from app.services.tariff_validation import normalize_periods, validate_periods
+
+    station = db.query(Station).filter(Station.id == station_id).first()
+    if not station:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy trạm sạc."
+        )
+
+    verify_station_ownership(station, current_user)
+
+    items = limits_in.limits if isinstance(limits_in, StationPowerLimitsUpdate) else limits_in
+
+    # Xác thực khung giờ bằng logic S-29 đã được tổng quát hóa
+    errors = validate_periods(items, value_field="power_limit_kw")
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=errors
+        )
+
+    # Xóa cấu hình cũ
+    db.query(StationPowerLimit).filter(StationPowerLimit.station_id == station_id).delete(
+        synchronize_session=False
+    )
+
+    new_limits = []
+    for index, item in enumerate(items):
+        sort_order = item.sort_order if item.sort_order != 0 else index
+        limit_obj = StationPowerLimit(
+            station_id=station_id,
+            start_time=item.start_time,
+            end_time=item.end_time,
+            power_limit_kw=float(item.power_limit_kw),
+            sort_order=sort_order,
+        )
+        db.add(limit_obj)
+        new_limits.append(limit_obj)
+
+    # Cập nhật ngay total_grid_capacity_kw theo khung giờ hiện tại
+    vn_now = get_vn_now()
+    cur_minute = vn_now.hour * 60 + vn_now.minute
+    normalized = normalize_periods(items, value_field="power_limit_kw")
+    active_limit_kw = None
+    for seg in normalized:
+        if seg.start_minute <= cur_minute < seg.end_minute:
+            active_limit_kw = seg.power_limit_kw
+            break
+
+    if active_limit_kw is not None:
+        station.total_grid_capacity_kw = active_limit_kw
+
+    db.commit()
+
+    # Kích hoạt rebalance tác vụ nền nếu trạm có phiên sạc
+    try:
+        trigger_rebalance_background(station_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Không thể kích hoạt rebalance ngầm cho trạm #%s: %s", station_id, exc
+        )
+
+    for obj in new_limits:
+        db.refresh(obj)
+
+    return new_limits
 
 
 @router.delete(

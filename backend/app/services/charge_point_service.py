@@ -104,10 +104,18 @@ def scan_and_mark_offline_charge_points(
 def mark_charge_point_online(
     charging_point: ChargingPoint, db: Optional[Session] = None
 ) -> None:
-    """Cập nhật last_seen_at và khôi phục trạng thái Online cho trụ (T-27)."""
+    """Cập nhật last_seen_at và khôi phục trạng thái Online cho trụ (T-27, SCRUM-318)."""
     now = datetime.now(timezone.utc)
     charging_point.last_seen_at = now
     if charging_point.status in ("Offline", "offline", "Unavailable", "unavailable"):
         charging_point.status = "Online"
     if db is not None:
+        try:
+            from app.services.alert_service import (
+                auto_resolve_offline_alert_for_charger,
+            )
+
+            auto_resolve_offline_alert_for_charger(db, charging_point.id, now)
+        except Exception:
+            logger.exception("Lỗi tự động đóng cảnh báo khi trụ %s trực tuyến", charging_point.id)
         db.commit()
