@@ -315,7 +315,7 @@ export function useTopupRealtimeSync({
 // ============================================================================
 
 export default function Wallet() {
-  const { user, token, isGuest, updateGuestName, guestName } = useAuth();
+  const { user, token, isGuest, updateGuestName, guestName, quickSwitch } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -898,6 +898,33 @@ export default function Wallet() {
           </span>
         </div>
       </div>
+
+      {/* Banner hướng dẫn vai trò nếu đang đăng nhập Admin / Kế toán / Chủ trạm */}
+      {user && user.role !== 'CUSTOMER' && (
+        <div className="bg-sky-950/40 border border-sky-500/40 rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-1.5 bg-sky-500/20 text-sky-400 rounded-md">
+              <User className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-semibold text-tech-white">
+                Bạn đang xem ví với tài khoản {user.full_name || user.username} ({user.role}).
+              </p>
+              <p className="text-steel-gray">
+                Để kiểm tra ví và các giao dịch nạp tiền / cước sạc thực tế của Tài xế (driver_vip - Trần Thị Bích Ngọc), bạn có thể chuyển nhanh sang vai trò Tài xế.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => quickSwitch && quickSwitch('CUSTOMER')}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-md transition-colors shrink-0 shadow-sm shadow-emerald-600/30"
+          >
+            <span>Chuyển sang Tài xế (driver_vip)</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Banner thông báo kết quả Callback / Webhook (SCRUM-239, SCRUM-240, SCRUM-245) */}
       {bannerAlert && (

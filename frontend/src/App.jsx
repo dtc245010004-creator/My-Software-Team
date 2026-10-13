@@ -95,19 +95,9 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Simulator /> : <Navigate to={homeRoute} replace />
             }
           />
-          <Route
-            path="/wallet"
-            element={
-              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
-            }
-          />
+          <Route path="/wallet" element={<Wallet />} />
           {/* Return URL / Callback từ cổng thanh toán Sandbox (SCRUM-239 & SCRUM-240) */}
-          <Route
-            path="/wallet/topup/result"
-            element={
-              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
-            }
-          />
+          <Route path="/wallet/topup/result" element={<Wallet />} />
           {/* Lịch sử đặt chỗ và phí quá hạn giữ chỗ (S-50 / SCRUM-354 / SCRUM-378) */}
           <Route path="/reservations" element={<Reservations />} />
           <Route path="/sessions" element={<Sessions />} />
