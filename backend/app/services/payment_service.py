@@ -1,8 +1,13 @@
 import hashlib
 import hmac
+import logging
 import urllib.parse
 
 from app.core.config import settings
+
+logger = logging.getLogger("ev_csms.payments")
+
+_secret_warning_logged = False
 
 
 def build_payment_url(order_code: str, amount: int, return_url: str = "") -> str:
@@ -39,16 +44,32 @@ def verify_webhook_signature(
     secret: str,
 ) -> bool:
     """Xác thực chữ ký HMAC-SHA256 của Webhook Sandbox (SCRUM-269)."""
-    if not signature or not secret:
+    global _secret_warning_logged
+    if not secret:
+        if not _secret_warning_logged:
+            logger.warning(
+                "PAYMENT_WEBHOOK_SECRET is empty or not configured. All webhook signatures will be rejected."
+            )
+            _secret_warning_logged = True
         return False
-    if isinstance(payload_data, str):
-        payload_bytes = payload_data.encode("utf-8")
-    else:
-        payload_bytes = payload_data
-    expected = hmac.new(
-        secret.encode("utf-8"), payload_bytes, hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    if not signature or not isinstance(signature, str):
+        return False
+
+    try:
+        if isinstance(payload_data, str):
+            payload_bytes = payload_data.encode("utf-8")
+        elif isinstance(payload_data, bytes):
+            payload_bytes = payload_data
+        else:
+            payload_bytes = str(payload_data).encode("utf-8")
+
+        expected = hmac.new(
+            secret.encode("utf-8"), payload_bytes, hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(expected, signature)
+    except (TypeError, ValueError, UnicodeError) as exc:
+        logger.debug("Signature comparison error: %s", exc)
+        return False
 
 
 def create_webhook_signature(order_code: str, status: str, secret: str) -> str:

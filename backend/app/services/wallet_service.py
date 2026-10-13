@@ -152,6 +152,9 @@ def topup_wallet(
     amount: Decimal,
     note: str | None = None,
     *,
+    reference_id: str | None = None,
+    reference_type: str = "TOPUP",
+    auto_commit: bool = True,
     full_name: str | None = None,
     actor_id: int | None = None,
     actor_type: str = "USER",
@@ -159,13 +162,26 @@ def topup_wallet(
 ) -> Wallet:
     """Nạp tiền và ghi sổ/audit trong cùng transaction DB.
 
-    Mặc định người nạp là chủ ví. Webhook thanh toán truyền actor_type=SYSTEM
-    để lưu rõ giao dịch được xác nhận bởi hệ thống thanh toán.
+    Mặc định người nạp là chủ ví. Webhook truyền actor_type=SYSTEM và có thể
+    đặt auto_commit=False để gộp số dư, sổ cái, audit và trạng thái đơn.
     """
     user = lock_user_for_sensitive_operation(db, user_id)
     if full_name and full_name.strip():
         user.full_name = full_name.strip()
-    wallet = db.query(Wallet).filter(Wallet.user_id == user_id).first()
+    if db.get_bind().dialect.name == "sqlite":
+        db.execute(
+            update(Wallet)
+            .where(Wallet.user_id == user_id)
+            .values(updated_at=func.now())
+        )
+
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.user_id == user_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if wallet is None:
         wallet = Wallet(
             user_id=user_id,
@@ -181,7 +197,8 @@ def topup_wallet(
         wallet_id=wallet.id,
         amount=amount,
         transaction_type="TOPUP",
-        reference_type="TOPUP",
+        reference_type=reference_type,
+        reference_id=reference_id,
         note=note or "Nạp tiền vào ví điện tử",
     )
     resolved_actor_id = user_id if actor_type == "USER" and actor_id is None else actor_id
@@ -203,8 +220,11 @@ def topup_wallet(
             "ip": client_ip,
         },
     )
-    db.commit()
-    db.refresh(wallet)
+    if auto_commit:
+        db.commit()
+        db.refresh(wallet)
+    else:
+        db.flush()
     return wallet
 
 

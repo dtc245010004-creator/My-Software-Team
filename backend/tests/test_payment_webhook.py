@@ -6,11 +6,10 @@ from app.models.payment import TopupOrder
 from app.models.wallet import Wallet
 
 
-def _signature(order_code: str, status: str) -> str:
+def compute_signature(order_code: str, status: str) -> str:
+    secret_key = settings.PAYMENT_WEBHOOK_SECRET.encode("utf-8")
     data = f"{order_code}|{status}".encode("utf-8")
-    return hmac.new(
-        settings.PAYMENT_WEBHOOK_SECRET.encode("utf-8"), data, hashlib.sha256
-    ).hexdigest()
+    return hmac.new(secret_key, data, hashlib.sha256).hexdigest()
 
 
 def test_payment_webhook_failed_or_cancelled(client, db_session):
@@ -46,7 +45,7 @@ def test_payment_webhook_failed_or_cancelled(client, db_session):
         "order_code": "ORDER_123",
         "status": "FAILED",
         "message": "User insufficient funds in bank",
-        "signature": _signature("ORDER_123", "FAILED"),
+        "signature": compute_signature("ORDER_123", "FAILED"),
     }
 
     response = client.post("/api/v1/payments/webhook", json=payload_failed)
@@ -77,7 +76,7 @@ def test_payment_webhook_failed_or_cancelled(client, db_session):
         "order_code": "ORDER_456",
         "status": "CANCELLED",
         "message": "User cancelled payment",
-        "signature": _signature("ORDER_456", "CANCELLED"),
+        "signature": compute_signature("ORDER_456", "CANCELLED"),
     }
 
     response = client.post("/api/v1/payments/webhook", json=payload_cancel)
@@ -126,8 +125,9 @@ def test_payment_webhook_success_and_idempotency(client, db_session):
         "order_code": "ORDER_789",
         "status": "SUCCESS",
         "message": "Payment successful",
-        "signature": _signature("ORDER_789", "SUCCESS"),
+        "signature": compute_signature("ORDER_789", "SUCCESS"),
     }
+
 
     response = client.post("/api/v1/payments/webhook", json=payload_success)
     assert response.status_code == 200

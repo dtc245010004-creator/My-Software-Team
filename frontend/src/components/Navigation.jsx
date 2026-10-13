@@ -12,6 +12,7 @@ import {
   ScrollText,
   Clock,
   AlertOctagon,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,6 +21,7 @@ export default function Navigation() {
 
   const navItems = [
     { to: '/', label: 'Bảng Điều Khiển', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
+    { to: '/driver/stations', label: 'Tìm Trạm Sạc', icon: Search, roles: ['CUSTOMER'] },
     { to: '/map', label: 'Bản Đồ', icon: MapPin, roles: ['CUSTOMER'] },
     { to: '/stations', label: 'Hạ Tầng Trạm Sạc', icon: BatteryCharging, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/tariffs', label: 'Biểu Giá', icon: Clock, roles: ['ADMIN', 'OPERATOR', 'CPO'] },

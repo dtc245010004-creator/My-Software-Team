@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import func, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_or_driver_guest
@@ -36,6 +37,10 @@ class SandboxSimulationPayload(BaseModel):
     message: str | None = None
 
 
+# Alias hỗ trợ quy chuẩn đặt tên PaymentWebhookRequest
+PaymentWebhookRequest = WebhookPayload
+
+
 def verify_signature(payload: WebhookPayload) -> bool:
     if not payload.signature:
         return False
@@ -54,11 +59,7 @@ async def simulate_sandbox_webhook(
     current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
-    """Ký callback sandbox tại server, chỉ bật khi cấu hình cho phép.
-
-    Trình duyệt không được nhận hoặc tự tạo chữ ký bằng secret. Endpoint chỉ
-    xử lý đơn PENDING thuộc chính tài khoản đang đăng nhập.
-    """
+    """Ký callback sandbox phía server cho đơn PENDING của tài khoản hiện tại."""
     if not settings.ALLOW_PAYMENT_SANDBOX_SIMULATION:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -82,7 +83,6 @@ async def simulate_sandbox_webhook(
             "order_code": order.order_code,
         }
 
-    message = payload.message or "Phản hồi mô phỏng từ cổng thanh toán Sandbox"
     signature = create_webhook_signature(
         order.order_code,
         payload.status,
@@ -93,7 +93,7 @@ async def simulate_sandbox_webhook(
         payload=WebhookPayload(
             order_code=order.order_code,
             status=payload.status,
-            message=message,
+            message=payload.message or "Phản hồi mô phỏng từ cổng thanh toán Sandbox",
             signature=signature,
         ),
         db=db,
@@ -107,15 +107,17 @@ async def payment_webhook(
     db: Session = Depends(get_db),
 ):
     # 1. Trích xuất Client IP (SCRUM-269, SCRUM-273)
+    client_ip = request.client.host if request.client else "unknown"
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         client_ip = forwarded.split(",")[0].strip()
-    else:
-        client_ip = request.client.host if request.client else "unknown"
 
     # 2. Xác thực chữ ký: Nếu thiếu hoặc sai -> Trả 401, không đổi số dư, ghi log cảnh báo kèm IP
-    if not payload.signature:
-        logger.warning("Webhook missing signature from IP: %s", client_ip)
+    if not payload.signature or not payload.signature.strip():
+        logger.warning(
+            "Audit Log - Webhook rejected: status=401, reason=missing_signature, ip=%s",
+            client_ip,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing signature"
         )
@@ -134,7 +136,10 @@ async def payment_webhook(
             logger.debug("Cannot read raw body for webhook verification: %s", exc)
 
     if not is_valid:
-        logger.warning("Webhook invalid signature from IP: %s", client_ip)
+        logger.warning(
+            "Audit Log - Webhook rejected: status=401, reason=invalid_signature, ip=%s",
+            client_ip,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature"
         )
@@ -151,6 +156,7 @@ async def payment_webhook(
         db.query(TopupOrder)
         .filter(TopupOrder.order_code == payload.order_code)
         .with_for_update()
+        .populate_existing()
         .first()
     )
     if not order:
@@ -163,57 +169,78 @@ async def payment_webhook(
 
     target_status = payload.status.upper()
 
-    if target_status in ["FAILED", "CANCELLED"]:
-        if order.status == "SUCCESS":
-            logger.info(
-                "Ignoring late negative webhook for successful order=%s status=%s",
-                order.order_code,
-                target_status,
+    # Xử lý đơn hàng đã ở trạng thái kết thúc (Terminal State)
+    if order.status in ["FAILED", "CANCELLED"]:
+        if target_status == "SUCCESS":
+            logger.warning(
+                "Late SUCCESS webhook for terminal order %s", order.order_code
             )
             return {
-                "status": "SUCCESS",
-                "message": "Already processed",
+                "status": order.status,
+                "message": "Order already in terminal state",
                 "order_code": order.order_code,
             }
-        if order.status not in ["FAILED", "CANCELLED"]:
-            order.status = target_status
-            order.failure_reason = payload.message or "Unknown error"
-            db.add(order)
-            db.commit()
-        return {"message": "Webhook processed successfully", "status": order.status}
+        return {
+            "status": order.status,
+            "message": "Already processed",
+            "order_code": order.order_code,
+        }
+
+    if order.status == "SUCCESS":
+        return {
+            "status": "SUCCESS",
+            "message": "Already processed",
+            "order_code": order.order_code,
+        }
+
+    # Đơn hàng đang PENDING (SCRUM-274): Cập nhật trạng thái và số dư
+    if target_status in ["FAILED", "CANCELLED"]:
+        order.status = target_status
+        order.failure_reason = payload.message or "Payment failed"
+        db.add(order)
+        db.commit()
+        return {
+            "status": order.status,
+            "message": "Webhook processed successfully",
+            "order_code": order.order_code,
+        }
 
     if target_status == "SUCCESS":
-        # 4. Check idempotency (SCRUM-270): Đã SUCCESS -> Trả ngay 200 OK, KHÔNG cộng tiền lại
-        if order.status == "SUCCESS":
-            return {
-                "status": "SUCCESS",
-                "message": "Already processed",
-                "order_code": order.order_code,
-            }
-
-        # 5. Đang PENDING (SCRUM-274): Cộng tiền ví qua sổ cái Ledger append-only S-41
-        if order.status == "PENDING":
+        try:
             order.status = "SUCCESS"
             db.add(order)
-            db.flush()
-
             note = f"Nạp tiền từ giao dịch {order.order_code}"
             topup_wallet(
                 db=db,
                 user_id=order.user_id,
                 amount=order.amount,
                 note=note,
+                reference_id=order.order_code,
+                reference_type="TOPUP",
                 actor_type="SYSTEM",
-                client_ip=request.client.host if request.client else None,
+                client_ip=client_ip,
+                auto_commit=False,
             )
-
+            db.commit()
             return {
                 "status": "SUCCESS",
                 "message": "Webhook processed successfully",
                 "order_code": order.order_code,
             }
+        except IntegrityError:
+            db.rollback()
+            logger.warning(
+                "Webhook duplicate transaction detected (race condition) for order: %s",
+                order.order_code,
+            )
+            return {
+                "status": "SUCCESS",
+                "message": "Already processed",
+                "order_code": order.order_code,
+            }
 
     return {"status": "IGNORED", "message": "Ignored"}
+
 
 
 

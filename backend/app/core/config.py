@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     )  # Trần số phút được tính phí chiếm trụ mỗi phiên
     ALLOW_REMOTE_START_SIMULATION: bool = False
     TESTING: bool = False
+    ENVIRONMENT: str = "development"
 
     # Cổng thanh toán Sandbox & Webhook (S-35)
     TOPUP_MIN_AMOUNT: int = 10000
