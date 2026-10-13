@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     ALLOW_REMOTE_START_SIMULATION: bool = False
     TESTING: bool = False
     ENVIRONMENT: str = "development"
+    RECONCILE_TOLERANCE_VND: int = 1000  # Ngưỡng lệch tiền chấp nhận được do làm tròn (S-53)
+    DEFAULT_NO_SHOW_FEE: int = 20000  # Phí giữ chỗ không đến mặc định (VND) (S-50 / SCRUM-374)
+
+
 
     # Cổng thanh toán Sandbox & Webhook (S-35)
     TOPUP_MIN_AMOUNT: int = 10000

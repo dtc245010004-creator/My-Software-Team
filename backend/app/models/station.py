@@ -1,5 +1,6 @@
 import enum
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     text,
 )
@@ -38,9 +40,16 @@ class Station(Base):
     operating_hours = Column(String(100), nullable=True, default="24/7")
     status = Column(String(50), nullable=False, default=StationStatus.ACTIVE.value)
     is_active = Column(Boolean, nullable=False, default=True)
+    no_show_fee = Column(
+        Numeric(12, 2),
+        nullable=False,
+        default=Decimal("20000.00"),
+        server_default="20000.00",
+    )
     created_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
     updated_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

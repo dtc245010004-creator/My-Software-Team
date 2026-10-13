@@ -356,12 +356,53 @@ async def create_reservation(
     )
 
 
+async def send_cancel_reservation_ocpp(
+    charge_point_code: str | None,
+    reservation_id: int,
+) -> bool:
+    """Gửi bản tin CancelReservation xuống trụ sạc một cách an toàn, không chặn luồng nếu trụ offline hoặc lỗi."""
+    if not charge_point_code:
+        return False
+    from app.ocpp.gateway import active_ocpp_connections
+
+    if charge_point_code not in active_ocpp_connections:
+        logger.info(
+            "Trụ %s đang offline, bỏ qua gửi CancelReservation cho reservation_id=%s",
+            charge_point_code,
+            reservation_id,
+        )
+        return False
+
+    try:
+        await send_call_and_wait(
+            charge_point_code=charge_point_code,
+            action="CancelReservation",
+            payload={"reservationId": reservation_id},
+            timeout_seconds=5,
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Không thể gửi CancelReservation tới trụ %s cho reservation %s: %s",
+            charge_point_code,
+            reservation_id,
+            exc,
+        )
+        return False
+
+
 async def cancel_reservation(
     db: Session,
     reservation_id: int,
     user: User,
 ) -> Reservation:
-    """Hủy đặt chỗ trước: giải phóng đầu nối sạc về AVAILABLE và gửi CancelReservation nếu trụ online."""
+    """Hủy đặt chỗ trước (S-51 / SCRUM-380, SCRUM-381):
+    - Kiểm tra quyền sở hữu (chủ đặt chỗ, admin, operator trạm) -> 403 nếu không có quyền.
+    - Kiểm tra còn trước hạn giữ chỗ (`expiry_date > now`) -> 400 nếu đã quá hạn.
+    - Cạnh tranh nguyên tử qua UPDATE có điều kiện (WHERE status='ACTIVE') -> chống race với job expired.
+    - Gửi CancelReservation xuống trụ nếu online, giải phóng đầu nối về AVAILABLE, không tính phí.
+    """
+    now = datetime.now(timezone.utc)
     reservation = (
         db.query(Reservation)
         .filter(Reservation.id == reservation_id)
@@ -373,6 +414,7 @@ async def cancel_reservation(
             detail="Không tìm thấy thông tin đặt chỗ.",
         )
 
+    # SCRUM-380: Phân quyền
     is_owner = reservation.user_id == user.id
     is_admin = user.role == "ADMIN"
     is_operator = False
@@ -385,33 +427,42 @@ async def cancel_reservation(
             detail="Bạn không có quyền hủy đặt chỗ này.",
         )
 
+    # SCRUM-380: Kiểm tra quá hạn
+    exp = reservation.expiry_date
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp <= now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Đặt chỗ đã quá hạn giữ chỗ, không thể hủy.",
+        )
+
     if reservation.status != ReservationStatus.ACTIVE.value:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Không thể hủy đặt chỗ ở trạng thái {reservation.status}.",
         )
 
-    cp = reservation.charging_point
-    if cp:
-        from app.ocpp.gateway import active_ocpp_connections
+    # Cạnh tranh chuyển trạng thái nguyên tử (SCRUM-381 / Chống race với job S-50)
+    updated_rows = db.query(Reservation).filter(
+        Reservation.id == reservation_id,
+        Reservation.status == ReservationStatus.ACTIVE.value,
+    ).update(
+        {
+            Reservation.status: ReservationStatus.CANCELLED.value,
+            Reservation.updated_at: now,
+        },
+        synchronize_session=False,
+    )
+    if updated_rows == 0:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Đặt chỗ đang được xử lý hoặc đã thay đổi trạng thái.",
+        )
 
-        if cp.code in active_ocpp_connections:
-            try:
-                await send_call_and_wait(
-                    charge_point_code=cp.code,
-                    action="CancelReservation",
-                    payload={"reservationId": reservation.id},
-                    timeout_seconds=5,
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Không thể gửi CancelReservation tới trụ %s: %s", cp.code, exc
-                )
-
-    reservation.status = ReservationStatus.CANCELLED.value
-    reservation.updated_at = datetime.now(timezone.utc)
-
-    conn = reservation.connector
+    # Giải phóng đầu nối về AVAILABLE trong DB
+    conn = db.query(Connector).filter(Connector.id == reservation.connector_id).first()
     if conn and conn.status.upper() == "RESERVED":
         conn.status = "AVAILABLE"
         conn.ocpp_status = "Available"
@@ -419,12 +470,132 @@ async def cancel_reservation(
     db.commit()
     db.refresh(reservation)
 
+    cp = reservation.charging_point
+    cp_code = cp.code if cp else None
+    await send_cancel_reservation_ocpp(cp_code, reservation.id)
+
     if cp:
         reservation.charge_point_code = cp.code
     if conn:
         reservation.connector_number = conn.connector_number or conn.connector_id
 
     return reservation
+
+
+async def expire_reservation_atomic(
+    db: Session,
+    reservation_id: int,
+) -> bool:
+    """Xử lý quá hạn cho một lượt đặt chỗ (S-50 / SCRUM-375, 376, 377):
+    - Đổi trạng thái sang EXPIRED bằng UPDATE có điều kiện (WHERE status='ACTIVE').
+    - Trụ nhận CancelReservation (lỗi/timeout không chặn luồng).
+    - Đầu nối mở lại AVAILABLE trong DB.
+    - Khách bị trừ phí không đến (no_show_fee) qua hàm sổ cái post_ledger_entry (S-41) với reference idempotent.
+    """
+    now = datetime.now(timezone.utc)
+    # 1. Update trạng thái nguyên tử
+    updated_rows = db.query(Reservation).filter(
+        Reservation.id == reservation_id,
+        Reservation.status == ReservationStatus.ACTIVE.value,
+    ).update(
+        {
+            Reservation.status: ReservationStatus.EXPIRED.value,
+            Reservation.updated_at: now,
+        },
+        synchronize_session=False,
+    )
+    if updated_rows == 0:
+        return False
+
+    res = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+    if not res:
+        return False
+
+    # 2. Giải phóng đầu nối về AVAILABLE
+    conn = db.query(Connector).filter(Connector.id == res.connector_id).first()
+    if conn and conn.status.upper() == "RESERVED":
+        conn.status = "AVAILABLE"
+        conn.ocpp_status = "Available"
+
+    # 3. Tính phí không đến theo cấu hình trạm hoặc mặc định hệ thống (SCRUM-374)
+    station = None
+    if res.charging_point and res.charging_point.station:
+        station = res.charging_point.station
+    elif conn and conn.charging_point and conn.charging_point.station:
+        station = conn.charging_point.station
+
+    fee_amount = Decimal(str(settings.DEFAULT_NO_SHOW_FEE))
+    if station and getattr(station, "no_show_fee", None) is not None:
+        fee_amount = Decimal(str(station.no_show_fee))
+
+    # 4. Trừ phí ví qua hàm sổ cái chung post_ledger_entry (SCRUM-377 / S-41)
+    if fee_amount > Decimal("0"):
+        from app.models.wallet import Wallet
+        from app.services.wallet_service import post_ledger_entry
+
+        wallet = db.query(Wallet).filter(Wallet.user_id == res.user_id).first()
+        if wallet:
+            try:
+                post_ledger_entry(
+                    db=db,
+                    wallet_id=wallet.id,
+                    amount=-fee_amount,  # CHARGE_FEE âm
+                    transaction_type="CHARGE_FEE",
+                    reference_id=f"reservation_{res.id}",
+                    reference_type="RESERVATION_NO_SHOW",
+                    note=f"Phí phạt giữ chỗ không đến cho lượt đặt #{res.id}",
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Lỗi khi trừ phí không đến lượt đặt %s của ví %s",
+                    res.id,
+                    wallet.id,
+                )
+
+
+
+    db.commit()
+
+    # 5. Gửi CancelReservation xuống trụ nếu online (SCRUM-376)
+    cp_code = res.charging_point.code if res.charging_point else None
+    await send_cancel_reservation_ocpp(cp_code, res.id)
+
+    logger.info(
+        "Đã xử lý quá hạn đặt chỗ %s: chuyển EXPIRED, trừ phí %s VND",
+        res.id,
+        fee_amount,
+    )
+    return True
+
+
+async def process_expired_reservations_job(db: Session | None = None) -> int:
+    """Job định kỳ quét các đặt chỗ ACTIVE đã quá expiry_date để hủy và trừ phí (SCRUM-375)."""
+    now = datetime.now(timezone.utc)
+    owns_db = False
+    if db is None:
+        from app.core.database import SessionLocal
+        db = SessionLocal()
+        owns_db = True
+
+    try:
+        expired_candidates = (
+            db.query(Reservation.id)
+            .filter(
+                Reservation.status == ReservationStatus.ACTIVE.value,
+                Reservation.expiry_date <= now,
+            )
+            .all()
+        )
+        count = 0
+        for (res_id,) in expired_candidates:
+            success = await expire_reservation_atomic(db, res_id)
+            if success:
+                count += 1
+        return count
+    finally:
+        if owns_db:
+            db.close()
+
 
 
 def get_my_reservations(
