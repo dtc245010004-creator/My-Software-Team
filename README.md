@@ -49,18 +49,20 @@ npm run dev
 - Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
 
 ### Cách 2: Khởi chạy toàn bộ hệ thống bằng Docker Compose
-`link tải docker desktop: https://www.docker.com/products/docker-desktop/`
+**Tải Docker Desktop:** [Windows x64 (AMD64)](https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe) · [Windows ARM64](https://desktop.docker.com/win/main/arm64/Docker%20Desktop%20Installer.exe) · [Chọn nền tảng khác](https://www.docker.com/products/docker-desktop/).
 
-Mở terminal tại thư mục gốc. Compose tự nhận `docker-compose.yml`; tên project dùng chung `ev-csms` cho toàn bộ Sprint 1–4(maybe). Hai volume dữ liệu phát triển hiện có vẫn được giữ nguyên.
+Sau khi cài đặt, mở Docker Desktop và chờ Docker Engine khởi động. Mở terminal tại thư mục gốc của project rồi chạy:
 
 ```powershell
-
+docker compose up -d --build
 docker compose ps
 ```
 
+Compose tự nhận `docker-compose.yml` và dùng tên project `ev-csms`; không cần chỉ định `-f` hoặc `--project-name`. Các volume dữ liệu có tên cố định trong file Compose nên vẫn được dùng lại giữa các lần chạy.
+
 - Giao diện: `http://localhost:8080`
 - API Swagger: `http://localhost:8001/docs`
-- Backend, frontend, PostgreSQL và 20 trụ OCPP ảo dùng chung một cấu hình cho toàn bộ code Sprint 1–4.
+- Backend, frontend, PostgreSQL và 20 trụ OCPP ảo dùng chung cấu hình hiện tại của project.
 - Tài khoản demo được khởi tạo an toàn khi backend Compose phát triển khởi động.
 - Dừng và giữ dữ liệu: `docker compose down` (không thêm `-v`).
 

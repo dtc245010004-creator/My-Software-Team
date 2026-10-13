@@ -65,6 +65,7 @@
 | 2026-10-13 | S-56 Backend — nhật ký thao tác ví | Audit nạp ví, đối soát/mở khóa và lọc nhật ký theo tài xế | Hoàn thành Backend; đã đẩy lên `Duong` | `backend/app/services/wallet_service.py`, `backend/app/api/v1/endpoints/{wallet.py,payments.py,audit_logs.py}`, `backend/tests/test_wallet_audit_s56.py` | 11 test mới; full backend **557 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Không migration/config mới. Commit `38dd323`. Không có chức năng điều chỉnh ví riêng trong code hiện tại. |
 | 2026-10-13 | S-57 Backend — yêu cầu ẩn danh hóa dữ liệu tài xế | Tạo yêu cầu, kiểm tra điều kiện duyệt, ẩn danh hóa lịch sử và audit | Hoàn thành Backend; chưa commit | `backend/app/api/v1/endpoints/data_erasure.py`, `backend/app/services/data_erasure_service.py`, model/schema/config, migration `cca26ecdf5a8`, `backend/tests/test_data_erasure_s57.py` | Thêm 16 ca; full suite và Ruff được ghi ở nhật ký #19 sau khi hoàn tất. Migration đã chạy upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; không dùng database dự án. Phạm vi dữ liệu cần mentor xác nhận. |
 | 2026-10-13 | Rà soát báo cáo lỗi OCPP và thanh toán | Sửa các lỗi webhook, xác thực ví khi bắt đầu sạc, ghi nợ lúc kết thúc phiên và thông báo thiếu tiền | Hoàn thành; đã kiểm tra toàn bộ backend và frontend | `backend/app/{api/v1/endpoints/payments.py,core/config.py,ocpp/handlers/{start_transaction.py,stop_transaction.py},services/payment_service.py}`, `frontend/src/pages/{Wallet.jsx,ChargerDetail.jsx}`, regression tests | Backend **595 passed, 1 skipped**; Ruff đạt; frontend **52 tests passed**, build đạt. Chi tiết tại nhật ký #21. |
+| 2026-10-13 | README — hướng dẫn Docker Compose | Kiểm tra và sửa liên kết tải Docker Desktop cùng lệnh khởi chạy ở Cách 2 | Hoàn thành | `README.md` | Dùng link cài Windows x64/ARM64 và trang chọn nền tảng chính thức; bổ sung `docker compose up -d --build` trước lệnh xem trạng thái. Người thực hiện: `KimiCoNY`. |
 
 ---
 
@@ -295,4 +296,11 @@
   - Trên màn hình trạm sạc, hiển thị thông báo cụ thể khi ví không đủ tiền và liên kết sang trang ví; luồng nạp sandbox gọi endpoint backend thay vì gửi chữ ký giả từ frontend.
 * **Kiểm thử:** Bổ sung hồi quy cho chữ ký giả, webhook đến muộn, quyền sandbox, ngưỡng số dư khi bắt đầu sạc, ghi nợ/idempotency khi kết thúc phiên và thông báo thiếu tiền phía frontend. Điều chỉnh fixture reconnect để nạp tiền thử nghiệm qua service ví vì StartTransaction giờ kiểm tra số dư thật.
 * **Xác minh:** Toàn bộ backend **595 passed, 1 skipped, 320 warnings** trong 266.46 giây; `ruff check .` đạt; frontend **52 tests passed** và `npm run build` đạt. Build chỉ có cảnh báo chunk JavaScript lớn hơn 500 KB. Không thêm migration.
+
+---
+
+#### 22. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Kiểm tra liên kết tải Docker Desktop và hoàn thiện hướng dẫn “Cách 2” trong README.
+* **Nội dung:** Xác minh trang sản phẩm Docker Desktop chính thức; cập nhật link tải trực tiếp Windows x64 (AMD64), Windows ARM64 và link chọn nền tảng khác. Bổ sung lệnh `docker compose up -d --build` để thật sự khởi động stack trước lệnh `docker compose ps`; ghi rõ chạy từ thư mục gốc và Compose tự nhận `docker-compose.yml`, dùng tên project `ev-csms`.
+* **Kiểm chứng:** Các liên kết tải Windows lấy từ nút Download trên trang Docker Desktop chính thức; không chạy lại stack vì thay đổi chỉ nằm trong hướng dẫn README. Không có migration hay thay đổi code ứng dụng.
 
