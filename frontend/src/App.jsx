@@ -22,6 +22,7 @@ import TariffForm from './components/TariffForm';
 import ChargerDetail from './pages/ChargerDetail';
 import InvoiceDetail from './pages/InvoiceDetail';
 import Reservations from './pages/Reservations';
+import StationReport from './pages/StationReport';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -61,6 +62,16 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Navigate to="/driver/stations" replace /> : <Stations />
             }
           />
+          {/* Màn hình báo cáo doanh thu & sản lượng theo trạm (SCRUM-384 / SCRUM-392) */}
+          <Route
+            path="/reports/revenue"
+            element={
+              ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CPO'].includes(role)
+                ? <StationReport />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
+          <Route path="/reports" element={<Navigate to="/reports/revenue" replace />} />
           <Route
             path="/tariffs"
             element={
