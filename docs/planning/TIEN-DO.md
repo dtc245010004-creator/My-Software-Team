@@ -246,3 +246,16 @@
 * **Kiểm chứng:** `alembic heads` trong Compose trả về duy nhất `f41a0b7c9d22 (head)`; S-44 không thay schema nên không sinh migration. `docker compose config --quiet` đạt. `ruff check .` đạt. Test mục tiêu S-42/S-43/S-44 và scheduler: **33 passed, 10 warnings**. Full backend suite trong Docker: **525 passed, 318 warnings** trong 229.23 giây.
 * **Giới hạn/đề xuất:** `applied_session_limits` còn lưu trong RAM; sau restart có thể mất dấu profile đã hạ tải. Có thể cân nhắc lưu profile áp dụng bền vững. Gateway disconnect chưa đóng phiên trực tiếp; scheduler hiện là nơi phát hiện phiên stale. Fair-share hiện tại vẫn chia đều, chưa dùng water-filling. Không thay các mục này trong phạm vi S-44.
 
+---
+
+#### 17. Ngày 2026-10-13 | Người thực hiện: Kỹ sư Frontend (SCRUM-372 / S-49)
+* **Nhiệm vụ thực hiện:** [FE] Hiện thông báo "đã có người đặt" và danh sách trụ gợi ý (Ticket SCRUM-372, thuộc User Story S-49 / SCRUM-353).
+* **Nội dung thực hiện cụ thể:**
+  1. Xây dựng component `ReservationConflictModal.jsx`: Modal thông báo xung đột bằng tiếng Việt chuẩn "Trụ này vừa được người khác đặt", hiển thị danh sách trụ/đầu nối khả dụng gợi ý trong cùng trạm sạc, giữ nguyên giờ tới người dùng đã chọn trước đó, hỗ trợ phím Esc, focus trap, aria, responsive mobile và dark mode.
+  2. Xây dựng dịch vụ `src/services/reservationApi.js`: Ghi rõ hợp đồng API đặt chỗ, kết nối `POST /api/v1/reservations`, `GET /api/v1/reservations/my` và `POST /api/v1/reservations/{id}/cancel`.
+  3. Xây dựng bộ tiện ích `src/utils/reservationUtils.js`: Hàm thuần `mapReservationError` chuẩn hóa lỗi 409 Conflict (`RESERVATION_CONFLICT`), 401, 403, 404/501 ("Chức năng chưa sẵn sàng"), 504 và lỗi mạng. Hàm `normalizeSuggestions` tương thích linh hoạt cả 2 định dạng `suggestions` và `suggested_connectors`. Hàm `createSingleFlightHandler` chống bấm đôi (anti-double-click).
+  4. Viết bộ kiểm thử đơn vị `src/utils/reservationUtils.test.js` với 15 ca test vitest bao phủ toàn diện.
+* **Xác minh kiểm thử:** Vitest full suite đạt **71/71 passed** (100%); Vite build `npm run build` thành công trong 31.53s (0 lỗi).
+* **Ghi chú tiến độ:** Do hộp thoại đặt chỗ ban đầu (Story S-48) chưa tồn tại trên Frontend, component xử lý xung đột đã được chuẩn hóa độc lập nhận dữ liệu qua props, sẵn sàng gắn kết nối ngay khi Story S-48 được tích hợp.
+
+

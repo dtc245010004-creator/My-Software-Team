@@ -115,3 +115,11 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 - `backend/app/services/scheduler_service.py` sau khi commit cờ `is_abnormal` gọi cùng cơ chế theo từng trạm; giữ nguyên trạng thái phiên CHARGING theo hợp đồng scheduler đang có. Gateway disconnect hiện chỉ dọn registry kết nối, không tự đóng phiên; phiên mất kết nối được scheduler phát hiện theo chu kỳ cấu hình.
 - Không cần migration dữ liệu cho S-44. Chưa đổi luật water-filling hay lưu bền `applied_session_limits`; cache này vẫn ở RAM và sẽ mất khi backend khởi động lại.
 - Kiểm tra S-44 trong Docker: `ruff check .` đạt; nhóm S-42/S-43/S-44 và scheduler đạt **33 passed**. Toàn bộ backend `pytest tests -q` đạt **525 passed, 318 warnings** (Python 3.12); không có test thất bại.
+
+## S-48/S-49 Frontend (SCRUM-372) — Thông báo xung đột đặt chỗ & Gợi ý trụ thay thế
+
+- `frontend/src/components/reservation/ReservationConflictModal.jsx`: Modal thông báo "Trụ này vừa được người khác đặt" khi nhận mã lỗi 409 Conflict (RESERVATION_CONFLICT). Hiển thị danh sách gợi ý trụ khả dụng cùng trạm, hỗ trợ phím Esc, focus trap, anti-double-click, responsive mobile và dark mode.
+- `frontend/src/services/reservationApi.js`: API service kết nối endpoint `POST /api/v1/reservations` với đầy đủ hợp đồng API đặt chỗ, danh sách đặt chỗ của tôi `GET /api/v1/reservations/my` và hủy đặt chỗ `POST /api/v1/reservations/{id}/cancel`.
+- `frontend/src/utils/reservationUtils.js`: Hàm thuần `mapReservationError` (chuẩn hóa lỗi 409 Conflict, 401, 403, 404/501 "Chức năng chưa sẵn sàng", 504, network error), `normalizeSuggestions` (hỗ trợ cả schema `suggestions` và `suggested_connectors`), `createSingleFlightHandler` (chống bấm đôi) và `formatSuggestionAvailableTime`.
+- `frontend/src/utils/reservationUtils.test.js`: Bộ kiểm thử đơn vị Vitest gồm 15 ca kiểm thử bao phủ toàn bộ các trường hợp lỗi xung đột, danh sách gợi ý rỗng/hợp lệ và chống gửi trùng request.
+
