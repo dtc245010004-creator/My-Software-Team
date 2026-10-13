@@ -241,3 +241,4 @@ export function formatKwh(val) {
   const num = Number(val) || 0;
   return `${num.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kWh`;
 }
+

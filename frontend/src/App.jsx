@@ -23,6 +23,7 @@ import ChargerDetail from './pages/ChargerDetail';
 import InvoiceDetail from './pages/InvoiceDetail';
 import Reservations from './pages/Reservations';
 import StationReport from './pages/StationReport';
+import ReconciliationReport from './pages/ReconciliationReport';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -72,6 +73,16 @@ function AppLayout() {
             }
           />
           <Route path="/reports" element={<Navigate to="/reports/revenue" replace />} />
+          {/* Màn hình đối soát kế toán kWh với tiền đã thu (SCRUM-385 / SCRUM-397) */}
+          <Route
+            path="/reconciliation"
+            element={
+              ['ADMIN', 'ACCOUNTANT'].includes(role)
+                ? <ReconciliationReport />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
+          <Route path="/reports/reconciliation" element={<Navigate to="/reconciliation" replace />} />
           <Route
             path="/tariffs"
             element={

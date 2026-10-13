@@ -14,6 +14,7 @@ import {
   AlertOctagon,
   Search,
   BarChart3,
+  Scale,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -26,6 +27,7 @@ export default function Navigation() {
     { to: '/map', label: 'Bản Đồ', icon: MapPin, roles: ['CUSTOMER'] },
     { to: '/stations', label: 'Hạ Tầng Trạm Sạc', icon: BatteryCharging, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/reports/revenue', label: 'Báo Cáo Doanh Thu', icon: BarChart3, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CPO'] },
+    { to: '/reconciliation', label: 'Đối Soát Kế Toán', icon: Scale, roles: ['ADMIN', 'ACCOUNTANT'] },
     { to: '/tariffs', label: 'Biểu Giá', icon: Clock, roles: ['ADMIN', 'OPERATOR', 'CPO'] },
     { to: '/abnormal-sessions', label: 'Phiên Bất Thường', icon: AlertOctagon, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
     { to: '/simulator', label: 'Bảng Giả Lập Sạc', icon: Gauge, roles: ['CUSTOMER'] },

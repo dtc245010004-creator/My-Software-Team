@@ -166,3 +166,4 @@ describe('SCRUM-392: reportUtils unit tests', () => {
     });
   });
 });
+
