@@ -1,11 +1,12 @@
 """Kiểm thử job chỉ đánh dấu phiên sạc mất liên lạc (T-53)."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
-from app.services import scheduler_service
+from app.services import scheduler_service, smart_charging
 
 
 def _create_charging_session(db_session, code: str, last_seen_at: datetime):
@@ -54,7 +55,13 @@ def test_abnormal_session_job_flags_stale_point_without_closing_session(
         datetime.now(timezone.utc) - timedelta(seconds=10),
     )
 
-    flagged = scheduler_service.flag_abnormal_charging_sessions_job(db_session)
+    triggered_stations = []
+    monkeypatch.setattr(
+        smart_charging,
+        "trigger_rebalance_background",
+        lambda station_id: triggered_stations.append(station_id),
+    )
+    flagged = asyncio.run(scheduler_service.flag_abnormal_charging_sessions_job(db_session))
     db_session.refresh(session)
 
     assert flagged == 1
@@ -62,6 +69,7 @@ def test_abnormal_session_job_flags_stale_point_without_closing_session(
     assert session.abnormal_reason == "Mất liên lạc với trụ quá 1 giây"
     assert session.status == "CHARGING"
     assert charge_point.status == "online"
+    assert triggered_stations == [charge_point.station_id]
 
 
 def test_abnormal_session_job_ignores_recently_seen_point(db_session, monkeypatch):
@@ -72,7 +80,7 @@ def test_abnormal_session_job_ignores_recently_seen_point(db_session, monkeypatc
         datetime.now(timezone.utc),
     )
 
-    flagged = scheduler_service.flag_abnormal_charging_sessions_job(db_session)
+    flagged = asyncio.run(scheduler_service.flag_abnormal_charging_sessions_job(db_session))
     db_session.refresh(session)
 
     assert flagged == 0

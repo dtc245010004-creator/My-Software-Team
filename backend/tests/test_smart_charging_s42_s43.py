@@ -947,13 +947,10 @@ def test_s43_not_supported_callerror_logged_session_kept(caplog):
     assert "ERROR: Charger CP-NOT-SUPP does not support SetChargingProfile" in caplog.text
 
 
-def test_s43_gateway_hook_order_and_stop_transaction_no_trigger(
+def test_s44_gateway_rebalances_after_stop_result_and_not_for_duplicate(
     client: TestClient, db_session: Session, auth_users
 ):
-    """S-43 & Gateway: StartTransaction gửi CALLRESULT trước rồi mới rebalance (kiểm thứ tự);
-
-    StopTransaction KHÔNG kích hoạt rebalance.
-    """
+    """Start/Stop trả CALLRESULT trước khi chia lại; StopTransaction lặp không chia lại."""
     op = auth_users["op_a"]
     driver = auth_users["driver"]
 
@@ -1081,15 +1078,32 @@ def test_s43_gateway_hook_order_and_stop_transaction_no_trigger(
             resp_stop = json.loads(ws.receive_text())
             assert resp_stop[0] == 3
 
-    # Kiểm tra thứ tự: CALLRESULT_SENT trước REBALANCE_TRIGGERED
-    assert len(events) >= 2
-    assert events[0][0] == "CALLRESULT_SENT"
-    assert events[1][0] == "REBALANCE_TRIGGERED"
-    assert events[1][1] == st.id
+            # Phát lại đúng OCPP message ID: gateway trả phản hồi đã lưu và không gọi hook.
+            ws.send_text(
+                build_call(
+                    "stop-msg-1",
+                    "StopTransaction",
+                    {
+                        "transactionId": tx_id,
+                        "meterStop": 200,
+                        "timestamp": "2026-10-12T10:30:00Z",
+                        "idTag": "TAG-HOOK-01",
+                    },
+                )
+            )
+            resp_duplicate_stop = json.loads(ws.receive_text())
+            assert resp_duplicate_stop[0] == 3
 
-    # StopTransaction KHÔNG kích hoạt trigger_rebalance_background (tổng số lần gọi vẫn là 1)
+    # Mỗi thao tác mới được xác nhận trước hook nền; message ID đã lưu không gọi lại.
     rebalance_triggers = [e for e in events if e[0] == "REBALANCE_TRIGGERED"]
-    assert len(rebalance_triggers) == 1
+    assert events == [
+        ("CALLRESULT_SENT", tx_id),
+        ("REBALANCE_TRIGGERED", st.id),
+        ("STOP_CALLRESULT_SENT", {"idTagInfo": {"status": "Accepted"}}),
+        ("REBALANCE_TRIGGERED", st.id),
+        ("STOP_CALLRESULT_SENT", {"idTagInfo": {"status": "Accepted"}}),
+    ]
+    assert len(rebalance_triggers) == 2
 
 
 def test_s43_cache_cleanup_when_session_ends(db_session: Session, auth_users):

@@ -60,6 +60,7 @@
 | 2026-10-09 | S-32 — SCRUM-211/219 | Diễn giải giá và quy tắc làm tròn theo đoạn | Hoàn thành / đã tích hợp | `pricing_engine.py`, `test_pricing_breakdown_s32.py` | Commit implementation `5b83f85`; S-33 đọc snapshot đoạn và giữ quy tắc làm tròn từng đoạn rồi cộng. |
 | 2026-10-09 | S-33 Backend — SCRUM-222/221/220/223/225 | Lưu snapshot và cung cấp hóa đơn diễn giải từng đoạn | Đã commit `60e801a`, push lên `origin/Duong`; chờ chạy lại full suite trong Docker | `backend/app/models/session_billing_segment.py`, `backend/app/services/billing_segment_service.py`, `backend/app/schemas/invoice.py`, `backend/app/api/v1/endpoints/sessions.py`, migration `d8f56c4a911e`, `backend/tests/test_invoice.py`, hồ sơ `docs/qa/stories/S-33.md` | Full suite hoàn chỉnh trước chỉnh sửa legacy: 411 passed, 303 warnings; sau chỉnh sửa `test_invoice.py`: 8 passed. Full host rerun: 409 passed, 1 skipped, 1 lỗi khởi tạo `tmp_path` do WinError 5; cần chạy lại trong Docker. Migration PostgreSQL Compose tạm đã kiểm tra nâng/hạ/nâng; DB dự án chưa migrate. |
 | 2026-10-09 | S-34 — SCRUM-226/231 | Phiên giữ nguyên biểu giá đã áp dụng dù biểu giá trạm được sửa sau đó | Hoàn thành / đã tích hợp | `backend/app/models/tariff.py`, logic phiên bản tariff, `test_tariff_versioning_s34.py` | Implementation có trong commit `5cda3ca`; giá mới áp dụng cho phiên bắt đầu sau, hóa đơn/đoạn giá phiên trước giữ snapshot cũ. |
+| 2026-10-12 | S-44 Backend — SCRUM-283–290 | Chia lại công suất khi xe rời hoặc chuyển SuspendedEV | Hoàn thành Backend | `backend/app/services/smart_charging.py`, `backend/app/ocpp/gateway.py`, `backend/app/services/scheduler_service.py`, config Compose, `test_smart_charging_s44.py` | Hook sau commit/CALLRESULT; phiên bất thường và SuspendedEV không tham gia phép chia; debounce trailing theo trạm. Ruff đạt, full backend suite **525 passed, 318 warnings**. Không cần migration. |
 
 ---
 
@@ -234,4 +235,14 @@
 * **Nội dung:** S-28/S-29 đã hoàn thành các thay đổi biểu giá và backend phí chiếm trụ; S-30/S-31 được tích hợp từ `origin/quocdung`; S-32/S-34 đã tích hợp logic breakdown/làm tròn và versioning tariff; S-33 đã lưu snapshot đoạn và cung cấp API hóa đơn.
 * **Trạng thái xác minh:** Các test theo story đã được ghi nhận trong những lượt trước; full suite sau thay đổi legacy S-33 còn cần chạy lại trong Docker. Quyết định mentor về cách thu phí bổ sung S-28 vẫn đang chờ.
 * **Tài liệu/điều phối:** Cập nhật `README.md` và xóa hướng dẫn sử dụng hai cấu hình Compose đã bỏ; cập nhật CI và tài liệu vận hành để dùng Compose chung. Các thay đổi tài liệu/xóa file hiện chưa commit.
+
+---
+
+#### 16. Ngày 2026-10-12 | Người thực hiện: Codex theo yêu cầu người dùng
+* **Nhiệm vụ thực hiện:** Backend S-44 — SCRUM-283/284/285/286/287/288/289/290: chia lại công suất trạm khi xe rời, tạm ngưng, hoặc scheduler đánh dấu phiên bất thường.
+* **Nội dung thực hiện cụ thể:** Thêm cấu hình `REBALANCE_MIN_INTERVAL_SECONDS` (mặc định 5 giây) vào settings, `.env.example` và biến môi trường backend trong Compose. `trigger_rebalance_background` điều phối riêng theo trạm, gom nhiều sự kiện thành tối đa một lượt chạy chờ; lượt chờ đọc trạng thái mới nhất từ DB và không giữ station lock trong thời gian đợi. Không sửa thuật toán fair-share.
+* **Hook OCPP và scheduler:** Gateway gọi rebalance sau commit và gửi CALLRESULT cho StopTransaction có thay đổi phiên; tin trùng đi qua nhánh idempotency và không kích hoạt lại. StatusNotification chỉ hook khi trạng thái đổi vào/ra `SuspendedEV`. Job gắn cờ `is_abnormal` gọi rebalance sau commit cho mỗi trạm bị ảnh hưởng, đồng thời giữ nguyên status phiên CHARGING.
+* **Phân bổ:** Phiên bất thường và SuspendedEV không tham gia phép chia; SuspendedEV giữ profile/cache để không nhận lệnh mới và có thể được tính lại khi trở lại Charging. Phiên đã kết thúc được dọn khỏi cache.
+* **Kiểm chứng:** `alembic heads` trong Compose trả về duy nhất `f41a0b7c9d22 (head)`; S-44 không thay schema nên không sinh migration. `docker compose config --quiet` đạt. `ruff check .` đạt. Test mục tiêu S-42/S-43/S-44 và scheduler: **33 passed, 10 warnings**. Full backend suite trong Docker: **525 passed, 318 warnings** trong 229.23 giây.
+* **Giới hạn/đề xuất:** `applied_session_limits` còn lưu trong RAM; sau restart có thể mất dấu profile đã hạ tải. Có thể cân nhắc lưu profile áp dụng bền vững. Gateway disconnect chưa đóng phiên trực tiếp; scheduler hiện là nơi phát hiện phiên stale. Fair-share hiện tại vẫn chia đều, chưa dùng water-filling. Không thay các mục này trong phạm vi S-44.
 

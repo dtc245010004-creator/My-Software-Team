@@ -2,9 +2,11 @@
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from app.core.config import settings
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.ocpp.dispatcher import OcppCallError, send_call_and_wait
@@ -20,6 +22,21 @@ station_locks: dict[int, asyncio.Lock] = {}
 
 # Tập tham chiếu mạnh giữ các background tasks để tránh Garbage Collector thu hồi
 _background_tasks: set[asyncio.Task] = set()
+
+# Per-station coalescing state. A pending set entry represents at most one trailing run.
+_pending_rebalances: set[int] = set()
+_rebalance_tasks: dict[int, asyncio.Task] = {}
+_last_rebalance_finished_at: dict[int, float] = {}
+
+
+def _rebalance_clock() -> float:
+    """Đồng hồ đơn điệu để đo khoảng cách giữa các lần chia lại; có thể thay trong test."""
+    return time.monotonic()
+
+
+async def _wait_for_rebalance_interval(seconds: float) -> None:
+    """Chờ ngoài station lock; hàm chờ có thể thay trong test để không ngủ thật."""
+    await asyncio.sleep(seconds)
 
 
 def get_station_lock(station_id: int) -> asyncio.Lock:
@@ -434,7 +451,7 @@ async def rebalance_station_power(
         session_factory = SessionLocal
 
     lock = get_station_lock(station_id)
-    rejected_sessions_to_stop: list[tuple[str, int]] = []
+    rejected_sessions_to_stop: list[tuple[str, int, str]] = []
 
     async with lock:
         with session_factory() as db:
@@ -444,8 +461,9 @@ async def rebalance_station_power(
 
             station_capacity_kw = float(station.total_grid_capacity_kw or 0.0)
 
-            # Đếm cả CHARGING và ACTIVE, loại trừ ABNORMAL
-            active_sessions = (
+            # Scheduler giữ nguyên status khi trụ mất liên lạc nhưng đặt
+            # is_abnormal; các phiên đó không còn được tính vào phân bổ công suất.
+            active_session_rows = (
                 db.query(ChargingSession)
                 .join(Connector, ChargingSession.connector_id == Connector.id)
                 .join(ChargingPoint, Connector.charging_point_id == ChargingPoint.id)
@@ -456,8 +474,20 @@ async def rebalance_station_power(
                 .all()
             )
 
+            non_abnormal_sessions = [
+                session for session in active_session_rows if not session.is_abnormal
+            ]
+            # SuspendedEV vẫn giữ profile/cache hiện tại nhưng không tham gia N
+            # và không nhận lệnh mới đến khi quay lại Charging.
+            active_sessions = [
+                session
+                for session in non_abnormal_sessions
+                if not session.connector
+                or session.connector.ocpp_status != "SuspendedEV"
+            ]
+
             # Thu thập danh sách ID các phiên đang hoạt động để dọn dẹp cache
-            active_tx_ids = {s.transaction_id for s in active_sessions}
+            active_tx_ids = {s.transaction_id for s in non_abnormal_sessions}
 
             # Dọn dẹp cache của các phiên thuộc trạm này đã kết thúc
             all_known_station_txs = [
@@ -579,13 +609,54 @@ async def rebalance_station_power(
         )
 
 
+def _start_rebalance_coordinator(
+    station_id: int,
+    session_factory: Callable[[], Any] | None,
+) -> asyncio.Task:
+    task = asyncio.create_task(_drain_rebalance_requests(station_id, session_factory))
+    _rebalance_tasks[station_id] = task
+    _background_tasks.add(task)
+
+    def cleanup(completed_task: asyncio.Task) -> None:
+        _background_tasks.discard(completed_task)
+        if _rebalance_tasks.get(station_id) is completed_task:
+            _rebalance_tasks.pop(station_id, None)
+            if station_id in _pending_rebalances:
+                _start_rebalance_coordinator(station_id, session_factory)
+
+    task.add_done_callback(cleanup)
+    return task
+
+
+async def _drain_rebalance_requests(
+    station_id: int,
+    session_factory: Callable[[], Any] | None,
+) -> None:
+    """Gom sự kiện theo trạm và chạy tối đa một lần chờ sau mỗi lần chia lại."""
+    while station_id in _pending_rebalances:
+        _pending_rebalances.discard(station_id)
+        last_finished_at = _last_rebalance_finished_at.get(station_id)
+        if last_finished_at is not None:
+            remaining = settings.REBALANCE_MIN_INTERVAL_SECONDS - (
+                _rebalance_clock() - last_finished_at
+            )
+            if remaining > 0:
+                # Không giữ station lock trong thời gian chờ; rebalance đọc DB mới.
+                await _wait_for_rebalance_interval(remaining)
+            # Gộp mọi sự kiện đến trong thời gian chờ vào lần chạy sắp tới.
+            _pending_rebalances.discard(station_id)
+
+        await _safe_rebalance_runner(station_id, session_factory)
+        _last_rebalance_finished_at[station_id] = _rebalance_clock()
+
+
 def trigger_rebalance_background(
     station_id: int,
     session_factory: Callable[[], Any] | None = None,
 ) -> asyncio.Task | None:
-    """Kích hoạt rebalance trong tác vụ nền với quản lý tham chiếu an toàn."""
+    """Chia lại ngay hoặc gom sự kiện thành một lần chạy chờ theo từng trạm."""
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
     except RuntimeError:
         logger.debug(
             "Không có running asyncio event loop, bỏ qua trigger_rebalance_background cho trạm #%s",
@@ -593,9 +664,10 @@ def trigger_rebalance_background(
         )
         return None
 
-    task = loop.create_task(_safe_rebalance_runner(station_id, session_factory))
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    _pending_rebalances.add(station_id)
+    task = _rebalance_tasks.get(station_id)
+    if task is None or task.done():
+        return _start_rebalance_coordinator(station_id, session_factory)
     return task
 
 
