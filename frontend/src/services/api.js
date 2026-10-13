@@ -37,3 +37,9 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+/** Đăng nhập — trả về { access_token, user }. */
+export async function loginRequest(email, password) {
+  const res = await api.post('/auth/login', { email, password });
+  return res.data;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import {
@@ -16,25 +16,28 @@ import {
   LocateFixed,
   Eye,
   Info,
+  CalendarClock,
 } from 'lucide-react';
 import api from '../services/api';
 import { MAP_CONFIG } from '../config/mapConfig';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Skeleton from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
+import ReservationModal from '../components/ReservationModal';
 
-// Danh sách thành phố chọn nhanh khi không có GPS
+// Danh s├ích th├ánh phß╗æ chß╗ìn nhanh khi kh├┤ng c├│ GPS
 const QUICK_CITIES = [
-  { name: 'Hà Nội', lat: 21.0285, lon: 105.8542 },
-  { name: 'Thái Nguyên', lat: 21.5928, lon: 105.8442 },
-  { name: 'Đà Nẵng', lat: 16.0544, lon: 108.2022 },
-  { name: 'TP. Hồ Chí Minh', lat: 10.7769, lon: 106.7009 },
+  { name: 'H├á Nß╗Öi', lat: 21.0285, lon: 105.8542 },
+  { name: 'Th├íi Nguy├¬n', lat: 21.5928, lon: 105.8442 },
+  { name: '─É├á Nß║╡ng', lat: 16.0544, lon: 108.2022 },
+  { name: 'TP. Hß╗ô Ch├¡ Minh', lat: 10.7769, lon: 106.7009 },
 ];
 
-// Tạo marker vị trí người dùng với hiệu ứng sóng radar 3D
+// Tß║ío marker vß╗ï tr├¡ ng╞░ß╗¥i d├╣ng vß╗¢i hiß╗çu ß╗⌐ng s├│ng radar 3D
 function createUserLocationIcon() {
   const html = `
     <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
@@ -51,7 +54,7 @@ function createUserLocationIcon() {
   });
 }
 
-// Tạo marker trạm sạc đa thông tin (Interactive Rich Pin with Station Info Pill)
+// Tß║ío marker trß║ím sß║íc ─æa th├┤ng tin (Interactive Rich Pin with Station Info Pill)
 function createStationMarkerIcon(st, isSelected) {
   const chargers = st.charging_points || [];
   const hasAvailable = chargers.some(
@@ -59,16 +62,16 @@ function createStationMarkerIcon(st, isSelected) {
   );
   const isMaintenance = st.status === 'MAINTENANCE';
 
-  let color = '#10B981'; // Xanh ngọc: có trụ sẵn sàng
+  let color = '#10B981'; // Xanh ngß╗ìc: c├│ trß╗Ñ sß║╡n s├áng
   let statusBadgeBg = 'rgba(16, 185, 129, 0.25)';
   let statusDot = '#10B981';
 
   if (isMaintenance) {
-    color = '#F59E0B'; // Vàng hổ phách: bảo trì
+    color = '#F59E0B'; // V├áng hß╗ò ph├ích: bß║úo tr├¼
     statusBadgeBg = 'rgba(245, 158, 11, 0.25)';
     statusDot = '#F59E0B';
   } else if (!hasAvailable) {
-    color = '#0284C7'; // Xanh dương: kín tải
+    color = '#0284C7'; // Xanh d╞░╞íng: k├¡n tß║úi
     statusBadgeBg = 'rgba(2, 132, 199, 0.25)';
     statusDot = '#0284C7';
   }
@@ -86,7 +89,7 @@ function createStationMarkerIcon(st, isSelected) {
 
   const html = `
     <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: scale(${pinScale}); transition: transform 0.2s cubic-bezier(0.2,0,0,1); cursor: pointer;">
-      <!-- Ghim Pin trạm sạc EV -->
+      <!-- Ghim Pin trß║ím sß║íc EV -->
       <div style="position: relative; width: 36px; height: 36px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: ${color}; display: flex; align-items: center; justify-content: center; ${ringGlow} border: 2.5px solid #FFFFFF;">
         <div style="transform: rotate(45deg); display: flex; align-items: center; justify-content: center;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -95,11 +98,11 @@ function createStationMarkerIcon(st, isSelected) {
         </div>
       </div>
 
-      <!-- Thẻ nhãn tên trạm & thông số trực tiếp trên mặt bản đồ -->
+      <!-- Thß║╗ nh├ún t├¬n trß║ím & th├┤ng sß╗æ trß╗▒c tiß║┐p tr├¬n mß║╖t bß║ún ─æß╗ô -->
       <div style="margin-top: 5px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border: 1.5px solid ${borderStroke}; padding: 3px 8px; border-radius: 9999px; display: flex; align-items: center; gap: 5px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); pointer-events: none;">
         <span style="font-size: 11px; font-weight: 700; color: #FFFFFF; font-family: system-ui, -apple-system, sans-serif; letter-spacing: -0.01em;">${st.name}</span>
         <span style="font-size: 10px; font-weight: 700; color: ${statusDot}; background: ${statusBadgeBg}; padding: 1px 6px; border-radius: 9999px; font-family: monospace;">
-          ${availableCount}/${totalCount} trụ • ${maxKw}kW
+          ${availableCount}/${totalCount} trß╗Ñ ΓÇó ${maxKw}kW
         </span>
       </div>
     </div>
@@ -117,13 +120,14 @@ function createStationMarkerIcon(st, isSelected) {
 export default function DriverMap() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const { role: userRole } = useAuth();
 
-  // Tọa độ người dùng và trạng thái định vị
+  // Tß╗ìa ─æß╗Ö ng╞░ß╗¥i d├╣ng v├á trß║íng th├íi ─æß╗ïnh vß╗ï
   const [userCoords, setUserCoords] = useState(null);
-  const [locationName, setLocationName] = useState('Đang định vị...');
+  const [locationName, setLocationName] = useState('─Éang ─æß╗ïnh vß╗ï...');
   const [gpsStatus, setGpsStatus] = useState('locating'); // 'locating' | 'granted' | 'denied' | 'custom'
 
-  // Dữ liệu trạm sạc & bộ lọc
+  // Dß╗» liß╗çu trß║ím sß║íc & bß╗Ö lß╗ìc
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStationId, setSelectedStationId] = useState(null);
@@ -132,10 +136,25 @@ export default function DriverMap() {
   const [powerFilter, setPowerFilter] = useState('ALL'); // 'ALL' | 'FAST' (>=60kW) | 'ULTRA' (>=120kW)
   const [availableOnly, setAvailableOnly] = useState(false);
 
-  // Chế độ lớp bản đồ: 'street' (Đường phố rõ nét mặc định) | 'dark' (Bản đồ tối) | 'satellite' (Vệ tinh)
+  // ─── Đặt chỗ trạm sạc (S-48 / S-49) ─────────────────────────
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [selectedConnector, setSelectedConnector] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null);
+
+  // Load số dư ví khi CUSTOMER mở modal
+  useEffect(() => {
+    if (showReservationModal && userRole === 'CUSTOMER') {
+      api.get('/wallet/me')
+        .then((r) => setWalletBalance(r.data?.balance ?? null))
+        .catch(() => setWalletBalance(null));
+    }
+    if (!showReservationModal) setSelectedConnector(null);
+  }, [showReservationModal, userRole]);
+
+  // Chß║┐ ─æß╗Ö lß╗¢p bß║ún ─æß╗ô: 'street' (─É╞░ß╗¥ng phß╗æ r├╡ n├⌐t mß║╖c ─æß╗ïnh) | 'dark' (Bß║ún ─æß╗ô tß╗æi) | 'satellite' (Vß╗ç tinh)
   const [layerMode, setLayerMode] = useState('street');
 
-  // Tham chiếu Leaflet Map
+  // Tham chiß║┐u Leaflet Map
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const baseLayersRef = useRef({});
@@ -145,16 +164,16 @@ export default function DriverMap() {
   const routeLineRef = useRef(null);
   const lastFittedKeyRef = useRef('');
 
-  // Khởi tạo định vị vị trí người dùng
+  // Khß╗ƒi tß║ío ─æß╗ïnh vß╗ï vß╗ï tr├¡ ng╞░ß╗¥i d├╣ng
   const detectUserLocation = useCallback(() => {
     setGpsStatus('locating');
-    setLocationName('Đang định vị GPS thiết bị...');
+    setLocationName('─Éang ─æß╗ïnh vß╗ï GPS thiß║┐t bß╗ï...');
 
     if (!navigator.geolocation) {
       setGpsStatus('denied');
-      const fallback = QUICK_CITIES[1]; // Thái Nguyên (khu vực trạm test)
+      const fallback = QUICK_CITIES[1]; // Th├íi Nguy├¬n (khu vß╗▒c trß║ím test)
       setUserCoords({ lat: fallback.lat, lon: fallback.lon });
-      setLocationName(fallback.name + ' (Mặc định)');
+      setLocationName(fallback.name + ' (Mß║╖c ─æß╗ïnh)');
       return;
     }
 
@@ -165,15 +184,15 @@ export default function DriverMap() {
           lon: position.coords.longitude,
         };
         setUserCoords(coords);
-        setLocationName('Vị trí GPS hiện tại của bạn');
+        setLocationName('Vß╗ï tr├¡ GPS hiß╗çn tß║íi cß╗ºa bß║ín');
         setGpsStatus('granted');
       },
       (error) => {
-        console.warn('Lỗi định vị GPS:', error.message);
+        console.warn('Lß╗ùi ─æß╗ïnh vß╗ï GPS:', error.message);
         setGpsStatus('denied');
-        const fallback = QUICK_CITIES[1]; // Thái Nguyên
+        const fallback = QUICK_CITIES[1]; // Th├íi Nguy├¬n
         setUserCoords({ lat: fallback.lat, lon: fallback.lon });
-        setLocationName(fallback.name + ' (Vị trí tạm)');
+        setLocationName(fallback.name + ' (Vß╗ï tr├¡ tß║ím)');
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
@@ -183,7 +202,7 @@ export default function DriverMap() {
     detectUserLocation();
   }, [detectUserLocation]);
 
-  // Nạp danh sách trạm sạc từ backend (có tính khoảng cách Haversine khi có userCoords)
+  // Nß║íp danh s├ích trß║ím sß║íc tß╗½ backend (c├│ t├¡nh khoß║úng c├ích Haversine khi c├│ userCoords)
   const fetchStations = useCallback(async () => {
     try {
       setLoading(true);
@@ -199,7 +218,7 @@ export default function DriverMap() {
       const res = await api.get('/stations', { params });
       setStations(res.data || []);
     } catch (err) {
-      console.error('Lỗi nạp danh sách trạm cho tài xế:', err);
+      console.error('Lß╗ùi nß║íp danh s├ích trß║ím cho t├ái xß║┐:', err);
     } finally {
       setLoading(false);
     }
@@ -211,7 +230,7 @@ export default function DriverMap() {
     }
   }, [userCoords, fetchStations]);
 
-  // Khởi tạo bản đồ Leaflet
+  // Khß╗ƒi tß║ío bß║ún ─æß╗ô Leaflet
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -227,26 +246,26 @@ export default function DriverMap() {
       });
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // 1. Lớp Đường phố tiêu chuẩn (Sắc nét, rõ tên đường tiếng Việt, màu đường cao tốc / nội đô phân biệt)
+      // 1. Lß╗¢p ─É╞░ß╗¥ng phß╗æ ti├¬u chuß║⌐n (Sß║»c n├⌐t, r├╡ t├¬n ─æ╞░ß╗¥ng tiß║┐ng Viß╗çt, m├áu ─æ╞░ß╗¥ng cao tß╗æc / nß╗Öi ─æ├┤ ph├ón biß╗çt)
       const streetLayer = L.tileLayer(MAP_CONFIG.street.url, {
         maxZoom: MAP_CONFIG.street.maxZoom,
         attribution: MAP_CONFIG.street.attribution,
       });
 
-      // 2. Lớp Bản đồ tối công nghệ cao (Tương phản cao, tên đường sáng rõ)
+      // 2. Lß╗¢p Bß║ún ─æß╗ô tß╗æi c├┤ng nghß╗ç cao (T╞░╞íng phß║ún cao, t├¬n ─æ╞░ß╗¥ng s├íng r├╡)
       const darkLayer = L.tileLayer(MAP_CONFIG.dark.url, {
         maxZoom: MAP_CONFIG.dark.maxZoom,
         attribution: MAP_CONFIG.dark.attribution,
         className: MAP_CONFIG.dark.className,
       });
 
-      // 3. Lớp Ảnh vệ tinh độ nét cao
+      // 3. Lß╗¢p ß║ónh vß╗ç tinh ─æß╗Ö n├⌐t cao
       const satelliteLayer = L.tileLayer(MAP_CONFIG.satellite.url, {
         maxZoom: MAP_CONFIG.satellite.maxZoom,
         attribution: MAP_CONFIG.satellite.attribution,
       });
 
-      // Mặc định nạp lớp Đường phố để tài xế quan sát dễ nhất
+      // Mß║╖c ─æß╗ïnh nß║íp lß╗¢p ─É╞░ß╗¥ng phß╗æ ─æß╗â t├ái xß║┐ quan s├ít dß╗à nhß║Ñt
       streetLayer.addTo(map);
 
       baseLayersRef.current = {
@@ -257,7 +276,7 @@ export default function DriverMap() {
 
       mapInstanceRef.current = map;
 
-      // Invalidate size để tránh lỗi vỡ khung
+      // Invalidate size ─æß╗â tr├ính lß╗ùi vß╗í khung
       setTimeout(() => {
         map.invalidateSize();
       }, 250);
@@ -271,7 +290,7 @@ export default function DriverMap() {
     };
   }, []);
 
-  // Đổi Tile Layer khi chuyển chế độ (Đường phố / Bản đồ tối / Vệ tinh)
+  // ─Éß╗òi Tile Layer khi chuyß╗ân chß║┐ ─æß╗Ö (─É╞░ß╗¥ng phß╗æ / Bß║ún ─æß╗ô tß╗æi / Vß╗ç tinh)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !baseLayersRef.current.street) return;
@@ -286,25 +305,25 @@ export default function DriverMap() {
     activeLayer.addTo(map);
   }, [layerMode]);
 
-  // Cập nhật marker vị trí người dùng & vòng tròn sóng radar
+  // Cß║¡p nhß║¡t marker vß╗ï tr├¡ ng╞░ß╗¥i d├╣ng & v├▓ng tr├▓n s├│ng radar
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !userCoords) return;
 
-    // Marker GPS người dùng
+    // Marker GPS ng╞░ß╗¥i d├╣ng
     if (!userMarkerRef.current) {
       const marker = L.marker([userCoords.lat, userCoords.lon], {
         icon: createUserLocationIcon(),
         zIndexOffset: 1000,
       }).addTo(map);
-      marker.bindPopup(`<div style="font-size: 13px; font-weight: 700; padding: 4px; font-family: system-ui;">📍 ${locationName}</div>`);
+      marker.bindPopup(`<div style="font-size: 13px; font-weight: 700; padding: 4px; font-family: system-ui;">≡ƒôì ${locationName}</div>`);
       userMarkerRef.current = marker;
     } else {
       userMarkerRef.current.setLatLng([userCoords.lat, userCoords.lon]);
-      userMarkerRef.current.setPopupContent(`<div style="font-size: 13px; font-weight: 700; padding: 4px; font-family: system-ui;">📍 ${locationName}</div>`);
+      userMarkerRef.current.setPopupContent(`<div style="font-size: 13px; font-weight: 700; padding: 4px; font-family: system-ui;">≡ƒôì ${locationName}</div>`);
     }
 
-    // Vòng tròn bán kính tìm kiếm quanh vị trí tài xế (1.5 km)
+    // V├▓ng tr├▓n b├ín k├¡nh t├¼m kiß║┐m quanh vß╗ï tr├¡ t├ái xß║┐ (1.5 km)
     if (!userRadiusRef.current) {
       const circle = L.circle([userCoords.lat, userCoords.lon], {
         radius: 1500,
@@ -319,16 +338,16 @@ export default function DriverMap() {
       userRadiusRef.current.setLatLng([userCoords.lat, userCoords.lon]);
     }
 
-    // Bay bản đồ đến vị trí người dùng
+    // Bay bß║ún ─æß╗ô ─æß║┐n vß╗ï tr├¡ ng╞░ß╗¥i d├╣ng
     map.flyTo([userCoords.lat, userCoords.lon], 13, { duration: 1.2 });
   }, [userCoords, locationName]);
 
-  // Cập nhật markers trạm sạc trên bản đồ
+  // Cß║¡p nhß║¡t markers trß║ím sß║íc tr├¬n bß║ún ─æß╗ô
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Xóa markers cũ
+    // X├│a markers c┼⌐
     Object.values(markersRef.current).forEach((m) => m.remove());
     markersRef.current = {};
 
@@ -349,7 +368,7 @@ export default function DriverMap() {
         zIndexOffset: isSelected ? 800 : 200,
       }).addTo(map);
 
-      // Nội dung popup trạm chi tiết, sắc nét
+      // Nß╗Öi dung popup trß║ím chi tiß║┐t, sß║»c n├⌐t
       const availableChargers = (st.charging_points || []).filter(
         (cp) => cp.status === 'AVAILABLE'
       ).length;
@@ -369,36 +388,36 @@ export default function DriverMap() {
           </div>
 
           <div style="color: ${isDark ? '#94A3B8' : '#64748B'}; font-size: 12px; margin-bottom: 10px; line-height: 1.4;">
-            ${st.address || 'Không có địa chỉ chi tiết'}
+            ${st.address || 'Kh├┤ng c├│ ─æß╗ïa chß╗ë chi tiß║┐t'}
           </div>
 
           <div style="background: ${isDark ? '#0F172A' : '#F8FAFC'}; border: 1px solid ${isDark ? '#334155' : '#E2E8F0'}; border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px;">
             <div>
-              <span style="color: #64748B; font-size: 11px; display: block;">Khoảng cách</span>
+              <span style="color: #64748B; font-size: 11px; display: block;">Khoß║úng c├ích</span>
               <strong style="color: #0284C7; font-size: 13px; font-family: monospace;">${distText || 'N/A'}</strong>
             </div>
             <div>
-              <span style="color: #64748B; font-size: 11px; display: block;">Công suất tối đa</span>
+              <span style="color: #64748B; font-size: 11px; display: block;">C├┤ng suß║Ñt tß╗æi ─æa</span>
               <strong style="color: ${isDark ? '#F1F5F9' : '#0F172A'}; font-size: 13px; font-family: monospace;">${maxKw} kW</strong>
             </div>
             <div>
-              <span style="color: #64748B; font-size: 11px; display: block;">Trụ sẵn sàng</span>
-              <strong style="color: ${availableChargers > 0 ? '#10B981' : '#F59E0B'}; font-size: 13px;">${availableChargers}/${totalChargers} trụ</strong>
+              <span style="color: #64748B; font-size: 11px; display: block;">Trß╗Ñ sß║╡n s├áng</span>
+              <strong style="color: ${availableChargers > 0 ? '#10B981' : '#F59E0B'}; font-size: 13px;">${availableChargers}/${totalChargers} trß╗Ñ</strong>
             </div>
             <div>
-              <span style="color: #64748B; font-size: 11px; display: block;">Đơn giá sạc</span>
-              <strong style="color: #D97706; font-size: 12px; font-family: monospace;">~3.858 đ</strong>
+              <span style="color: #64748B; font-size: 11px; display: block;">─É╞ín gi├í sß║íc</span>
+              <strong style="color: #D97706; font-size: 12px; font-family: monospace;">~3.858 ─æ</strong>
             </div>
           </div>
 
           <div style="display: flex; gap: 6px;">
             <a href="https://www.google.com/maps/dir/?api=1&destination=${parsedLat},${parsedLng}" target="_blank" rel="noreferrer"
                style="flex: 1; text-align: center; background: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; padding: 7px 10px; border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
-              <span>Chỉ đường</span>
+              <span>Chß╗ë ─æ╞░ß╗¥ng</span>
             </a>
             <button id="popup-charge-btn-${st.id}" type="button"
                style="flex: 1.2; text-align: center; background: #0284C7; color: #FFFFFF; padding: 7px 10px; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.4);">
-              <span>⚡ Sạc ngay</span>
+              <span>ΓÜí Sß║íc ngay</span>
             </button>
           </div>
         </div>
@@ -435,7 +454,7 @@ export default function DriverMap() {
     }
   }, [stations, selectedStationId, isDark]);
 
-  // Cập nhật đường nối trực quan (Direction route line) giữa GPS tài xế và trạm đang chọn
+  // Cß║¡p nhß║¡t ─æ╞░ß╗¥ng nß╗æi trß╗▒c quan (Direction route line) giß╗»a GPS t├ái xß║┐ v├á trß║ím ─æang chß╗ìn
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -462,7 +481,7 @@ export default function DriverMap() {
         ).addTo(map);
 
         if (selectedStation.distance_km != null) {
-          line.bindTooltip(`🚗 ${selectedStation.distance_km.toFixed(1)} km`, {
+          line.bindTooltip(`≡ƒÜù ${selectedStation.distance_km.toFixed(1)} km`, {
             permanent: true,
             direction: 'center',
             className: 'route-distance-tooltip',
@@ -474,15 +493,15 @@ export default function DriverMap() {
     }
   }, [selectedStationId, userCoords, stations]);
 
-  // Chọn thành phố thủ công khi GPS từ chối hoặc người dùng muốn đổi khu vực
+  // Chß╗ìn th├ánh phß╗æ thß╗º c├┤ng khi GPS tß╗½ chß╗æi hoß║╖c ng╞░ß╗¥i d├╣ng muß╗æn ─æß╗òi khu vß╗▒c
   const handleSelectCity = (city) => {
     setUserCoords({ lat: city.lat, lon: city.lon });
-    setLocationName(`Khu vực: ${city.name}`);
+    setLocationName(`Khu vß╗▒c: ${city.name}`);
     setGpsStatus('custom');
     setSelectedStationId(null);
   };
 
-  // Chọn trạm từ danh sách hoặc từ click marker
+  // Chß╗ìn trß║ím tß╗½ danh s├ích hoß║╖c tß╗½ click marker
   const handleSelectStation = (st) => {
     setSelectedStationId(st.id);
     const map = mapInstanceRef.current;
@@ -499,7 +518,7 @@ export default function DriverMap() {
     }
   };
 
-  // Nút bay về vị trí GPS người dùng
+  // N├║t bay vß╗ü vß╗ï tr├¡ GPS ng╞░ß╗¥i d├╣ng
   const handleFlyToUser = () => {
     const map = mapInstanceRef.current;
     if (map && userCoords) {
@@ -510,7 +529,7 @@ export default function DriverMap() {
     }
   };
 
-  // Nút xem bao trọn tất cả trạm (Fit All Bounds)
+  // N├║t xem bao trß╗ìn tß║Ñt cß║ú trß║ím (Fit All Bounds)
   const handleFitAllStations = () => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -529,7 +548,7 @@ export default function DriverMap() {
     }
   };
 
-  // Điều hướng sang màn hình trụ sạc của trạm này (S-24 / T-52)
+  // ─Éiß╗üu h╞░ß╗¢ng sang m├án h├¼nh trß╗Ñ sß║íc cß╗ºa trß║ím n├áy (S-24 / T-52)
   const handleChargeAtStation = (st) => {
     const chargers = st.charging_points || [];
     const availableCharger = chargers.find((c) => c.status === 'AVAILABLE') || chargers[0];
@@ -540,7 +559,29 @@ export default function DriverMap() {
     }
   };
 
-  // Lọc danh sách trạm theo tìm kiếm, chuẩn sạc, công suất & trạng thái
+  // Mở modal đặt chỗ với connector đã chọn (S-48 / S-49)
+  const handleReserveConnector = useCallback((connector, station) => {
+    if (userRole !== 'CUSTOMER') return;
+    setSelectedConnector({
+      id: connector.id,
+      connector_number: connector.connector_number,
+      max_power_kw: connector.max_power_kw,
+      status: connector.status,
+      charge_point_code: connector.charge_point_code || station.code || `ST-${station.id}`,
+      charge_point_id: connector.charge_point_id || connector.id,
+      charge_point_name: connector.name || '',
+      station_name: station.name || 'Trạm sạc',
+      station_id: station.id,
+    });
+    setShowReservationModal(true);
+  }, [userRole]);
+
+  // Callback khi đặt chỗ thành công
+  const handleReservationSuccess = useCallback(() => {
+    setShowReservationModal(false);
+  }, []);
+
+  // Lß╗ìc danh s├ích trß║ím theo t├¼m kiß║┐m, chuß║⌐n sß║íc, c├┤ng suß║Ñt & trß║íng th├íi
   const filteredStations = useMemo(() => {
     return stations.filter((st) => {
       if (searchQuery.trim()) {
@@ -565,7 +606,7 @@ export default function DriverMap() {
     });
   }, [stations, searchQuery, availableOnly, powerFilter]);
 
-  // Trạm sạc đang được chọn
+  // Trß║ím sß║íc ─æang ─æ╞░ß╗úc chß╗ìn
   const selectedStation = useMemo(() => {
     return stations.find((s) => s.id === selectedStationId) || null;
   }, [stations, selectedStationId]);
@@ -573,7 +614,7 @@ export default function DriverMap() {
   return (
     <div className="space-y-4">
       
-      {/* Top Banner: Định vị & Chọn thành phố */}
+      {/* Top Banner: ─Éß╗ïnh vß╗ï & Chß╗ìn th├ánh phß╗æ */}
       <Card padding="p-4" className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-sm">
         <div className="flex items-center space-x-3.5">
           <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 shadow-inner">
@@ -582,7 +623,7 @@ export default function DriverMap() {
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Vị trí tìm kiếm:
+                Vß╗ï tr├¡ t├¼m kiß║┐m:
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white">
                 {locationName}
@@ -594,14 +635,14 @@ export default function DriverMap() {
               )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Tự động sắp xếp các trạm sạc công cộng theo khoảng cách thực tế gần bạn nhất
+              Tß╗▒ ─æß╗Öng sß║»p xß║┐p c├íc trß║ím sß║íc c├┤ng cß╗Öng theo khoß║úng c├ích thß╗▒c tß║┐ gß║ºn bß║ín nhß║Ñt
             </p>
           </div>
         </div>
 
-        {/* Nút chọn nhanh khu vực & định vị lại */}
+        {/* N├║t chß╗ìn nhanh khu vß╗▒c & ─æß╗ïnh vß╗ï lß║íi */}
         <div className="flex items-center flex-wrap gap-2">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Khu vực:</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Khu vß╗▒c:</span>
           {QUICK_CITIES.map((city) => (
             <button
               key={city.name}
@@ -617,36 +658,36 @@ export default function DriverMap() {
             size="sm"
             icon={RotateCcw}
             onClick={detectUserLocation}
-            title="Định vị lại GPS của bạn"
+            title="─Éß╗ïnh vß╗ï lß║íi GPS cß╗ºa bß║ín"
             className="rounded-full"
           >
-            Định vị lại
+            ─Éß╗ïnh vß╗ï lß║íi
           </Button>
         </div>
       </Card>
 
-      {/* Cảnh báo khi GPS bị từ chối */}
+      {/* Cß║únh b├ío khi GPS bß╗ï tß╗½ chß╗æi */}
       {gpsStatus === 'denied' && (
         <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 p-3 rounded-2xl text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <Info className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <span>
-              Trình duyệt chưa cấp quyền GPS. Đang hiển thị trạm sạc khu vực Thái Nguyên mặc định. Bạn có thể chọn nhanh thành phố phía trên hoặc bấm "Định vị lại".
+              Tr├¼nh duyß╗çt ch╞░a cß║Ñp quyß╗ün GPS. ─Éang hiß╗ân thß╗ï trß║ím sß║íc khu vß╗▒c Th├íi Nguy├¬n mß║╖c ─æß╗ïnh. Bß║ín c├│ thß╗â chß╗ìn nhanh th├ánh phß╗æ ph├¡a tr├¬n hoß║╖c bß║Ñm "─Éß╗ïnh vß╗ï lß║íi".
             </span>
           </div>
         </div>
       )}
 
-      {/* Layout Split: Trái là Bản đồ, Phải là Danh sách trạm gần nhất */}
+      {/* Layout Split: Tr├íi l├á Bß║ún ─æß╗ô, Phß║úi l├á Danh s├ích trß║ím gß║ºn nhß║Ñt */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-220px)] min-h-[620px]">
         
-        {/* Khối Bản đồ tương tác đa lớp thông tin */}
+        {/* Khß╗æi Bß║ún ─æß╗ô t╞░╞íng t├íc ─æa lß╗¢p th├┤ng tin */}
         <div className="lg:col-span-7 xl:col-span-8 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-soft dark:shadow-soft-dark flex flex-col relative bg-slate-100 dark:bg-slate-900">
           
-          {/* Thanh công cụ điều khiển bản đồ nổi góc trên (Layer Switcher + Zoom + Center) */}
+          {/* Thanh c├┤ng cß╗Ñ ─æiß╗üu khiß╗ân bß║ún ─æß╗ô nß╗òi g├│c tr├¬n (Layer Switcher + Zoom + Center) */}
           <div className="absolute top-3 right-3 z-[400] flex items-center gap-2">
             
-            {/* Bộ chọn 3 lớp bản đồ: Đường phố (rõ nét) / Tối / Vệ tinh */}
+            {/* Bß╗Ö chß╗ìn 3 lß╗¢p bß║ún ─æß╗ô: ─É╞░ß╗¥ng phß╗æ (r├╡ n├⌐t) / Tß╗æi / Vß╗ç tinh */}
             <div className="flex items-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-1 rounded-xl border border-slate-200/90 dark:border-slate-800/90 shadow-md">
               <button
                 type="button"
@@ -656,9 +697,9 @@ export default function DriverMap() {
                     ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/30'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
-                title="Bản đồ đường phố: Tên đường, địa danh tiếng Việt cực kỳ rõ nét & chi tiết"
+                title="Bß║ún ─æß╗ô ─æ╞░ß╗¥ng phß╗æ: T├¬n ─æ╞░ß╗¥ng, ─æß╗ïa danh tiß║┐ng Viß╗çt cß╗▒c kß╗│ r├╡ n├⌐t & chi tiß║┐t"
               >
-                <span>🗺️ Đường phố</span>
+                <span>≡ƒù║∩╕Å ─É╞░ß╗¥ng phß╗æ</span>
               </button>
 
               <button
@@ -669,9 +710,9 @@ export default function DriverMap() {
                     ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/30'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
-                title="Bản đồ đêm công nghệ cao: Độ tương phản cao, tên đường sáng rõ"
+                title="Bß║ún ─æß╗ô ─æ├¬m c├┤ng nghß╗ç cao: ─Éß╗Ö t╞░╞íng phß║ún cao, t├¬n ─æ╞░ß╗¥ng s├íng r├╡"
               >
-                <span>🌙 Bản đồ tối</span>
+                <span>≡ƒîÖ Bß║ún ─æß╗ô tß╗æi</span>
               </button>
 
               <button
@@ -682,20 +723,20 @@ export default function DriverMap() {
                     ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/30'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 }`}
-                title="Ảnh vệ tinh mặt đất độ phân giải cao"
+                title="ß║ónh vß╗ç tinh mß║╖t ─æß║Ñt ─æß╗Ö ph├ón giß║úi cao"
               >
-                <span>🛰️ Vệ tinh</span>
+                <span>≡ƒ¢░∩╕Å Vß╗ç tinh</span>
               </button>
             </div>
 
-            {/* Nút hành động nhanh: GPS tài xế & Xem toàn cảnh */}
+            {/* N├║t h├ánh ─æß╗Öng nhanh: GPS t├ái xß║┐ & Xem to├án cß║únh */}
             <div className="flex items-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-1 rounded-xl border border-slate-200/90 dark:border-slate-800/90 shadow-md gap-1">
               <button
                 type="button"
                 onClick={handleFlyToUser}
                 className="p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
-                title="Bay về vị trí GPS của bạn"
-                aria-label="Vị trí của tôi"
+                title="Bay vß╗ü vß╗ï tr├¡ GPS cß╗ºa bß║ín"
+                aria-label="Vß╗ï tr├¡ cß╗ºa t├┤i"
               >
                 <LocateFixed className="w-4 h-4" />
               </button>
@@ -704,8 +745,8 @@ export default function DriverMap() {
                 type="button"
                 onClick={handleFitAllStations}
                 className="p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
-                title="Thu phóng bao trọn tất cả trạm sạc"
-                aria-label="Xem tất cả"
+                title="Thu ph├│ng bao trß╗ìn tß║Ñt cß║ú trß║ím sß║íc"
+                aria-label="Xem tß║Ñt cß║ú"
               >
                 <Eye className="w-4 h-4" />
               </button>
@@ -718,7 +759,7 @@ export default function DriverMap() {
             className="w-full h-full relative z-0"
           />
 
-          {/* Thẻ nổi thông tin trạm đang chọn (Quick Floating Station Card) */}
+          {/* Thß║╗ nß╗òi th├┤ng tin trß║ím ─æang chß╗ìn (Quick Floating Station Card) */}
           {selectedStation && (
             <div className="absolute top-16 left-4 right-4 sm:right-auto sm:max-w-md z-[400] bg-white/95 dark:bg-[#151D2A]/95 backdrop-blur-md border border-sky-500/50 p-4 rounded-2xl shadow-xl space-y-3 transition-all animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-start justify-between gap-3">
@@ -732,7 +773,7 @@ export default function DriverMap() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1" title={selectedStation.address}>
-                    {selectedStation.address || 'Địa chỉ đang cập nhật'}
+                    {selectedStation.address || '─Éß╗ïa chß╗ë ─æang cß║¡p nhß║¡t'}
                   </p>
                 </div>
 
@@ -740,36 +781,36 @@ export default function DriverMap() {
                   type="button"
                   onClick={() => setSelectedStationId(null)}
                   className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  title="Đóng thẻ thông tin"
+                  title="─É├│ng thß║╗ th├┤ng tin"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Thông số nhanh của trạm đang chọn */}
+              {/* Th├┤ng sß╗æ nhanh cß╗ºa trß║ím ─æang chß╗ìn */}
               <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 text-xs text-center">
                 <div>
-                  <span className="text-[10px] text-slate-400 block">KHOẢNG CÁCH</span>
+                  <span className="text-[10px] text-slate-400 block">KHOß║óNG C├üCH</span>
                   <strong className="text-sky-600 dark:text-sky-400 font-mono font-bold text-xs">
                     {selectedStation.distance_km != null ? `${selectedStation.distance_km.toFixed(1)} km` : 'N/A'}
                   </strong>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 block">TRỤ SẴN SÀNG</span>
+                  <span className="text-[10px] text-slate-400 block">TRß╗ñ Sß║┤N S├ÇNG</span>
                   <strong className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs">
                     {(selectedStation.charging_points || []).filter((c) => c.status === 'AVAILABLE').length}/
-                    {(selectedStation.charging_points || []).length} trụ
+                    {(selectedStation.charging_points || []).length} trß╗Ñ
                   </strong>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 block">CÔNG SUẤT TỐI ĐA</span>
+                  <span className="text-[10px] text-slate-400 block">C├öNG SUß║ñT Tß╗ÉI ─ÉA</span>
                   <strong className="text-slate-800 dark:text-slate-200 font-mono font-bold text-xs">
                     {(selectedStation.charging_points || []).reduce((m, c) => Math.max(m, c.max_power_kw || 0), 0) || selectedStation.total_grid_capacity_kw || 60} kW
                   </strong>
                 </div>
               </div>
 
-              {/* Nút hành động trực tiếp */}
+              {/* N├║t h├ánh ─æß╗Öng trß╗▒c tiß║┐p */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <a
                   href={`https://www.google.com/maps/dir/?api=1&destination=${selectedStation.latitude},${selectedStation.longitude}`}
@@ -778,7 +819,7 @@ export default function DriverMap() {
                   className="inline-flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all shadow-sm"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-sky-500" />
-                  <span>Chỉ đường</span>
+                  <span>Chß╗ë ─æ╞░ß╗¥ng</span>
                 </a>
 
                 <Button
@@ -790,53 +831,69 @@ export default function DriverMap() {
                 >
                   Sạc tại trạm này
                 </Button>
+
+                {/* Nút Đặt chỗ — chỉ khi có connector rảnh + role = CUSTOMER */}
+                {(selectedStation.charging_points || []).some((c) => c.status === 'AVAILABLE') && userRole === 'CUSTOMER' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={CalendarClock}
+                    onClick={() => {
+                      const avail = (selectedStation.charging_points || []).find((c) => c.status === 'AVAILABLE');
+                      if (avail) handleReserveConnector(avail, selectedStation);
+                    }}
+                    className="py-2 text-xs"
+                  >
+                    Đặt chỗ
+                  </Button>
+                )}
               </div>
             </div>
           )}
 
-          {/* Map floating legend (Glassmorphism) góc dưới bên trái */}
+          {/* Map floating legend (Glassmorphism) g├│c d╞░ß╗¢i b├¬n tr├íi */}
           <div className="absolute bottom-4 left-4 z-[400] bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 p-3 rounded-2xl text-xs text-slate-700 dark:text-slate-300 space-y-1.5 shadow-lg pointer-events-auto">
             <div className="font-semibold text-xs text-slate-900 dark:text-white mb-1">
-              Trạng thái trạm sạc
+              Trß║íng th├íi trß║ím sß║íc
             </div>
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shadow-sm"></span>
-              <span>Có trụ sẵn sàng</span>
+              <span>C├│ trß╗Ñ sß║╡n s├áng</span>
             </div>
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block shadow-sm"></span>
-              <span>Đang phục vụ sạc</span>
+              <span>─Éang phß╗Ñc vß╗Ñ sß║íc</span>
             </div>
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shadow-sm"></span>
-              <span>Bảo trì kỹ thuật</span>
+              <span>Bß║úo tr├¼ kß╗╣ thuß║¡t</span>
             </div>
           </div>
         </div>
 
-        {/* Danh sách trạm sạc gần nhất bên phải */}
+        {/* Danh s├ích trß║ím sß║íc gß║ºn nhß║Ñt b├¬n phß║úi */}
         <div className="lg:col-span-5 xl:col-span-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151D2A] shadow-soft dark:shadow-soft-dark flex flex-col overflow-hidden">
           
-          {/* Header & Bộ lọc tìm kiếm */}
+          {/* Header & Bß╗Ö lß╗ìc t├¼m kiß║┐m */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <NavigationIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 <h2 className="font-bold text-sm text-slate-900 dark:text-white">
-                  Trạm Sạc Gần Bạn ({filteredStations.length})
+                  Trß║ím Sß║íc Gß║ºn Bß║ín ({filteredStations.length})
                 </h2>
               </div>
               <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Sắp xếp theo khoảng cách
+                Sß║»p xß║┐p theo khoß║úng c├ích
               </span>
             </div>
 
-            {/* Input tìm kiếm */}
+            {/* Input t├¼m kiß║┐m */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
               <input
                 type="text"
-                placeholder="Tìm theo tên trạm hoặc địa chỉ..."
+                placeholder="T├¼m theo t├¬n trß║ím hoß║╖c ─æß╗ïa chß╗ë..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 pl-9 pr-9 py-2 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 placeholder:text-slate-400 transition-all"
@@ -852,7 +909,7 @@ export default function DriverMap() {
               )}
             </div>
 
-            {/* Bộ lọc chuẩn sạc dạng Chips & Trạng thái */}
+            {/* Bß╗Ö lß╗ìc chuß║⌐n sß║íc dß║íng Chips & Trß║íng th├íi */}
             <div className="flex items-center justify-between gap-2 pt-1">
               <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar">
                 {['ALL', 'CCS2', 'TYPE_2', 'CHADEMO'].map((type) => (
@@ -866,7 +923,7 @@ export default function DriverMap() {
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
-                    {type === 'ALL' ? 'Tất cả chuẩn' : type.replace('_', ' ')}
+                    {type === 'ALL' ? 'Tß║Ñt cß║ú chuß║⌐n' : type.replace('_', ' ')}
                   </button>
                 ))}
               </div>
@@ -878,13 +935,13 @@ export default function DriverMap() {
                   onChange={(e) => setAvailableOnly(e.target.checked)}
                   className="rounded text-sky-600 focus:ring-sky-500 w-4 h-4 border-slate-300 dark:border-slate-700 dark:bg-slate-900"
                 />
-                <span>Còn trụ</span>
+                <span>C├▓n trß╗Ñ</span>
               </label>
             </div>
 
-            {/* Bộ lọc công suất nhanh (>=60kW, >=120kW) */}
+            {/* Bß╗Ö lß╗ìc c├┤ng suß║Ñt nhanh (>=60kW, >=120kW) */}
             <div className="flex items-center gap-1.5 pt-0.5 text-xs">
-              <span className="text-slate-400 text-[11px] font-medium shrink-0">Công suất:</span>
+              <span className="text-slate-400 text-[11px] font-medium shrink-0">C├┤ng suß║Ñt:</span>
               <button
                 type="button"
                 onClick={() => setPowerFilter('ALL')}
@@ -894,7 +951,7 @@ export default function DriverMap() {
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                Mọi công suất
+                Mß╗ìi c├┤ng suß║Ñt
               </button>
               <button
                 type="button"
@@ -905,7 +962,7 @@ export default function DriverMap() {
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                ⚡ Nhanh (≥60 kW)
+                ΓÜí Nhanh (ΓëÑ60 kW)
               </button>
               <button
                 type="button"
@@ -916,12 +973,12 @@ export default function DriverMap() {
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                ⚡ Siêu nhanh (≥120 kW)
+                ΓÜí Si├¬u nhanh (ΓëÑ120 kW)
               </button>
             </div>
           </div>
 
-          {/* Danh sách cuộn trạm sạc */}
+          {/* Danh s├ích cuß╗Ön trß║ím sß║íc */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
             {loading ? (
               <div className="space-y-3">
@@ -932,9 +989,9 @@ export default function DriverMap() {
             ) : filteredStations.length === 0 ? (
               <EmptyState
                 icon={MapPinOff}
-                title="Không tìm thấy trạm sạc phù hợp"
-                description="Hãy thử đổi từ khóa tìm kiếm hoặc bỏ chọn các điều kiện lọc để xem thêm trạm sạc khác."
-                actionLabel="Đặt lại bộ lọc"
+                title="Kh├┤ng t├¼m thß║Ñy trß║ím sß║íc ph├╣ hß╗úp"
+                description="H├úy thß╗¡ ─æß╗òi tß╗½ kh├│a t├¼m kiß║┐m hoß║╖c bß╗Å chß╗ìn c├íc ─æiß╗üu kiß╗çn lß╗ìc ─æß╗â xem th├¬m trß║ím sß║íc kh├íc."
+                actionLabel="─Éß║╖t lß║íi bß╗Ö lß╗ìc"
                 onAction={() => {
                   setSearchQuery('');
                   setConnectorFilter('ALL');
@@ -961,7 +1018,7 @@ export default function DriverMap() {
                         : 'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm'
                     }`}
                   >
-                    {/* Header trạm: Tên & Khoảng cách */}
+                    {/* Header trß║ím: T├¬n & Khoß║úng c├ích */}
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
                         <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center space-x-2">
@@ -971,7 +1028,7 @@ export default function DriverMap() {
                           </span>
                         </div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1" title={st.address}>
-                          {st.address || 'Địa chỉ đang cập nhật'}
+                          {st.address || '─Éß╗ïa chß╗ë ─æang cß║¡p nhß║¡t'}
                         </div>
                       </div>
 
@@ -984,10 +1041,10 @@ export default function DriverMap() {
                       )}
                     </div>
 
-                    {/* Thông số kỹ thuật: Trụ khả dụng & Công suất */}
+                    {/* Th├┤ng sß╗æ kß╗╣ thuß║¡t: Trß╗Ñ khß║ú dß╗Ñng & C├┤ng suß║Ñt */}
                     <div className="grid grid-cols-2 gap-2.5 my-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs">
                       <div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">TRỤ KHẢ DỤNG</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">TRß╗ñ KHß║ó Dß╗ñNG</div>
                         <div className="font-semibold flex items-center space-x-1.5 mt-0.5">
                           <span
                             className={`w-2 h-2 rounded-full ${
@@ -995,13 +1052,13 @@ export default function DriverMap() {
                             }`}
                           />
                           <span className={availableCount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
-                            {availableCount}/{totalCount} trụ sẵn sàng
+                            {availableCount}/{totalCount} trß╗Ñ sß║╡n s├áng
                           </span>
                         </div>
                       </div>
 
                       <div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">CÔNG SUẤT TỐI ĐA</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">C├öNG SUß║ñT Tß╗ÉI ─ÉA</div>
                         <div className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 flex items-center space-x-1 font-mono">
                           <Zap className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                           <span>{maxKw} kW</span>
@@ -1009,14 +1066,14 @@ export default function DriverMap() {
                       </div>
                     </div>
 
-                    {/* Đơn giá & Giờ hoạt động */}
+                    {/* ─É╞ín gi├í & Giß╗¥ hoß║ít ─æß╗Öng */}
                     <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-3.5">
                       <span className="flex items-center space-x-1.5">
                         <Clock className="w-3.5 h-3.5" />
                         <span>{st.operating_hours || '24/7'}</span>
                       </span>
                       <span className="text-slate-700 dark:text-slate-300">
-                        Đơn giá: <strong className="text-amber-600 dark:text-amber-400 font-mono">~3.858 đ/kWh</strong>
+                        ─É╞ín gi├í: <strong className="text-amber-600 dark:text-amber-400 font-mono">~3.858 ─æ/kWh</strong>
                       </span>
                     </div>
 
@@ -1030,7 +1087,7 @@ export default function DriverMap() {
                         className="inline-flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all shadow-sm"
                       >
                         <ExternalLink className="w-3.5 h-3.5 text-sky-500" />
-                        <span>Chỉ đường</span>
+                        <span>Chß╗ë ─æ╞░ß╗¥ng</span>
                       </a>
 
                       <Button
@@ -1043,9 +1100,34 @@ export default function DriverMap() {
                         }}
                         className="py-2 text-xs"
                       >
-                        Sạc tại trạm này
+                        Sß║íc tß║íi trß║ím n├áy
                       </Button>
                     </div>
+
+                    {/* Nut Dat cho */}
+                    {(() => {
+                      const chargers = st.charging_points || [];
+                      const avail = chargers.find((c) => c.status === 'AVAILABLE');
+                      if (avail && userRole === 'CUSTOMER') {
+                        return (
+                          <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              icon={CalendarClock}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReserveConnector(avail, st);
+                              }}
+                              className="w-full py-2 text-xs"
+                            >
+                              Dat cho
+                            </Button>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 );
               })
@@ -1053,6 +1135,14 @@ export default function DriverMap() {
           </div>
         </div>
       </div>
+      {/* Modal Đặt chỗ */}
+      <ReservationModal
+        isOpen={showReservationModal}
+        onClose={() => setShowReservationModal(false)}
+        connector={selectedConnector}
+        walletBalance={walletBalance}
+        onSuccess={handleReservationSuccess}
+      />
     </div>
   );
 }
