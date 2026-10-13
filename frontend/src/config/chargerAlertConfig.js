@@ -3,12 +3,13 @@
  * Tập trung các hằng số, thông điệp tiếng Việt và Mock Data theo yêu cầu PO.
  */
 
-// 1. Ngưỡng quy định cảnh báo
+// 1. Ngưỡng quy định cảnh báo (TẠM THỜI – giá trị tạm, chờ PO xác nhận)
 export const ALERT_THRESHOLDS = {
-  // Trụ ngoại tuyến quá lâu (phút)
+  // Trụ ngoại tuyến quá lâu (phút) - TẠM THỜI: chờ PO xác nhận (gợi ý: 30)
   OFFLINE_MINUTES: 30,
-  // Số lần lỗi FAULTED liên tiếp
-  CONSECUTIVE_FAULTS: 3,
+  // Số lần lỗi FAULTED liên tiếp - TẠM THỜI: chờ PO xác nhận
+  // Mặc định = 1 để khớp thẻ thống kê "Bị lỗi" và hiện ngay khi báo lỗi (có thể cấu hình thành 3 nếu PO yêu cầu)
+  CONSECUTIVE_FAULTS: 1,
 };
 
 // 2. Mức độ ưu tiên cảnh báo (sử dụng đúng token màu của dự án)
@@ -73,3 +74,65 @@ export const MOCK_CHARGER_ALERTS = {
   ],
 };
 
+/**
+ * Định dạng thời gian sự kiện theo chuẩn hiển thị FE: HH:mm:ss DD/MM/YYYY
+ * @param {string|number|Date} [dateInput]
+ * @returns {string}
+ */
+export const formatEventTime = (dateInput) => {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  if (isNaN(d.getTime())) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    const dateStr = now.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    return `${timeStr} ${dateStr}`;
+  }
+  const time = d.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const date = d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  return `${time} ${date}`;
+};
+
+/**
+ * Tính toán và định dạng khoảng thời gian đã ngoại tuyến theo thời gian thực
+ * @param {string|number|Date} offlineSince Mốc thời điểm bắt đầu mất kết nối
+ * @param {number|Date} [currentTime=Date.now()] Mốc thời gian hiện tại từ live timer
+ * @returns {string}
+ */
+export const formatOfflineDuration = (offlineSince, currentTime = Date.now()) => {
+  if (!offlineSince) return 'Gần đây';
+  const start = new Date(offlineSince).getTime();
+  const now = typeof currentTime === 'number' ? currentTime : new Date(currentTime).getTime();
+  const diffSec = Math.max(0, Math.floor((now - start) / 1000));
+
+  if (diffSec < 60) {
+    return `${diffSec} giây`;
+  }
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return `${diffMin} phút`;
+  }
+  const hours = Math.floor(diffMin / 60);
+  const remainingMins = diffMin % 60;
+  if (remainingMins === 0) {
+    return `${hours} giờ`;
+  }
+  return `${hours} giờ ${remainingMins} phút`;
+};

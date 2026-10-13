@@ -24,7 +24,8 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { telemetryWs } from '../services/websocket';
 import AlertBanner from '../components/ui/AlertBanner';
-import { MOCK_CHARGER_ALERTS } from '../config/chargerAlertConfig';
+import { ALERT_THRESHOLDS } from '../config/chargerAlertConfig';
+import { buildChargerAlerts } from '../services/chargerAlertAdapter';
 
 // Định nghĩa cấu hình trạng thái: Nhãn chữ, Icon và Mã ký hiệu trợ năng WCAG
 const STATUS_CONFIG = {
@@ -143,7 +144,34 @@ export default function ChargerGridMonitor() {
         api.get('/chargers'),
         api.get('/stations'),
       ]);
-      setChargers(chargersRes.data || []);
+      const rawChargers = chargersRes.data || [];
+      setChargers((prev) => {
+        const prevMap = new Map(prev.map((c) => [c.id, c]));
+        return rawChargers.map((c) => {
+          const isFaulted = (c.status || '').toUpperCase() === 'FAULTED';
+          const prevCharger = prevMap.get(c.id);
+
+          return {
+            ...c,
+            // consecutiveFaults: Ưu tiên dữ liệu BE; nếu BE chưa có, bảo toàn bộ đếm trong phiên nếu vẫn FAULTED, ngược lại là 0
+            consecutiveFaults:
+              c.consecutiveFaults !== undefined
+                ? c.consecutiveFaults
+                : (c.consecutive_faults !== undefined
+                    ? c.consecutive_faults
+                    : (isFaulted ? (prevCharger?.consecutiveFaults || 1) : 0)),
+            lastFaultAt:
+              c.lastFaultAt ||
+              prevCharger?.lastFaultAt ||
+              (isFaulted ? (c.faulted_at || c.updated_at || new Date().toISOString()) : null),
+            // offlineSince: Chỉ kích hoạt khi có thông tin ngắt kết nối thực tế từ BE (không tự ép UNAVAILABLE thành offline)
+            offlineSince:
+              c.offlineSince ||
+              prevCharger?.offlineSince ||
+              (c.connected === false || c.is_online === false ? (c.last_seen_at || new Date().toISOString()) : null),
+          };
+        });
+      });
       setStations(stationsRes.data || []);
     } catch (err) {
       console.error('Lỗi tải dữ liệu màn hình lưới:', err);
@@ -168,9 +196,23 @@ export default function ChargerGridMonitor() {
       if (data.event === 'STATUS_CHANGED' && data.entity_type === 'CHARGING_POINT') {
         const targetId = Number(data.id);
         const newStatus = data.status;
+        const isFaulted = (newStatus || '').toUpperCase() === 'FAULTED';
+        const nowIso = new Date().toISOString();
 
         setChargers((prev) =>
-          prev.map((c) => (c.id === targetId ? { ...c, status: newStatus } : c))
+          prev.map((c) => {
+            if (c.id === targetId) {
+              const currentFaults = c.status === 'FAULTED' ? (c.consecutiveFaults || 1) : 0;
+              const nextFaults = isFaulted ? currentFaults + 1 : 0;
+              return {
+                ...c,
+                status: newStatus,
+                consecutiveFaults: nextFaults,
+                lastFaultAt: isFaulted ? (c.lastFaultAt || nowIso) : null,
+              };
+            }
+            return c;
+          })
         );
 
         setUpdatedChargerId(targetId);
@@ -178,7 +220,16 @@ export default function ChargerGridMonitor() {
 
         // Nếu modal đang mở đúng trụ này, cập nhật modal luôn
         setSelectedCharger((prev) =>
-          prev && prev.id === targetId ? { ...prev, status: newStatus } : prev
+          prev && prev.id === targetId
+            ? {
+                ...prev,
+                status: newStatus,
+                consecutiveFaults: isFaulted
+                  ? (prev.status === 'FAULTED' ? (prev.consecutiveFaults || 1) + 1 : 1)
+                  : 0,
+                lastFaultAt: isFaulted ? (prev.lastFaultAt || nowIso) : null,
+              }
+            : prev
         );
       }
 
@@ -208,7 +259,7 @@ export default function ChargerGridMonitor() {
     };
   }, [fetchData]);
 
-  // Thao tác đổi trạng thái trụ sạc nhanh (Admin / Operator)
+  // Thao tác đổi trạng thái trụ sạc nhanh (Admin / Operator) - Lớp mô phỏng demo theo SCRUM-320
   const handleUpdateStatus = async (newStatus) => {
     if (!selectedCharger) return;
     try {
@@ -218,15 +269,42 @@ export default function ChargerGridMonitor() {
         status: newStatus,
       });
 
-      // Cập nhật state cục bộ
-      const updated = res.data;
+      // Lớp mô phỏng riêng để demo trạng thái (SCRUM-320 / SCRUM-295)
+      const isFaulted = (newStatus || '').toUpperCase() === 'FAULTED';
+      const now = new Date();
+
+      // Mỗi lần trụ nhận trạng thái FAULTED (kể cả bấm "Báo lỗi" lặp lại) tính là 1 lần lỗi; bộ đếm lỗi liên tiếp tăng lên.
+      // Trụ chuyển sang trạng thái khác FAULTED thì bộ đếm reset về 0.
+      const currentFaults =
+        selectedCharger.status === 'FAULTED' ? (selectedCharger.consecutiveFaults || 1) : 0;
+      const nextFaults = isFaulted ? currentFaults + 1 : 0;
+
+      const updated = {
+        ...res.data,
+        consecutiveFaults: nextFaults,
+        lastFaultAt: isFaulted ? (selectedCharger.lastFaultAt || now.toISOString()) : null,
+        offlineSince:
+          res.data.offlineSince ||
+          (res.data.connected === false ? (res.data.last_seen_at || now.toISOString()) : null),
+      };
+
       setChargers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       setSelectedCharger(updated);
+
+      let successText = `Đã cập nhật trạng thái trụ thành ${STATUS_CONFIG[newStatus]?.label || newStatus}`;
+      if (isFaulted) {
+        if (nextFaults >= ALERT_THRESHOLDS.CONSECUTIVE_FAULTS) {
+          successText += ` (${nextFaults} lần lỗi - Đã kích hoạt Banner cảnh báo)`;
+        } else {
+          successText += ` (${nextFaults}/${ALERT_THRESHOLDS.CONSECUTIVE_FAULTS} lần lỗi - Cần thêm ${ALERT_THRESHOLDS.CONSECUTIVE_FAULTS - nextFaults} lần để đạt ngưỡng cảnh báo)`;
+        }
+      }
+
       setStatusUpdateMessage({
         type: 'success',
-        text: `Đã cập nhật trạng thái trụ thành ${STATUS_CONFIG[newStatus]?.label || newStatus}`,
+        text: successText,
       });
-      setTimeout(() => setStatusUpdateMessage(null), 3000);
+      setTimeout(() => setStatusUpdateMessage(null), 3500);
     } catch (err) {
       console.error('Lỗi cập nhật trạng thái trụ sạc:', err);
       setStatusUpdateMessage({
@@ -268,6 +346,11 @@ export default function ChargerGridMonitor() {
       preparing,
       totalLivePower: Math.round(totalLivePower * 10) / 10,
     };
+  }, [chargers]);
+
+  // Danh sách alerts chuẩn hóa tính từ dữ liệu sống của màn hình (SCRUM-320 / SCRUM-295)
+  const chargerAlerts = useMemo(() => {
+    return buildChargerAlerts(chargers);
   }, [chargers]);
 
   // Lọc danh sách trụ sạc
@@ -355,30 +438,14 @@ export default function ChargerGridMonitor() {
 
       {/* SCRUM-320: Banner cảnh báo đầu màn hình theo dõi trụ sạc */}
       <AlertBanner
-        faultedChargers={MOCK_CHARGER_ALERTS.faulted}
-        offlineChargers={MOCK_CHARGER_ALERTS.offline}
+        alerts={chargerAlerts}
         onSelectCharger={(alertItem) => {
           if (!alertItem) return;
-          // Tìm trụ tương ứng trong danh sách để mở modal chi tiết
           const targetCharger = chargers.find(
-            (c) => c.id === alertItem.id || c.code === alertItem.code
+            (c) => c.id === alertItem.chargerId || c.code === alertItem.chargerCode
           );
           if (targetCharger) {
             setSelectedCharger(targetCharger);
-          } else {
-            // Mở modal với dữ liệu mô phỏng nếu chưa có trong DB
-            setSelectedCharger({
-              id: alertItem.id,
-              code: alertItem.code,
-              station_name: alertItem.station_name,
-              status: alertItem.consecutive_faults ? 'FAULTED' : 'UNAVAILABLE',
-              vendor: 'VinFast / ABB',
-              model: 'FastCharger 150kW',
-              max_power_kw: 150,
-              firmware_version: '1.2.0',
-              power_sharing_enabled: true,
-              connectors: [],
-            });
           }
         }}
       />
@@ -834,11 +901,16 @@ export default function ChargerGridMonitor() {
                     Tạm ngưng
                   </button>
                   <button
-                    disabled={isUpdatingStatus || selectedCharger.status === 'FAULTED'}
+                    disabled={isUpdatingStatus}
                     onClick={() => handleUpdateStatus('FAULTED')}
                     className="px-2.5 py-2 rounded-lg text-xs font-medium bg-rose-950/70 hover:bg-rose-900 text-rose-400 border border-rose-500/40 transition-all disabled:opacity-40"
+                    title={
+                      selectedCharger.status === 'FAULTED'
+                        ? 'Bấm lại để ghi nhận thêm 1 lần lỗi (tăng bộ đếm lỗi liên tiếp)'
+                        : 'Chuyển trạng thái sang Báo lỗi'
+                    }
                   >
-                    Báo lỗi
+                    Báo lỗi {selectedCharger.status === 'FAULTED' && selectedCharger.consecutiveFaults ? `(${selectedCharger.consecutiveFaults})` : ''}
                   </button>
                 </div>
               </div>
