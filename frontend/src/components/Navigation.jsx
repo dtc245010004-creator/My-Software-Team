@@ -14,6 +14,8 @@ import {
   Clock,
   AlertOctagon,
   Search,
+  BarChart3,
+  Scale,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -26,10 +28,13 @@ export default function Navigation() {
     { to: '/driver/stations', label: 'Tìm Trạm Sạc', icon: Search, roles: ['CUSTOMER'] },
     { to: '/map', label: 'Bản Đồ', icon: MapPin, roles: ['CUSTOMER'] },
     { to: '/stations', label: 'Hạ Tầng Trạm Sạc', icon: BatteryCharging, roles: ['ADMIN', 'OPERATOR'] },
+    { to: '/reports/revenue', label: 'Báo Cáo Doanh Thu', icon: BarChart3, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CPO'] },
+    { to: '/reconciliation', label: 'Đối Soát Kế Toán', icon: Scale, roles: ['ADMIN', 'ACCOUNTANT'] },
     { to: '/tariffs', label: 'Biểu Giá', icon: Clock, roles: ['ADMIN', 'OPERATOR', 'CPO'] },
     { to: '/abnormal-sessions', label: 'Phiên Bất Thường', icon: AlertOctagon, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
     { to: '/simulator', label: 'Bảng Giả Lập Sạc', icon: Gauge, roles: ['CUSTOMER'] },
-    { to: '/wallet', label: 'Ví Cá Nhân', icon: Wallet, roles: ['CUSTOMER'] },
+    { to: '/reservations', label: 'Đặt Chỗ', icon: Clock, roles: ['CUSTOMER', 'ADMIN', 'OPERATOR'] },
+    { to: '/wallet', label: 'Ví Cá Nhân', icon: Wallet, roles: ['CUSTOMER', 'ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
     { to: '/sessions', label: 'Nhật Ký Phiên Sạc', icon: History, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CUSTOMER'] },
     { to: '/audit-logs', label: 'Tra Cứu Nhật Ký', icon: ScrollText, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
     { to: '/ai-advisor', label: 'AI Cố Vấn & Bảo Trì', icon: Cpu, roles: ['ADMIN', 'OPERATOR'] },

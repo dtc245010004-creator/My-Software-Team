@@ -15,6 +15,15 @@ export const ACTION_LABELS = {
   REMOTE_START_TRANSACTION: 'Bắt đầu phiên từ xa',
   CHANGE_AVAILABILITY: 'Đổi trạng thái trụ',
   UPDATE_FIRMWARE: 'Cập nhật firmware',
+  // Thao tác giao dịch ví & tài xế (SCRUM-388 / SCRUM-412)
+  ADMIN_MANUAL_TOPUP: 'Nạp tay ví tài xế',
+  ADMIN_MANUAL_TOPUP_FAILED: 'Nạp tay ví thất bại',
+  MANUAL_TOPUP: 'Nạp tay ví tài xế',
+  WalletReconciliationUnlocked: 'Mở khóa đối soát ví',
+  WalletLedgerMismatchDetected: 'Phát hiện lệch sổ cái ví',
+  WALLET_ADJUSTMENT: 'Điều chỉnh số dư ví',
+  DEBT_LOCK: 'Khóa nợ ví',
+  DEBT_UNLOCK: 'Mở khóa nợ ví',
 };
 
 export const RESULT_LABELS = {
@@ -24,6 +33,7 @@ export const RESULT_LABELS = {
   Accepted: 'Chấp nhận',
   Rejected: 'Từ chối',
   Timeout: 'Quá thời gian',
+  Completed: 'Đã hoàn thành',
 };
 
 /**

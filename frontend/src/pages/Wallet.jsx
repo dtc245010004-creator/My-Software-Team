@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   PlusCircle,
@@ -25,6 +25,7 @@ import api from '../services/api';
 import { telemetryWs } from '../services/websocket';
 import { useAuth } from '../context/AuthContext';
 import { formatVNDateTime } from '../utils/formatTime';
+import { isPenaltyTransaction } from '../utils/reservationUtils';
 
 // ============================================================================
 // HẰNG SỐ & HÀM HELPER THUẦN KHIẾT (PURE FUNCTIONS) CHO VALIDATION & CALLBACK
@@ -314,7 +315,7 @@ export function useTopupRealtimeSync({
 // ============================================================================
 
 export default function Wallet() {
-  const { user, token, isGuest, updateGuestName, guestName } = useAuth();
+  const { user, token, isGuest, updateGuestName, guestName, quickSwitch } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -350,6 +351,46 @@ export default function Wallet() {
   // Pagination (Client-side cho danh sách 50 dòng API trả về)
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
+
+  // SCRUM-378: Bộ lọc loại giao dịch sổ cái (Tất cả, Nạp tiền, Cước sạc, Phí quá hạn giữ chỗ)
+  const [txFilter, setTxFilter] = useState(() => {
+    const filterParam = searchParams.get('filter');
+    const hlParam = searchParams.get('highlight');
+    if (
+      filterParam === 'PENALTY' ||
+      hlParam === 'penalty' ||
+      (hlParam && String(hlParam).toLowerCase().includes('res'))
+    ) {
+      return 'PENALTY';
+    }
+    return 'ALL';
+  });
+
+  // Giả lập trừ phí giữ chỗ quá hạn để kiểm thử hiển thị (S-50 / SCRUM-354 / SCRUM-378)
+  const handleSimulatePenaltyTx = () => {
+    const fee = 20000;
+    const mockTx = {
+      id: Date.now(),
+      wallet_id: wallet?.id || 1,
+      amount: -fee,
+      transaction_type: 'NO_SHOW_PENALTY',
+      balance_before: wallet ? Number(wallet.balance) : 250000,
+      balance_after: (wallet ? Number(wallet.balance) : 250000) - fee,
+      reference_type: 'RESERVATION',
+      reference_id: `RES-20261013-001`,
+      receipt_code: null,
+      note: 'Phí giữ chỗ quá hạn không tới nhận trụ #RES-20261013-001 tại Trạm Sạc VinFast Thảo Điền',
+      created_at: new Date().toISOString(),
+    };
+    setTransactions((prev) => [mockTx, ...prev]);
+    if (wallet) {
+      setWallet((prev) => ({
+        ...prev,
+        balance: (Number(prev.balance) - fee).toFixed(2),
+      }));
+    }
+    setTxFilter('PENALTY');
+  };
 
   // Tải số dư ví, lịch sử sổ cái và danh sách đơn nạp Sandbox
   const fetchWalletData = useCallback(async (silent = false) => {
@@ -714,6 +755,57 @@ export default function Wallet() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const balance = wallet ? Number(wallet.balance) : 0;
+  const currentAmountNum = parseFloat(topupAmount) || 100000;
+  const transferContent = `EVCSMS NAP ${payerName.trim() || 'TAI XE'}`;
+  const vietQrUrl = `https://api.vietqr.io/image/970422-999988886666-compact2.png?amount=${currentAmountNum}&addInfo=${encodeURIComponent(
+    transferContent
+  )}&accountName=EV%20CSMS%20CHARGING`;
+
+  // SCRUM-378: Lọc giao dịch theo loại (Tất cả, Nạp tiền, Cước sạc, Phí quá hạn)
+  const penaltyTxs = useMemo(
+    () => (Array.isArray(transactions) ? transactions.filter(isPenaltyTransaction) : []),
+    [transactions]
+  );
+  const totalPenaltyAmount = useMemo(() => {
+    return penaltyTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.amount || 0)), 0);
+  }, [penaltyTxs]);
+
+  const topupTxsCount = useMemo(
+    () =>
+      Array.isArray(transactions)
+        ? transactions.filter((tx) => tx.transaction_type === 'TOPUP').length
+        : 0,
+    [transactions]
+  );
+  const chargeTxsCount = useMemo(
+    () =>
+      Array.isArray(transactions)
+        ? transactions.filter(
+            (tx) => tx.transaction_type === 'CHARGE_FEE' && !isPenaltyTransaction(tx)
+          ).length
+        : 0,
+    [transactions]
+  );
+
+  const filteredTransactions = useMemo(() => {
+    if (!Array.isArray(transactions)) return [];
+    if (txFilter === 'TOPUP') return transactions.filter((tx) => tx.transaction_type === 'TOPUP');
+    if (txFilter === 'CHARGE_FEE')
+      return transactions.filter(
+        (tx) => tx.transaction_type === 'CHARGE_FEE' && !isPenaltyTransaction(tx)
+      );
+    if (txFilter === 'PENALTY') return penaltyTxs;
+    return transactions;
+  }, [transactions, txFilter, penaltyTxs]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE) || 1;
+  const currentTransactions = filteredTransactions.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12 text-steel-gray">
@@ -752,20 +844,6 @@ export default function Wallet() {
       </div>
     );
   }
-
-  const balance = wallet ? Number(wallet.balance) : 0;
-  const currentAmountNum = parseFloat(topupAmount) || 100000;
-  const transferContent = `EVCSMS NAP ${payerName.trim() || 'TAI XE'}`;
-  const vietQrUrl = `https://api.vietqr.io/image/970422-999988886666-compact2.png?amount=${currentAmountNum}&addInfo=${encodeURIComponent(
-    transferContent
-  )}&accountName=EV%20CSMS%20CHARGING`;
-
-  // Pagination logic
-  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
-  const currentTransactions = transactions.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
 
   // Render Badge cho trạng thái đơn nạp tiền Sandbox (SCRUM-245)
   const renderOrderStatusBadge = (status) => {
@@ -829,6 +907,33 @@ export default function Wallet() {
           </span>
         </div>
       </div>
+
+      {/* Banner hướng dẫn vai trò nếu đang đăng nhập Admin / Kế toán / Chủ trạm */}
+      {user && user.role !== 'CUSTOMER' && (
+        <div className="bg-sky-950/40 border border-sky-500/40 rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-1.5 bg-sky-500/20 text-sky-400 rounded-md">
+              <User className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-semibold text-tech-white">
+                Bạn đang xem ví với tài khoản {user.full_name || user.username} ({user.role}).
+              </p>
+              <p className="text-steel-gray">
+                Để kiểm tra ví và các giao dịch nạp tiền / cước sạc thực tế của Tài xế (driver_vip - Trần Thị Bích Ngọc), bạn có thể chuyển nhanh sang vai trò Tài xế.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => quickSwitch && quickSwitch('CUSTOMER')}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-md transition-colors shrink-0 shadow-sm shadow-emerald-600/30"
+          >
+            <span>Chuyển sang Tài xế (driver_vip)</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Banner thông báo kết quả Callback / Webhook (SCRUM-239, SCRUM-240, SCRUM-245) */}
       {bannerAlert && (
@@ -1167,28 +1272,117 @@ export default function Wallet() {
 
           {/* BẢNG 2: LỊCH SỬ BIẾN ĐỘNG SỐ DƯ SỔ CÁI (WALLET LEDGER) */}
           <div className="bg-panel border border-hairline p-5 rounded-sm space-y-4 flex flex-col">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
-                LỊCH SỬ BIẾN ĐỘNG SỐ DƯ SỔ CÁI &amp; QUYẾT TOÁN CƯỚC SẠC
-              </h2>
-              <span className="text-[11px] font-mono text-steel-gray">
-                {transactions.length} Giao dịch
-              </span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
+                  LỊCH SỬ BIẾN ĐỘNG SỐ DƯ SỔ CÁI &amp; QUYẾT TOÁN CƯỚC SẠC
+                </h2>
+                <span className="text-[11px] font-mono text-steel-gray">
+                  Hiển thị {filteredTransactions.length} / {transactions.length} Giao dịch
+                </span>
+              </div>
+
+              {/* Nút giả lập phí quá hạn & Link sang Đặt chỗ (S-50 / SCRUM-354 / SCRUM-378) */}
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={handleSimulatePenaltyTx}
+                  className="px-2.5 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/40 text-[10px] font-mono font-bold transition-colors inline-flex items-center space-x-1"
+                  title="Thêm 1 giao dịch mẫu trừ phí quá hạn giữ chỗ để đối soát trên ví"
+                >
+                  <PlusCircle className="w-3 h-3" />
+                  <span>+ Giả Lập Phí Quá Hạn (Demo)</span>
+                </button>
+
+                <Link
+                  to="/reservations"
+                  className="px-2.5 py-1 rounded bg-obsidian hover:bg-hairline text-steel-gray hover:text-tech-white border border-hairline text-[10px] font-mono transition-colors inline-flex items-center space-x-1"
+                >
+                  <Clock className="w-3 h-3 text-sky-400" />
+                  <span>Lịch Sử Đặt Chỗ</span>
+                  <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
             </div>
 
+            {/* Bộ lọc loại giao dịch (SCRUM-378) */}
+            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pt-1">
+              {[
+                { key: 'ALL', label: 'TẤT CẢ', count: transactions.length },
+                { key: 'TOPUP', label: 'NẠP TIỀN', count: topupTxsCount },
+                { key: 'CHARGE_FEE', label: 'CƯỚC SẠC', count: chargeTxsCount },
+                {
+                  key: 'PENALTY',
+                  label: 'PHÍ QUÁ HẠN GIỮ CHỖ',
+                  count: penaltyTxs.length,
+                  highlight: true,
+                },
+              ].map((tab) => {
+                const isSelected = txFilter === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      setTxFilter(tab.key);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold flex items-center space-x-1.5 transition-all whitespace-nowrap ${
+                      isSelected
+                        ? tab.highlight
+                          ? 'bg-amber-500 text-black shadow-sm'
+                          : 'bg-electric-cyan text-tech-white shadow-sm'
+                        : tab.highlight && tab.count > 0
+                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25'
+                        : 'bg-obsidian border border-hairline text-steel-gray hover:text-tech-white'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
+                        isSelected ? 'bg-black/20 text-white' : 'bg-panel text-steel-gray'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Cảnh báo nếu có khoản phí giữ chỗ quá hạn (SCRUM-378 Notice) */}
+            {penaltyTxs.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded p-3 text-[11px] font-mono text-amber-300 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>
+                    Ví của bạn có <strong>{penaltyTxs.length}</strong> khoản phí phạt do giữ chỗ quá 15 phút không tới nhận trụ (Tổng: <strong className="text-critical-red">-{totalPenaltyAmount.toLocaleString('vi-VN')} đ</strong>).
+                  </span>
+                </div>
+                <Link
+                  to="/reservations?tab=EXPIRED"
+                  className="text-amber-400 underline font-bold hover:text-white shrink-0 ml-3"
+                >
+                  Xem chi tiết đặt chỗ &rarr;
+                </Link>
+              </div>
+            )}
+
             <div className="overflow-x-auto flex-1">
-              {transactions.length === 0 ? (
+              {filteredTransactions.length === 0 ? (
                 <div className="text-xs text-steel-gray text-center py-12 font-mono">
-                  Chưa có lịch sử giao dịch nào được ghi nhận cho ví này.
+                  {txFilter === 'PENALTY'
+                    ? 'Không có khoản phí phạt giữ chỗ quá hạn nào.'
+                    : 'Chưa có lịch sử giao dịch nào được ghi nhận cho bộ lọc này.'}
                 </div>
               ) : (
                 <table className="w-full text-left font-mono text-xs">
                   <thead>
                     <tr className="border-b border-hairline text-steel-gray">
                       <th className="pb-2">MÃ GD</th>
-                      <th className="pb-2">LOẠI</th>
+                      <th className="pb-2">LOẠI GIAO DỊCH</th>
                       <th className="pb-2">SỐ TIỀN</th>
-                      <th className="pb-2">GHI CHÚ</th>
+                      <th className="pb-2">GHI CHÚ / THAM CHIẾU</th>
                       <th className="pb-2">THỜI GIAN</th>
                       <th className="pb-2 text-right">CHI TIẾT</th>
                     </tr>
@@ -1196,36 +1390,51 @@ export default function Wallet() {
                   <tbody className="divide-y divide-hairline">
                     {currentTransactions.map((tx) => {
                       const isCredit = tx.transaction_type === 'TOPUP';
+                      const isPenalty = isPenaltyTransaction(tx);
                       const amountNum = Number(tx.amount);
 
                       const targetLink = isCredit
                         ? '/wallet'
+                        : isPenalty
+                        ? `/reservations?highlight=${tx.reference_id || tx.id}`
                         : `/session/${tx.reference_id || tx.id}`;
 
                       return (
-                        <tr key={tx.id} className="hover:bg-panel-hover group transition-colors">
+                        <tr
+                          key={tx.id}
+                          className={`hover:bg-panel-hover group transition-colors ${
+                            isPenalty ? 'bg-amber-500/5' : ''
+                          }`}
+                        >
                           <td className="py-2.5 text-steel-gray">#{tx.id}</td>
                           <td className="py-2.5">
                             <span
                               className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                 isCredit
-                                  ? 'bg-grid-green/20 text-grid-green'
-                                  : 'bg-critical-red/20 text-critical-red'
+                                  ? 'bg-grid-green/20 text-grid-green border border-grid-green/30'
+                                  : isPenalty
+                                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 inline-flex items-center space-x-1'
+                                  : 'bg-critical-red/20 text-critical-red border border-critical-red/30'
                               }`}
                             >
-                              {tx.transaction_type}
+                              {isPenalty && <Clock className="w-2.5 h-2.5 mr-0.5" />}
+                              {isPenalty ? 'PHÍ QUÁ HẠN GIỮ CHỖ' : tx.transaction_type}
                             </span>
                           </td>
                           <td
                             className={`py-2.5 font-bold tabular-nums ${
-                              isCredit ? 'text-grid-green' : 'text-critical-red'
+                              isCredit
+                                ? 'text-grid-green'
+                                : isPenalty
+                                ? 'text-amber-400 font-extrabold'
+                                : 'text-critical-red'
                             }`}
                           >
                             {isCredit ? '+' : '-'}
-                            {amountNum.toLocaleString('vi-VN')} đ
+                            {Math.abs(amountNum).toLocaleString('vi-VN')} đ
                           </td>
                           <td className="py-2.5 text-steel-gray text-[11px] max-w-xs truncate">
-                            {tx.note || '—'}
+                            {tx.note || (isPenalty ? 'Phí giữ chỗ quá hạn không tới nhận trụ' : '—')}
                           </td>
                           <td className="py-2.5 text-steel-gray text-[11px]">
                             {formatVNDateTime(tx.created_at)}
@@ -1233,9 +1442,13 @@ export default function Wallet() {
                           <td className="py-2.5 text-right">
                             <Link
                               to={targetLink}
-                              className="inline-flex items-center text-[10px] uppercase font-bold text-electric-cyan hover:text-white transition-colors p-1"
+                              className={`inline-flex items-center text-[10px] uppercase font-bold transition-colors p-1 ${
+                                isPenalty
+                                  ? 'text-amber-400 hover:text-amber-300'
+                                  : 'text-electric-cyan hover:text-white'
+                              }`}
                             >
-                              <span>Xem</span>
+                              <span>{isPenalty ? 'Xem Đặt Chỗ' : 'Xem'}</span>
                               <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                             </Link>
                           </td>
@@ -1248,12 +1461,12 @@ export default function Wallet() {
             </div>
 
             {/* Pagination Controls */}
-            {transactions.length > 0 && (
+            {filteredTransactions.length > 0 && (
               <div className="border-t border-hairline pt-4 flex items-center justify-between text-[11px] font-mono text-steel-gray">
                 <div>
                   Đang hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{' '}
-                  {Math.min(currentPage * ITEMS_PER_PAGE, transactions.length)} trong tổng số{' '}
-                  {transactions.length} giao dịch
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredTransactions.length)} trong tổng số{' '}
+                  {filteredTransactions.length} giao dịch
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
