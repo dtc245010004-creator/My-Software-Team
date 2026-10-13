@@ -20,6 +20,7 @@ import AbnormalSessions from './pages/AbnormalSessions';
 import AuditLogs from './pages/AuditLogs';
 import TariffForm from './components/TariffForm';
 import ChargerDetail from './pages/ChargerDetail';
+import ChargerGridMonitor from './pages/ChargerGridMonitor';
 import InvoiceDetail from './pages/InvoiceDetail';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
@@ -96,6 +97,15 @@ function AppLayout() {
             }
           />
           <Route path="/session/:id" element={<ActiveSession />} />
+          {/* Màn hình lưới theo dõi trụ sạc (SCRUM-52 / SCRUM-129 / SCRUM-320) */}
+          <Route
+            path="/charger-grid"
+            element={
+              ['ADMIN', 'OPERATOR'].includes(role)
+                ? <ChargerGridMonitor />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
           {/* Màn hình trụ sạc và điều khiển bắt đầu từ xa (S-24 / T-52 / SCRUM-154) */}
           <Route path="/chargers/:id" element={<ChargerDetail />} />
           <Route path="/charger/:id" element={<ChargerDetail />} />
