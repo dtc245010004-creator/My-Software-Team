@@ -179,6 +179,8 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `GEMINI_API_KEY` | String | `""` | Khóa API dịch vụ AI Google Gemini (tùy chọn) |
 | `AI_MODEL_NAME` | String | `gemini-1.5-flash` | Định danh mô hình AI phân tích tải trạm |
 | `HEARTBEAT_INTERVAL_SECONDS` | Integer | `300` | Chu kỳ heartbeat trả trong BootNotification OCPP 1.6J (giây) |
+| `STATION_NEARBY_DEFAULT_LIMIT` | Integer | `20` | Số trạm mặc định trả về mỗi trang của API công khai tìm trạm gần |
+| `STATION_NEARBY_MAX_LIMIT` | Integer | `50` | Số trạm tối đa cho mỗi trang API tìm trạm gần |
 | `OCPP_CALL_TIMEOUT_SECONDS` | Float | `30.0` | Thời gian chờ CALL do CSMS gửi xuống trụ khi không truyền timeout riêng (giây) |
 | `ABNORMAL_SESSION_THRESHOLD_SECONDS` | Integer | `500` | Ngưỡng thời gian không nhận liên lạc trước khi job gắn cờ phiên đang sạc bất thường (giây); job không tự đóng phiên |
 | `IDLE_FEE_MAX_MINUTES` | Integer | `240` | Trần số phút chịu phí chiếm trụ trong một phiên, sau khi trừ thời gian ân hạn |

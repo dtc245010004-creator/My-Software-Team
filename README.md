@@ -101,6 +101,12 @@ curl -X GET "http://localhost:8000/api/v1/health"
 curl -X POST "http://localhost:8000/api/v1/auth/login" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=operator&password=OpPass123"
+
+# 3. Tìm trạm gần vị trí Hà Nội (không cần đăng nhập)
+curl "http://localhost:8000/api/v1/stations/nearby?user_lat=21.0285&user_lon=105.8542&radius_km=15&limit=20"
+
+# 4. Tìm theo tên hoặc địa chỉ khi không có GPS
+curl --get "http://localhost:8000/api/v1/stations/nearby" --data-urlencode "q=Hà Nội"
 ```
 
 ### Dữ liệu demo
@@ -182,7 +188,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 *(Nguồn: `backend/app/api/v1/__init__.py:10-18`)*
 Hệ thống cung cấp 9 nhóm router REST API tại tiền tố `/api/v1`:
 1. `/api/v1/auth`: Đăng ký, đăng nhập JWT, lấy thông tin cá nhân.
-2. `/api/v1/stations`: Quản lý trạm sạc, đo đếm phụ tải trạm.
+2. `/api/v1/stations`: Quản lý trạm sạc, đo đếm phụ tải trạm; `GET /nearby` tìm trạm công khai theo GPS hoặc tên/địa chỉ, xem đầu nối rảnh và giá hiện tại.
 3. `/api/v1/chargers`: Quản lý trụ sạc và cổng sạc vật lý.
 4. `/api/v1/tariffs`: Quản lý biểu giá điện TOU 3 khung giờ.
 5. `/api/v1/wallet`: Quản lý ví điện tử, nạp tiền, trừ cước.

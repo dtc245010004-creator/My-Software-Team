@@ -177,11 +177,18 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
 
 ---
 
+## TC-FB-19: Tìm trạm gần và xem đầu nối rảnh (S-47, Backend)
+* **Hợp đồng API**: `GET /api/v1/stations/nearby` là endpoint công khai; chấp nhận cặp `user_lat`/`user_lon` hoặc từ khóa `q`, tùy chọn `radius_km` và `connector_type`, cùng `limit` (tối đa 50) / `offset`. Không có vị trí và từ khóa thì trả HTTP 422.
+* **Phản hồi công khai**: Chỉ trả trạm `ACTIVE` đang hoạt động, khoảng cách Haversine nếu có tọa độ, số đầu nối rảnh/tổng, loại đầu nối, trạng thái/công suất tóm tắt, và giá TOU hiệu lực hiện tại. Không trả `operator_id`, công suất lưới hay cờ nội bộ. Trạm thiếu GPS vẫn tìm được theo từ khóa và xếp cuối khi tìm kèm GPS; radius loại trạm không có tọa độ.
+* **Bằng chứng kiểm thử backend (13/10/2026, chưa commit)**: `backend/tests/test_station_nearby_s47.py` đạt **8 passed**; full backend suite trên Python 3.14.7 đạt **546 passed, 1 skipped, 320 warnings**. Test migration cũ dùng thư mục `tmp_path` trong workspace do quyền Windows chặn thư mục tạm mặc định. Ruff đạt; chưa kiểm thử trình duyệt vì Story yêu cầu phạm vi Backend.
+
+---
+
 ## Current Summary
 
 ### Đánh giá mức độ tích hợp Frontend ↔ Backend
   * **Mức độ tương thích**: Hợp đồng API có kiểm thử backend tự động; chưa kiểm tra thủ công giao diện trên trình duyệt sau cập nhật hóa đơn S-33.
-* TC-FB-01 đến TC-FB-18 có mô tả hợp đồng; backend suite hiện đạt 437 passed. Telemetry ngày 10/10/2026 đã qua 39 test frontend, build và runtime WebSocket smoke; chưa kiểm tra trực quan trên trình duyệt.
+* TC-FB-01 đến TC-FB-19 có mô tả hợp đồng; backend suite ngày 13/10/2026 đạt 546 passed, 1 skipped. Telemetry ngày 10/10/2026 đã qua 39 test frontend, build và runtime WebSocket smoke; chưa kiểm tra trực quan trên trình duyệt.
 * Mã nguồn telemetry dùng WebSocket singleton dùng chung; runtime smoke đã kết nối, đăng ký topic và nhận PONG.
 
 ---
