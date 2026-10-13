@@ -1,7 +1,7 @@
 """Các phép tính tiền điện và phí chiếm trụ."""
 
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import NamedTuple
 
 from app.core.config import settings
@@ -40,7 +40,10 @@ def calculate_idle_fee_details(
         (excess_microseconds + minute_microseconds - 1) // minute_microseconds,
     )
     chargeable_minutes = min(max_minutes, chargeable_minutes)
-    return fee_per_minute * chargeable_minutes, chargeable_minutes
+    total_fee = (fee_per_minute * chargeable_minutes).quantize(
+        Decimal("1"), rounding=ROUND_HALF_UP
+    )
+    return total_fee, chargeable_minutes
 
 
 def calculate_idle_fee(

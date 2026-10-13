@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta, timezone
- 
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
- 
+
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.core.datetime_utils import VIETNAM_TZ, get_vn_now, to_vn_time
@@ -13,10 +14,21 @@ from app.models.user import User
 from app.schemas.tariff import TariffCreate, TariffResponse, TariffUpdate
 from app.services.station_service import verify_station_ownership
 from app.services.tariff_validation import validate_periods
- 
+
 router = APIRouter(prefix="/tariffs", tags=["Biểu giá điện linh hoạt (Tariffs)"])
  
  
+def _is_duplicate_effective_tariff_error(exc: IntegrityError) -> bool:
+    """Nhận diện xung đột duy nhất theo trạm và thời điểm hiệu lực."""
+    original = exc.orig
+    constraint_name = getattr(getattr(original, "diag", None), "constraint_name", None)
+    if constraint_name == "uq_tariffs_station_effective":
+        return True
+    return "UNIQUE constraint failed: tariffs.station_id, tariffs.effective_from" in str(
+        original
+    )
+
+
 def _build_periods(periods) -> list[TariffPeriod]:
     errors = validate_periods(periods)
     if errors:
@@ -139,7 +151,16 @@ def create_tariff(
     if tariff_in.periods is not None:
         new_tariff.periods = _build_periods(tariff_in.periods)
     db.add(new_tariff)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if _is_duplicate_effective_tariff_error(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Đã có biểu giá cho trạm tại thời điểm hiệu lực này.",
+            ) from exc
+        raise
     db.refresh(new_tariff)
     return new_tariff
  
@@ -226,6 +247,8 @@ def update_tariff(
         "peak_end_2": current_tariff.peak_end_2,
         "offpeak_start": current_tariff.offpeak_start,
         "offpeak_end": current_tariff.offpeak_end,
+        "idle_fee_per_minute": current_tariff.idle_fee_per_minute,
+        "idle_grace_minutes": current_tariff.idle_grace_minutes,
         "is_active": True,
         "effective_from": effective_dt,
     }
@@ -240,7 +263,16 @@ def update_tariff(
     else:
         new_version_tariff.periods = _clone_periods(current_tariff.periods)
     db.add(new_version_tariff)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if _is_duplicate_effective_tariff_error(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Đã có biểu giá cho trạm tại thời điểm hiệu lực này.",
+            ) from exc
+        raise
     db.refresh(new_version_tariff)
     return new_version_tariff
  
@@ -275,4 +307,3 @@ def delete_tariff(
     tariff.is_active = False
     db.commit()
     return {"message": f"Đã vô hiệu hóa biểu giá '{tariff.name}' thành công."}
- 

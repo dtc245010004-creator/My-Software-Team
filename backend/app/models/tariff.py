@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    UniqueConstraint,
     func,
     text,
 )
@@ -30,6 +31,9 @@ class Tariff(Base):
         ),
         CheckConstraint(
             "idle_grace_minutes >= 0", name="ck_tariff_idle_grace_non_negative"
+        ),
+        UniqueConstraint(
+            "station_id", "effective_from", name="uq_tariffs_station_effective"
         ),
     )
 

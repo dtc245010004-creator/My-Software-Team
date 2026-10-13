@@ -6,6 +6,7 @@ import { getTariff, saveTariff } from '../services/tariffApi';
 
 export default function TariffForm({ stationId = 1 }) {
     const [periods, setPeriods] = useState([]);
+    const [tariffId, setTariffId] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState(null); // 'success' | 'error' | null
@@ -13,6 +14,7 @@ export default function TariffForm({ stationId = 1 }) {
 
     useEffect(() => {
         getTariff(stationId).then(data => {
+            setTariffId(data?.id ?? null);
             if (data && data.periods) {
                 setPeriods(data.periods);
             }
@@ -49,12 +51,13 @@ export default function TariffForm({ stationId = 1 }) {
         setSaveStatus(null);
         
         try {
-            await saveTariff(stationId, { periods });
+            const savedTariff = await saveTariff(tariffId, { periods });
+            setTariffId(savedTariff.id);
             setSaveStatus('success');
             setTimeout(() => setSaveStatus(null), 3000);
         } catch (error) {
             setSaveStatus('error');
-            setServerError(error.message || 'Lỗi khi lưu biểu giá từ server');
+            setServerError(error.response?.data?.detail || error.message || 'Lỗi khi lưu biểu giá từ server');
         } finally {
             setIsSaving(false);
         }

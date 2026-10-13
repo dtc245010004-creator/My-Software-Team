@@ -16,14 +16,16 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 | `backend/app/ocpp/handlers/` | Xử lý thông điệp OCPP, gồm trạng thái connector và kết thúc phiên. |
 | `backend/alembic/versions/` | Migration Alembic; cấu hình tại `backend/alembic.ini`. |
 | `backend/tests/` | Kiểm thử backend, bao gồm API, ACID và luồng OCPP. |
-| `frontend/src/` | Giao diện React; không thuộc phạm vi thay đổi của phần billing backend này. |
+| `frontend/src/` | Giao diện React và các dịch vụ gọi API chung cho từng khu vực chức năng. |
 | `docs/` | Kiến trúc, vận hành, kế hoạch, QA và hướng dẫn phát triển. |
 
 ## Biểu giá và tính tiền phiên sạc
 
-- `backend/app/models/tariff.py` lưu biểu giá gắn theo `station_id`; các cột giá TOU và giờ cố định vẫn được giữ.
-- `backend/app/schemas/tariff.py` xác thực đơn giá, phí chiếm trụ và thời gian ân hạn không âm trước khi request vào endpoint.
-- `backend/app/services/billing.py` chứa `calculate_idle_fee` và hàm tổng hợp `calculate_session_total`. Phí chiếm trụ lấy khoảng thời gian connector báo `Finishing` hoặc `SuspendedEV` đến khi báo `Available`, trừ ân hạn, làm tròn lên theo phút bằng `Decimal` và giới hạn số phút chịu phí bởi `IDLE_FEE_MAX_MINUTES` (mặc định 240, đọc từ settings).
+- `backend/app/models/tariff.py` lưu biểu giá gắn theo `station_id`; ràng buộc `uq_tariffs_station_effective` ngăn hai phiên bản giá của cùng trạm có cùng `effective_from`.
+- `backend/app/schemas/tariff.py` xác thực đơn giá và phí chiếm trụ không âm, tối đa 8 chữ số nguyên và 2 chữ số thập phân, tương ứng với `Numeric(10,2)` trong DB.
+- `backend/app/api/v1/endpoints/tariffs.py` tạo phiên bản mới khi cập nhật, sao chép cả cấu hình phí chiếm trụ/ân hạn; xung đột hiệu lực trả HTTP 409. Migration kiểm tra dữ liệu trùng trước khi thêm unique constraint và dừng có thông báo nếu cần xử lý dữ liệu hiện hữu.
+- `frontend/src/services/tariffApi.js` dùng API client chung tại `/api/v1/tariffs`, chọn phiên bản hiệu lực, ánh xạ trường khung giờ của backend và không dùng dữ liệu giả.
+- `backend/app/services/billing.py` chứa `calculate_idle_fee` và hàm tổng hợp `calculate_session_total`. Phí chiếm trụ lấy khoảng thời gian connector báo `Finishing` hoặc `SuspendedEV` đến khi báo `Available`, trừ ân hạn, làm tròn số phút lên, làm tròn tiền lẻ đến đồng theo `ROUND_HALF_UP`, và giới hạn số phút chịu phí bởi `IDLE_FEE_MAX_MINUTES` (mặc định 240, đọc từ settings).
 - `backend/app/models/station.py` lưu thời điểm đổi trạng thái cùng mốc bắt đầu/kết thúc chiếm trụ; `backend/app/ocpp/handlers/status_notification.py` ghi nhận các mốc từ `StatusNotification`.
 - `backend/app/models/session.py` lưu riêng `idle_amount` để hóa đơn có thể đọc lại.
 - Bốn điểm kết thúc phiên dùng chung hàm tính tổng: `stop_charging_session`, `reconcile_interrupted_sessions` và `remote_stop_charging_session` trong `backend/app/services/session_service.py`, cùng `handle_stop_transaction` trong `backend/app/ocpp/handlers/stop_transaction.py`.
