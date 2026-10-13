@@ -9,6 +9,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,8 @@ from app.models.id_tag import IdTag
 from app.models.meter_value import MeterValue
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
+from app.models.wallet import Wallet
+from app.services.wallet_service import topup_wallet
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 pytestmark = pytest.mark.skipif(
@@ -75,6 +78,24 @@ def prepare_live_points(engine, count: int):
 
         station_id = points[0].station_id
         tag = db.query(IdTag).filter(IdTag.code == "SIM-DEMO-TAG").one()
+
+        # StartTransaction now enforces the same minimum wallet balance as the
+        # REST flow. The simulator's demo user is intentionally isolated, so
+        # fund it through the normal ledger path before starting live sessions.
+        target_balance = Decimal(os.getenv("OCPP_RECONNECT_TEST_WALLET_BALANCE", "1000000"))
+        wallet = db.query(Wallet).filter(Wallet.user_id == tag.user_id).one_or_none()
+        current_balance = Decimal(str(wallet.balance)) if wallet is not None else Decimal("0")
+        if current_balance < target_balance:
+            topup_wallet(
+                db,
+                user_id=tag.user_id,
+                amount=target_balance - current_balance,
+                note="Số dư fixture cho kiểm thử OCPP reconnect.",
+                reference_id=f"ocpp-reconnect-fixture-{uuid.uuid4().hex}",
+                reference_type="TEST_FIXTURE",
+                auto_commit=False,
+            )
+
         test_points = []
         for index in range(count):
             code = f"TEST-RECONNECT-{index + 1:03d}"
