@@ -28,6 +28,10 @@ from app.schemas.station import (
     StationUpdate,
 )
 from app.services.event_broadcaster import sse_broadcaster
+from app.services.session_service import (
+    determine_tou_rate,
+    get_or_create_default_tariff,
+)
 from app.services.station_service import (
     atomic_reactivate_station,
     atomic_soft_delete_station,
@@ -121,6 +125,17 @@ def list_stations(
             .distinct()
         )
 
+    vn_now_time = get_vn_now().time()
+    try:
+        default_tariff = get_or_create_default_tariff(db, station_id=None)
+        system_rate = (
+            float(determine_tou_rate(default_tariff, vn_now_time))
+            if default_tariff
+            else 3200.0
+        )
+    except Exception:  # noqa: BLE001
+        system_rate = 3200.0
+
     # Nếu có tọa độ GPS -> Lọc thô Bounding Box và tính khoảng cách Haversine
     if user_lat is not None and user_lon is not None:
         if radius_km:
@@ -135,6 +150,16 @@ def list_stations(
         stations = query.all()
         results: List[StationDistanceResponse] = []
         for st in stations:
+            try:
+                st_tariff = get_or_create_default_tariff(db, station_id=st.id)
+                rate = (
+                    float(determine_tou_rate(st_tariff, vn_now_time))
+                    if st_tariff
+                    else system_rate
+                )
+            except Exception:  # noqa: BLE001
+                rate = system_rate
+
             if st.latitude is not None and st.longitude is not None:
                 dist = calculate_haversine_distance(
                     user_lat, user_lon, st.latitude, st.longitude
@@ -143,11 +168,13 @@ def list_stations(
                     enriched = enrich_station_response(st)
                     dist_item = StationDistanceResponse.model_validate(enriched)
                     dist_item.distance_km = dist
+                    dist_item.current_price_per_kwh = rate
                     results.append(dist_item)
             elif radius_km is None:
-                results.append(
-                    StationDistanceResponse.model_validate(enrich_station_response(st))
-                )
+                enriched = enrich_station_response(st)
+                dist_item = StationDistanceResponse.model_validate(enriched)
+                dist_item.current_price_per_kwh = rate
+                results.append(dist_item)
 
         # Sắp xếp theo khoảng cách tăng dần và áp dụng phân trang
         results.sort(
@@ -157,7 +184,21 @@ def list_stations(
 
     # Không truyền GPS -> Phân trang thông thường
     stations = query.offset(skip).limit(limit).all()
-    return [enrich_station_response(st) for st in stations]
+    resp_list: List[StationResponse] = []
+    for st in stations:
+        try:
+            st_tariff = get_or_create_default_tariff(db, station_id=st.id)
+            rate = (
+                float(determine_tou_rate(st_tariff, vn_now_time))
+                if st_tariff
+                else system_rate
+            )
+        except Exception:  # noqa: BLE001
+            rate = system_rate
+        enriched = enrich_station_response(st)
+        enriched.current_price_per_kwh = rate
+        resp_list.append(enriched)
+    return resp_list
 
 
 @router.get(

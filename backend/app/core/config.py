@@ -34,6 +34,7 @@ class Settings(BaseSettings):
         default=240, ge=0
     )  # Trần số phút được tính phí chiếm trụ mỗi phiên
     ALLOW_REMOTE_START_SIMULATION: bool = False
+    ENABLE_DEMO_ACCOUNTS: bool = False
     TESTING: bool = False
     ENVIRONMENT: str = "development"
     RECONCILE_TOLERANCE_VND: int = 1000  # Ngưỡng lệch tiền chấp nhận được do làm tròn (S-53)

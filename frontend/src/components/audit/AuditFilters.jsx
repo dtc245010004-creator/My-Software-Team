@@ -20,6 +20,7 @@ const QUICK_RANGES = [
 export default function AuditFilters({
   chargers,
   users,
+  drivers = [],
   draft,
   applied,
   onChange,
@@ -50,7 +51,7 @@ export default function AuditFilters({
         </h2>
       </div>
 
-      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Bộ lọc 1 — Trụ sạc */}
         <div className="flex flex-col gap-1">
           <label htmlFor="filter-charger" className="text-[11px] font-mono text-steel-gray">
@@ -115,7 +116,50 @@ export default function AuditFilters({
           </div>
         </div>
 
-        {/* Bộ lọc 3 — Khoảng thời gian */}
+        {/* Bộ lọc 3 — Tài xế / Chủ ví (SCRUM-412) */}
+        <div className="flex flex-col gap-1">
+          <label htmlFor="filter-driver" className="text-[11px] font-mono text-steel-gray">
+            Tài xế / Chủ ví
+          </label>
+          <div className="flex gap-1">
+            {drivers.length > 0 ? (
+              <select
+                id="filter-driver"
+                value={draft.driverId || ''}
+                onChange={(e) => onChange({ ...draft, driverId: e.target.value })}
+                className="flex-1 bg-obsidian border border-hairline text-tech-white rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-electric-cyan"
+              >
+                <option value="">Tất cả tài xế</option>
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label || (d.fullName ? `${d.fullName} (${d.username})` : d.username)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id="filter-driver"
+                type="text"
+                placeholder="Nhập mã / ID tài xế..."
+                value={draft.driverId || ''}
+                onChange={(e) => onChange({ ...draft, driverId: e.target.value })}
+                className="flex-1 bg-obsidian border border-hairline text-tech-white rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-electric-cyan placeholder:text-steel-gray/50"
+              />
+            )}
+            {draft.driverId && (
+              <button
+                type="button"
+                onClick={() => clearSingle('driverId')}
+                title="Xóa lựa chọn tài xế"
+                className="px-2 bg-obsidian border border-hairline rounded text-steel-gray hover:text-tech-white hover:border-electric-cyan transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bộ lọc 4 — Khoảng thời gian */}
         <div className="flex flex-col gap-1">
           <span className="text-[11px] font-mono text-steel-gray">Khoảng thời gian</span>
           <div className="flex items-center gap-1">
@@ -217,6 +261,13 @@ export default function AuditFilters({
             </span>
           ) : (
             <span className="text-steel-gray/60">Tất cả người dùng</span>
+          )}
+          {applied.driverId ? (
+            <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30">
+              Tài xế: {applied.driverLabel || `#${applied.driverId}`}
+            </span>
+          ) : (
+            <span className="text-steel-gray/60">Tất cả tài xế</span>
           )}
           {applied.from || applied.to ? (
             <span className="px-1.5 py-0.5 rounded bg-caution-amber/15 text-caution-amber border border-caution-amber/30">

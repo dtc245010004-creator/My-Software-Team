@@ -39,13 +39,14 @@ def _ensure_simulation_allowed(user: User, condition: str) -> None:
     """
     if not condition:
         return
-    if not settings.ALLOW_REMOTE_START_SIMULATION:
+    enable_demo = getattr(settings, "ENABLE_DEMO_ACCOUNTS", False)
+    if not settings.ALLOW_REMOTE_START_SIMULATION and not enable_demo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chế độ mô phỏng chưa được bật trên môi trường này.",
         )
     running_pytest = settings.TESTING and "PYTEST_CURRENT_TEST" in os.environ
-    if not running_pytest and user.role != "ADMIN":
+    if not running_pytest and user.role != "ADMIN" and not enable_demo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ quản trị viên được dùng chế độ mô phỏng.",
@@ -61,10 +62,28 @@ def parse_time_str(time_str: str) -> time:
 def determine_tou_rate(tariff: Tariff, check_time: time) -> Decimal:
     """
     Xác định đơn giá điện TOU theo khung giờ:
-    - Giờ cao điểm (PEAK): 09:30 - 11:30 hoặc 17:00 - 20:00
-    - Giờ thấp điểm (OFFPEAK): 22:00 - 04:00 (vắt qua nửa đêm)
-    - Giờ bình thường (NORMAL): Các khung giờ còn lại
+    - Nếu biểu giá có danh sách khung giờ linh hoạt (tariff.periods): ưu tiên khớp theo khung giờ.
+    - Ngược lại fallback về 3 khung giờ mặc định (PEAK / OFFPEAK / NORMAL).
     """
+    periods = getattr(tariff, "periods", None)
+    if periods:
+        cur_min = check_time.hour * 60 + check_time.minute
+        for period in periods:
+            s_parts = period.start_time.split(":")
+            e_parts = period.end_time.split(":")
+            s_min = int(s_parts[0]) * 60 + int(s_parts[1])
+            e_min = (
+                1440
+                if period.end_time == "24:00"
+                else int(e_parts[0]) * 60 + int(e_parts[1])
+            )
+            if e_min > s_min:
+                if s_min <= cur_min < e_min:
+                    return Decimal(str(period.price_per_kwh))
+            elif e_min < s_min:
+                if cur_min >= s_min or cur_min < e_min:
+                    return Decimal(str(period.price_per_kwh))
+
     t = check_time
     peak1_s = parse_time_str(tariff.peak_start)
     peak1_e = parse_time_str(tariff.peak_end)
@@ -88,6 +107,7 @@ def determine_tou_rate(tariff: Tariff, check_time: time) -> Decimal:
 
     # 3. Giờ bình thường
     return tariff.price_normal
+
 
 
 def get_or_create_default_tariff(
