@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 
 from app.core.config import settings
+from app.core.security import create_access_token
 from app.models.payment import TopupOrder
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
@@ -334,4 +335,117 @@ def test_webhook_failed_status_updates_order_without_changing_balance(
     # Số dư ví giữ nguyên
     db_session.refresh(wallet)
     assert wallet.balance == Decimal("50000.00")
+
+
+def test_legacy_test_signature_is_rejected(client, db_session, driver_and_wallet_s39):
+    user = driver_and_wallet_s39["user"]
+    order = TopupOrder(
+        user_id=user.id,
+        order_code="ORDER_S39_LEGACY_SIGNATURE",
+        amount=Decimal("25000.00"),
+        status="PENDING",
+    )
+    db_session.add(order)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/payments/webhook",
+        json={
+            "order_code": order.order_code,
+            "status": "SUCCESS",
+            "signature": "test_valid_signature",
+        },
+    )
+
+    assert response.status_code == 401
+    db_session.refresh(order)
+    assert order.status == "PENDING"
+    assert driver_and_wallet_s39["wallet"].balance == Decimal("50000.00")
+
+
+def test_late_failed_webhook_cannot_overwrite_success(
+    client, db_session, driver_and_wallet_s39
+):
+    user = driver_and_wallet_s39["user"]
+    wallet = driver_and_wallet_s39["wallet"]
+    order = TopupOrder(
+        user_id=user.id,
+        order_code="ORDER_S39_LATE_FAILURE",
+        amount=Decimal("30000.00"),
+        status="PENDING",
+    )
+    db_session.add(order)
+    db_session.commit()
+
+    for target_status in ("SUCCESS", "FAILED", "CANCELLED"):
+        response = client.post(
+            "/api/v1/payments/webhook",
+            json={
+                "order_code": order.order_code,
+                "status": target_status,
+                "message": "late gateway callback",
+                "signature": compute_signature(order.order_code, target_status),
+            },
+        )
+        assert response.status_code == 200
+
+    db_session.refresh(order)
+    db_session.refresh(wallet)
+    assert order.status == "SUCCESS"
+    assert wallet.balance == Decimal("80000.00")
+    assert (
+        db_session.query(WalletTransaction)
+        .filter(
+            WalletTransaction.wallet_id == wallet.id,
+            WalletTransaction.transaction_type == "TOPUP",
+            WalletTransaction.amount == Decimal("30000.00"),
+        )
+        .count()
+        == 1
+    )
+
+
+def test_sandbox_simulation_signs_callback_on_server_and_checks_ownership(
+    client, db_session, driver_and_wallet_s39, monkeypatch
+):
+    user = driver_and_wallet_s39["user"]
+    wallet = driver_and_wallet_s39["wallet"]
+    monkeypatch.setattr(settings, "ALLOW_PAYMENT_SANDBOX_SIMULATION", True)
+    order = TopupOrder(
+        user_id=user.id,
+        order_code="ORDER_S39_SANDBOX_SIMULATION",
+        amount=Decimal("22000.00"),
+        status="PENDING",
+    )
+    db_session.add(order)
+    db_session.commit()
+    token = create_access_token({"sub": str(user.id), "role": user.role})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.post(
+        "/api/v1/payments/sandbox/simulate",
+        json={"order_code": order.order_code, "status": "SUCCESS"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+    db_session.refresh(wallet)
+    assert wallet.balance == Decimal("72000.00")
+
+    other = User(
+        username="other_sandbox_driver",
+        email="other_sandbox_driver@test.com",
+        password_hash="hashed_pw",
+        role="CUSTOMER",
+    )
+    db_session.add(other)
+    db_session.commit()
+    other_token = create_access_token({"sub": str(other.id), "role": other.role})
+    denied = client.post(
+        "/api/v1/payments/sandbox/simulate",
+        json={"order_code": order.order_code, "status": "SUCCESS"},
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+    assert denied.status_code == 404
 

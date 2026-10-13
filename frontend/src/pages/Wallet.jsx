@@ -546,6 +546,12 @@ export default function Wallet() {
   // ============================================================================
   // CÁC HÀNH ĐỘNG TRÊN CỔNG THANH TOÁN SANDBOX (4 KỊCH BẢN AC CỦA SCRUM-232)
   // ============================================================================
+  const sendSandboxWebhook = (orderCode, status, message) =>
+    api.post('/payments/sandbox/simulate', {
+      order_code: orderCode,
+      status,
+      message,
+    });
 
   // Kịch bản 1 (AC1 & AC2): Thanh toán thành công -> Gửi Webhook hợp lệ -> Quay về Return URL
   const handleSandboxPaySuccess = async () => {
@@ -554,12 +560,11 @@ export default function Wallet() {
       setProcessingGatewayAction(true);
       const { orderCode } = sandboxCheckout;
 
-      await api.post('/payments/webhook', {
-        order_code: orderCode,
-        status: 'SUCCESS',
-        message: 'Thanh toán thành công tại cổng Sandbox',
-        signature: 'test_valid_signature',
-      });
+      await sendSandboxWebhook(
+        orderCode,
+        'SUCCESS',
+        'Thanh toán thành công tại cổng Sandbox',
+      );
 
       setSandboxCheckout(null);
       navigate(`/wallet/topup/result?order_code=${orderCode}&status=SUCCESS`);
@@ -584,12 +589,11 @@ export default function Wallet() {
     // Giả lập cổng thanh toán gửi Webhook trễ sau 4 giây
     setTimeout(async () => {
       try {
-        await api.post('/payments/webhook', {
-          order_code: orderCode,
-          status: 'SUCCESS',
-          message: 'Webhook Sandbox xử lý hoàn tất (đến sau khi tài xế quay về ví)',
-          signature: 'test_valid_signature',
-        });
+        await sendSandboxWebhook(
+          orderCode,
+          'SUCCESS',
+          'Webhook Sandbox xử lý hoàn tất (đến sau khi tài xế quay về ví)',
+        );
       } catch (err) {
         console.error('Lỗi bắn Webhook trễ:', err);
       }
@@ -604,12 +608,7 @@ export default function Wallet() {
       const { orderCode } = sandboxCheckout;
       const reason = 'Ngân hàng phát hành từ chối giao dịch (Thẻ Sandbox vượt hạn mức ngày)';
 
-      await api.post('/payments/webhook', {
-        order_code: orderCode,
-        status: 'FAILED',
-        message: reason,
-        signature: 'test_valid_signature',
-      });
+      await sendSandboxWebhook(orderCode, 'FAILED', reason);
 
       setSandboxCheckout(null);
       navigate(
@@ -632,12 +631,7 @@ export default function Wallet() {
       const { orderCode } = sandboxCheckout;
       const reason = 'Tài xế chủ động hủy giao dịch tại cổng thanh toán Sandbox';
 
-      await api.post('/payments/webhook', {
-        order_code: orderCode,
-        status: 'CANCELLED',
-        message: reason,
-        signature: 'test_valid_signature',
-      });
+      await sendSandboxWebhook(orderCode, 'CANCELLED', reason);
 
       setSandboxCheckout(null);
       navigate(
@@ -655,12 +649,11 @@ export default function Wallet() {
   // Nút hỗ trợ kích hoạt Webhook trực tiếp cho một đơn đang PENDING trong danh sách
   const handleTriggerWebhookForOrder = async (orderCode) => {
     try {
-      await api.post('/payments/webhook', {
-        order_code: orderCode,
-        status: 'SUCCESS',
-        message: 'Xác nhận Webhook từ cổng Sandbox',
-        signature: 'test_valid_signature',
-      });
+      await sendSandboxWebhook(
+        orderCode,
+        'SUCCESS',
+        'Xác nhận Webhook từ cổng Sandbox',
+      );
       await checkOrderStatusNow(orderCode);
     } catch (err) {
       alert('Không thể gửi Webhook: ' + (err.response?.data?.detail || err.message));

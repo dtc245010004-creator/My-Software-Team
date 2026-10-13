@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     TOPUP_MAX_AMOUNT: int = 50000000
     SANDBOX_PAYMENT_SECRET: str = "sandbox_secret"
     PAYMENT_WEBHOOK_SECRET: str = "sandbox_secret"
+    ALLOW_PAYMENT_SANDBOX_SIMULATION: bool = False
 
     # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"

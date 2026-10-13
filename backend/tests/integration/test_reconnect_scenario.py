@@ -6,6 +6,7 @@ import random
 import time
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from app.models.id_tag import IdTag
 from app.models.meter_value import MeterValue
@@ -13,6 +14,7 @@ from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
+from app.services.wallet_service import topup_wallet
 
 RECONNECT_COUNT = int(os.getenv("OCPP_RECONNECT_CHARGE_POINTS", "5"))
 RECONNECT_DELAY_SECONDS = float(os.getenv("OCPP_RECONNECT_DELAY_SECONDS", "2"))
@@ -49,6 +51,7 @@ def test_reconnect_scenario_keeps_one_session_and_expected_energy(client, db_ses
     )
     db_session.add(user)
     db_session.flush()
+    topup_wallet(db_session, user.id, Decimal("1000000.00"), note="Dữ liệu test reconnect")
     station = Station(
         name="Trạm kiểm thử khôi phục",
         address="Địa chỉ kiểm thử",

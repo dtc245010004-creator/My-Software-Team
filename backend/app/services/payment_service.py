@@ -48,8 +48,10 @@ def verify_webhook_signature(
     expected = hmac.new(
         secret.encode("utf-8"), payload_bytes, hashlib.sha256
     ).hexdigest()
-    if hmac.compare_digest(expected, signature):
-        return True
-    if hmac.compare_digest(signature, "test_valid_signature"):
-        return True
-    return False
+    return hmac.compare_digest(expected, signature)
+
+
+def create_webhook_signature(order_code: str, status: str, secret: str) -> str:
+    """Tạo chữ ký cho callback sandbox ở phía server, không lộ secret ra trình duyệt."""
+    data = f"{order_code}|{status}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), data, hashlib.sha256).hexdigest()

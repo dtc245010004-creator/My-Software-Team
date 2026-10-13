@@ -7,6 +7,7 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 | Đường dẫn | Vai trò |
 | --- | --- |
 | `backend/app/api/v1/endpoints/` | Router REST và điều phối request/response. |
+| `backend/app/api/v1/endpoints/payments.py` | Nhận callback thanh toán HMAC; endpoint mô phỏng sandbox chỉ ký tại backend và chỉ cho chủ đơn PENDING dùng khi cấu hình bật. |
 | `backend/app/schemas/` | Kiểm tra dữ liệu vào/ra bằng Pydantic. |
 | `backend/app/models/` | Model SQLAlchemy cho trạm, đầu nối, phiên sạc, biểu giá, ví và dòng sổ cái. |
 | `backend/app/services/` | Nghiệp vụ dùng chung như quản lý phiên sạc, biểu giá, ví, sổ cái và billing. |
@@ -46,6 +47,14 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - Migration `backend/alembic/versions/f41a0b7c9d22_wallet_ledger_append_only.py` thêm cờ, chỉ mục duy nhất và trigger append-only. Do `wallet_transactions.wallet_id` và `wallets.user_id` dùng `ON DELETE CASCADE`, trigger cũng làm thao tác xóa ví/người dùng có giao dịch thất bại; giữ lịch sử bằng soft delete. Migration cố REVOKE UPDATE/DELETE cho role kết nối nếu role tồn tại, nhưng quyền của table owner/superuser không thể bị loại bỏ bằng REVOKE; trigger vẫn chặn DML thông thường.
 - Ví cũ thiếu dòng sổ sẽ được job phát hiện và khóa. Chưa backfill số dư đầu kỳ; cần phê duyệt riêng trước khi tạo dữ liệu opening-balance.
 - `[CẦN XÁC NHẬN]` S-37 cho phép phát sinh số dư âm, trong khi DB hiện chặn dưới `-500000` và tầng ứng dụng đặt ngưỡng khóa nợ `-300000`; chưa thay đổi hai ngưỡng này.
+
+## OCPP và toàn vẹn thanh toán
+
+- `backend/app/ocpp/handlers/start_transaction.py` gọi `validate_wallet_balance_for_session` trước khi chấp nhận `StartTransaction`; việc này chặn trụ dùng LocalPreAuthorize/cache thẻ để bỏ qua kiểm tra số dư của `Authorize`.
+- `backend/app/ocpp/handlers/stop_transaction.py` tính hóa đơn và gọi `auto_deduct_session_payment` trước cùng lần commit, tạo một dòng `CHARGE_FEE` tham chiếu `session_{id}`. Phiên cần xem xét không bị tự động thu tiền; lặp StopTransaction không trừ lần hai.
+- `backend/app/services/payment_service.py::verify_webhook_signature` chỉ chấp nhận HMAC hợp lệ từ `PAYMENT_WEBHOOK_SECRET`; chuỗi giả chữ ký cố định không còn ngoại lệ. `payments.py` giữ SUCCESS ở trạng thái kết thúc khi FAILED/CANCELLED đến muộn.
+- `POST /api/v1/payments/sandbox/simulate` tạo HMAC trong backend, chỉ cho phép mô phỏng đơn PENDING của chính tài khoản. Mặc định `ALLOW_PAYMENT_SANDBOX_SIMULATION` tắt trong settings; Compose phát triển bật để các nút sandbox hiện có hoạt động. Khi triển khai môi trường thật phải tắt cờ này.
+- `frontend/src/pages/Wallet.jsx` gọi endpoint mô phỏng có kiểm soát thay vì gửi chữ ký cố định; `frontend/src/pages/ChargerDetail.jsx` hiển thị thông báo số dư thiếu và nút sang `/wallet` khi backend trả `WALLET_INSUFFICIENT_BALANCE`.
 
 ### Đã thay đổi (10/10/2026, code commit `9ceae53`)
 

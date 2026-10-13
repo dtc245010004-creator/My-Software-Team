@@ -64,6 +64,7 @@
 | 2026-10-13 | S-47 Backend — tìm trạm gần và đầu nối rảnh | Endpoint công khai tìm theo GPS/tên/địa chỉ, trạng thái đầu nối và giá TOU | Hoàn thành Backend; đã đẩy lên `Duong`; chưa làm UI theo phạm vi | `backend/app/api/v1/endpoints/stations.py`, `backend/app/schemas/station.py`, `backend/app/services/station_discovery_service.py`, `backend/app/core/config.py`, `backend/tests/test_station_nearby_s47.py`, `.env.example`, `docker-compose.yml` | Test mới 8 passed; full backend **546 passed, 1 skipped, 320 warnings**; Ruff đạt. Compose config hợp lệ; Docker Desktop không khởi động được. Không cần migration. Commit `3d98b39`. |
 | 2026-10-13 | S-56 Backend — nhật ký thao tác ví | Audit nạp ví, đối soát/mở khóa và lọc nhật ký theo tài xế | Hoàn thành Backend; đã đẩy lên `Duong` | `backend/app/services/wallet_service.py`, `backend/app/api/v1/endpoints/{wallet.py,payments.py,audit_logs.py}`, `backend/tests/test_wallet_audit_s56.py` | 11 test mới; full backend **557 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Không migration/config mới. Commit `38dd323`. Không có chức năng điều chỉnh ví riêng trong code hiện tại. |
 | 2026-10-13 | S-57 Backend — yêu cầu ẩn danh hóa dữ liệu tài xế | Tạo yêu cầu, kiểm tra điều kiện duyệt, ẩn danh hóa lịch sử và audit | Hoàn thành Backend; chưa commit | `backend/app/api/v1/endpoints/data_erasure.py`, `backend/app/services/data_erasure_service.py`, model/schema/config, migration `cca26ecdf5a8`, `backend/tests/test_data_erasure_s57.py` | Thêm 16 ca; full suite và Ruff được ghi ở nhật ký #19 sau khi hoàn tất. Migration đã chạy upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; không dùng database dự án. Phạm vi dữ liệu cần mentor xác nhận. |
+| 2026-10-13 | Rà soát báo cáo lỗi OCPP và thanh toán | Sửa các lỗi webhook, xác thực ví khi bắt đầu sạc, ghi nợ lúc kết thúc phiên và thông báo thiếu tiền | Hoàn thành; đã kiểm tra toàn bộ backend và frontend | `backend/app/{api/v1/endpoints/payments.py,core/config.py,ocpp/handlers/{start_transaction.py,stop_transaction.py},services/payment_service.py}`, `frontend/src/pages/{Wallet.jsx,ChargerDetail.jsx}`, regression tests | Backend **595 passed, 1 skipped**; Ruff đạt; frontend **52 tests passed**, build đạt. Chi tiết tại nhật ký #21. |
 
 ---
 
@@ -281,4 +282,17 @@
 * **Phân loại báo cáo:** DEFECT-11 về WebSocket ActiveSession đã được xử lý trước đó trong `telemetryClient.js`/`websocket.js`, không còn tái hiện nên không sửa lại. Hành vi `station_id` không được phép đổi qua schema update được giữ nguyên. Các quyết định nghiệp vụ về grace microseconds, trần 240 phút và datetime naive chưa tự đổi; báo cáo kiểm thử PostgreSQL lịch sử cũng chưa được tái hiện trên database hiện tại.
 * **Kiểm chứng:** Bộ test mục tiêu đạt **42 passed**; full backend đạt **589 passed, 1 skipped, 320 warnings** trong 235.17 giây; frontend đạt **50 passed** và build thành công. Migration PostgreSQL 16 tạm `upgrade → downgrade → upgrade` đạt; `alembic heads` có đúng một head `6e7b8d9f1023`; `ruff check .` đạt. Test full dùng thư mục tạm riêng vì Windows chặn pytest temp mặc định.
 * **Đề xuất:** Chốt các câu hỏi nghiệp vụ trong báo cáo trước khi đổi grace/trần; nếu database hiện hữu có cặp station/time trùng, xử lý thủ công theo quyết định nghiệp vụ trước khi áp migration. Không tự xóa hay gộp biểu giá cũ.
+
+---
+
+#### 21. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Đối chiếu các lỗi trong `Bao_Cao_Loi_He_Thong_OCPP_Va_Thanh_Toan.docx` với code, sửa các lỗi còn tái hiện được và kiểm tra hồi quy.
+* **Lỗi đã sửa:**
+  - Bỏ chữ ký webhook giả `test_valid_signature`; thêm luồng giả lập thanh toán sandbox ký HMAC phía server, chỉ cho phép khi cấu hình bật, đơn thuộc tài khoản đang đăng nhập và còn `PENDING`.
+  - Chặn webhook trạng thái `FAILED`/`CANCELLED` đến muộn ghi đè đơn đã `SUCCESS`.
+  - Kiểm tra ví và trạng thái khóa đối soát trước khi chấp nhận `StartTransaction`, kể cả khi trụ bỏ qua `Authorize`; ví không đủ tiền trả về `Blocked`.
+  - Khi `StopTransaction` chốt phiên, ghi khoản phí phiên vào ví/sổ cái trong cùng luồng giao dịch; retry không tạo khoản trừ thứ hai.
+  - Trên màn hình trạm sạc, hiển thị thông báo cụ thể khi ví không đủ tiền và liên kết sang trang ví; luồng nạp sandbox gọi endpoint backend thay vì gửi chữ ký giả từ frontend.
+* **Kiểm thử:** Bổ sung hồi quy cho chữ ký giả, webhook đến muộn, quyền sandbox, ngưỡng số dư khi bắt đầu sạc, ghi nợ/idempotency khi kết thúc phiên và thông báo thiếu tiền phía frontend. Điều chỉnh fixture reconnect để nạp tiền thử nghiệm qua service ví vì StartTransaction giờ kiểm tra số dư thật.
+* **Xác minh:** Toàn bộ backend **595 passed, 1 skipped, 320 warnings** trong 266.46 giây; `ruff check .` đạt; frontend **52 tests passed** và `npm run build` đạt. Build chỉ có cảnh báo chunk JavaScript lớn hơn 500 KB. Không thêm migration.
 

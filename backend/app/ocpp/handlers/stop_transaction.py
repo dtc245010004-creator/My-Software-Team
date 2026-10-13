@@ -15,6 +15,7 @@ from app.models.station import ChargingPoint, Connector
 from app.services.billing import calculate_session_total
 from app.services.billing_segment_service import persist_session_billing_segments
 from app.services.metering import calculate_kwh
+from app.services.wallet_service import auto_deduct_session_payment
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +222,14 @@ def handle_stop_transaction(
         session.idle_grace_minutes_applied = billing_total.idle_grace_minutes
         session.total_amount = billing_total.total_amount
         persist_session_billing_segments(db, session)
+        if session.user_id is not None and billing_total.total_amount > Decimal("0.00"):
+            # Ghi sổ cái và cập nhật ví trong cùng transaction với hóa đơn/phiên.
+            # Nếu lỗi thì không commit phiên đã chốt mà chưa thu được tiền.
+            auto_deduct_session_payment(
+                db,
+                session,
+                invoice_amount=Decimal(str(billing_total.total_amount)),
+            )
 
     # 5. Giải phóng cổng sạc
     if session.connector:

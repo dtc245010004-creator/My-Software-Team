@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -6,10 +7,15 @@ from pydantic import BaseModel
 from sqlalchemy import func, update
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user_or_driver_guest
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.payment import TopupOrder
-from app.services.payment_service import verify_webhook_signature
+from app.models.user import User
+from app.services.payment_service import (
+    create_webhook_signature,
+    verify_webhook_signature,
+)
 from app.services.wallet_service import topup_wallet
 
 logger = logging.getLogger("ev_csms.payments")
@@ -24,12 +30,74 @@ class WebhookPayload(BaseModel):
     signature: str | None = None
 
 
+class SandboxSimulationPayload(BaseModel):
+    order_code: str
+    status: Literal["SUCCESS", "FAILED", "CANCELLED"]
+    message: str | None = None
+
+
 def verify_signature(payload: WebhookPayload) -> bool:
     if not payload.signature:
         return False
     secret_key = settings.PAYMENT_WEBHOOK_SECRET
     data = f"{payload.order_code}|{payload.status}"
     return verify_webhook_signature(data, payload.signature, secret_key)
+
+
+@router.post(
+    "/sandbox/simulate",
+    summary="Mô phỏng callback thanh toán trong môi trường phát triển",
+)
+async def simulate_sandbox_webhook(
+    payload: SandboxSimulationPayload,
+    request: Request,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """Ký callback sandbox tại server, chỉ bật khi cấu hình cho phép.
+
+    Trình duyệt không được nhận hoặc tự tạo chữ ký bằng secret. Endpoint chỉ
+    xử lý đơn PENDING thuộc chính tài khoản đang đăng nhập.
+    """
+    if not settings.ALLOW_PAYMENT_SANDBOX_SIMULATION:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chức năng mô phỏng thanh toán sandbox đang tắt.",
+        )
+
+    order = (
+        db.query(TopupOrder)
+        .filter(
+            TopupOrder.order_code == payload.order_code,
+            TopupOrder.user_id == current_user.id,
+        )
+        .first()
+    )
+    if order is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy giao dịch.")
+    if order.status != "PENDING":
+        return {
+            "status": order.status,
+            "message": "Giao dịch đã được xử lý.",
+            "order_code": order.order_code,
+        }
+
+    message = payload.message or "Phản hồi mô phỏng từ cổng thanh toán Sandbox"
+    signature = create_webhook_signature(
+        order.order_code,
+        payload.status,
+        settings.PAYMENT_WEBHOOK_SECRET,
+    )
+    return await payment_webhook(
+        request=request,
+        payload=WebhookPayload(
+            order_code=order.order_code,
+            status=payload.status,
+            message=message,
+            signature=signature,
+        ),
+        db=db,
+    )
 
 
 @router.post("/webhook", summary="Xử lý Webhook từ cổng thanh toán")
@@ -96,6 +164,17 @@ async def payment_webhook(
     target_status = payload.status.upper()
 
     if target_status in ["FAILED", "CANCELLED"]:
+        if order.status == "SUCCESS":
+            logger.info(
+                "Ignoring late negative webhook for successful order=%s status=%s",
+                order.order_code,
+                target_status,
+            )
+            return {
+                "status": "SUCCESS",
+                "message": "Already processed",
+                "order_code": order.order_code,
+            }
         if order.status not in ["FAILED", "CANCELLED"]:
             order.status = target_status
             order.failure_reason = payload.message or "Unknown error"
