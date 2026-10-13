@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { validateTariffPeriods, timeToMinutes, minutesToTime } from './tariffValidation';
+import {
+  validateTariffPeriods,
+  timeToMinutes,
+  minutesToTime,
+  isTimeOverlapping,
+  validatePowerLimitSlots,
+} from './tariffValidation';
 
 describe('tariffValidation', () => {
   describe('timeToMinutes & minutesToTime', () => {
@@ -56,6 +62,47 @@ describe('tariffValidation', () => {
       const result = validateTariffPeriods(periods);
       expect(result.isValid).toBe(true);
       expect(result.segments.some(s => s.isOvernight)).toBe(true);
+    });
+  });
+
+  describe('SCRUM-294 / SCRUM-314: isTimeOverlapping & validatePowerLimitSlots', () => {
+    it('phát hiện đúng 2 khung giờ bị đè lên nhau (08:00-10:00 và 09:00-11:00)', () => {
+      expect(
+        isTimeOverlapping(
+          { startTime: '08:00', endTime: '10:00' },
+          { startTime: '09:00', endTime: '11:00' }
+        )
+      ).toBe(true);
+
+      // Hai khung giờ nối tiếp nhau (08:00-10:00 và 10:00-12:00) không bị coi là đè
+      expect(
+        isTimeOverlapping(
+          { startTime: '08:00', endTime: '10:00' },
+          { startTime: '10:00', endTime: '12:00' }
+        )
+      ).toBe(false);
+    });
+
+    it('validatePowerLimitSlots: bắt lỗi startTime >= endTime, maxPowerKw <= 0 và overlap', () => {
+      const invalidTimeRange = validatePowerLimitSlots([
+        { startTime: '12:00', endTime: '08:00', maxPowerKw: 100 },
+      ]);
+      expect(invalidTimeRange.isValid).toBe(false);
+      expect(invalidTimeRange.errorsByIndex[0].timeRange).toBeTruthy();
+
+      const invalidPower = validatePowerLimitSlots([
+        { startTime: '08:00', endTime: '12:00', maxPowerKw: 0 },
+      ]);
+      expect(invalidPower.isValid).toBe(false);
+      expect(invalidPower.errorsByIndex[0].maxPowerKw).toBeTruthy();
+
+      const overlapping = validatePowerLimitSlots([
+        { startTime: '08:00', endTime: '10:00', maxPowerKw: 120 },
+        { startTime: '09:00', endTime: '11:00', maxPowerKw: 80 },
+      ]);
+      expect(overlapping.isValid).toBe(false);
+      expect(overlapping.errorsByIndex[0].overlap).toBeTruthy();
+      expect(overlapping.errorsByIndex[1].overlap).toBeTruthy();
     });
   });
 });
