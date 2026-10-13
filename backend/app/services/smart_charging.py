@@ -653,8 +653,17 @@ async def _drain_rebalance_requests(
 def trigger_rebalance_background(
     station_id: int,
     session_factory: Callable[[], Any] | None = None,
-) -> asyncio.Task:
+) -> asyncio.Task | None:
     """Chia lại ngay hoặc gom sự kiện thành một lần chạy chờ theo từng trạm."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        logger.debug(
+            "Không có running asyncio event loop, bỏ qua trigger_rebalance_background cho trạm #%s",
+            station_id,
+        )
+        return None
+
     _pending_rebalances.add(station_id)
     task = _rebalance_tasks.get(station_id)
     if task is None or task.done():

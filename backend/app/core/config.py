@@ -74,6 +74,18 @@ class Settings(BaseSettings):
     ABNORMAL_SESSION_THRESHOLD_SECONDS: int = 500
     REBALANCE_MIN_INTERVAL_SECONDS: int = Field(default=5, gt=0)
 
+    # Cảnh báo trạm & trụ sạc (Story 2: SCRUM-317, SCRUM-319)
+    CHARGER_OFFLINE_ALERT_MINUTES: int = 15
+    CONNECTOR_ERROR_ALERT_THRESHOLD: int = 5
+    CONNECTOR_ERROR_WINDOW_MINUTES: int = 15
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = True
+    ALERT_EMAIL_FROM: str = "alerts@evcsms.vn"
+    ALERT_EMAIL_ADMINS: str = "admin@evcsms.vn"
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"

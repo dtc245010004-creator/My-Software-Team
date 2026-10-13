@@ -1,5 +1,6 @@
 """Chuẩn hóa và kiểm tra khung giờ trong bộ nhớ, không phụ thuộc DB/FastAPI."""
 
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -10,8 +11,9 @@ from decimal import Decimal, InvalidOperation
 class NormalizedPeriod:
     start_minute: int
     end_minute: int
-    price_per_kwh: Decimal
+    price_per_kwh: Decimal | None
     source_index: int
+    power_limit_kw: float | None = None
 
 
 def time_to_minutes(value: str, *, allow_day_end: bool = False) -> int:
@@ -31,7 +33,7 @@ def time_to_minutes(value: str, *, allow_day_end: bool = False) -> int:
 
 
 def _value(period, field):
-    return period.get(field) if isinstance(period, Mapping) else getattr(period, field)
+    return period.get(field) if isinstance(period, Mapping) else getattr(period, field, None)
 
 
 def _label(period) -> str:
@@ -42,7 +44,9 @@ def _format_minute(minute: int) -> str:
     return f"{minute // 60:02d}:{minute % 60:02d}"
 
 
-def _normalize_period(period, index: int) -> list[NormalizedPeriod]:
+def _normalize_period(
+    period, index: int, *, value_field: str | None = "price_per_kwh"
+) -> list[NormalizedPeriod]:
     start = time_to_minutes(_value(period, "start_time"))
     end = time_to_minutes(_value(period, "end_time"), allow_day_end=True)
     # Từ chối mọi start == end; cả ngày phải khai báo rõ 00:00-24:00.
@@ -51,51 +55,70 @@ def _normalize_period(period, index: int) -> list[NormalizedPeriod]:
             f"Khung {_label(period)} có giờ bắt đầu trùng giờ kết thúc; "
             "dùng 00:00-24:00 cho cả ngày."
         )
-    try:
-        price = Decimal(str(_value(period, "price_per_kwh")))
-    except InvalidOperation as exc:
-        raise ValueError(f"Khung {_label(period)}: price_per_kwh phải là số.") from exc
-    if not price.is_finite() or price < 0:
-        raise ValueError(
-            f"Khung {_label(period)}: price_per_kwh phải là số hữu hạn, không được âm."
-        )
+    price: Decimal | None = None
+    power_limit: float | None = None
+
+    if value_field == "price_per_kwh":
+        try:
+            price = Decimal(str(_value(period, "price_per_kwh")))
+        except InvalidOperation as exc:
+            raise ValueError(f"Khung {_label(period)}: price_per_kwh phải là số.") from exc
+        if not price.is_finite() or price < 0:
+            raise ValueError(
+                f"Khung {_label(period)}: price_per_kwh phải là số hữu hạn, không được âm."
+            )
+    elif value_field == "power_limit_kw":
+        val = _value(period, "power_limit_kw")
+        try:
+            power_limit = float(val)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Khung {_label(period)}: power_limit_kw phải là số.") from exc
+        if not math.isfinite(power_limit) or power_limit <= 0:
+            raise ValueError(
+                f"Khung {_label(period)}: power_limit_kw phải là số dương lớn hơn 0."
+            )
+
     if start < end:
-        return [NormalizedPeriod(start, end, price, index)]
-    segments = [NormalizedPeriod(start, 1440, price, index)]
+        return [NormalizedPeriod(start, end, price, index, power_limit_kw=power_limit)]
+    segments = [NormalizedPeriod(start, 1440, price, index, power_limit_kw=power_limit)]
     if end > 0:
-        segments.append(NormalizedPeriod(0, end, price, index))
+        segments.append(NormalizedPeriod(0, end, price, index, power_limit_kw=power_limit))
     return segments
 
 
-def normalize_periods(periods) -> list[NormalizedPeriod]:
+def normalize_periods(
+    periods, *, value_field: str | None = "price_per_kwh"
+) -> list[NormalizedPeriod]:
     """Tách qua nửa đêm, sắp theo phút; khoảng [start, end), không sửa đầu vào.
 
-    Chấp nhận dict, schema hoặc model với ba trường giờ/giá. Dữ liệu sai định
-    dạng hoặc start == end gây ValueError; dùng validate_periods để lấy lỗi.
+    Chấp nhận dict, schema hoặc model với ba trường giờ/giá hoặc giờ/công suất.
+    Dữ liệu sai định dạng hoặc start == end gây ValueError; dùng validate_periods để lấy lỗi.
     """
     return sorted(
         [
             segment
             for index, period in enumerate(periods)
-            for segment in _normalize_period(period, index)
+            for segment in _normalize_period(period, index, value_field=value_field)
         ],
         key=lambda segment: (segment.start_minute, segment.end_minute),
     )
 
 
-def validate_periods(periods) -> list[str]:
-    """Trả các lỗi định dạng, đơn giá, chồng lấn hoặc khoảng trống trong ngày."""
+def validate_periods(
+    periods, *, value_field: str | None = "price_per_kwh"
+) -> list[str]:
+    """Trả các lỗi định dạng, đơn giá/công suất, chồng lấn hoặc khoảng trống trong ngày."""
     periods = list(periods)
     errors = []
     for index, period in enumerate(periods):
         try:
-            _normalize_period(period, index)
+            _normalize_period(period, index, value_field=value_field)
         except ValueError as exc:
             errors.append(str(exc))
     if errors:
         return errors
 
-    segments = normalize_periods(periods)
+    segments = normalize_periods(periods, value_field=value_field)
     reported_pairs = set()
     covered_until = 0
     active = []
