@@ -39,13 +39,13 @@ def _ensure_simulation_allowed(user: User, condition: str) -> None:
     """
     if not condition:
         return
-    if not settings.ALLOW_REMOTE_START_SIMULATION:
+    if not settings.ALLOW_REMOTE_START_SIMULATION and not settings.ENABLE_DEMO_ACCOUNTS:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chế độ mô phỏng chưa được bật trên môi trường này.",
         )
     running_pytest = settings.TESTING and "PYTEST_CURRENT_TEST" in os.environ
-    if not running_pytest and user.role != "ADMIN":
+    if not running_pytest and user.role != "ADMIN" and not settings.ENABLE_DEMO_ACCOUNTS:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ quản trị viên được dùng chế độ mô phỏng.",
