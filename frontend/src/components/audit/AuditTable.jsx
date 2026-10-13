@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FileSearch, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { formatVNDateTime } from '../../utils/formatTime';
 import { getActionLabel } from './auditLabels';
+import { getAuditDriverInfo } from '../../utils/auditUtils';
 
 /**
  * Bảng dữ liệu phân trang phía server.
@@ -20,7 +21,7 @@ export default function AuditTable({ rows, loading, error, page, pageSize, total
     <div className="bg-panel border border-hairline rounded-sm overflow-hidden">
       <div className="px-4 py-2.5 border-b border-hairline bg-obsidian/60 flex items-center justify-between gap-3">
         <h2 className="text-xs font-bold font-mono text-tech-white uppercase">
-          Danh sách nhật ký vận hành
+          Danh sách nhật ký vận hành & kiểm toán
         </h2>
         <span className="text-[11px] font-mono text-steel-gray tabular-nums">
           {total > 0 ? `${rangeStart}–${rangeEnd} / ${total} bản ghi` : '0 bản ghi'}
@@ -43,7 +44,7 @@ export default function AuditTable({ rows, loading, error, page, pageSize, total
             Không tìm thấy nhật ký phù hợp
           </p>
           <p className="font-mono text-[11px] text-steel-gray mt-1">
-            Hãy kiểm tra lại trụ, người thực hiện hoặc khoảng thời gian đã chọn.
+            Hãy kiểm tra lại trụ, tài xế, người thực hiện hoặc khoảng thời gian đã chọn.
           </p>
         </div>
       ) : (
@@ -55,8 +56,8 @@ export default function AuditTable({ rows, loading, error, page, pageSize, total
             <thead>
               <tr className="border-b border-hairline bg-obsidian text-steel-gray">
                 <th scope="col" className="py-2.5 px-4 whitespace-nowrap">Thời điểm</th>
-                <th scope="col" className="py-2.5 px-4 whitespace-nowrap">Mã trụ</th>
-                <th scope="col" className="py-2.5 px-4 whitespace-nowrap">Tên trụ / Trạm</th>
+                <th scope="col" className="py-2.5 px-4 whitespace-nowrap">Đối tượng</th>
+                <th scope="col" className="py-2.5 px-4 whitespace-nowrap">Tên trụ / Trạm / Ví</th>
                 <th scope="col" className="py-2.5 px-4 whitespace-nowrap">Người thực hiện</th>
                 <th scope="col" className="py-2.5 px-4 whitespace-nowrap">Hành động</th>
                 <th scope="col" className="py-2.5 px-4 whitespace-nowrap">Nội dung</th>
@@ -65,6 +66,19 @@ export default function AuditTable({ rows, loading, error, page, pageSize, total
             <tbody className="divide-y divide-hairline">
               {rows.map((row) => {
                 const isExpanded = expandedId === row.id;
+                const driverInfo = getAuditDriverInfo(row);
+                const isWallet = row.objectType === 'wallet';
+
+                // Diễn giải nội dung mặc định cho thao tác ví nếu chưa có description
+                let rowDescription = row.description;
+                if (!rowDescription && isWallet) {
+                  if (driverInfo.hasDriverInfo && driverInfo.amount) {
+                    rowDescription = `Nạp tay tài xế #${driverInfo.driverId} (+${Number(driverInfo.amount).toLocaleString('vi-VN')} đ)${driverInfo.receiptCode ? ` · Phiếu: ${driverInfo.receiptCode}` : ''}`;
+                  } else if (driverInfo.reason) {
+                    rowDescription = driverInfo.reason;
+                  }
+                }
+
                 return (
                   <React.Fragment key={row.id}>
                     <tr className="hover:bg-panel-hover transition-colors">
@@ -72,11 +86,16 @@ export default function AuditTable({ rows, loading, error, page, pageSize, total
                         {formatVNDateTime(row.timestamp)}
                       </td>
                       <td className="py-2.5 px-4 text-tech-white font-bold whitespace-nowrap">
-                        {row.objectCode || '—'}
+                        {row.objectCode || (isWallet ? `Ví #${row.objectId}` : '—')}
+                        {driverInfo.hasDriverInfo && (
+                          <span className="block text-[10px] text-purple-300 font-normal">
+                            Tài xế #{driverInfo.driverId}
+                          </span>
+                        )}
                       </td>
                       <td className="py-2.5 px-4 text-steel-gray">
-                        <span className="block truncate max-w-[220px]" title={row.stationName || ''}>
-                          {row.stationName || '—'}
+                        <span className="block truncate max-w-[220px]" title={row.stationName || (isWallet ? 'Ví điện tử' : '')}>
+                          {row.stationName || (isWallet ? 'Ví điện tử' : '—')}
                         </span>
                       </td>
                       <td className="py-2.5 px-4 text-tech-white whitespace-nowrap">
@@ -105,9 +124,9 @@ export default function AuditTable({ rows, loading, error, page, pageSize, total
                           onClick={() => setExpandedId(isExpanded ? null : row.id)}
                           aria-expanded={isExpanded}
                           className="text-left text-steel-gray hover:text-tech-white transition-colors max-w-[320px] truncate block"
-                          title={row.description || 'Xem nội dung đầy đủ'}
+                          title={rowDescription || 'Xem nội dung đầy đủ'}
                         >
-                          {row.description || '—'}
+                          {rowDescription || '—'}
                         </button>
                       </td>
                     </tr>
@@ -131,11 +150,63 @@ export default function AuditTable({ rows, loading, error, page, pageSize, total
                                 <dd className="text-tech-white">{row.stationName}</dd>
                               </div>
                             )}
+                            {/* Chi tiết liên quan đến tài xế & giao dịch ví (SCRUM-388 / SCRUM-412) */}
+                            {driverInfo.hasDriverInfo && (
+                              <div className="flex gap-2">
+                                <dt className="text-steel-gray shrink-0">Tài xế / Chủ ví:</dt>
+                                <dd className="text-purple-300 font-bold">
+                                  Tài xế #{driverInfo.driverId}
+                                </dd>
+                              </div>
+                            )}
+                            {driverInfo.walletId && (
+                              <div className="flex gap-2">
+                                <dt className="text-steel-gray shrink-0">Mã ví điện tử:</dt>
+                                <dd className="text-tech-white">Ví #{driverInfo.walletId}</dd>
+                              </div>
+                            )}
+                            {driverInfo.amount !== null && driverInfo.amount !== undefined && (
+                              <div className="flex gap-2">
+                                <dt className="text-steel-gray shrink-0">Số tiền giao dịch:</dt>
+                                <dd className="text-grid-green font-bold">
+                                  {Number(driverInfo.amount).toLocaleString('vi-VN')} đ
+                                </dd>
+                              </div>
+                            )}
+                            {driverInfo.receiptCode && (
+                              <div className="flex gap-2">
+                                <dt className="text-steel-gray shrink-0">Mã phiếu thu:</dt>
+                                <dd className="text-electric-cyan font-bold">{driverInfo.receiptCode}</dd>
+                              </div>
+                            )}
+                            {driverInfo.balanceBefore !== null && driverInfo.balanceAfter !== null && (
+                              <div className="flex gap-2 sm:col-span-2">
+                                <dt className="text-steel-gray shrink-0">Biến động số dư:</dt>
+                                <dd className="text-tech-white">
+                                  {Number(driverInfo.balanceBefore).toLocaleString('vi-VN')} đ →{' '}
+                                  <span className="text-electric-cyan font-bold">
+                                    {Number(driverInfo.balanceAfter).toLocaleString('vi-VN')} đ
+                                  </span>
+                                </dd>
+                              </div>
+                            )}
+                            {driverInfo.reason && (
+                              <div className="flex gap-2 sm:col-span-2">
+                                <dt className="text-steel-gray shrink-0">Lý do / Diễn giải:</dt>
+                                <dd className="text-tech-white">{driverInfo.reason}</dd>
+                              </div>
+                            )}
+                            {driverInfo.ip && (
+                              <div className="flex gap-2">
+                                <dt className="text-steel-gray shrink-0">Địa chỉ IP:</dt>
+                                <dd className="text-steel-gray">{driverInfo.ip}</dd>
+                              </div>
+                            )}
                             {row.detail && (
                               <div className="flex gap-2 sm:col-span-2">
-                                <dt className="text-steel-gray shrink-0">Dữ liệu kèm theo:</dt>
+                                <dt className="text-steel-gray shrink-0">Dữ liệu thô kèm theo:</dt>
                                 <dd className="text-tech-white break-all whitespace-pre-wrap">
-                                  {row.detail}
+                                  {typeof row.detail === 'object' ? JSON.stringify(row.detail, null, 2) : row.detail}
                                 </dd>
                               </div>
                             )}
