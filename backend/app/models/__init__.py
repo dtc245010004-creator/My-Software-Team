@@ -1,4 +1,5 @@
 from app.models.audit_log import AuditLog
+from app.models.data_erasure_request import DataErasureRequest
 from app.models.id_tag import IdTag
 from app.models.meter_value import MeterValue
 from app.models.ocpp_message import OcppMessage
@@ -26,6 +27,7 @@ __all__ = [
     "ChargingPoint",
     "ChargingSession",
     "Connector",
+    "DataErasureRequest",
     "IdTag",
     "Ledger",
     "LedgerEntry",

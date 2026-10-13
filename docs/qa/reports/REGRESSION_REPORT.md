@@ -172,3 +172,10 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 * `test_wallet_audit_s56.py`: **11 passed**; nhóm S-56 + S-36 + S-41 + payment regression: **38 passed**.
 * Full backend suite: **557 passed, 1 skipped, 320 warnings** trong 224.36 giây; 558 tests được thu thập. Môi trường Windows host/Python 3.14.7; không chạy Docker ở lượt này.
 * `ruff check .`: **All checks passed**. Không có migration mới; Alembic chỉ có head `c316a2b4d6e8`.
+
+## S-57 — Yêu cầu ẩn danh hóa dữ liệu tài xế (13/10/2026, chưa commit)
+
+* `test_data_erasure_s57.py`: **16 passed**; bao phủ request ownership/duplicate, admin RBAC, chặn duyệt vì số dư/phiên/reconcile/topup, từ chối có lý do, anonymization, giữ nguyên session/invoice/ledger, rollback và idempotency.
+* Hồi quy toàn bộ backend: **573 passed, 1 skipped, 320 warnings**, 574 tests được thu thập, 235.19 giây; Windows host/Python 3.14.7. `ruff check .` đạt; migration S-57 kiểm tra Ruff riêng.
+* Alembic sau pull `origin/main` có một head `cca26ecdf5a8`. Migration chạy upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; DB ứng dụng không bị migrate. Suite host cần dùng basetemp trong workspace để test migration con truy cập DB tạm.
+* Cần mentor xác nhận phạm vi dữ liệu; log audit/sổ cái append-only cũ không được sửa, lựa chọn chặn số dư âm, thời hạn xử lý/hoàn tiền và việc ẩn vị trí lịch sử. S-55 chưa có trong repo.

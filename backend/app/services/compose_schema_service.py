@@ -3,6 +3,9 @@
 from sqlalchemy import Engine, inspect, text
 
 SQLITE_COLUMN_ADDITIONS = {
+    "users": {
+        "data_erased_at": "DATETIME",
+    },
     "wallets": {
         "is_reconcile_locked": "BOOLEAN NOT NULL DEFAULT 0",
     },

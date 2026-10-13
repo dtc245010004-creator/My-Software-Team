@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     OCPP_CALL_TIMEOUT_SECONDS: float = 30.0
     ABNORMAL_SESSION_THRESHOLD_SECONDS: int = 500
     REBALANCE_MIN_INTERVAL_SECONDS: int = Field(default=5, gt=0)
+    DATA_ERASURE_IDENTIFIER_PREFIX: str = Field(
+        default="deleted", min_length=1, max_length=30
+    )
 
     # Cảnh báo trạm & trụ sạc (Story 2: SCRUM-317, SCRUM-319)
     CHARGER_OFFLINE_ALERT_MINUTES: int = 15

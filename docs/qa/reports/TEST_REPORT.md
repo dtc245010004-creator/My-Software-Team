@@ -6,14 +6,15 @@
 
 ---
 
-## Latest Completed Full Backend Run (13/10/2026)
+## Latest Completed Full Backend Run (13/10/2026, S-57)
 
-* **Lệnh**: `pytest tests -q` trong thư mục backend; test migration dùng fixture `tmp_path` được chuyển vào thư mục workspace đã tạo sẵn do Windows chặn thư mục tạm mặc định.
-* **Môi trường**: Windows host, Python 3.14.7. Docker Desktop không khởi động trong lượt xác minh.
-* **Kết quả**: **557 passed, 1 skipped, 320 warnings**; `pytest tests --collect-only -q` thu thập 558 tests. `ruff check .` đạt.
+* **Lệnh**: `python -m pytest tests -q --basetemp .pytest-s57-full-elevated-20261013 -p no:cacheprovider` trong thư mục backend.
+* **Môi trường**: Windows host, Python 3.14.7. Full run được phép tiến trình migration test mở database tạm trong workspace; ứng dụng DB không bị migrate.
+* **Kết quả**: **573 passed, 1 skipped, 320 warnings**; 574 tests được thu thập, hoàn tất trong 235.19 giây. `ruff check .` và Ruff trên file migration S-57 đạt.
 * **S-47**: `test_station_nearby_s47.py` có 8 ca về tìm GPS/tên/địa chỉ, trạng thái đầu nối, giới hạn công khai, giá TOU và phân trang; cả 8 passed.
 * **S-56**: `test_wallet_audit_s56.py` có 11 ca về log nạp tay/thường, lỗi rollback, reconcile lock/unlock, lọc tài xế và RBAC; cả 11 passed. Nhóm S-56 cùng S-36/S-41/payment đạt 38 passed.
-* Không có migration mới; `alembic heads` trả duy nhất `c316a2b4d6e8` sau khi pull `origin/main`.
+* **S-57**: `test_data_erasure_s57.py` có 16 ca về ownership/RBAC, blockers, ẩn danh hóa và bảo toàn tài chính, rollback/audit FAILED, idempotency; cả 16 passed.
+* Sau `git pull origin main`, `alembic heads` trả duy nhất `cca26ecdf5a8`. Migration S-57 đã upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; DB dự án không bị migrate.
 
 ## Lần chạy hoàn chỉnh trước S-47 (09/10/2026)
 

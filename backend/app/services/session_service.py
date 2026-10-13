@@ -21,6 +21,7 @@ from app.models.wallet import Wallet
 from app.services.audit_service import ghi_nhat_ky
 from app.services.billing import calculate_session_total
 from app.services.billing_segment_service import persist_session_billing_segments
+from app.services.identity_guard_service import lock_user_for_sensitive_operation
 from app.services.wallet_service import (
     WalletInsufficientBalanceException,
     WalletNegativeBalanceException,
@@ -230,6 +231,7 @@ def start_charging_session(
     3. Khóa cổng sạc độc quyền chống Race Condition bằng Atomic Conditional Update.
     4. Chốt đơn giá điện TOU 1 lần tại thời điểm cắm sạc.
     """
+    user = lock_user_for_sensitive_operation(db, user.id)
     # Khóa ví để kiểm tra reconcile lock tuần tự với job đối soát và các giao dịch.
     wallet_query = db.query(Wallet).filter(Wallet.user_id == user.id)
     if db.get_bind().dialect.name == "sqlite":
@@ -971,6 +973,7 @@ async def remote_start_charging_session(
 
     condition = (simulate_condition or "").upper().strip()
     _ensure_simulation_allowed(user, condition)
+    user = lock_user_for_sensitive_operation(db, user.id)
 
     connector = (
         db.query(Connector)

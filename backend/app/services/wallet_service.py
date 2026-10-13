@@ -12,6 +12,7 @@ from app.models.session import ChargingSession
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
 from app.services.audit_service import ghi_nhat_ky
+from app.services.identity_guard_service import lock_user_for_sensitive_operation
 
 logger = logging.getLogger("ev_csms.wallet")
 
@@ -151,6 +152,7 @@ def topup_wallet(
     amount: Decimal,
     note: str | None = None,
     *,
+    full_name: str | None = None,
     actor_id: int | None = None,
     actor_type: str = "USER",
     client_ip: str | None = None,
@@ -160,6 +162,9 @@ def topup_wallet(
     Mặc định người nạp là chủ ví. Webhook thanh toán truyền actor_type=SYSTEM
     để lưu rõ giao dịch được xác nhận bởi hệ thống thanh toán.
     """
+    user = lock_user_for_sensitive_operation(db, user_id)
+    if full_name and full_name.strip():
+        user.full_name = full_name.strip()
     wallet = db.query(Wallet).filter(Wallet.user_id == user_id).first()
     if wallet is None:
         wallet = Wallet(
@@ -271,7 +276,7 @@ def admin_manual_topup(
             logger.warning("Không thể ghi audit log thất bại: %s", audit_exc)
 
     # 1. Tìm ví theo wallet_id hoặc driver_id
-    query = db.query(Wallet).with_for_update()
+    query = db.query(Wallet)
     if wallet_id is not None:
         wallet = query.filter(Wallet.id == wallet_id).first()
     elif driver_id is not None:
@@ -307,6 +312,27 @@ def admin_manual_topup(
     wallet_id = wallet.id
     driver_id = wallet.user_id
 
+    try:
+        lock_user_for_sensitive_operation(db, driver_id)
+    except HTTPException:
+        db.rollback()
+        log_failure_audit("Tài khoản tài xế đã bị vô hiệu hóa.")
+        raise
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.id == wallet_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if wallet is None:
+        db.rollback()
+        log_failure_audit("Không tìm thấy ví điện tử sau khi khóa tài khoản.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy ví điện tử.",
+        )
+
     # 2. Kiểm tra trước xem receipt_code đã tồn tại chưa
     existing_tx = (
         db.query(WalletTransaction)
@@ -314,6 +340,9 @@ def admin_manual_topup(
         .first()
     )
     if existing_tx:
+        # SQLite giữ khóa ghi do lock_user_for_sensitive_operation; nhả khóa
+        # trước khi session riêng ghi audit thất bại.
+        db.rollback()
         log_failure_audit(f"Mã phiếu thu '{normalized_receipt}' đã tồn tại trên hệ thống")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

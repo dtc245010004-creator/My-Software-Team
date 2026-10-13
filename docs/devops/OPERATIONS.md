@@ -113,7 +113,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-`backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; `alembic heads` ngày 10/10/2026 trả một head `e72b461d9ac3`, nối `5f9249bf58da` và `d8f56c4a911e`. Lượt kiểm tra này chỉ liệt kê head, không chạy upgrade/downgrade. DB dự án không bị migrate. Trước khi nâng cấp môi trường thật, sao lưu cơ sở dữ liệu đích theo đúng loại backend.
+`backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; sau `git pull origin main` ngày 13/10/2026, `alembic heads` trả duy nhất `cca26ecdf5a8`. Migration S-57 đã kiểm tra upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; DB dự án không bị migrate. Trước khi nâng cấp môi trường thật, sao lưu cơ sở dữ liệu đích theo đúng loại backend.
 
 ---
 
@@ -125,7 +125,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
 Căn cứ theo `backend/pytest.ini`, `backend/tests/` và `frontend/package.json:9`:
 
 ### Kiểm thử Backend (Pytest)
-Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Lượt xác minh mới nhất ngày 13/10/2026 trên Windows/Python 3.14.7 thu thập 558 tests và đạt **557 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Những con số 84/89/90 và kết quả 263 passed ngày 05/10/2026 là các snapshot lịch sử, không đại diện cho tổng hiện tại:
+Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Sau S-57, lượt full suite ngày 13/10/2026 thu thập 574 tests và đạt **573 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7; `ruff check .` đạt. Những con số 84/89/90 và kết quả 263 passed ngày 05/10/2026 là các snapshot lịch sử, không đại diện cho tổng hiện tại:
 ```powershell
 cd backend
 pytest
@@ -167,6 +167,7 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `VERSION` | String | `1.0.0` | Phiên bản ứng dụng |
 | `API_V1_STR` | String | `/api/v1` | Tiền tố đường dẫn API v1 |
 | `DATABASE_URL` | String | `sqlite:///./ev_csms.db` | Chuỗi kết nối CSDL (hỗ trợ SQLite / PostgreSQL) |
+| `DATA_ERASURE_IDENTIFIER_PREFIX` | String | `deleted` | Prefix cho username/email/tag đã ẩn danh; config giới hạn 1–30 ký tự |
 | `SECRET_KEY` | String | *(Khóa dev mặc định)* | Khóa bí mật dùng để ký và giải mã JWT token |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Integer | `1440` (24 giờ) | Thời gian hiệu lực của phiên đăng nhập |
 | `MAX_FAILED_LOGIN_ATTEMPTS` | Integer | `5` | Số lần đăng nhập sai tối đa trước khi khóa tạm thời |

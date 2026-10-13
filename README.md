@@ -9,12 +9,13 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Backend full suite gần nhất trên Windows host/Python 3.14.7 đạt **557 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Lượt Docker ngày 10/10/2026 trước đó đạt 451 passed, 307 warnings.
+- **Kiểm thử tự động**: Sau S-57, backend full suite Windows/Python 3.14.7 thu thập 574 tests và đạt **573 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Lượt Docker ngày 10/10/2026 trước đó đạt 451 passed, 307 warnings.
 - **Chức năng OCPP**: Bao gồm MeterValues, chống số đo lùi/trùng, khôi phục phiên khi reconnect, RemoteStart/RemoteStop và audit log giới hạn theo quyền sở hữu trạm.
-- **Kiến trúc dữ liệu**: Các module model hiện đăng ký **21 bảng** trong `Base.metadata`. Các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. *(Nguồn: nạp `app.models`, đếm `Base.metadata.tables` ngày 13/10/2026.)*
-- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; sau `git pull origin main`, `alembic heads` ngày 13/10/2026 xác nhận head duy nhất `c316a2b4d6e8`. Migration S-41 và trigger đã kiểm tra trên PostgreSQL tạm; DB dự án không bị migrate.
+- **Kiến trúc dữ liệu**: Các module model hiện đăng ký **22 bảng** trong `Base.metadata`, gồm `data_erasure_requests`. Các bảng kỹ thuật khác gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. *(Nguồn: nạp `app.models`, đếm `Base.metadata.tables` ngày 13/10/2026.)*
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; sau `git pull origin main`, `alembic heads` xác nhận duy nhất `cca26ecdf5a8`. Migration S-57 đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL 16 tạm; DB dự án không bị migrate.
 - **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
 - **Sổ cái/audit ví S-41/S-56**: Nạp/trừ được ghi qua một hàm append-only; job đối soát khóa ví lệch. Nạp tay/thường, callback, phát hiện khóa và mở khóa được audit; `GET /audit-logs?driver_id=...` lọc event ví theo tài xế. Không có chức năng điều chỉnh ví riêng.
+- **Ẩn danh hóa dữ liệu S-57 (Backend)**: Tài xế tạo/xem yêu cầu của mình; Admin duyệt/từ chối có lý do. Khi đủ điều kiện, hệ thống ẩn danh thông tin tài khoản và liên kết ID với lịch sử sạc trong một transaction; giữ nguyên phiên, hóa đơn, tiền, kWh, ví và sổ cái. **Phạm vi dữ liệu cần mentor xác nhận**; không đưa ra kết luận pháp lý.
 - **Realtime theo dõi phiên**: ActiveSession nhận dữ liệu qua WebSocket singleton dùng cùng-origin `/ws/telemetry` và ánh xạ tên trường backend (`energy_kwh`, `cost_estimate`, `soc`, `temp_c`) sang giao diện. Đã có test frontend cho mapper và smoke WebSocket runtime `CONNECTED/SUBSCRIBED/PONG`; chưa kiểm tra trực quan qua trình duyệt.
 - **Mô phỏng RemoteStart/RemoteStop**: mặc định tắt (`ALLOW_REMOTE_START_SIMULATION=false`); khi được chủ động bật, chỉ ADMIN dùng được ngoài pytest. `TESTING` mặc định false và không được bật trong triển khai.
 - **Docker & CI/CD**: `docker-compose.yml` chạy stack Backend, Frontend, PostgreSQL và simulator 20 trụ dùng chung cho Sprint 1–4. CI cấu hình tại `.github/workflows/`.
@@ -145,7 +146,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Lượt full suite gần nhất (13/10/2026, S-56):** 558 tests thu thập; **557 passed, 1 skipped, 320 warnings** trên Windows host/Python 3.14.7; Ruff đạt. Không có migration mới. Lượt Docker hoàn chỉnh trước đó (10/10/2026, code commit `9ceae53`) đạt 451 passed, 307 warnings trong Python 3.12. Frontend lần kiểm chứng trước đạt 39 passed/build; S-56 không sửa UI.
+**Lượt full suite gần nhất (13/10/2026, S-57):** 574 tests thu thập; **573 passed, 1 skipped, 320 warnings** trong 235.19 giây trên Windows host/Python 3.14.7; `ruff check .` đạt. Migration `cca26ecdf5a8` được kiểm tra tiến/lùi/tiến trên PostgreSQL 16 tạm, không áp dụng vào DB dự án. Lượt Docker hoàn chỉnh trước đó (10/10/2026, code commit `9ceae53`) đạt 451 passed, 307 warnings trong Python 3.12. Frontend không đổi trong S-57.
 
 ---
 

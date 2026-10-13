@@ -66,8 +66,8 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - `backend/app/ocpp/handlers/stop_transaction.py` lưu `transactionData` hợp lệ vào `MeterValue` đã có. Nếu Available đến trước StopTransaction, phiên được đánh dấu cần xem xét; StopTransaction hợp lệ đến sau mới chốt. Không tự hoàn tất phiên chỉ dựa vào Available.
 - Scheduler chuyển RemoteStart quá hạn từ `PENDING` sang `EXPIRED` mỗi phút. RemoteStop trả HTTP 409 khi trụ offline.
 - `ALLOW_REMOTE_START_SIMULATION` mặc định false; khi bật, mô phỏng chỉ dùng được bởi ADMIN ngoài test pytest đang chạy.
-- Trước migration S-41, Alembic có head `e72b461d9ac3`; migration S-41 tạo head `f41a0b7c9d22`. Sau pull `origin/main` ngày 13/10/2026, `alembic heads` trả một head hiện tại `c316a2b4d6e8`. Các lượt upgrade/downgrade/upgrade PostgreSQL nêu trong lịch sử được chạy trên database tạm; database ứng dụng không bị migrate.
-- Kiểm chứng Docker ngày 10/10/2026: backend full suite **451 passed, 307 warnings**; PostgreSQL trigger chặn UPDATE/DELETE; backend `/docs` trả 200 và backend/DB/frontend/OCPP simulator đều được Compose khởi động. Lượt kiểm thử backend mới nhất sau S-56 ngày 13/10/2026 chạy trên Windows host/Python 3.14.7: **557 passed, 1 skipped, 320 warnings**; Ruff đạt. Chưa kiểm tra UI trực quan trên trình duyệt trong lượt này.
+- Trước migration S-57, Alembic có head `c316a2b4d6e8`; sau khi thêm migration `cca26ecdf5a8`, `alembic heads` trả đúng một head mới. S-57 upgrade/downgrade/upgrade trên PostgreSQL 16 tạm; database ứng dụng không bị migrate.
+- Kiểm chứng Docker ngày 10/10/2026: backend full suite **451 passed, 307 warnings**; PostgreSQL trigger chặn UPDATE/DELETE; backend `/docs` trả 200 và backend/DB/frontend/OCPP simulator đều được Compose khởi động. Lượt backend mới nhất sau S-57 ngày 13/10/2026 chạy trên Windows host/Python 3.14.7: **573 passed, 1 skipped, 320 warnings** (574 tests); Ruff đạt. Chưa kiểm tra UI trực quan trên trình duyệt trong lượt này.
 
 ## S-29 — Biểu giá nhiều khung giờ (Backend)
 
@@ -135,3 +135,13 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 - `HEARTBEAT_INTERVAL_SECONDS=300` và giới hạn trang `STATION_NEARBY_DEFAULT_LIMIT=20` / `STATION_NEARBY_MAX_LIMIT=50` được đọc từ `app/core/config.py`, khai báo trong `.env.example` và truyền qua backend Compose. S-47 không cần migration.
 - `backend/tests/test_station_nearby_s47.py`: **8 passed**. Full backend suite ngày 13/10/2026: **546 passed, 1 skipped, 320 warnings** trên Python 3.14.7; pytest dùng thư mục `tmp_path` trong workspace do Windows chặn thư mục tạm mặc định. `ruff check .` đạt. Docker daemon không hoạt động nên chưa chạy kiểm thử trong container.
 - Đề xuất: hỗ trợ tìm không dấu tiếng Việt, thêm chỉ mục không gian nếu dữ liệu lớn và cân nhắc cache giá hiện hành. Chưa làm bản đồ, chỉ đường hoặc đặt chỗ.
+
+## S-57 — Yêu cầu ẩn danh hóa dữ liệu tài xế (Backend)
+
+- API `backend/app/api/v1/endpoints/data_erasure.py`: tài xế `CUSTOMER` chỉ tạo/xem yêu cầu của mình; Admin lọc, duyệt hoặc từ chối (lý do từ chối bắt buộc). Các request trùng đang chờ trả 409.
+- `backend/app/models/data_erasure_request.py` / `backend/app/schemas/data_erasure.py`: trạng thái yêu cầu, partial unique index cho một `PENDING` mỗi user, DTO riêng cho request/review. `User.data_erased_at` là dấu bền vững để ngăn đăng nhập và tái kích hoạt tài khoản đã ẩn danh.
+- `backend/app/services/data_erasure_service.py`: kiểm tra số dư dương/âm, reconcile lock, phiên CHARGING/ACTIVE/ABNORMAL/NEEDS_REVIEW/flag review và TopupOrder PENDING; khóa user/wallet, làm sạch định danh trong một transaction, audit cùng transaction. Lỗi rollback ghi audit FAILED bằng session riêng. Tiền, kWh, thời gian, hóa đơn/đoạn giá, ví và sổ cái append-only không đổi.
+- `backend/app/services/identity_guard_service.py`: tuần tự hóa tạo phiên OCPP/API, RemoteStart và nạp tiền với quy trình ẩn danh; SQLite dùng khóa ghi không đổi giá trị, PostgreSQL dùng `SELECT FOR UPDATE`. Prefix token/email ẩn danh cấu hình qua `DATA_ERASURE_IDENTIFIER_PREFIX` trong `backend/app/core/config.py` và `.env.example`.
+- Migration `backend/alembic/versions/cca26ecdf5a8_add_driver_data_erasure_requests.py` thêm bảng request, chỉ mục, ràng buộc trạng thái và `users.data_erased_at`. Sau `git pull origin main`, `alembic heads` là một head `cca26ecdf5a8`; PostgreSQL 16 tạm đã qua upgrade → downgrade → upgrade, không migrate DB dự án.
+- Test `backend/tests/test_data_erasure_s57.py`: 16 ca về quyền, yêu cầu lặp, phê duyệt/ẩn danh và giữ nguyên số liệu, blockers, từ chối, rollback, audit và idempotency. Kết quả full suite/ruff sau lần chạy hoàn chỉnh cuối cùng được ghi trong nhật ký tiến độ.
+- Giới hạn: phạm vi dữ liệu cần mentor xác nhận. Audit/sổ cái append-only cũ có thể còn ID/IP/nội dung định danh; lựa chọn chặn số dư âm bảo thủ; cần chốt thời hạn xử lý, hoàn tiền, vị trí lịch sử và tương thích whitelist S-55 (chưa có trong repo). Không có kết luận pháp lý trong code/docs; không làm giao diện.

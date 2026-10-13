@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ `pytest tests --collect-only -q` và full run ngày 13/10/2026 trên Windows/Python 3.14.7: **558 tests collected, 557 passed, 1 skipped, 320 warnings**. Lượt Docker ngày 10/10/2026 trước đó đạt 451 passed, 307 warnings. Các số 84, 89 và 90 trong baseline là snapshot lịch sử từ các giai đoạn khác nhau, không phải tổng kiểm thử hiện tại.
+Căn cứ full run ngày 13/10/2026 trên Windows/Python 3.14.7 sau S-57: **574 tests collected, 573 passed, 1 skipped, 320 warnings**. Lượt Docker ngày 10/10/2026 trước đó đạt 451 passed, 307 warnings. Các số 84, 89 và 90 trong baseline là snapshot lịch sử từ các giai đoạn khác nhau, không phải tổng kiểm thử hiện tại.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -239,7 +239,7 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
 * **Kiểm thử tự động**: Lượt full suite backend trong Docker ngày 10/10/2026 đạt 451 passed, 307 warnings; frontend gần nhất có 39 passed và build thành công.
-* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; sau pull `origin/main`, `alembic heads` ngày 13/10/2026 trả một head `c316a2b4d6e8`. Migration S-41 nâng/hạ/nâng trên PostgreSQL Compose tạm và trigger đã chặn UPDATE/DELETE; không migrate DB ứng dụng.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; sau pull `origin/main` và migration S-57, `alembic heads` ngày 13/10/2026 trả một head `cca26ecdf5a8`. Migration S-41 trước đó đã nâng/hạ/nâng trên PostgreSQL tạm và trigger đã chặn UPDATE/DELETE; migration S-57 cũng đã nâng/hạ/nâng trên PostgreSQL 16 tạm; không migrate DB ứng dụng.
 * **Đóng gói & CI/CD**: Stack dùng chung Sprint 1–4 chạy bằng `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline `.github/workflows/ci.yml`. Hai file `docker-compose.staging.yml` và `docker-compose.env.example` đã bị gỡ; không dùng chúng để khởi chạy project.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
@@ -321,6 +321,15 @@ Kiểm tra volume SQLite cũ nhận cột khóa đối soát, chỉ mục duy nh
 
 **Kết quả ngày 13/10/2026**: 11/11 ca passed; toàn bộ backend thu thập **558 tests**, kết quả chạy **557 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7.
 
+### 4.27. Yêu cầu ẩn danh hóa dữ liệu tài xế S-57 — `test_data_erasure_s57.py` (16 ca)
+
+* Kiểm tra tài xế chỉ tạo/xem yêu cầu của mình, request lặp trả 409, role không đủ quyền bị 403, chưa đăng nhập 401; Admin bắt buộc nhập lý do từ chối.
+* Kiểm tra chặn duyệt khi số dư ví dương/âm, đối soát khóa ví, phiên đang sạc/bất thường/cần xem xét hoặc TopupOrder PENDING.
+* Kiểm tra ẩn danh hóa giữ nguyên phiên/hóa đơn/đoạn giá, thời gian, kWh, số tiền, ví và ledger; account không đăng nhập/tái kích hoạt được; rollback giữa chừng giữ nguyên dữ liệu và sinh audit FAILED; duyệt lại COMPLETED idempotent.
+* Migration `cca26ecdf5a8` đã upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; database dự án không bị migrate.
+
+**Kết quả ngày 13/10/2026**: 16/16 ca S-57 passed; toàn bộ backend thu thập **574 tests**, đạt **573 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7.
+
 ## 5. Historical Tests
 
 * **Giai đoạn trước**: 83 test cases đã được xây dựng và duy trì trong quá trình phát triển Giai đoạn 1.
@@ -366,5 +375,5 @@ Khi sửa các file cấu hình nền tảng (`app/core/config.py`, `app/core/da
 
 * **Ngày kiểm chứng gần nhất**: 13/10/2026.
 * **Môi trường thực thi**: Windows host, Python 3.14.7; suite dùng DB kiểm thử và thư mục migration tạm trong workspace.
-* **Kết quả gần nhất**: `pytest tests --collect-only -q` thu thập 558 tests; full run **557 passed, 1 skipped, 320 warnings**. `ruff check .` đạt.
+* **Kết quả gần nhất**: Full run sau S-57 thu thập 574 tests; **573 passed, 1 skipped, 320 warnings**. `ruff check .` đạt.
 * **Người xác thực**: AI Assistant phối hợp cùng Tech Lead dự án.

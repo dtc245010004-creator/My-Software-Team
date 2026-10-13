@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.id_tag import IdTag
@@ -11,6 +12,7 @@ from app.models.remote_start_request import RemoteStartRequest
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
 from app.models.tariff import Tariff
+from app.services.identity_guard_service import lock_user_for_sensitive_operation
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,14 @@ def handle_start_transaction(
             "transactionId": 0,
             "idTagInfo": {"status": "Invalid"},
         }
+
+    try:
+        lock_user_for_sensitive_operation(db, id_tag.user_id)
+    except HTTPException:
+        return {"transactionId": 0, "idTagInfo": {"status": "Blocked"}}
+    id_tag = db.query(IdTag).filter(IdTag.code == id_tag_code).populate_existing().first()
+    if id_tag is None:
+        return {"transactionId": 0, "idTagInfo": {"status": "Invalid"}}
 
     if id_tag.status == "blocked":
         logger.warning("StartTransaction bị từ chối do thẻ bị khóa: %s", id_tag_code)
