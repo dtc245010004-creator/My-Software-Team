@@ -304,6 +304,14 @@ Kiểm tra volume SQLite cũ nhận cột khóa đối soát, chỉ mục duy nh
 
 ---
 
+### 4.25. Tìm trạm gần và đầu nối rảnh S-47 — `test_station_nearby_s47.py` (8 ca)
+
+* Kiểm tra thứ tự Haversine, phản hồi chỉ có trường công khai, bộ đếm đầu nối và trạng thái heartbeat/OCPP/internal.
+* Kiểm tra loại trừ trạm ngừng, tìm tên/địa chỉ không phân biệt hoa thường, yêu cầu đủ tọa độ hoặc từ khóa, và validation tọa độ.
+* Kiểm tra giá TOU theo thời điểm/phiên bản hiệu lực, giá null khi chưa có tariff, trang giới hạn 50 và trạm thiếu tọa độ vẫn có thể tìm bằng `q`.
+
+**Kết quả ngày 13/10/2026 (chưa commit)**: 8/8 ca passed; full backend suite đạt **546 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7.
+
 ## 5. Historical Tests
 
 * **Giai đoạn trước**: 83 test cases đã được xây dựng và duy trì trong quá trình phát triển Giai đoạn 1.

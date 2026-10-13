@@ -6,7 +6,15 @@
 
 ---
 
-## Latest Completed Full Backend Run (09/10/2026)
+## Latest Completed Full Backend Run (13/10/2026)
+
+* **Lệnh**: `pytest tests -q` trong thư mục backend; test migration dùng fixture `tmp_path` được chuyển vào thư mục workspace đã tạo sẵn do Windows chặn thư mục tạm mặc định.
+* **Môi trường**: Windows host, Python 3.14.7. Docker Desktop không khởi động trong lượt xác minh.
+* **Kết quả**: **546 passed, 1 skipped, 320 warnings**. `ruff check .` đạt; `docker compose config --quiet` đạt.
+* **S-47**: `test_station_nearby_s47.py` có 8 ca về tìm GPS/tên/địa chỉ, trạng thái đầu nối, giới hạn công khai, giá TOU và phân trang; cả 8 passed.
+* Không có migration mới; `alembic heads` trả duy nhất `c316a2b4d6e8` sau khi pull `origin/main`.
+
+## Lần chạy hoàn chỉnh trước S-47 (09/10/2026)
 
 * **Lệnh**: `python -m pytest tests -q` trong backend container, gắn mã nguồn và fixture OCPP từ workspace.
 * **Môi trường**: Docker backend, Python 3.12.

@@ -62,6 +62,7 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Kiểm thử tự động**: Lượt full suite backend trong Docker ngày 10/10/2026 đạt 451 passed, 307 warnings. Test sổ cái + wallet ACID đạt 18 passed; test schema SQLite Compose cũ xác nhận nâng lặp an toàn và trigger chặn sửa/xóa.
 * **CSDL và migration**: SQLAlchemy khai báo 18 bảng. `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; `alembic heads` ngày 10/10/2026 trả một head `f41a0b7c9d22`. Toàn chuỗi migration lên head và S-41 nâng/hạ/nâng trên PostgreSQL tạm thành công; database tạm đã xóa và DB dự án không bị migrate.
 * **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
+* **S-47 Backend (13/10/2026)**: `GET /api/v1/stations/nearby` tìm trạm active theo GPS hoặc tên/địa chỉ, trả đầu nối rảnh/tổng và giá TOU hiện tại bằng DTO công khai riêng. Test mới 8 passed; toàn backend trên host đạt 546 passed, 1 skipped, 320 warnings; Ruff sạch. Chưa triển khai giao diện theo phạm vi Backend.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
 * **SCRUM-283–290 thuộc S-41 (10/10/2026, code commit `9ceae53`)**: Thêm helper ghi sổ cái chung, khóa hàng ví khi ghi, đảm bảo tham chiếu phiên không ghi trùng, thêm trigger append-only, job đối soát một truy vấn nhóm, khóa ví lệch, endpoint Admin mở khóa có lý do và log/audit. Cập nhật seed/demo để số dư ban đầu mới có dòng ledger; ví legacy không được tự backfill. Full suite Docker 451 passed, 307 warnings; migration và trigger PostgreSQL đã xác minh trên database tạm.
@@ -107,6 +108,8 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Gộp các head Alembic còn lại**: Ngày **30/09/2026**, commit `3cdb675`, thêm revision merge `f2c9a6d81b40` nối `795931a69149` và `e4b6f9a2c1d3`; không thay đổi schema.
 
 ---
+
+* **S-47 Backend (13/10/2026 - chưa commit)**: Thêm endpoint công khai `GET /api/v1/stations/nearby`, DTO riêng, quy tắc trạng thái connector/heartbeat và giá TOU/version theo lô; thêm tìm kiếm GPS/tên/địa chỉ, radius và phân trang. Test mới 8 passed, full backend 546 passed/1 skipped, Ruff đạt; không migration. Docker Desktop không khởi động trong lượt xác minh nên suite chạy trên host Windows/Python 3.14.7. UI, chỉ đường và đặt chỗ không thuộc phạm vi.
 
 ## 4. Sprint 2 — “Trụ ảo nối vào hệ thống được xác thực; vận hành viên thấy đúng trạng thái mọi trụ” (28/9 – 5/10, 20 SP)
 

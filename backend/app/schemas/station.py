@@ -1,4 +1,5 @@
 import math
+from decimal import Decimal
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -318,6 +319,31 @@ class StationDistanceResponse(StationResponse):
     """Schema mở rộng cho API tìm kiếm trả về khoảng cách tính bằng km."""
 
     distance_km: Optional[float] = None
+
+
+class NearbyConnectorSummary(BaseModel):
+    """Thông tin công khai tối thiểu để tài xế nhận biết từng đầu nối."""
+
+    connector_number: Optional[int] = None
+    connector_type: str
+    max_power_kw: Optional[float] = None
+    status: str
+
+
+class NearbyStationResponse(BaseModel):
+    """Dữ liệu công khai cho tìm trạm gần, không chứa thông tin nội bộ trạm."""
+
+    id: int
+    name: str
+    address: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    distance_km: Optional[float] = None
+    connectors_available: int
+    connectors_total: int
+    connector_types: list[str]
+    current_price_per_kwh: Optional[Decimal] = None
+    connectors: list[NearbyConnectorSummary]
 
 
 # ==========================================

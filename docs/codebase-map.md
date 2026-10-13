@@ -11,6 +11,7 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 | `backend/app/models/` | Model SQLAlchemy cho trạm, đầu nối, phiên sạc, biểu giá, ví và dòng sổ cái. |
 | `backend/app/services/` | Nghiệp vụ dùng chung như quản lý phiên sạc, biểu giá, ví, sổ cái và billing. |
 | `backend/app/services/billing_segment_service.py` | Chuyển kết quả phân đoạn S-30/S-31 thành snapshot DB khi chốt phiên; không tự commit. |
+| `backend/app/services/station_discovery_service.py` | Tính đầu nối rảnh theo trạng thái OCPP/heartbeat và lấy giá TOU hiện hành theo lô cho API tìm trạm công khai S-47. |
 | `backend/app/services/scheduler_service.py` | Job định kỳ, gồm đối soát sổ cái ví, gắn cờ phiên OCPP bất thường và hết hạn RemoteStart đang PENDING. |
 | `backend/app/ocpp/handlers/` | Xử lý thông điệp OCPP, gồm trạng thái connector và kết thúc phiên. |
 | `backend/alembic/versions/` | Migration Alembic; cấu hình tại `backend/alembic.ini`. |
@@ -148,3 +149,12 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 
 
 
+## S-47 — Tìm trạm gần và đầu nối đang rảnh (Backend)
+
+- `GET /api/v1/stations/nearby` trong `backend/app/api/v1/endpoints/stations.py` là endpoint công khai riêng; endpoint `GET /api/v1/stations` hiện có được giữ nguyên. Response dùng `NearbyStationResponse`, không serialize schema `StationResponse` hay trường nội bộ của chủ trạm/lưới điện.
+- GPS phải có đủ vĩ độ/kinh độ; nếu không có GPS phải có `q` không rỗng. Kết quả chỉ gồm trạm `is_active=true` và `status=ACTIVE`, dùng khoảng cách Haversine, radius tùy chọn, `limit` tối đa 50 và `offset`. Trạm thiếu tọa độ tìm được bằng từ khóa, khoảng cách null và xếp cuối khi truy vấn GPS không radius.
+- `is_connector_available` trong `backend/app/services/station_discovery_service.py` là quy tắc duy nhất: connector/trụ hoạt động, heartbeat trụ không quá hạn theo `HEARTBEAT_INTERVAL_SECONDS`, `ocpp_status == "Available"` và internal `status == "AVAILABLE"`. Connector tắt không vào tổng; connector của trụ offline có trong tổng nhưng không rảnh.
+- Giá tại thời điểm request dùng bộ chọn phiên bản `get_effective_tariffs_for_stations` (cùng quy tắc với `get_or_create_default_tariff`) và `resolve_tariff_for_date`/`get_tariff_rate_at_time`; truy vấn tariff/period theo lô, tiền trả dạng Decimal. Không tạo biểu giá mặc định từ endpoint đọc.
+- `HEARTBEAT_INTERVAL_SECONDS=300` và giới hạn trang `STATION_NEARBY_DEFAULT_LIMIT=20` / `STATION_NEARBY_MAX_LIMIT=50` được đọc từ `app/core/config.py`, khai báo trong `.env.example` và truyền qua backend Compose. S-47 không cần migration.
+- `backend/tests/test_station_nearby_s47.py`: **8 passed**. Full backend suite ngày 13/10/2026: **546 passed, 1 skipped, 320 warnings** trên Python 3.14.7; pytest dùng thư mục `tmp_path` trong workspace do Windows chặn thư mục tạm mặc định. `ruff check .` đạt. Docker daemon không hoạt động nên chưa chạy kiểm thử trong container.
+- Đề xuất: hỗ trợ tìm không dấu tiếng Việt, thêm chỉ mục không gian nếu dữ liệu lớn và cân nhắc cache giá hiện hành. Chưa làm bản đồ, chỉ đường hoặc đặt chỗ.

@@ -7,15 +7,17 @@ from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, noload, selectinload
 
 from app.api.deps import get_optional_current_user, require_roles
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.datetime_utils import get_vn_now, to_vn_time
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station, StationPowerLimit
 from app.models.user import User
 from app.schemas.station import (
+    NearbyStationResponse,
     StationCreate,
     StationDistanceResponse,
     StationGridItem,
@@ -31,6 +33,10 @@ from app.services.event_broadcaster import sse_broadcaster
 from app.services.session_service import (
     determine_tou_rate,
     get_or_create_default_tariff,
+)
+from app.services.station_discovery_service import (
+    build_public_connector_summary,
+    get_current_station_prices,
 )
 from app.services.station_service import (
     atomic_reactivate_station,
@@ -223,6 +229,134 @@ def list_stations(
         enriched.current_price_per_kwh = rate
         resp_list.append(enriched)
     return resp_list
+
+
+@router.get(
+    "/nearby",
+    response_model=List[NearbyStationResponse],
+    summary="Tìm trạm công khai gần tài xế và xem đầu nối rảnh",
+)
+def list_nearby_stations(
+    user_lat: Optional[float] = Query(
+        None, ge=-90.0, le=90.0, description="Vĩ độ hiện tại của tài xế"
+    ),
+    user_lon: Optional[float] = Query(
+        None, ge=-180.0, le=180.0, description="Kinh độ hiện tại của tài xế"
+    ),
+    radius_km: Optional[float] = Query(
+        None, gt=0, description="Bán kính tìm kiếm quanh vị trí (km)"
+    ),
+    q: Optional[str] = Query(None, description="Tìm theo tên trạm hoặc địa chỉ"),
+    connector_type: Optional[str] = Query(
+        None, description="Lọc đầu nối: CCS2, TYPE_2 hoặc CHADEMO"
+    ),
+    limit: int = Query(
+        settings.STATION_NEARBY_DEFAULT_LIMIT,
+        ge=1,
+        le=settings.STATION_NEARBY_MAX_LIMIT,
+        description="Số trạm tối đa trong trang",
+    ),
+    offset: int = Query(0, ge=0, description="Vị trí bắt đầu phân trang"),
+    _current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
+    """Trả danh sách trạm active theo khoảng cách hoặc theo từ khóa công khai.
+
+    Khi có connector_type, số đếm và danh sách đầu nối chỉ phản ánh loại đã chọn.
+    Tìm theo GPS vẫn đưa trạm chưa có tọa độ xuống cuối nếu không đặt bán kính.
+    """
+    if (user_lat is None) != (user_lon is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="user_lat và user_lon phải được cung cấp cùng nhau.",
+        )
+
+    search_text = (q or "").strip().casefold()
+    has_location = user_lat is not None and user_lon is not None
+    if not has_location and not search_text:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Cần cung cấp cả user_lat/user_lon hoặc từ khóa q không rỗng.",
+        )
+    if radius_km is not None and not has_location:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="radius_km chỉ dùng khi có đủ user_lat và user_lon.",
+        )
+
+    now_vn = to_vn_time(get_vn_now())
+    stations = (
+        db.query(Station)
+        .options(
+            noload(Station.operator),
+            selectinload(Station.charging_points).selectinload(
+                ChargingPoint.connectors
+            ),
+        )
+        .filter(Station.is_active.is_(True), Station.status == "ACTIVE")
+        .order_by(Station.name, Station.id)
+        .all()
+    )
+
+    matches: list[tuple[Station, float | None, dict]] = []
+    for station in stations:
+        if search_text and search_text not in (
+            f"{station.name} {station.address}".casefold()
+        ):
+            continue
+
+        summary = build_public_connector_summary(
+            station,
+            connector_type=connector_type,
+            now=now_vn,
+        )
+        if connector_type and summary["connectors_total"] == 0:
+            continue
+
+        distance_km = None
+        if has_location:
+            if station.latitude is None or station.longitude is None:
+                if radius_km is not None:
+                    continue
+            else:
+                distance_km = calculate_haversine_distance(
+                    user_lat, user_lon, station.latitude, station.longitude
+                )
+                if radius_km is not None and distance_km > radius_km:
+                    continue
+        matches.append((station, distance_km, summary))
+
+    if has_location:
+        matches.sort(
+            key=lambda item: (
+                item[1] is None,
+                item[1] if item[1] is not None else 0.0,
+                item[0].name.casefold(),
+                item[0].id,
+            )
+        )
+    else:
+        matches.sort(key=lambda item: (item[0].name.casefold(), item[0].id))
+
+    page = matches[offset : offset + limit]
+    prices = get_current_station_prices(
+        db,
+        [station.id for station, _, _ in page],
+        at_time=now_vn,
+    )
+    return [
+        NearbyStationResponse(
+            id=station.id,
+            name=station.name,
+            address=station.address,
+            latitude=station.latitude,
+            longitude=station.longitude,
+            distance_km=distance_km,
+            current_price_per_kwh=prices.get(station.id),
+            **summary,
+        )
+        for station, distance_km, summary in page
+    ]
 
 
 @router.get(

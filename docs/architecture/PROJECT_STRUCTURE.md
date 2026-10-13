@@ -13,12 +13,13 @@
   * Tầng cơ sở dữ liệu: `backend/app/models/wallet.py` dòng 11 có ràng buộc cứng `CheckConstraint("balance >= -500000", name="check_min_balance")`. Bảng `users` trang bị 2 cột `failed_login_attempts` và `locked_until`.
   * Tầng ứng dụng: `backend/app/core/config.py` quy định `NEGATIVE_BALANCE_LIMIT = -300000` (ngưỡng khóa nợ), `MAX_SAFE_DEBT_LIMIT = -500000` (chặn thấu chi tối đa), `MAX_FAILED_LOGIN_ATTEMPTS = 5` và `LOCKOUT_DURATION_MINUTES = 15` (khóa tạm 15 phút khi sai mật khẩu 5 lần).
 * **Sổ cái ví S-41**: `WalletTransaction` là append-only; `post_ledger_entry` là điểm duy nhất cập nhật `Wallet.balance`, với `TOPUP`/`REFUND` dương và `CHARGE_FEE` âm. Job đối soát dùng một truy vấn nhóm mỗi `RECONCILE_INTERVAL_MINUTES` (mặc định 15), khóa ví lệch bằng `is_reconcile_locked`, khác với `is_debt_locked`. Admin chỉ mở khóa qua endpoint có lý do khi tổng ledger đã khớp.
-* **Cấu hình migration**: `backend/alembic.ini` trỏ tới `backend/alembic/`; `alembic heads` ngày 10/10/2026 xác nhận một head `f41a0b7c9d22`. Toàn chuỗi lên head và S-41 tiến/lùi/tiến đã kiểm tra trên PostgreSQL tạm; không chạy migration trên DB dự án.
+* **Cấu hình migration**: `backend/alembic.ini` trỏ tới `backend/alembic/`; sau đồng bộ `origin/main`, `alembic heads` ngày 13/10/2026 xác nhận một head `c316a2b4d6e8`. Toàn chuỗi lên head và S-41 tiến/lùi/tiến đã kiểm tra trên PostgreSQL tạm; S-47 không đổi schema.
 * **Giao thức OCPP 1.6J**: `backend/app/ocpp/frames.py` là bộ đọc/ghi thuần; gateway `/ocpp/{charge_point_code}` xử lý BootNotification, Authorize, MeterValues, CALLRESULT/CALLERROR chờ lệnh và idempotency CSDL. `dispatcher.py` ghép phản hồi theo message ID bằng `asyncio.Future`; API Reset gọi lại dispatcher dùng chung. MeterValues gửi CALLRESULT trước thao tác DB; kiểm tra lùi/trùng và lưu số đo trong transaction có khóa. S-22 trả phiên hiện tại kèm số đo mới nhất; S-23 chờ `StopTransaction` thật sau khi trụ nhận `RemoteStopTransaction`; S-24 lưu yêu cầu RemoteStart trước khi gửi để không lỡ phản hồi sớm; reconnect giữ phiên dựa trên DB. S-27 cung cấp nhật ký append-only, giới hạn bản ghi Operator theo trạm được sở hữu. Job `flag_abnormal_charging_sessions_job` chạy mỗi phút, chỉ gắn cờ khi `last_seen_at` quá `ABNORMAL_SESSION_THRESHOLD_SECONDS` (mặc định 500 giây), không tự đóng phiên.
 * **Tính tiền S-28**: `backend/app/services/billing.py` tập trung công thức tiền điện và phí chiếm trụ; bốn điểm kết thúc phiên dùng chung `calculate_session_total`. Connector lưu thời điểm đổi trạng thái và hai mốc idle từ StatusNotification; ChargingSession lưu riêng `idle_amount`. `IDLE_FEE_MAX_MINUTES` (mặc định 240) giới hạn số phút chịu phí sau ân hạn.
 * **Tài khoản demo**: `backend/app/services/demo_account_service.py` đồng bộ an toàn các tài khoản/role demo, ví thiếu và IdTag cho stack phát triển khi bật `ENABLE_DEMO_ACCOUNTS=true`; không xóa dữ liệu khác. Nút 1-Click dùng `admin / 12345678a`; `driver_debt` vẫn bị từ chối đăng nhập theo cờ khóa nợ.
 * **Bản đồ tối tài xế**: `frontend/src/config/mapConfig.js` dùng OSM tiles kèm lớp CSS `map-tiles-dark`; không phụ thuộc Carto API key.
 * **Phạm vi đọc trạm/trụ**: `backend/app/services/station_service.py:filter_station_access` là bộ lọc dùng chung cho list/detail/tree/grid trạm và list/detail trụ. Operator bị giới hạn bởi `Station.operator_id`; Admin xem toàn bộ; khách chỉ xem tài nguyên hoạt động. Bản ghi thiếu GPS vẫn được trả trong truy vấn không đặt bán kính; Connector `Type 2` cũ được chuẩn hóa ở DTO mà không cập nhật DB.
+* **Tìm trạm công khai S-47 (Backend)**: `GET /api/v1/stations/nearby` dùng DTO riêng, không trả trường nội bộ; hỗ trợ GPS/Haversine, radius, tìm tên/địa chỉ, `connector_type`, limit/offset, số connector rảnh/tổng và giá Decimal theo phiên bản/khung giờ đang hiệu lực. Heartbeat, `STATION_NEARBY_DEFAULT_LIMIT` (20) và `STATION_NEARBY_MAX_LIMIT` (50) được đọc từ config.
 * **Số lượng kiểm thử tự động**: Lượt full suite backend trong Docker ngày 10/10/2026 đạt 451 passed, 307 warnings. Nhóm test wallet ACID/S-41 và nâng schema Compose SQLite legacy đạt 19 passed. Các tổng baseline lịch sử 84, 89 và 90 ca mâu thuẫn `[CẦN XÁC NHẬN]`.
 * **Compose với SQLite legacy**: `backend/app/services/compose_schema_service.py` thêm cột `is_reconcile_locked`, unique index và trigger append-only còn thiếu vào volume cũ theo cách idempotent; giữ nguyên số dư và giao dịch hiện tại. Backend đã healthy sau khi build lại.
 * **Mô hình dữ liệu**: SQLAlchemy hiện khai báo 18 bảng; `session_billing_segments` lưu snapshot giá/kWh từng đoạn, ngày áp dụng và thành tiền đã làm tròn.
@@ -34,6 +35,7 @@
 * **SCRUM-283–290 thuộc S-41 (10/10/2026, code commit `9ceae53`)**: Dùng `post_ledger_entry` cho nạp/trừ, khóa ghi đồng thời, unique reference, trigger chặn sửa/xóa dòng sổ và cờ `is_reconcile_locked`. Scheduler đối soát theo cấu hình; ví lệch bị khóa, Admin mở lại bằng endpoint có lý do chỉ khi tổng sổ khớp. Ghi nhận lệch/mở khóa qua logger và `audit_logs`; demo/seeder mới ghi số dư mở đầu thành dòng ledger. Full suite Docker đạt 451 passed, 307 warnings; PostgreSQL migration và trigger đã xác minh trên database tạm.
 * **Sửa Compose backend unhealthy (10/10/2026, code commit `9ceae53`)**: Volume SQLite cũ không có `wallets.is_reconcile_locked`; helper Compose bổ sung schema thiếu cùng trigger/unique index mà không thay đổi dữ liệu. Thêm `backend/tests/test_compose_schema_service.py`; backend `/docs` trả 200 và toàn stack được khởi động.
 * **Sửa lỗi theo Báo cáo EV CSMS (10/10/2026, code commit `0bb5f67`)**: Đưa ActiveSession về dùng WebSocket singleton và ánh xạ telemetry; lưu `transactionData` vào `MeterValue`; giữ phiên cần review khi Available đến sớm; thêm job hết hạn RemoteStart; chuẩn hóa RemoteStop offline thành 409; khóa mô phỏng từ xa theo cấu hình/role; thêm CTA bản đồ cho tài xế và image tag simulator. Backend full suite 437 passed, 307 warnings; Ruff `All checks passed`; frontend 39 test passed/build thành công. Compose health và WebSocket smoke thành công; chưa kiểm tra UI trực quan.
+* **S-47 Backend (13/10/2026 - chưa commit)**: Thêm route nearby/schema/service riêng, eager-load trạm/trụ/cổng, chọn tariff hiệu lực và giá TOU theo lô, lọc status/heartbeat và tìm kiếm case-insensitive. Có 8 ca S-47; full suite 546 passed, 1 skipped, 320 warnings trên host Python 3.14.7; Ruff đạt. Không migration; UI không thuộc phạm vi.
 * **Bản đồ tối, đăng nhập demo và lệnh chạy chung (09/10/2026 - chưa commit)**: Chuyển tile tối khỏi Carto endpoint yêu cầu API key sang OSM với filter CSS hiện có; Compose phát triển đồng bộ tài khoản demo có kiểm soát mà không drop DB; `docker compose up -d --build` và `python run.py` chạy stack đầy đủ Sprint 1–4 dưới project `ev-csms`, tiếp tục dùng các volume dữ liệu sẵn có `ev-sprint3_sqlite_data` và `ev-sprint3_postgres_data`.
 * **Bỏ cấu hình Compose phụ (09/10/2026 - chưa commit)**: Xóa `docker-compose.staging.yml` và `docker-compose.env.example`; README/vận hành chỉ hướng dẫn Compose dùng chung, CI kiểm tra `docker compose config --quiet`. Không đổi named volume database.
 * **SCRUM-188/189/190/192 thuộc S-28 (08/10/2026 - chưa commit)**: Thêm phí chiếm trụ/ân hạn theo biểu giá, kiểm tra giá trị âm ở Pydantic, ghi nhận mốc `Finishing`/`SuspendedEV` và `Available`, gom bốn công thức tính tổng vào `billing.py`, lưu `ChargingSession.idle_amount`, và giới hạn phút chịu phí từ settings `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến sau billing, chỉ lưu mốc kết thúc; hóa đơn/sổ cái đã ghi không đổi và không tự trừ ví lần hai. Chờ mentor xác nhận cách ghi dòng sổ cái/trừ ví nếu triển khai phí bổ sung. `backend/tests/test_billing_idle_fee.py` có 20 ca; full suite đạt 298 passed, 1 skipped. Migration đã kiểm tra tiến/lùi/nâng lại trên SQLite tạm; không cập nhật DB dự án.
@@ -129,7 +131,7 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   └── pull_request_template.md
 ├── backend/                           # Phân hệ Dịch vụ Máy chủ (FastAPI)
 │   ├── alembic/                       # Kịch bản di chuyển cơ sở dữ liệu
-│   │   └── versions/                  # Migration đến S-41, head f41a0b7c9d22
+│   │   └── versions/                  # Migration có một head hiện tại c316a2b4d6e8
 │   ├── alembic.ini                    # Cấu hình công cụ Alembic
 │   ├── app/                           # Mã nguồn nghiệp vụ Backend
 │   │   ├── api/                       # Định nghĩa router và dependency injection (RBAC)
@@ -144,7 +146,8 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   │   ├── schemas/                   # Lớp xác thực Pydantic (In/Out DTOs)
 │   │   ├── services/                  # Xử lý nghiệp vụ lõi
 │   │   │   ├── billing.py             # Tính tiền điện và phí chiếm trụ dùng chung
-│   │   │   └── billing_segment_service.py # Lưu snapshot đoạn giá khi chốt phiên
+│   │   │   ├── billing_segment_service.py # Lưu snapshot đoạn giá khi chốt phiên
+│   │   │   └── station_discovery_service.py # Tìm trạm S-47, trạng thái cổng và giá theo lô
 │   │   ├── simulator/                 # Bộ mô phỏng sạc nội bộ CC/CV
 │   │   ├── ocpp/                      # Bộ khung, gateway và handler OCPP 1.6J
 │   │   │   ├── __init__.py
@@ -167,7 +170,8 @@ E:\Nền tảng vận hành trạm sạc xe điện\
 │   ├── tests/                         # Bộ kiểm thử tự động
 │   │   ├── test_billing_idle_fee.py   # Kiểm thử tính phí và kiểm tra API S-28
 │   │   ├── test_billing_segments.py  # Snapshot đoạn giá và hóa đơn legacy S-33
-│   │   └── test_invoice.py           # Hóa đơn S-33, RBAC, review và phí chiếm trụ
+│   │   ├── test_invoice.py           # Hóa đơn S-33, RBAC, review và phí chiếm trụ
+│   │   └── test_station_nearby_s47.py # Tìm trạm công khai, connector và giá hiện hành
 ├── docs/                              # TRUNG TÂM TRI THỨC VÀ TÀI LIỆU DỰ ÁN
 │   ├── README.md                      # Cổng điều hướng toàn hệ thống & FAQ Tester
 │   ├── codebase-map.md                # Bản đồ khu vực mã nguồn và luồng billing S-28
@@ -265,6 +269,7 @@ Ma trận truy vết ánh xạ các Story đã triển khai:
 | **S-26** | Hạ tầng kiểm thử tích hợp 20 trụ OCPP ảo | T-55, T-56 | `docker-compose.yml`, `tools/ocpp-spike/`, `.github/workflows/main.yml` | Compose khởi chạy backend/frontend, 20 trụ; cổng host API 8001/UI 8080; `tools/ocpp-spike/test_reconnect_scenario.py` chạy qua backend/Postgres thật; 3 vòng reconnect; CI ép API về cổng 8000 và cleanup qua trap |
 | **S-28** | Khai báo biểu giá kWh và phí chiếm trụ | SCRUM-188, SCRUM-189, SCRUM-190, SCRUM-192 | `backend/app/models/tariff.py`, `backend/app/services/billing.py`, `backend/app/ocpp/handlers/status_notification.py`, `backend/app/models/session.py` | `backend/tests/test_billing_idle_fee.py` (20 ca); migrations `783e7f907c98`, `1660df6b86c6`; mentor cần xác nhận cách quyết toán phí bổ sung khi `Available` đến muộn |
 | **S-33** | Lưu đơn giá đã áp dụng và trả hóa đơn theo từng đoạn | SCRUM-222, SCRUM-221, SCRUM-220, SCRUM-223, SCRUM-225 | `backend/app/models/session_billing_segment.py`, `backend/app/services/billing_segment_service.py`, `backend/app/schemas/invoice.py`, `backend/app/api/v1/endpoints/sessions.py` | `test_billing_segments.py` (6), `test_invoice.py` (8); migrations `5ccaa686da2b`, `d8f56c4a911e`; RBAC, review null-money, idle-fee line, legacy không backfill |
+| **S-47 Backend** | Tìm trạm active theo GPS/tên/địa chỉ và xem trạng thái connector/giá hiện tại | Story S-47 | `backend/app/api/v1/endpoints/stations.py`, `backend/app/schemas/station.py`, `backend/app/services/station_discovery_service.py` | `backend/tests/test_station_nearby_s47.py` (8 ca); full suite 546 passed, 1 skipped, 320 warnings; không migration |
 
 ---
 

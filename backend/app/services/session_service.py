@@ -5,9 +5,9 @@ from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, text, update
+from sqlalchemy import func, or_, text, update
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.core.datetime_utils import to_vn_time
@@ -109,6 +109,74 @@ def determine_tou_rate(tariff: Tariff, check_time: time) -> Decimal:
     return tariff.price_normal
 
 
+def get_effective_tariffs_for_stations(
+    db: Session,
+    station_ids: list[int],
+    at_time: datetime | None = None,
+    *,
+    load_periods: bool = False,
+) -> dict[int | None, Tariff]:
+    """Chọn phiên bản biểu giá hiệu lực cho nhiều trạm trong một lượt truy vấn.
+
+    Mỗi trạm ưu tiên biểu giá riêng mới nhất có effective_from không muộn hơn
+    thời điểm tra cứu; nếu không có thì dùng biểu giá toàn hệ thống theo cùng quy
+    tắc. Khi hệ thống chỉ có biểu giá toàn cục ở tương lai, giữ fallback cũ là
+    phiên bản toàn cục có effective_from sớm nhất. Khóa None chứa lựa chọn toàn
+    cục, dùng cho các bên gọi không có station_id.
+    """
+    check_time = at_time or datetime.now(timezone.utc)
+    if check_time.tzinfo is None:
+        check_time = check_time.replace(tzinfo=timezone.utc)
+    check_time_utc = check_time.astimezone(timezone.utc)
+
+    query = db.query(Tariff).filter(Tariff.is_active.is_(True))
+    if station_ids:
+        query = query.filter(
+            or_(Tariff.station_id.in_(set(station_ids)), Tariff.station_id.is_(None))
+        )
+    else:
+        query = query.filter(Tariff.station_id.is_(None))
+    if load_periods:
+        query = query.options(selectinload(Tariff.periods))
+
+    tariffs = query.order_by(Tariff.effective_from.desc(), Tariff.id.desc()).all()
+
+    def effective_at_or_before(tariff: Tariff) -> bool:
+        effective_from = tariff.effective_from
+        if effective_from.tzinfo is None:
+            effective_from = effective_from.replace(tzinfo=timezone.utc)
+        return effective_from.astimezone(timezone.utc) <= check_time_utc
+
+    global_tariffs = [tariff for tariff in tariffs if tariff.station_id is None]
+    def effective_sort_key(tariff: Tariff) -> tuple[datetime, int]:
+        effective_from = tariff.effective_from
+        if effective_from.tzinfo is None:
+            effective_from = effective_from.replace(tzinfo=timezone.utc)
+        return effective_from.astimezone(timezone.utc), tariff.id
+
+    global_fallback = min(global_tariffs, key=effective_sort_key, default=None)
+    station_effective: dict[int, Tariff] = {}
+    global_effective = None
+    for tariff in tariffs:
+        if not effective_at_or_before(tariff):
+            continue
+        if tariff.station_id is None:
+            global_effective = global_effective or tariff
+        else:
+            station_effective.setdefault(tariff.station_id, tariff)
+
+    selected: dict[int | None, Tariff] = {}
+    global_tariff = global_effective or global_fallback
+    if global_tariff is not None:
+        selected[None] = global_tariff
+
+    for station_id in set(station_ids):
+        station_tariff = station_effective.get(station_id)
+        if station_tariff is not None:
+            selected[station_id] = station_tariff
+        elif global_tariff is not None:
+            selected[station_id] = global_tariff
+    return selected
 
 def get_or_create_default_tariff(
     db: Session,
@@ -124,69 +192,42 @@ def get_or_create_default_tariff(
     if check_time.tzinfo is None:
         check_time = check_time.replace(tzinfo=timezone.utc)
 
-    if station_id:
-        tariff = (
+    tariff_choices = get_effective_tariffs_for_stations(
+        db,
+        [station_id] if station_id else [],
+        at_time=check_time,
+    )
+    selected_tariff = tariff_choices.get(station_id if station_id else None)
+    if selected_tariff is not None:
+        return selected_tariff
+
+    try:
+        default_tariff = Tariff(
+            station_id=None,
+            name="Biểu giá EV CSMS chuẩn (TOU 3 khung giờ)",
+            price_normal=Decimal("3200.00"),
+            price_peak=Decimal("4500.00"),
+            price_offpeak=Decimal("2500.00"),
+            peak_start="09:30",
+            peak_end="11:30",
+            peak_start_2="17:00",
+            peak_end_2="20:00",
+            offpeak_start="22:00",
+            offpeak_end="04:00",
+            is_active=True,
+            effective_from=datetime(2000, 1, 1, 0, 0, tzinfo=timezone.utc),
+        )
+        db.add(default_tariff)
+        db.commit()
+        db.refresh(default_tariff)
+    except SQLAlchemyError:
+        db.rollback()
+        default_tariff = (
             db.query(Tariff)
-            .filter(
-                Tariff.station_id == station_id,
-                Tariff.is_active.is_(True),
-                Tariff.effective_from <= check_time,
-            )
+            .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
             .order_by(Tariff.effective_from.desc(), Tariff.id.desc())
             .first()
         )
-        if tariff:
-            return tariff
-
-    # Lấy biểu giá mặc định hệ thống theo phiên bản có hiệu lực
-    default_tariff = (
-        db.query(Tariff)
-        .filter(
-            Tariff.station_id.is_(None),
-            Tariff.is_active.is_(True),
-            Tariff.effective_from <= check_time,
-        )
-        .order_by(Tariff.effective_from.desc(), Tariff.id.desc())
-        .first()
-    )
-    if not default_tariff:
-        # Nếu chưa có biểu giá nào thoả effective_from <= check_time, thử lấy biểu giá active bất kỳ
-        fallback_tariff = (
-            db.query(Tariff)
-            .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
-            .order_by(Tariff.effective_from.asc())
-            .first()
-        )
-        if fallback_tariff:
-            return fallback_tariff
-
-        try:
-            default_tariff = Tariff(
-                station_id=None,
-                name="Biểu giá EV CSMS chuẩn (TOU 3 khung giờ)",
-                price_normal=Decimal("3200.00"),
-                price_peak=Decimal("4500.00"),
-                price_offpeak=Decimal("2500.00"),
-                peak_start="09:30",
-                peak_end="11:30",
-                peak_start_2="17:00",
-                peak_end_2="20:00",
-                offpeak_start="22:00",
-                offpeak_end="04:00",
-                is_active=True,
-                effective_from=datetime(2000, 1, 1, 0, 0, tzinfo=timezone.utc),
-            )
-            db.add(default_tariff)
-            db.commit()
-            db.refresh(default_tariff)
-        except SQLAlchemyError:
-            db.rollback()
-            default_tariff = (
-                db.query(Tariff)
-                .filter(Tariff.station_id.is_(None), Tariff.is_active.is_(True))
-                .order_by(Tariff.effective_from.desc(), Tariff.id.desc())
-                .first()
-            )
 
     return default_tariff
 
