@@ -617,12 +617,23 @@ def start_scheduler():
             id="scan_and_create_charger_alerts",
             replace_existing=True,
         )
+        # Job quét đặt chỗ quá hạn và trừ phí không đến (S-50 / SCRUM-375)
+        from app.services.reservation_service import process_expired_reservations_job
+
+        scheduler.add_job(
+            process_expired_reservations_job,
+            "interval",
+            minutes=1,
+            id="process_expired_reservations",
+            replace_existing=True,
+        )
         scheduler.start()
         logger.info(
             "Đã khởi động APScheduler cho Smart Charging (3p), Power Metrics (1p), "
-            "phiên bất thường (1p), dọn RemoteStart (1p), đối soát ví (%sp), ranh giới khung giờ (1p) và cảnh báo trụ (1p).",
+            "phiên bất thường (1p), dọn RemoteStart (1p), đối soát ví (%sp), ranh giới khung giờ (1p), cảnh báo trụ (1p) và quá hạn đặt chỗ (1p).",
             settings.RECONCILE_INTERVAL_MINUTES,
         )
+
 
 
 def stop_scheduler():

@@ -273,6 +273,7 @@ def test_calculate_bill_with_tou_tariff_at_connect_time(client, db_session, setu
         peak_end_2="20:00",
         offpeak_start="22:00",
         offpeak_end="04:00",
+        effective_from=datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
         is_active=True,
     )
     db_session.add(tariff)

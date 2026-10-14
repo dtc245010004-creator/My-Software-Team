@@ -280,14 +280,12 @@ def create_tariff(
     db.add(new_tariff)
     try:
         db.commit()
-    except IntegrityError as exc:
+    except IntegrityError:
         db.rollback()
-        if _is_duplicate_effective_tariff_error(exc):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Đã có biểu giá cho trạm tại thời điểm hiệu lực này.",
-            ) from exc
-        raise
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Đã tồn tại biểu giá có hiệu lực từ thời điểm này cho trạm sạc chỉ định.",
+        )
     db.refresh(new_tariff)
     return new_tariff
  
@@ -362,26 +360,18 @@ def update_tariff(
             verify_station_ownership(new_st, current_user)
  
     # Nguyên tắc S-34: Không ghi đè bản ghi cũ; tạo phiên bản mới kế tiếp
+    # Tự động kế thừa toàn bộ thuộc tính của bản ghi cũ (trừ id, created_at, effective_from)
+    # để tránh rủi ro quên cột khi model Tariff được mở rộng.
+    ignored_columns = {"id", "created_at", "effective_from"}
     new_version_data = {
-        "station_id": current_tariff.station_id,
-        "name": current_tariff.name,
-        "price_normal": current_tariff.price_normal,
-        "price_peak": current_tariff.price_peak,
-        "price_offpeak": current_tariff.price_offpeak,
-        "peak_start": current_tariff.peak_start,
-        "peak_end": current_tariff.peak_end,
-        "peak_start_2": current_tariff.peak_start_2,
-        "peak_end_2": current_tariff.peak_end_2,
-        "offpeak_start": current_tariff.offpeak_start,
-        "offpeak_end": current_tariff.offpeak_end,
-        "idle_fee_per_minute": current_tariff.idle_fee_per_minute,
-        "idle_grace_minutes": current_tariff.idle_grace_minutes,
-        "is_active": True,
-        "effective_from": effective_dt,
+        col.name: getattr(current_tariff, col.name)
+        for col in Tariff.__table__.columns
+        if col.name not in ignored_columns
     }
     new_version_data.update(update_data)
     new_version_data["effective_from"] = effective_dt
- 
+
+
     new_version_tariff = Tariff(**new_version_data)
     # Khung giờ: nếu có gửi lên thì thay toàn bộ; nếu bỏ qua/null thì giữ nguyên
     # khung giờ của phiên bản cũ (sao chép sang phiên bản mới).
@@ -392,14 +382,12 @@ def update_tariff(
     db.add(new_version_tariff)
     try:
         db.commit()
-    except IntegrityError as exc:
+    except IntegrityError:
         db.rollback()
-        if _is_duplicate_effective_tariff_error(exc):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Đã có biểu giá cho trạm tại thời điểm hiệu lực này.",
-            ) from exc
-        raise
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Đã tồn tại biểu giá có hiệu lực từ thời điểm này cho trạm sạc chỉ định.",
+        )
     db.refresh(new_version_tariff)
     return new_version_tariff
  

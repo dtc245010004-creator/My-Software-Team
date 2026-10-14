@@ -1,12 +1,12 @@
 """S-29: kiểm tra khung giờ, API, tương thích biểu giá cũ và ràng buộc lưu trữ."""
- 
+
 import os
 import sqlite3
 import subprocess
 import sys
 from contextlib import closing
 from copy import deepcopy
-from datetime import time
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
  
@@ -174,8 +174,15 @@ def _write(client, headers, method, payload):
         return client.post("/api/v1/tariffs", json=_payload(**payload), headers=headers)
     created = client.post("/api/v1/tariffs", json=_payload(), headers=headers)
     assert created.status_code == 201
+    # PUT tạo phiên bản mới → cần effective_from khác với bản gốc (ngày mai).
+    # Dùng ngày mai+2 để không vi phạm UniqueConstraint(station_id, effective_from).
+    put_effective_from = (
+        datetime.now(timezone.utc) + timedelta(days=2)
+    ).isoformat()
     return client.put(
-        f"/api/v1/tariffs/{created.json()['id']}", json=payload, headers=headers
+        f"/api/v1/tariffs/{created.json()['id']}",
+        json={**payload, "effective_from": put_effective_from},
+        headers=headers,
     )
  
  
@@ -262,9 +269,14 @@ def test_update_replaces_periods_atomically_and_omission_keeps_them(
     current_id = created["id"]
  
     # S-34: mỗi lần PUT tạo phiên bản mới, nên luôn đi theo id của phiên bản mới nhất.
-    for data in ({"name": "Đổi tên biểu giá"}, {"periods": None}):
+    # Đồng thời cần mốc effective_from khác nhau để tuân thủ UniqueConstraint(station_id, effective_from).
+    base_time = datetime.now(timezone.utc)
+    for day_offset, data in enumerate(({"name": "Đổi tên biểu giá"}, {"periods": None}), start=2):
+        put_time = (base_time + timedelta(days=day_offset)).isoformat()
         response = client.put(
-            f"/api/v1/tariffs/{current_id}", json=data, headers=headers
+            f"/api/v1/tariffs/{current_id}",
+            json={**data, "effective_from": put_time},
+            headers=headers,
         )
         assert response.status_code == 200
         assert _strip_ids(response.json()["periods"]) == expected
@@ -281,8 +293,14 @@ def test_update_replaces_periods_atomically_and_omission_keeps_them(
     assert unchanged["name"] == "Đổi tên biểu giá"
     assert _strip_ids(unchanged["periods"]) == expected
  
+    next_put_time = (base_time + timedelta(days=5)).isoformat()
     replaced = client.put(
-        url, json={"periods": [_period("00:00", "24:00", "1234.56")]}, headers=headers
+        url,
+        json={
+            "periods": [_period("00:00", "24:00", "1234.56")],
+            "effective_from": next_put_time,
+        },
+        headers=headers,
     )
     assert replaced.status_code == 200
     new_id = replaced.json()["id"]
