@@ -61,6 +61,7 @@
 | 2026-10-09 | S-33 Backend — SCRUM-222/221/220/223/225 | Lưu snapshot và cung cấp hóa đơn diễn giải từng đoạn | Đã commit `60e801a`, push lên `origin/Duong`; chờ chạy lại full suite trong Docker | `backend/app/models/session_billing_segment.py`, `backend/app/services/billing_segment_service.py`, `backend/app/schemas/invoice.py`, `backend/app/api/v1/endpoints/sessions.py`, migration `d8f56c4a911e`, `backend/tests/test_invoice.py`, hồ sơ `docs/qa/stories/S-33.md` | Full suite hoàn chỉnh trước chỉnh sửa legacy: 411 passed, 303 warnings; sau chỉnh sửa `test_invoice.py`: 8 passed. Full host rerun: 409 passed, 1 skipped, 1 lỗi khởi tạo `tmp_path` do WinError 5; cần chạy lại trong Docker. Migration PostgreSQL Compose tạm đã kiểm tra nâng/hạ/nâng; DB dự án chưa migrate. |
 | 2026-10-09 | S-34 — SCRUM-226/231 | Phiên giữ nguyên biểu giá đã áp dụng dù biểu giá trạm được sửa sau đó | Hoàn thành / đã tích hợp | `backend/app/models/tariff.py`, logic phiên bản tariff, `test_tariff_versioning_s34.py` | Implementation có trong commit `5cda3ca`; giá mới áp dụng cho phiên bắt đầu sau, hóa đơn/đoạn giá phiên trước giữ snapshot cũ. |
 | 2026-10-12 | S-44 Backend — SCRUM-283–290 | Chia lại công suất khi xe rời hoặc chuyển SuspendedEV | Hoàn thành Backend | `backend/app/services/smart_charging.py`, `backend/app/ocpp/gateway.py`, `backend/app/services/scheduler_service.py`, config Compose, `test_smart_charging_s44.py` | Hook sau commit/CALLRESULT; phiên bất thường và SuspendedEV không tham gia phép chia; debounce trailing theo trạm. Ruff đạt, full backend suite **525 passed, 318 warnings**. Không cần migration. |
+| 2026-10-14 | S-55 Frontend — SCRUM-408 | Nút chốt/mở lại kỳ, hộp thoại xác nhận, hiện danh sách phiên chặn chốt | Hoàn thành Frontend | `frontend/src/pages/Settlement.jsx`, `frontend/src/components/settlement/`, `frontend/src/services/settlementApi.js`, `frontend/src/utils/settlement.js` | Hoàn thành 100% tiêu chí chấp nhận SCRUM-408: route `/settlement`, role guard `ACCOUNTANT` & `ADMIN`, nút Chốt kỳ + cảnh báo chỉ đọc, bắt lỗi 409 `BLOCKED_BY_ABNORMAL_SESSIONS` hiện danh sách phiên chặn + link `/session/:id` & `/abnormal-sessions`, nút Mở lại kỳ cho `ADMIN` bắt buộc lý do có inline validate và cảnh báo audit log. 31 test Vitest mới, full suite 151/151 passed, Vite build pass. |
 
 ---
 
@@ -257,5 +258,22 @@
   4. Viết bộ kiểm thử đơn vị `src/utils/reservationConflictUtils.test.js` với 15 ca test vitest bao phủ toàn diện.
 * **Xác minh kiểm thử:** Vitest full suite đạt **71/71 passed** (100%); Vite build `npm run build` thành công trong 31.53s (0 lỗi).
 * **Ghi chú tiến độ:** Do hộp thoại đặt chỗ ban đầu (Story S-48) chưa tồn tại trên Frontend, component xử lý xung đột đã được chuẩn hóa độc lập nhận dữ liệu qua props, sẵn sàng gắn kết nối ngay khi Story S-48 được tích hợp.
+
+---
+
+#### 18. Ngày 2026-10-14 | Người thực hiện: Kỹ sư Frontend (SCRUM-408 / S-55)
+* **Nhiệm vụ thực hiện:** [FE] Nút chốt/mở lại kỳ, hộp thoại xác nhận, hiện danh sách phiên chặn chốt (Ticket SCRUM-408, ticket cha SCRUM-387 / Story S-55).
+* **Nội dung thực hiện cụ thể:**
+  1. `frontend/src/pages/Settlement.jsx`: Màn hình Quản lý Kỳ đối soát (`/settlement`) dành cho vai trò `ACCOUNTANT` và `ADMIN`. Đủ 4 trạng thái: Loading (Skeleton), Rỗng (EmptyState), Lỗi ("Thử lại"), Thành công. Danh sách kỳ hiển thị Badge Mở/Đã chốt (icon ổ khóa), nhãn kỳ và khoảng ngày lấy trực tiếp từ backend, thông tin "Đã chốt bởi <closed_by_name> lúc <closed_at>" theo helper `formatTime.js`.
+  2. `frontend/src/components/settlement/ClosePeriodConfirmModal.jsx`: Hộp thoại xác nhận chốt kỳ cho `ACCOUNTANT` và `ADMIN`. Cảnh báo rõ ràng: "Sau khi chốt, phiên/hoá đơn/sổ cái trong kỳ chỉ đọc". Hỗ trợ phím Esc, focus trap, loading state và chống bấm đôi.
+  3. `frontend/src/components/settlement/ReopenPeriodModal.jsx`: Hộp thoại mở lại kỳ dành riêng cho `ADMIN`. Bắt buộc nhập lý do mở lại với độ dài tối thiểu 10 ký tự, hiển thị lỗi inline ngay trong ô, cảnh báo "Thao tác này được ghi nhật ký kiểm toán". Nếu lý do không hợp lệ thì chặn không gọi API.
+  4. `frontend/src/components/settlement/BlockedSessionsModal.jsx`: Khối/hộp thoại xử lý khi API trả 409 `BLOCKED_BY_ABNORMAL_SESSIONS`. Hiển thị "Không thể chốt kỳ: còn phiên bất thường chưa xử lý", danh sách các phiên chặn (mã phiên có link sang `/session/:id`, mã trụ, thời điểm bắt đầu định dạng múi giờ VN, lý do chặn) và nút chuyển sang `/abnormal-sessions`. Kỳ đối soát giữ nguyên trạng thái MỞ.
+  5. `frontend/src/services/settlementApi.js`: Tách biệt các lời gọi API `GET /api/v1/settlement/periods`, `POST /api/v1/settlement/periods/{id}/close`, `POST /api/v1/settlement/periods/{id}/reopen` kèm hợp đồng API chi tiết ở đầu file.
+  6. `frontend/src/utils/settlement.js`: Logic thuần kiểm tra quyền `canClose`, `canReopen`, validate lý do `validateReopenReason`, ánh xạ lỗi `mapSettlementError`, chuẩn hóa phiên chặn `describeBlockingSession`, định dạng khoảng ngày `formatPeriodRange`.
+  7. `frontend/src/App.jsx` & `frontend/src/components/Navigation.jsx`: Thêm route `/settlement` và menu điều hướng "Kỳ Đối Soát" phân quyền cho `['ADMIN', 'ACCOUNTANT']`.
+* **Xác minh kiểm thử & Build:**
+  - Vitest: 28 bài test mới (22 test utils + 6 test API service). Toàn bộ frontend test suite đạt **148/148 passed (11/11 test files)**.
+  - Vite build: `npm run build` biên dịch thành công 100%, không có lỗi runtime/syntax.
+
 
 

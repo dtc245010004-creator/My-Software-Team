@@ -25,6 +25,7 @@ import InvoiceDetail from './pages/InvoiceDetail';
 import Reservations from './pages/Reservations';
 import StationReport from './pages/StationReport';
 import ReconciliationReport from './pages/ReconciliationReport';
+import Settlement from './pages/Settlement';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -84,6 +85,15 @@ function AppLayout() {
             }
           />
           <Route path="/reports/reconciliation" element={<Navigate to="/reconciliation" replace />} />
+          {/* Màn hình chốt/mở lại kỳ đối soát và chia doanh thu (S-55 / SCRUM-387 / SCRUM-408) */}
+          <Route
+            path="/settlement"
+            element={
+              ['ADMIN', 'ACCOUNTANT'].includes(role)
+                ? <Settlement />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
           <Route
             path="/tariffs"
             element={

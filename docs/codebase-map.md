@@ -123,3 +123,15 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 - `frontend/src/utils/reservationConflictUtils.js`: Hàm thuần `mapReservationError` (chuẩn hóa lỗi 409 Conflict, 401, 403, 404/501 "Chức năng chưa sẵn sàng", 504, network error), `normalizeSuggestions` (hỗ trợ cả schema `suggestions` và `suggested_connectors`), `createSingleFlightHandler` (chống bấm đôi) và `formatSuggestionAvailableTime`.
 - `frontend/src/utils/reservationConflictUtils.test.js`: Bộ kiểm thử đơn vị Vitest gồm 15 ca kiểm thử bao phủ toàn bộ các trường hợp lỗi xung đột, danh sách gợi ý rỗng/hợp lệ và chống gửi trùng request.
 
+## S-55 Frontend (SCRUM-408) — Chốt và Mở lại Kỳ đối soát, Hộp thoại xác nhận & Chặn chốt do phiên bất thường
+
+- `frontend/src/pages/Settlement.jsx`: Màn hình Quản lý Kỳ đối soát (`/settlement`) dành cho vai trò `ACCOUNTANT` và `ADMIN`. Thể hiện đầy đủ 4 trạng thái giao diện: Đang tải (`Skeleton`), Rỗng (`EmptyState`), Lỗi (thông báo + nút "Thử lại"), Thành công (danh sách kỳ với Badge Mở/Đã chốt có icon ổ khóa, thông tin "Đã chốt bởi <closed_by_name> lúc <closed_at>").
+- `frontend/src/components/settlement/ClosePeriodConfirmModal.jsx`: Hộp thoại xác nhận chốt kỳ cho `ACCOUNTANT` và `ADMIN`. Thể hiện rõ ràng cảnh báo: "Sau khi chốt, phiên/hoá đơn/sổ cái trong kỳ chỉ đọc". Hỗ trợ phím Esc, focus trap, loading state và chống bấm đôi.
+- `frontend/src/components/settlement/ReopenPeriodModal.jsx`: Hộp thoại mở lại kỳ chỉ dành riêng cho `ADMIN`. Bắt buộc nhập lý do mở lại với độ dài tối thiểu 10 ký tự, hiển thị lỗi inline ngay trong ô, cảnh báo "Thao tác này được ghi nhật ký kiểm toán". Nếu lý do không hợp lệ thì chặn không gửi request API.
+- `frontend/src/components/settlement/BlockedSessionsModal.jsx`: Hộp thoại cảnh báo khi backend trả về lỗi HTTP 409 `BLOCKED_BY_ABNORMAL_SESSIONS`. Hiển thị "Không thể chốt kỳ: còn phiên bất thường chưa xử lý", danh sách các phiên chặn (mã phiên có link sang `/session/:id`, mã trụ, thời điểm bắt đầu, lý do chặn) và nút điều hướng sang `/abnormal-sessions`. Kỳ đối soát vẫn giữ trạng thái MỞ.
+- `frontend/src/services/settlementApi.js`: Module giao tiếp API tách biệt gọi `GET /api/v1/settlement/periods`, `POST /api/v1/settlement/periods/{id}/close`, `POST /api/v1/settlement/periods/{id}/reopen` kèm hợp đồng API chi tiết ở đầu file.
+- `frontend/src/config/settlementConfig.js`: Định nghĩa các hằng số phân quyền và độ dài tối thiểu/tối đa của lý do mở lại kỳ (`REOPEN_REASON_MIN_LENGTH = 10`, `REOPEN_REASON_MAX_LENGTH = 500`).
+- `frontend/src/utils/settlement.js`: Các hàm thuần kiểm tra quyền `canClose`, `canReopen`, xác thực lý do `validateReopenReason`, ánh xạ lỗi tiếng Việt `mapSettlementError`, chuẩn hóa phiên chặn `describeBlockingSession`, định dạng khoảng ngày `formatPeriodRange`.
+- `frontend/src/utils/settlement.test.js` & `frontend/src/services/settlementApi.test.js`: 28 bài test tự động Vitest (22 test utils + 6 test API service) bao phủ 100% logic nghiệp vụ thuần và service API.
+
+
