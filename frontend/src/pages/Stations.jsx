@@ -29,6 +29,7 @@ import { useRestartChargePoint } from '../hooks/useRestartChargePoint';
 import StationLocationPicker from '../components/StationLocationPicker';
 import StationsMapView from '../components/StationsMapView';
 import TariffForm from '../components/TariffForm';
+import StatusBadge from '../components/ui/StatusBadge';
 import { validatePowerLimitSlots } from '../utils/tariffValidation';
 
 export default function Stations() {
@@ -902,45 +903,49 @@ export default function Stations() {
             <div
               key={st.id}
               id={`station-card-${st.id}`}
-              className="bg-panel border border-hairline rounded-sm overflow-hidden scroll-mt-24"
+              className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 rounded-2xl overflow-hidden scroll-mt-24 shadow-sm hover:shadow-md transition-all duration-200"
             >
               {/* Station Header Bar */}
               <div
                 onClick={() => setExpandedStationId(isExpanded ? null : st.id)}
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-panel-hover transition-colors"
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="bg-obsidian border border-hairline p-2 rounded">
-                    <Zap className="w-5 h-5 text-electric-cyan" />
+                <div className="flex items-center space-x-3.5">
+                  <div className="bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 p-2.5 rounded-xl text-sky-600 dark:text-sky-400">
+                    <Zap className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="flex items-center space-x-2">
-                      <h2 className="text-sm font-bold text-tech-white">{st.name}</h2>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-obsidian text-steel-gray border border-hairline">
+                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">{st.name}</h2>
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60 font-semibold">
                         MÃ: ST-{st.id}
                       </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-grid-green/20 text-grid-green font-semibold">
-                        {st.status}
-                      </span>
+                      <StatusBadge
+                        variant={st.status === 'ACTIVE' ? 'success' : st.status === 'MAINTENANCE' ? 'warning' : 'neutral'}
+                        size="sm"
+                        dot
+                      >
+                        {st.status === 'ACTIVE' ? 'Hoạt động' : st.status}
+                      </StatusBadge>
                       {role === 'ADMIN' && (
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-semibold ${
+                        <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border font-semibold ${
                           st.operator_id
-                            ? 'bg-caution-amber/15 text-caution-amber border-caution-amber/30'
-                            : 'bg-obsidian text-steel-gray border-hairline'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50'
+                            : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60'
                         }`}>
                           {st.operator_id ? `Chủ trạm: ${st.operator_name || `ID #${st.operator_id}`}` : 'Chưa gán chủ'}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center space-x-3 text-xs text-steel-gray mt-1 font-mono">
+                    <div className="flex items-center space-x-3 text-xs text-slate-600 dark:text-slate-400 mt-1 font-mono">
                       <span className="flex items-center">
-                        <MapPin className="w-3.5 h-3.5 mr-1" />
+                        <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400 dark:text-slate-500" />
                         {st.address}
                       </span>
                       {st.latitude != null && st.longitude != null && (
                         <>
                           <span>•</span>
-                          <span className="text-[11px] text-electric-cyan">
+                          <span className="text-[11px] text-sky-600 dark:text-sky-400">
                             GPS: {st.latitude.toFixed(4)}, {st.longitude.toFixed(4)}
                           </span>
                         </>
@@ -953,8 +958,8 @@ export default function Stations() {
 
                 <div className="flex items-center space-x-4">
                   <div className="text-right font-mono">
-                    <div className="text-xs text-steel-gray">CÔNG SUẤT LƯỚI ĐỊNH MỨC</div>
-                    <div className="text-base font-bold text-electric-cyan tabular-nums">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">CÔNG SUẤT LƯỚI ĐỊNH MỨC</div>
+                    <div className="text-base font-bold text-sky-600 dark:text-sky-400 tabular-nums">
                       {st.total_grid_capacity_kw} kW
                     </div>
                   </div>
@@ -1024,9 +1029,9 @@ export default function Stations() {
 
               {/* Station Expanded Chargers View */}
               {isExpanded && (
-                <div className="border-t border-hairline bg-obsidian p-4 space-y-4">
+                <div className="border-t border-slate-200 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/40 p-4 sm:p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">
                       DANH SÁCH TRỤ SẠC (EVSE BAYS) — {chargers.length} TRỤ VẬT LÝ
                     </span>
                     {canManageChargers && (
@@ -1035,7 +1040,7 @@ export default function Stations() {
                           e.stopPropagation();
                           handleOpenAddCharger(st);
                         }}
-                        className="flex items-center space-x-1 px-2.5 py-1 rounded bg-panel hover:bg-panel-hover border border-electric-cyan/40 hover:border-electric-cyan text-electric-cyan text-xs font-mono font-semibold transition-colors shadow-sm"
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-mono font-semibold transition-all shadow-sm hover:shadow"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>GẮN TRỤ SẠC</span>
@@ -1044,7 +1049,7 @@ export default function Stations() {
                   </div>
 
                   {chargers.length === 0 ? (
-                    <div className="text-xs text-steel-gray text-center py-6 font-mono border border-dashed border-hairline rounded bg-panel/30">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 text-center py-8 font-mono border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl bg-white/50 dark:bg-slate-900/20">
                       <p>Chưa có trụ sạc nào được gắn vào trạm này.</p>
                       {canManageChargers && (
                         <button
@@ -1052,7 +1057,7 @@ export default function Stations() {
                             e.stopPropagation();
                             handleOpenAddCharger(st);
                           }}
-                          className="mt-2 inline-flex items-center space-x-1 text-electric-cyan hover:underline text-xs"
+                          className="mt-2.5 inline-flex items-center space-x-1 text-sky-600 dark:text-sky-400 hover:underline text-xs font-semibold"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Gắn trụ sạc đầu tiên cho trạm</span>
@@ -1060,23 +1065,31 @@ export default function Stations() {
                       )}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                       {chargers.map((ch) => (
-                        <div key={ch.id} className="bg-panel border border-hairline p-3 rounded-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-mono text-xs font-bold text-tech-white">{ch.code}</span>
-                            <div className="flex items-center space-x-1.5">
-                              <span
-                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                        <div
+                          key={ch.id}
+                          className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200"
+                        >
+                          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">{ch.code}</span>
+                            <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                              <StatusBadge
+                                variant={
                                   ch.status === 'CHARGING'
-                                    ? 'bg-electric-cyan/20 text-electric-cyan'
+                                    ? 'info'
                                     : ch.status === 'AVAILABLE'
-                                    ? 'bg-grid-green/20 text-grid-green'
-                                    : 'bg-critical-red/20 text-critical-red'
-                                }`}
+                                    ? 'success'
+                                    : ch.status === 'FAULTED'
+                                    ? 'danger'
+                                    : 'warning'
+                                }
+                                size="sm"
+                                dot
+                                pulse={ch.status === 'CHARGING'}
                               >
-                                {ch.status === 'UNAVAILABLE' ? 'MAINTENANCE' : ch.status}
-                              </span>
+                                {ch.status === 'UNAVAILABLE' ? 'Bảo trì' : ch.status === 'CHARGING' ? 'Đang sạc' : ch.status === 'AVAILABLE' ? 'Sẵn sàng' : ch.status}
+                              </StatusBadge>
                               {(role === 'ADMIN' || role === 'OPERATOR') && (
                                 <button
                                   type="button"
@@ -1092,12 +1105,12 @@ export default function Stations() {
                                     e.stopPropagation();
                                     handleToggleChargerStatus(ch.id, ch.status);
                                   }}
-                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+                                  className={`text-[11px] font-mono px-2 py-0.5 rounded-lg border font-semibold transition-colors ${
                                     ch.status === 'CHARGING'
-                                      ? 'opacity-40 cursor-not-allowed border-hairline text-steel-gray'
+                                      ? 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
                                       : ch.status === 'AVAILABLE'
-                                      ? 'border-caution-amber/40 text-caution-amber hover:bg-caution-amber/20'
-                                      : 'border-grid-green/40 text-grid-green hover:bg-grid-green/20'
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60 hover:bg-amber-100'
+                                      : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60 hover:bg-emerald-100'
                                   }`}
                                 >
                                   {ch.status === 'AVAILABLE' ? 'Bảo trì' : 'Mở lại'}
@@ -1112,7 +1125,7 @@ export default function Stations() {
                                     setRestartingCharger({ id: ch.id, code: ch.code, status: ch.status });
                                     resetResult();
                                   }}
-                                  className="text-[10px] font-mono flex items-center space-x-1 px-1.5 py-0.5 rounded border border-blue-500/40 text-blue-500 hover:bg-blue-500/20 transition-colors"
+                                  className="text-[11px] font-mono flex items-center space-x-1 px-2 py-0.5 rounded-lg border border-sky-200 dark:border-sky-800/60 text-sky-800 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 transition-colors font-semibold"
                                 >
                                   <RefreshCw className="w-3 h-3" />
                                   <span>Khởi động lại</span>
@@ -1125,7 +1138,7 @@ export default function Stations() {
                                   e.stopPropagation();
                                   navigate(`/chargers/${ch.id}`);
                                 }}
-                                className="text-[10px] font-mono flex items-center space-x-1 px-1.5 py-0.5 rounded border border-electric-cyan/40 text-electric-cyan hover:bg-electric-cyan/20 transition-colors"
+                                className="text-[11px] font-mono flex items-center space-x-1 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/70 hover:bg-slate-200 transition-colors font-semibold"
                               >
                                 <Play className="w-3 h-3 fill-current" />
                                 <span>Màn hình trụ</span>

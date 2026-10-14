@@ -343,3 +343,4 @@ export const ChargerStationGrid: React.FC<ChargerStationGridProps> = ({
 };
 
 export default ChargerStationCard;
+

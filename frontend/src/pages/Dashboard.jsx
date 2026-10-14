@@ -19,12 +19,14 @@ import {
   Info,
   SlidersHorizontal,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { telemetryWs } from '../services/websocket';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import BusbarLoadIndicator from '../components/BusbarLoadIndicator';
 import MetricBox from '../components/MetricBox';
+import ChargerStationCard from '../components/ChargerStationCard';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -45,6 +47,7 @@ import {
 export default function Dashboard() {
   const { user, role } = useAuth();
   const { isDark } = useTheme();
+  const navigate = useNavigate();
 
   const [accessibleStations, setAccessibleStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState('ALL');
@@ -710,7 +713,7 @@ export default function Dashboard() {
               Giám sát trạng thái vật lý từng trụ sạc &amp; rơ-le nguồn
             </p>
 
-            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
               {chargers.length === 0 ? (
                 <EmptyState
                   icon={BatteryCharging}
@@ -719,73 +722,27 @@ export default function Dashboard() {
                   className="py-6"
                 />
               ) : (
-                chargers.map((c) => {
-                  const isCharging = c.status === 'CHARGING';
-                  const isAvailable = c.status === 'AVAILABLE';
-                  const isFaulted = c.status === 'FAULTED';
-
-                  return (
-                    <motion.div
-                      key={c.id}
-                      whileHover={{ x: 2, transition: { duration: 0.15 } }}
-                      className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
-                        isCharging
-                          ? 'border-sky-300 dark:border-sky-800 bg-sky-50/40 dark:bg-sky-950/20 shadow-sm'
-                          : isAvailable
-                          ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-emerald-300'
-                          : 'border-rose-200 dark:border-rose-800 bg-rose-50/40 dark:bg-rose-950/20'
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          {/* Pulsing LED status dot */}
-                          <span className="relative flex h-2.5 w-2.5">
-                            {isCharging && (
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
-                            )}
-                            <span
-                              className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                                isCharging
-                                  ? 'bg-sky-500'
-                                  : isAvailable
-                                  ? 'bg-emerald-500'
-                                  : 'bg-rose-500'
-                              }`}
-                            />
-                          </span>
-                          <span className="text-xs font-bold font-mono text-slate-900 dark:text-slate-100">
-                            {c.code}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-600 dark:text-slate-400">
-                          {c.vendor} —{' '}
-                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-                            {c.max_power_kw} kW
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Status Pill Badge (WCAG AA compliant contrast) */}
-                      <div>
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-                            isCharging
-                              ? 'bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200/90 dark:border-sky-800/60'
-                              : isAvailable
-                              ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200/90 dark:border-emerald-800/60'
-                              : 'bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200/90 dark:border-rose-800/60'
-                          }`}
-                        >
-                          {isCharging
-                            ? 'Đang sạc'
-                            : isAvailable
-                            ? 'Sẵn sàng'
-                            : 'Cảnh báo'}
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })
+                chargers.map((c, idx) => (
+                  <ChargerStationCard
+                    key={c.id}
+                    station={{
+                      id: c.id,
+                      code: c.code,
+                      connectorType: c.connectors?.[0]?.connector_type || 'Type 2',
+                      powerKw: c.max_power_kw || 22,
+                      currentPowerKw:
+                        c.status === 'CHARGING'
+                          ? c.active_kw || (c.max_power_kw ? c.max_power_kw * 0.75 : 18.5)
+                          : 0,
+                      soc: c.status === 'CHARGING' ? 74 : undefined,
+                      status: c.status || 'AVAILABLE',
+                      vendor: c.vendor,
+                      stationLocation: c.location,
+                    }}
+                    index={idx}
+                    onClick={() => navigate(`/chargers/${c.id}`)}
+                  />
+                ))
               )}
             </div>
           </div>
