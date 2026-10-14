@@ -13,8 +13,10 @@ from fastapi.responses import JSONResponse
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.websocket import ws_manager
+from app.models.reconciliation import PeriodLockedException
 from app.ocpp.gateway import router as ocpp_router
 from app.routers.admin_users import router as admin_users_router
+from app.services.reconciliation_service import PeriodLockConflictException
 from app.services.reservation_service import ReservationConflictException
 from app.services.wallet_service import (
     WalletInsufficientBalanceException,
@@ -165,6 +167,32 @@ async def reservation_conflict_handler(
         content={
             "detail": exc.detail,
             "suggested_connectors": exc.suggested_connectors,
+        },
+    )
+
+
+@app.exception_handler(PeriodLockedException)
+async def period_locked_exception_handler(
+    request: Request, exc: PeriodLockedException
+):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(PeriodLockConflictException)
+async def period_lock_conflict_handler(
+    request: Request, exc: PeriodLockConflictException
+):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "unresolved_sessions": [
+                s.model_dump() if hasattr(s, "model_dump") else s
+                for s in exc.unresolved_sessions
+            ],
         },
     )
 

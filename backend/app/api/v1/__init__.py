@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     chargers,
     data_erasure,
     payments,
+    reconciliation,
     reports,
     reservations,
     sessions,
@@ -33,6 +34,7 @@ api_router.include_router(wallet.router)
 api_router.include_router(sessions.router)
 api_router.include_router(reservations.router)
 api_router.include_router(reports.router)
+api_router.include_router(reconciliation.router)
 
 api_router.include_router(simulator.router)
 api_router.include_router(ai.router)
