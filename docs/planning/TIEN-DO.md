@@ -67,6 +67,9 @@
 | 2026-10-13 | Rà soát báo cáo lỗi OCPP và thanh toán | Sửa các lỗi webhook, xác thực ví khi bắt đầu sạc, ghi nợ lúc kết thúc phiên và thông báo thiếu tiền | Hoàn thành; đã kiểm tra toàn bộ backend và frontend | `backend/app/{api/v1/endpoints/payments.py,core/config.py,ocpp/handlers/{start_transaction.py,stop_transaction.py},services/payment_service.py}`, `frontend/src/pages/{Wallet.jsx,ChargerDetail.jsx}`, regression tests | Backend **595 passed, 1 skipped**; Ruff đạt; frontend **52 tests passed**, build đạt. Chi tiết tại nhật ký #21. |
 | 2026-10-13 | README — hướng dẫn Docker Compose | Kiểm tra và sửa liên kết tải Docker Desktop cùng lệnh khởi chạy ở Cách 2 | Hoàn thành | `README.md` | Dùng link cài Windows x64/ARM64 và trang chọn nền tảng chính thức; bổ sung `docker compose up -d --build` trước lệnh xem trạng thái. Người thực hiện: `KimiCoNY`. |
 
+| 2026-10-14 | S-55 Frontend — SCRUM-408 | Nút chốt/mở lại kỳ, hộp thoại xác nhận, hiện danh sách phiên chặn chốt | Hoàn thành Frontend | `frontend/src/pages/Settlement.jsx`, `frontend/src/components/settlement/`, `frontend/src/services/settlementApi.js`, `frontend/src/utils/settlement.js` | Hoàn thành 100% tiêu chí chấp nhận SCRUM-408: route `/settlement`, role guard `ACCOUNTANT` & `ADMIN`, nút Chốt kỳ + cảnh báo chỉ đọc, bắt lỗi 409 `BLOCKED_BY_ABNORMAL_SESSIONS` hiện danh sách phiên chặn + link `/session/:id` & `/abnormal-sessions`, nút Mở lại kỳ cho `ADMIN` bắt buộc lý do có inline validate và cảnh báo audit log. 31 test Vitest mới, full suite 151/151 passed, Vite build pass. |
+
+
 ---
 
 ### NHẬT KÝ THỰC HIỆN CHI TIẾT THEO NGÀY & THÀNH VIÊN (EXECUTION LOG)
@@ -253,6 +256,7 @@
 
 ---
 
+
 #### 17. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** Backend S-47 — API công khai giúp tài xế tìm trạm gần và xem đầu nối rảnh, loại đầu nối cùng đơn giá hiện hành.
 * **Nội dung cụ thể:** Thêm `GET /api/v1/stations/nearby` với GPS hoặc `q` tên/địa chỉ, radius, loại connector, limit/offset; chỉ trả trạm active và dùng DTO công khai riêng. Tính khoảng cách Haversine; trạm thiếu GPS vẫn tìm bằng từ khóa và xếp cuối trong kết quả GPS. Quy tắc rảnh yêu cầu cổng/trụ active, heartbeat còn hạn theo config và hai trạng thái nội bộ/OCPP khớp. Response có số cổng rảnh/tổng, loại, công suất/trạng thái tóm tắt và giá TOU đang hiệu lực dạng Decimal. Lấy trạm/trụ/cổng và biểu giá theo lô; không thêm migration.
@@ -303,4 +307,32 @@
 * **Nhiệm vụ thực hiện:** Kiểm tra liên kết tải Docker Desktop và hoàn thiện hướng dẫn “Cách 2” trong README.
 * **Nội dung:** Xác minh trang sản phẩm Docker Desktop chính thức; cập nhật link tải trực tiếp Windows x64 (AMD64), Windows ARM64 và link chọn nền tảng khác. Bổ sung lệnh `docker compose up -d --build` để thật sự khởi động stack trước lệnh `docker compose ps`; ghi rõ chạy từ thư mục gốc và Compose tự nhận `docker-compose.yml`, dùng tên project `ev-csms`.
 * **Kiểm chứng:** Các liên kết tải Windows lấy từ nút Download trên trang Docker Desktop chính thức; không chạy lại stack vì thay đổi chỉ nằm trong hướng dẫn README. Không có migration hay thay đổi code ứng dụng.
+=======
+#### 17. Ngày 2026-10-13 | Người thực hiện: Kỹ sư Frontend (SCRUM-372 / S-49)
+* **Nhiệm vụ thực hiện:** [FE] Hiện thông báo "đã có người đặt" và danh sách trụ gợi ý (Ticket SCRUM-372, thuộc User Story S-49 / SCRUM-353).
+* **Nội dung thực hiện cụ thể:**
+  1. Xây dựng component `ReservationConflictModal.jsx`: Modal thông báo xung đột bằng tiếng Việt chuẩn "Trụ này vừa được người khác đặt", hiển thị danh sách trụ/đầu nối khả dụng gợi ý trong cùng trạm sạc, giữ nguyên giờ tới người dùng đã chọn trước đó, hỗ trợ phím Esc, focus trap, aria, responsive mobile và dark mode.
+  2. Xây dựng dịch vụ `src/services/reservationApi.js`: Ghi rõ hợp đồng API đặt chỗ, kết nối `POST /api/v1/reservations`, `GET /api/v1/reservations/my` và `POST /api/v1/reservations/{id}/cancel`.
+  3. Xây dựng bộ tiện ích `src/utils/reservationConflictUtils.js`: Hàm thuần `mapReservationError` chuẩn hóa lỗi 409 Conflict (`RESERVATION_CONFLICT`), 401, 403, 404/501 ("Chức năng chưa sẵn sàng"), 504 và lỗi mạng. Hàm `normalizeSuggestions` tương thích linh hoạt cả 2 định dạng `suggestions` và `suggested_connectors`. Hàm `createSingleFlightHandler` chống bấm đôi (anti-double-click).
+  4. Viết bộ kiểm thử đơn vị `src/utils/reservationConflictUtils.test.js` với 15 ca test vitest bao phủ toàn diện.
+* **Xác minh kiểm thử:** Vitest full suite đạt **71/71 passed** (100%); Vite build `npm run build` thành công trong 31.53s (0 lỗi).
+* **Ghi chú tiến độ:** Do hộp thoại đặt chỗ ban đầu (Story S-48) chưa tồn tại trên Frontend, component xử lý xung đột đã được chuẩn hóa độc lập nhận dữ liệu qua props, sẵn sàng gắn kết nối ngay khi Story S-48 được tích hợp.
+
+---
+
+#### 18. Ngày 2026-10-14 | Người thực hiện: Kỹ sư Frontend (SCRUM-408 / S-55)
+* **Nhiệm vụ thực hiện:** [FE] Nút chốt/mở lại kỳ, hộp thoại xác nhận, hiện danh sách phiên chặn chốt (Ticket SCRUM-408, ticket cha SCRUM-387 / Story S-55).
+* **Nội dung thực hiện cụ thể:**
+  1. `frontend/src/pages/Settlement.jsx`: Màn hình Quản lý Kỳ đối soát (`/settlement`) dành cho vai trò `ACCOUNTANT` và `ADMIN`. Đủ 4 trạng thái: Loading (Skeleton), Rỗng (EmptyState), Lỗi ("Thử lại"), Thành công. Danh sách kỳ hiển thị Badge Mở/Đã chốt (icon ổ khóa), nhãn kỳ và khoảng ngày lấy trực tiếp từ backend, thông tin "Đã chốt bởi <closed_by_name> lúc <closed_at>" theo helper `formatTime.js`.
+  2. `frontend/src/components/settlement/ClosePeriodConfirmModal.jsx`: Hộp thoại xác nhận chốt kỳ cho `ACCOUNTANT` và `ADMIN`. Cảnh báo rõ ràng: "Sau khi chốt, phiên/hoá đơn/sổ cái trong kỳ chỉ đọc". Hỗ trợ phím Esc, focus trap, loading state và chống bấm đôi.
+  3. `frontend/src/components/settlement/ReopenPeriodModal.jsx`: Hộp thoại mở lại kỳ dành riêng cho `ADMIN`. Bắt buộc nhập lý do mở lại với độ dài tối thiểu 10 ký tự, hiển thị lỗi inline ngay trong ô, cảnh báo "Thao tác này được ghi nhật ký kiểm toán". Nếu lý do không hợp lệ thì chặn không gọi API.
+  4. `frontend/src/components/settlement/BlockedSessionsModal.jsx`: Khối/hộp thoại xử lý khi API trả 409 `BLOCKED_BY_ABNORMAL_SESSIONS`. Hiển thị "Không thể chốt kỳ: còn phiên bất thường chưa xử lý", danh sách các phiên chặn (mã phiên có link sang `/session/:id`, mã trụ, thời điểm bắt đầu định dạng múi giờ VN, lý do chặn) và nút chuyển sang `/abnormal-sessions`. Kỳ đối soát giữ nguyên trạng thái MỞ.
+  5. `frontend/src/services/settlementApi.js`: Tách biệt các lời gọi API `GET /api/v1/settlement/periods`, `POST /api/v1/settlement/periods/{id}/close`, `POST /api/v1/settlement/periods/{id}/reopen` kèm hợp đồng API chi tiết ở đầu file.
+  6. `frontend/src/utils/settlement.js`: Logic thuần kiểm tra quyền `canClose`, `canReopen`, validate lý do `validateReopenReason`, ánh xạ lỗi `mapSettlementError`, chuẩn hóa phiên chặn `describeBlockingSession`, định dạng khoảng ngày `formatPeriodRange`.
+  7. `frontend/src/App.jsx` & `frontend/src/components/Navigation.jsx`: Thêm route `/settlement` và menu điều hướng "Kỳ Đối Soát" phân quyền cho `['ADMIN', 'ACCOUNTANT']`.
+* **Xác minh kiểm thử & Build:**
+  - Vitest: 28 bài test mới (22 test utils + 6 test API service). Toàn bộ frontend test suite đạt **148/148 passed (11/11 test files)**.
+  - Vite build: `npm run build` biên dịch thành công 100%, không có lỗi runtime/syntax.
+
+
 
