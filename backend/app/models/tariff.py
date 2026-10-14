@@ -16,7 +16,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class Tariff(Base):

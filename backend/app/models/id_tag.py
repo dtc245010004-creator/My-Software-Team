@@ -2,7 +2,10 @@
 
 from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, String
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class IdTag(Base):

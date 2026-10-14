@@ -13,7 +13,10 @@ from sqlalchemy import (
     text,
 )
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class DataErasureRequest(Base):

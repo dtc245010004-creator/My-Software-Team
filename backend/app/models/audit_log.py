@@ -1,7 +1,10 @@
 """Nhật ký bất biến cho các lệnh điều khiển từ xa."""
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, Integer, String, func
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class AuditLog(Base):

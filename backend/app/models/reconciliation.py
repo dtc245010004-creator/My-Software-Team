@@ -4,7 +4,6 @@ import enum
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import HTTPException, status
 from sqlalchemy import (
     Boolean,
     Column,
@@ -19,7 +18,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class PeriodStatus(str, enum.Enum):
@@ -28,17 +30,17 @@ class PeriodStatus(str, enum.Enum):
     REOPENED = "REOPENED"
 
 
-class PeriodLockedException(HTTPException):
+class PeriodLockedException(Exception):
     """Ngoại lệ khi cố gắng thay đổi dữ liệu thuộc kỳ đối soát đã bị khóa (S-55 / HTTP 409 Conflict)."""
 
     def __init__(
         self,
         detail: str = "Kỳ đối soát đã khóa, dữ liệu ở chế độ chỉ đọc (Read-only).",
+        status_code: int = 409,
     ):
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=detail,
-        )
+        self.detail = detail
+        self.status_code = status_code
+        super().__init__(detail)
 
 
 class PartnerRevenueShareConfig(Base):
@@ -258,9 +260,14 @@ def _prevent_mutation_in_locked_period(mapper, connection, target):
 
 def register_reconciliation_listeners():
     """Đăng ký listener cho ChargingSession, SessionBillingSegment, WalletTransaction."""
-    from app.models.session import ChargingSession
-    from app.models.session_billing_segment import SessionBillingSegment
-    from app.models.wallet import WalletTransaction
+    try:
+        from .session import ChargingSession
+        from .session_billing_segment import SessionBillingSegment
+        from .wallet import WalletTransaction
+    except (ImportError, ValueError):
+        from app.models.session import ChargingSession
+        from app.models.session_billing_segment import SessionBillingSegment
+        from app.models.wallet import WalletTransaction
 
     for model_cls in (ChargingSession, SessionBillingSegment, WalletTransaction):
         if not event.contains(model_cls, "before_update", _prevent_mutation_in_locked_period):

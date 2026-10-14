@@ -17,7 +17,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import backref, relationship, synonym
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class StationStatus(str, enum.Enum):
