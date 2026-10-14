@@ -275,5 +275,24 @@
   - Vitest: 28 bài test mới (22 test utils + 6 test API service). Toàn bộ frontend test suite đạt **148/148 passed (11/11 test files)**.
   - Vite build: `npm run build` biên dịch thành công 100%, không có lỗi runtime/syntax.
 
+---
+
+#### 19. Ngày 2026-10-14 | Người thực hiện: Kỹ sư Frontend (SCRUM-418 / S-57 / SCRUM-389)
+* **Nhiệm vụ thực hiện:** [FE] Trang yêu cầu xóa dữ liệu (tài xế) và màn hình duyệt (admin) (Ticket SCRUM-418, ticket cha SCRUM-389 / SCRUM-41, phụ thuộc S-55).
+* **Nội dung thực hiện cụ thể:**
+  1. `frontend/src/pages/DataErasure.jsx`: Trang yêu cầu xóa dữ liệu cá nhân (`/data-erasure`) dành cho vai trò `CUSTOMER`. Đầy đủ 4 trạng thái giao diện (Skeleton, Lỗi kèm "Thử lại", Thành công). Hiện trạng thái yêu cầu hiện tại (Chờ duyệt, Đang xử lý, Từ chối kèm lý do, Hoàn tất); nếu đang có yêu cầu thì khóa form gửi mới. Cảnh báo số dư ví dương (`GET /wallet/me`) kèm số dư định dạng VND và link sang `/wallet`. Khối giải thích tĩnh theo Nghị định 13/2023/NĐ-CP ghi chú rõ "chờ người có thẩm quyền xác nhận", không tư vấn pháp lý. Form gửi yêu cầu kèm giới hạn ký tự, checkbox cam kết không thể hoàn tác và modal xác nhận lần hai chống bấm đôi.
+  2. `frontend/src/pages/AdminDataErasure.jsx`: Màn hình duyệt xóa dữ liệu (`/admin/data-erasure`) dành cho vai trò `ADMIN`. KPI thống kê nhanh, thanh tìm kiếm theo tên tài xế/mã yêu cầu, bộ lọc tab trạng thái (Tất cả, Chờ duyệt, Đang xử lý, Từ chối, Hoàn tất), bảng danh sách hiển thị số dư ví và cảnh báo còn tiền, nút xem chi tiết, nút duyệt và nút từ chối.
+  3. `frontend/src/components/dataErasure/ApproveErasureModal.jsx`: Hộp thoại xác nhận duyệt cho Admin, yêu cầu tick "Tôi đã xem phạm vi dữ liệu được hiển thị và xác nhận", vô hiệu hóa duyệt nếu ví còn số dư dương, hỗ trợ phím Esc và chống bấm đôi.
+  4. `frontend/src/components/dataErasure/RejectErasureModal.jsx`: Hộp thoại từ chối yêu cầu, bắt buộc nhập lý do từ chối từ 10 đến 500 ký tự với thông báo lỗi inline.
+  5. `frontend/src/components/dataErasure/ErasureDetailModal.jsx`: Hộp thoại xem chi tiết yêu cầu, phạm vi dữ liệu ẩn danh hóa / lưu trữ sổ cái kế toán do backend trả về (hoặc giải thích sơ bộ).
+  6. `frontend/src/services/dataErasureApi.js`: Module dịch vụ API kết nối `GET /data-erasure/requests/me`, `POST /data-erasure/requests`, `GET /admin/data-erasure/requests`, `GET /admin/data-erasure/requests/{id}`, `POST /admin/data-erasure/requests/{id}/approve`, `POST /admin/data-erasure/requests/{id}/reject`, `GET /wallet/me` kèm hợp đồng API chi tiết ở đầu file.
+  7. `frontend/src/config/dataErasureConfig.js`: Cấu hình các hằng số phân quyền, độ dài lý do và nội dung giải thích tĩnh sơ bộ.
+  8. `frontend/src/utils/dataErasure.js`: Hàm thuần `mapErasureStatus`, `canSubmitRequest`, `canApprove`, `canReject`, `validateRejectReason`, `mapErasureError` (xử lý `REQUEST_ALREADY_EXISTS`, `WALLET_HAS_BALANCE`, `PERIOD_LOCKED`), `createSingleFlightHandler`, `formatCurrencyVND`.
+  9. `frontend/src/App.jsx` & `frontend/src/components/Navigation.jsx`: Thêm route `/data-erasure`, `/admin/data-erasure` và menu điều hướng "Xóa Dữ Liệu" (cho `CUSTOMER`), "Duyệt Xóa Dữ Liệu" (cho `ADMIN`).
+  10. Tích hợp endpoint thật Backend S-57 (`/me/data-erasure-requests`, `/admin/data-erasure-requests`) và bổ sung cơ chế tự động Fallback Demo Data khi môi trường cục bộ chưa merge API, kết nối đồng bộ dữ liệu giữa tài xế và quản trị viên.
+* **Xác minh kiểm thử & Build:**
+  - Vitest: 42 bài test cho SCRUM-418 (28 test utils + 14 test API service). Toàn bộ frontend test suite đạt **190/190 passed (13/13 test files)**.
+  - Vite build: `npm run build` biên dịch thành công 100% không có lỗi runtime/syntax.
+
 
 

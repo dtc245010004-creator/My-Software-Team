@@ -134,4 +134,17 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 - `frontend/src/utils/settlement.js`: Các hàm thuần kiểm tra quyền `canClose`, `canReopen`, xác thực lý do `validateReopenReason`, ánh xạ lỗi tiếng Việt `mapSettlementError`, chuẩn hóa phiên chặn `describeBlockingSession`, định dạng khoảng ngày `formatPeriodRange`.
 - `frontend/src/utils/settlement.test.js` & `frontend/src/services/settlementApi.test.js`: 28 bài test tự động Vitest (22 test utils + 6 test API service) bao phủ 100% logic nghiệp vụ thuần và service API.
 
+## S-57 / SCRUM-389 Frontend (SCRUM-418) — Trang yêu cầu xóa dữ liệu (tài xế) và màn hình duyệt (admin)
+
+- `frontend/src/pages/DataErasure.jsx`: Trang yêu cầu xóa dữ liệu cá nhân (`/data-erasure`) dành cho vai trò `CUSTOMER`. Hiển thị trạng thái yêu cầu hiện tại (Chờ duyệt, Đang xử lý, Từ chối kèm lý do, Hoàn tất), cảnh báo số dư ví dương kèm link sang `/wallet`, khối giải thích tĩnh theo Nghị định 13/2023/NĐ-CP (ghi chú: "Chờ người có thẩm quyền xác nhận phạm vi dữ liệu"), form gửi yêu cầu kèm checkbox xác nhận tính chất không hoàn tác và hộp thoại xác nhận lần hai.
+- `frontend/src/pages/AdminDataErasure.jsx`: Màn hình duyệt yêu cầu xóa dữ liệu (`/admin/data-erasure`) dành riêng cho `ADMIN`. Lọc theo trạng thái, tìm kiếm tài xế, hiển thị số dư ví và cảnh báo còn tiền, nút xem chi tiết, nút duyệt và nút từ chối.
+- `frontend/src/components/dataErasure/ApproveErasureModal.jsx`: Hộp thoại xác nhận duyệt cho Admin, yêu cầu tick checkbox "Tôi đã xem phạm vi dữ liệu được hiển thị và xác nhận", chặn duyệt nếu ví còn số dư dương, hỗ trợ phím Esc và chống bấm đôi.
+- `frontend/src/components/dataErasure/RejectErasureModal.jsx`: Hộp thoại từ chối yêu cầu cho Admin, bắt buộc nhập lý do từ chối từ 10 đến 500 ký tự với thông báo lỗi inline.
+- `frontend/src/components/dataErasure/ErasureDetailModal.jsx`: Hộp thoại xem chi tiết yêu cầu, phạm vi dữ liệu ẩn danh hóa / lưu trữ sổ cái kế toán do backend trả về (hoặc giải thích sơ bộ).
+- `frontend/src/services/dataErasureApi.js`: Module dịch vụ API kết nối `GET /data-erasure/requests/me`, `POST /data-erasure/requests`, `GET /admin/data-erasure/requests`, `GET /admin/data-erasure/requests/{id}`, `POST /admin/data-erasure/requests/{id}/approve`, `POST /admin/data-erasure/requests/{id}/reject`, `GET /wallet/me` kèm hợp đồng API chi tiết.
+- `frontend/src/config/dataErasureConfig.js`: Định nghĩa các hằng số phân quyền, độ dài lý do và nội dung giải thích sơ bộ.
+- `frontend/src/utils/dataErasure.js`: Các hàm thuần `mapErasureStatus`, `canSubmitRequest`, `canApprove`, `canReject`, `validateRejectReason`, `mapErasureError` (xử lý `REQUEST_ALREADY_EXISTS`, `WALLET_HAS_BALANCE`, `PERIOD_LOCKED`), `createSingleFlightHandler`, `formatCurrencyVND`.
+- `frontend/src/utils/dataErasure.test.js` & `frontend/src/services/dataErasureApi.test.js`: 41 bài test tự động Vitest (28 test utils + 13 test API service) bao phủ 100% logic nghiệp vụ thuần và service API.
+
+
 
