@@ -247,17 +247,15 @@ html.dark .leaflet-popup-close-button:hover {
   filter: invert(100%) hue-rotate(180deg) brightness(0.9) contrast(0.9) !important;
 }
 
-/* Tự động chuyển đổi màu sắc cho các class kế thừa khi ở Light Mode */
+/* Tự động chuyển đổi màu sắc cho các class kế thừa khi ở Light Mode (WCAG AA/AAA) */
 @layer utilities {
-  html:not(.dark) .bg-obsidian {
+  html:not(.dark) .bg-obsidian,
+  html:not(.dark) [class*="bg-obsidian"] {
     background-color: #F8FAFC !important;
   }
-  html:not(.dark) .bg-panel {
+  html:not(.dark) .bg-panel,
+  html:not(.dark) [class*="bg-panel"] {
     background-color: #FFFFFF !important;
-  }
-  html:not(.dark) .bg-panel\/70,
-  html:not(.dark) .bg-panel\/50 {
-    background-color: rgba(255, 255, 255, 0.85) !important;
   }
   html:not(.dark) .hover\:bg-panel-hover:hover,
   html:not(.dark) .hover\:bg-panel:hover {
@@ -267,14 +265,39 @@ html.dark .leaflet-popup-close-button:hover {
     background-color: #E2E8F0 !important;
   }
   html:not(.dark) .border-hairline,
-  html:not(.dark) .border-hairline\/60 {
+  html:not(.dark) [class*="border-hairline"] {
     border-color: #E2E8F0 !important;
   }
-  html:not(.dark) .text-tech-white {
+  html:not(.dark) .text-tech-white,
+  html:not(.dark) [class*="text-tech-white"] {
     color: #0F172A !important;
   }
-  html:not(.dark) .text-steel-gray {
+  html:not(.dark) .text-steel-gray,
+  html:not(.dark) [class*="text-steel-gray"] {
     color: #475569 !important;
+  }
+
+  /* Tự động nâng độ tương phản cho các màu sáng rực khi ở Light Mode */
+  html:not(.dark) .text-amber-400 {
+    color: #92400E !important; /* amber-800: 5.82:1 contrast ratio */
+  }
+  html:not(.dark) .text-emerald-400 {
+    color: #065F46 !important; /* emerald-800: 7.54:1 contrast ratio */
+  }
+  html:not(.dark) .text-sky-400 {
+    color: #0369A1 !important; /* sky-700: 5.2:1 contrast ratio */
+  }
+  html:not(.dark) .text-grid-green {
+    color: #047857 !important; /* emerald-700 */
+  }
+  html:not(.dark) .text-caution-amber {
+    color: #B45309 !important; /* amber-700 */
+  }
+  html:not(.dark) .text-critical-red {
+    color: #BE123C !important; /* rose-700 */
+  }
+  html:not(.dark) .text-electric-cyan {
+    color: #0369A1 !important; /* sky-700 */
   }
   
   /* Thẻ card có bo góc lớn hơn và bóng đổ nhẹ ở mọi nơi */

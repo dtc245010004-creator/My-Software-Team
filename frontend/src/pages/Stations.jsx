@@ -736,21 +736,21 @@ export default function Stations() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-tech-white">Hạ Tầng Trạm Sạc & Điểm Cấp Nguồn</h1>
-          <p className="text-xs text-steel-gray mt-0.5 font-mono">
-            QUẢN LÝ MÁY BIẾN ÁP, CÔNG SUẤT ĐỊNH MỨC & CÁC CỔNG SẠC VẬT LÝ
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Hạ Tầng Trạm Sạc &amp; Điểm Cấp Nguồn</h1>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 font-mono">
+            QUẢN LÝ MÁY BIẾN ÁP, CÔNG SUẤT ĐỊNH MỨC &amp; CÁC CỔNG SẠC VẬT LÝ
           </p>
         </div>
         <div className="flex items-center space-x-2">
           {/* Bộ chuyển đổi chế độ xem: DANH SÁCH | BẢN ĐỒ */}
-          <div className="flex items-center bg-obsidian border border-hairline rounded p-0.5 text-xs font-mono">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl p-1 text-xs font-mono">
             <button
               type="button"
               onClick={() => handleToggleViewMode('list')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-panel text-tech-white font-bold shadow-sm'
-                  : 'text-steel-gray hover:text-tech-white'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <ListIcon className="w-3.5 h-3.5" />
@@ -759,10 +759,10 @@ export default function Stations() {
             <button
               type="button"
               onClick={() => handleToggleViewMode('map')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors ${
                 viewMode === 'map'
-                  ? 'bg-panel text-electric-cyan font-bold shadow-sm'
-                  : 'text-steel-gray hover:text-tech-white'
+                  ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 font-bold shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
@@ -773,7 +773,7 @@ export default function Stations() {
           {role === 'ADMIN' && (
             <button
               onClick={handleOpenAddStation}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white text-xs font-semibold transition-colors"
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>THÊM TRẠM SẠC</span>
@@ -801,47 +801,47 @@ export default function Stations() {
         <div className="space-y-6">
           {/* KPI Summary Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="bg-panel border border-hairline p-3 rounded-lg">
-              <span className="text-[11px] font-mono text-steel-gray uppercase block">Tổng trạm sạc</span>
-              <span className="text-lg font-bold font-mono text-tech-white mt-1 block">
-                {stationStats.total} <span className="text-xs text-steel-gray font-normal">trạm</span>
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm">
+              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase font-semibold block">Tổng trạm sạc</span>
+              <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 block">
+                {stationStats.total} <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">trạm</span>
               </span>
             </div>
-            <div className="bg-panel border border-hairline p-3 rounded-lg">
-              <span className="text-[11px] font-mono text-emerald-400 uppercase block">Đang hoạt động</span>
-              <span className="text-lg font-bold font-mono text-emerald-400 mt-1 block">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm">
+              <span className="text-[11px] font-mono text-emerald-800 dark:text-emerald-400 uppercase font-semibold block">Đang hoạt động</span>
+              <span className="text-xl font-bold font-mono text-emerald-800 dark:text-emerald-300 mt-1 block">
                 {stationStats.active}
               </span>
             </div>
-            <div className="bg-panel border border-hairline p-3 rounded-lg">
-              <span className="text-[11px] font-mono text-amber-400 uppercase block">Bảo trì</span>
-              <span className="text-lg font-bold font-mono text-amber-400 mt-1 block">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm">
+              <span className="text-[11px] font-mono text-amber-800 dark:text-amber-400 uppercase font-semibold block">Bảo trì</span>
+              <span className="text-xl font-bold font-mono text-amber-800 dark:text-amber-300 mt-1 block">
                 {stationStats.maintenance}
               </span>
             </div>
-            <div className="bg-panel border border-hairline p-3 rounded-lg">
-              <span className="text-[11px] font-mono text-electric-cyan uppercase block">Tổng công suất nguồn</span>
-              <span className="text-lg font-bold font-mono text-electric-cyan mt-1 block">
-                {stationStats.totalKw} <span className="text-xs text-steel-gray font-normal">kW</span>
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm">
+              <span className="text-[11px] font-mono text-sky-800 dark:text-sky-400 uppercase font-semibold block">Tổng công suất nguồn</span>
+              <span className="text-xl font-bold font-mono text-sky-800 dark:text-sky-300 mt-1 block">
+                {stationStats.totalKw} <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">kW</span>
               </span>
             </div>
           </div>
 
           {/* Search & Status Filter Bar */}
-          <div className="bg-panel/90 border border-hairline p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
             <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-steel-gray absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm theo tên trạm hoặc địa chỉ..."
-                className="w-full bg-obsidian border border-hairline rounded-lg pl-9 pr-8 py-1.5 text-xs text-tech-white placeholder-steel-gray/60 focus:outline-none focus:border-electric-cyan font-mono"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 font-mono"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-steel-gray hover:text-tech-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -849,25 +849,25 @@ export default function Stations() {
             </div>
 
             <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-              <span className="text-[11px] font-mono text-steel-gray mr-1 hidden md:inline">Lọc trạng thái:</span>
+              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mr-1 hidden md:inline font-semibold">Lọc trạng thái:</span>
               {[
                 { id: 'ALL', label: 'TẤT CẢ', count: stationStats.total },
-                { id: 'ACTIVE', label: 'HOẠT ĐỘNG', count: stationStats.active, color: 'text-emerald-400' },
-                { id: 'MAINTENANCE', label: 'BẢO TRÌ', count: stationStats.maintenance, color: 'text-amber-400' },
+                { id: 'ACTIVE', label: 'HOẠT ĐỘNG', count: stationStats.active, color: 'text-emerald-700 dark:text-emerald-300' },
+                { id: 'MAINTENANCE', label: 'BẢO TRÌ', count: stationStats.maintenance, color: 'text-amber-700 dark:text-amber-300' },
               ].map((item) => {
                 const active = statusFilter === item.id;
                 return (
                   <button
                     key={item.id}
                     onClick={() => setStatusFilter(item.id)}
-                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-xl text-[11px] font-mono font-medium transition-all ${
                       active
-                        ? 'bg-electric-cyan text-tech-white font-bold shadow-sm'
-                        : 'bg-obsidian/70 text-steel-gray hover:text-tech-white hover:bg-obsidian border border-hairline'
+                        ? 'bg-sky-600 text-white font-bold shadow-sm'
+                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/60'
                     }`}
                   >
                     <span>{item.label}</span>
-                    <span className={`px-1 rounded text-[10px] ${active ? 'bg-black/30 text-white' : item.color || 'text-steel-gray'}`}>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${active ? 'bg-black/25 text-white' : item.color || 'text-slate-500'}`}>
                       {item.count}
                     </span>
                   </button>
@@ -974,10 +974,10 @@ export default function Stations() {
                         handleOpenEditStation(st);
                       }
                     }}
-                    className={`p-1.5 rounded border border-hairline transition-colors ${
+                    className={`p-1.5 rounded-xl border transition-colors ${
                       st.latitude != null && st.longitude != null
-                        ? 'hover:bg-obsidian text-steel-gray hover:text-electric-cyan'
-                        : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                        ? 'border-slate-200 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-sky-600'
+                        : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50'
                     }`}
                   >
                     <MapIcon className="w-4 h-4" />
@@ -992,7 +992,7 @@ export default function Stations() {
                           e.stopPropagation();
                           setTariffStation(st);
                         }}
-                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-mono font-bold transition-colors"
+                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800/50 text-[11px] font-mono font-bold transition-colors shadow-sm"
                       >
                         <Coins className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Biểu giá trạm</span>
@@ -1005,7 +1005,7 @@ export default function Stations() {
                           e.stopPropagation();
                           handleOpenPowerLimitModal(st);
                         }}
-                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded bg-obsidian hover:bg-electric-cyan/15 text-electric-cyan border border-electric-cyan/40 text-[11px] font-mono font-bold transition-colors"
+                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 dark:bg-sky-950/50 dark:hover:bg-sky-900/50 dark:text-sky-300 dark:border-sky-800/50 text-[11px] font-mono font-bold transition-colors shadow-sm"
                       >
                         <Clock className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Hạn mức khung giờ</span>
@@ -1017,13 +1017,13 @@ export default function Stations() {
                           e.stopPropagation();
                           handleOpenEditStation(st);
                         }}
-                        className="p-1.5 rounded hover:bg-obsidian text-steel-gray hover:text-electric-cyan border border-hairline transition-colors"
+                        className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 border border-slate-200 dark:border-slate-700/60 transition-colors"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                     </>
                   )}
-                  {isExpanded ? <ChevronDown className="w-5 h-5 text-steel-gray" /> : <ChevronRight className="w-5 h-5 text-steel-gray" />}
+                  {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
                 </div>
               </div>
 
@@ -1188,14 +1188,14 @@ export default function Stations() {
                             </div>
                           )}
 
-                          <div className="text-xs text-steel-gray font-mono mb-2">
-                            Hãng: {ch.vendor} • Định mức: <span className="text-tech-white font-bold">{ch.max_power_kw} kW</span>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 font-mono mb-2">
+                            Hãng: {ch.vendor} • Định mức: <span className="text-slate-900 dark:text-slate-100 font-bold">{ch.max_power_kw} kW</span>
                           </div>
 
                           {/* Connectors list */}
-                          <div className="space-y-1.5 pt-2 border-t border-hairline">
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/60">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-steel-gray font-mono block">CỔNG SẠC (CONNECTORS):</span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-semibold block">CỔNG SẠC (CONNECTORS):</span>
                               {canManageChargers && (
                                 <button
                                   type="button"
@@ -1204,7 +1204,7 @@ export default function Stations() {
                                     e.stopPropagation();
                                     handleOpenAddConnector(ch);
                                   }}
-                                  className="flex items-center space-x-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded border border-electric-cyan/40 text-electric-cyan hover:bg-electric-cyan/10 transition-colors"
+                                  className="flex items-center space-x-0.5 text-[10px] font-mono px-2 py-0.5 rounded-lg border border-sky-300 dark:border-sky-800/60 text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 transition-colors font-semibold"
                                 >
                                   <Plus className="w-3 h-3" />
                                   <span>ĐẦU NỐI</span>
@@ -1212,17 +1212,29 @@ export default function Stations() {
                               )}
                             </div>
                             {(ch.connectors || []).length === 0 && (
-                              <div className="text-[11px] text-steel-gray font-mono italic">Trụ chưa có đầu nối nào.</div>
+                              <div className="text-[11px] text-slate-500 font-mono italic">Trụ chưa có đầu nối nào.</div>
                             )}
                             {(ch.connectors || []).map((conn) => (
                               <div
                                 key={conn.id}
-                                className="bg-obsidian border border-hairline px-2 py-1 rounded flex items-center justify-between text-xs font-mono"
+                                className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/60 px-2.5 py-1.5 rounded-xl flex items-center justify-between text-xs font-mono text-slate-800 dark:text-slate-200"
                               >
                                 <span>Súng #{conn.connector_number} ({conn.connector_type}) • {conn.max_power_kw} kW</span>
-                                <span className={conn.status === 'CHARGING' ? 'text-electric-cyan font-bold' : 'text-grid-green'}>
+                                <StatusBadge
+                                  variant={
+                                    conn.status === 'CHARGING'
+                                      ? 'info'
+                                      : conn.status === 'AVAILABLE'
+                                      ? 'success'
+                                      : conn.status === 'FAULTED'
+                                      ? 'danger'
+                                      : 'neutral'
+                                  }
+                                  size="sm"
+                                  dot
+                                >
                                   {conn.status}
-                                </span>
+                                </StatusBadge>
                               </div>
                             ))}
                           </div>
@@ -1239,14 +1251,14 @@ export default function Stations() {
           )}
 
           {/* Bản đồ tổng quát mạng lưới trạm sạc */}
-          <div id="stations-overview-map" className="pt-6 border-t border-hairline space-y-3">
+          <div id="stations-overview-map" className="pt-6 border-t border-slate-200 dark:border-slate-800/60 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-sm font-bold text-tech-white uppercase font-mono flex items-center space-x-2">
-                  <MapIcon className="w-4 h-4 text-electric-cyan" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase font-mono flex items-center space-x-2">
+                  <MapIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                   <span>BẢN ĐỒ TỔNG QUÁT MẠNG LƯỚI TRẠM SẠC</span>
                 </h2>
-                <p className="text-xs text-steel-gray font-mono mt-0.5">
+                <p className="text-xs text-slate-600 dark:text-slate-400 font-mono mt-0.5">
                   VỊ TRÍ GPS VÀ TRẠNG THÁI HOẠT ĐỘNG THỜI GIAN THỰC CỦA TOÀN BỘ {stations.length} TRẠM SẠC
                 </p>
               </div>
