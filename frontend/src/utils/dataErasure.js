@@ -380,3 +380,13 @@ export const DEMO_ERASURE_REQUESTS = [
   },
 ];
 
+/**
+ * Thêm yêu cầu demo mới từ tài xế (dùng khi backend chưa có API để kiểm thử luồng E2E)
+ * @param {object} req
+ */
+export function addDemoErasureRequest(req) {
+  if (req && typeof req === 'object') {
+    DEMO_ERASURE_REQUESTS.unshift(req);
+  }
+}
+

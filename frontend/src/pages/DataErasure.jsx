@@ -32,6 +32,7 @@ import {
   mapErasureError,
   createSingleFlightHandler,
   formatCurrencyVND,
+  addDemoErasureRequest,
 } from '../utils/dataErasure';
 import { formatVNDateTime } from '../utils/formatTime';
 import {
@@ -119,12 +120,29 @@ export default function DataErasure() {
         } catch (apiErr) {
           if (apiErr.response?.status === 404 || apiErr.response?.status === 501) {
             // Demo fallback khi backend chưa có API
-            setCurrentRequest({
-              id: 999,
+            const newReq = {
+              id: Math.floor(Math.random() * 900) + 100,
+              user_id: user?.id || 1,
+              driver_name: user?.full_name || 'Trần Thị Bích Ngọc (Tài xế VF9)',
+              driver_email: user?.email || 'driver_vip@gmail.com',
               status: 'PENDING',
               requested_at: new Date().toISOString(),
+              wallet_balance: Number(wallet?.balance) || 0,
               reason: reason.trim() || 'Tôi không còn nhu cầu sử dụng dịch vụ.',
-            });
+              scope: {
+                to_anonymize: [
+                  'Họ và tên, số điện thoại, email tài xế',
+                  'Lịch sử phiên sạc chi tiết và thời điểm sạc',
+                  'Lịch sử đặt chỗ và lộ trình di chuyển các trạm sạc',
+                ],
+                to_retain: [
+                  'Tổng số kWh điện năng đã tiêu thụ (Sổ cái kế toán)',
+                  'Tổng doanh thu phát sinh và chứng từ hạch toán tài chính (Luật Kế toán)',
+                ],
+              },
+            };
+            addDemoErasureRequest(newReq);
+            setCurrentRequest(newReq);
           } else {
             throw apiErr;
           }
@@ -141,7 +159,7 @@ export default function DataErasure() {
         setSubmitting(false);
       }
     }),
-    [reason, showToast, fetchData]
+    [reason, user, wallet, showToast, fetchData]
   );
 
   // Kiểm tra quyền
@@ -422,11 +440,9 @@ export default function DataErasure() {
                     variant="danger"
                     size="md"
                     icon={Send}
-                    disabled={!confirmedIrreversible || hasPositiveBalance || submitting}
+                    disabled={!confirmedIrreversible || submitting}
                     title={
-                      hasPositiveBalance
-                        ? 'Ví còn số dư dương, vui lòng hoàn tiền trước'
-                        : !confirmedIrreversible
+                      !confirmedIrreversible
                         ? 'Vui lòng đánh dấu xác nhận trước khi gửi'
                         : 'Mở hộp xác nhận gửi yêu cầu'
                     }
@@ -465,6 +481,18 @@ export default function DataErasure() {
                 Yêu cầu sẽ được chuyển đến Quản trị viên để xét duyệt. Khi được duyệt, thông tin cá nhân của bạn sẽ bị ẩn danh hóa vĩnh viễn.
               </p>
             </div>
+
+            {hasPositiveBalance && (
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-200 text-xs text-left">
+                <p className="font-semibold flex items-center space-x-1.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                  <span>Ví hiện còn số dư: {formatCurrencyVND(wallet.balance)}</span>
+                </p>
+                <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1">
+                  Lưu ý: Quản trị viên chỉ có thể phê duyệt sau khi số dư đã được xử lý hoàn tiền hoặc rút về 0 đ.
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button
