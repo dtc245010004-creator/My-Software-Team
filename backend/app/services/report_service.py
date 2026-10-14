@@ -264,7 +264,9 @@ def get_reconciliation_report(
             continue
 
         # (3) Bất thường 3: AMOUNT_MISMATCH - Tiền hóa đơn lệch so với tính lại từ biểu giá phiên bản đã dùng
-        if s.tariff and s.stop_time and s.start_time and kwh > Decimal("0"):
+        elif s.tariff and s.stop_time and s.start_time and kwh > Decimal("0"):
+            if any(item.session_id == s.transaction_id for item in issues):
+                continue
             try:
                 segments = calculate_session_price_segments(
                     start_time=s.start_time,

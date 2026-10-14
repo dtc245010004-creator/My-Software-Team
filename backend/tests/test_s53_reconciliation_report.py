@@ -77,16 +77,22 @@ def s53_setup(db_session):
     db_session.add(conn)
     db_session.commit()
 
-    now = datetime.now(timezone.utc)
+    # Dọn dẹp dữ liệu phiên và giao dịch cũ trước khi khởi tạo fixture
+    db_session.query(ChargingSession).delete()
+    db_session.query(WalletTransaction).delete()
+    db_session.commit()
 
-    # 1. Phiên bình thường: khớp đúng hoàn toàn
+    now = datetime.now(timezone.utc)
+    offpeak_time = now.replace(hour=19, minute=0, second=0, microsecond=0)
+
+    # 1. Phiên bình thường: khớp đúng hoàn toàn (10 kWh * 2000 đ/kWh offpeak = 20,000 VND)
     s_normal = ChargingSession(
         connector_id=conn.id,
         user_id=driver.id,
         tariff_id=tariff.id,
         status="COMPLETED",
-        start_time=now,
-        stop_time=now,
+        start_time=offpeak_time,
+        stop_time=offpeak_time,
         total_kwh=Decimal("10.000"),
         total_amount=Decimal("20000.00"),
         created_at=now,

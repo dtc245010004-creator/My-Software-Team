@@ -25,17 +25,6 @@ from app.services.tariff_validation import validate_periods
 router = APIRouter(prefix="/tariffs", tags=["Biểu giá điện linh hoạt (Tariffs)"])
 
 
-def _is_duplicate_effective_tariff_error(exc: IntegrityError) -> bool:
-    """Nhận diện xung đột duy nhất theo trạm và thời điểm hiệu lực."""
-    original = exc.orig
-    constraint_name = getattr(getattr(original, "diag", None), "constraint_name", None)
-    if constraint_name == "uq_tariffs_station_effective":
-        return True
-    return "UNIQUE constraint failed: tariffs.station_id, tariffs.effective_from" in str(
-        original
-    )
-
-
 def _build_periods(periods) -> list[TariffPeriod]:
     errors = validate_periods(periods)
     if errors:
@@ -284,7 +273,7 @@ def create_tariff(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Đã tồn tại biểu giá có hiệu lực từ thời điểm này cho trạm sạc chỉ định.",
+            detail="Đã tồn tại biểu giá có cùng thời điểm hiệu lực từ thời điểm này cho trạm sạc chỉ định.",
         )
     db.refresh(new_tariff)
     return new_tariff
@@ -386,7 +375,7 @@ def update_tariff(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Đã tồn tại biểu giá có hiệu lực từ thời điểm này cho trạm sạc chỉ định.",
+            detail="Đã tồn tại biểu giá có cùng thời điểm hiệu lực từ thời điểm này cho trạm sạc chỉ định.",
         )
     db.refresh(new_version_tariff)
     return new_version_tariff
@@ -422,3 +411,4 @@ def delete_tariff(
     tariff.is_active = False
     db.commit()
     return {"message": f"Đã vô hiệu hóa biểu giá '{tariff.name}' thành công."}
+ 
