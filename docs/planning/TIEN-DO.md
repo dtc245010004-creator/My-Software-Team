@@ -289,9 +289,10 @@
   7. `frontend/src/config/dataErasureConfig.js`: Cấu hình các hằng số phân quyền, độ dài lý do và nội dung giải thích tĩnh sơ bộ.
   8. `frontend/src/utils/dataErasure.js`: Hàm thuần `mapErasureStatus`, `canSubmitRequest`, `canApprove`, `canReject`, `validateRejectReason`, `mapErasureError` (xử lý `REQUEST_ALREADY_EXISTS`, `WALLET_HAS_BALANCE`, `PERIOD_LOCKED`), `createSingleFlightHandler`, `formatCurrencyVND`.
   9. `frontend/src/App.jsx` & `frontend/src/components/Navigation.jsx`: Thêm route `/data-erasure`, `/admin/data-erasure` và menu điều hướng "Xóa Dữ Liệu" (cho `CUSTOMER`), "Duyệt Xóa Dữ Liệu" (cho `ADMIN`).
+  10. Tích hợp endpoint thật Backend S-57 (`/me/data-erasure-requests`, `/admin/data-erasure-requests`) và bổ sung cơ chế tự động Fallback Demo Data khi môi trường cục bộ chưa merge API, kết nối đồng bộ dữ liệu giữa tài xế và quản trị viên.
 * **Xác minh kiểm thử & Build:**
-  - Vitest: 41 bài test mới (28 test utils + 13 test API service). Toàn bộ frontend test suite đạt **189/189 passed (13/13 test files)**.
-  - Vite build: `npm run build` biên dịch thành công 100% trong 13.06s, không có lỗi runtime/syntax.
+  - Vitest: 42 bài test cho SCRUM-418 (28 test utils + 14 test API service). Toàn bộ frontend test suite đạt **190/190 passed (13/13 test files)**.
+  - Vite build: `npm run build` biên dịch thành công 100% không có lỗi runtime/syntax.
 
 
 
