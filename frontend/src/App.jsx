@@ -20,7 +20,11 @@ import AbnormalSessions from './pages/AbnormalSessions';
 import AuditLogs from './pages/AuditLogs';
 import TariffForm from './components/TariffForm';
 import ChargerDetail from './pages/ChargerDetail';
+import ChargerGridMonitor from './pages/ChargerGridMonitor';
 import InvoiceDetail from './pages/InvoiceDetail';
+import Reservations from './pages/Reservations';
+import StationReport from './pages/StationReport';
+import ReconciliationReport from './pages/ReconciliationReport';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -60,6 +64,26 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Navigate to="/driver/stations" replace /> : <Stations />
             }
           />
+          {/* Màn hình báo cáo doanh thu & sản lượng theo trạm (SCRUM-384 / SCRUM-392) */}
+          <Route
+            path="/reports/revenue"
+            element={
+              ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CPO'].includes(role)
+                ? <StationReport />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
+          <Route path="/reports" element={<Navigate to="/reports/revenue" replace />} />
+          {/* Màn hình đối soát kế toán kWh với tiền đã thu (SCRUM-385 / SCRUM-397) */}
+          <Route
+            path="/reconciliation"
+            element={
+              ['ADMIN', 'ACCOUNTANT'].includes(role)
+                ? <ReconciliationReport />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
+          <Route path="/reports/reconciliation" element={<Navigate to="/reconciliation" replace />} />
           <Route
             path="/tariffs"
             element={
@@ -72,19 +96,11 @@ function AppLayout() {
               role === 'CUSTOMER' ? <Simulator /> : <Navigate to={homeRoute} replace />
             }
           />
-          <Route
-            path="/wallet"
-            element={
-              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
-            }
-          />
+          <Route path="/wallet" element={<Wallet />} />
           {/* Return URL / Callback từ cổng thanh toán Sandbox (SCRUM-239 & SCRUM-240) */}
-          <Route
-            path="/wallet/topup/result"
-            element={
-              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
-            }
-          />
+          <Route path="/wallet/topup/result" element={<Wallet />} />
+          {/* Lịch sử đặt chỗ và phí quá hạn giữ chỗ (S-50 / SCRUM-354 / SCRUM-378) */}
+          <Route path="/reservations" element={<Reservations />} />
           <Route path="/sessions" element={<Sessions />} />
           {/* Danh sách phiên bất thường trên màn hình vận hành (SCRUM-52 / SCRUM-148): Chỉ Vận hành viên (OPERATOR) và Kế toán (ACCOUNTANT) */}
           <Route
@@ -96,6 +112,15 @@ function AppLayout() {
             }
           />
           <Route path="/session/:id" element={<ActiveSession />} />
+          {/* Màn hình lưới theo dõi trụ sạc (SCRUM-52 / SCRUM-129 / SCRUM-320) */}
+          <Route
+            path="/charger-grid"
+            element={
+              ['ADMIN', 'OPERATOR'].includes(role)
+                ? <ChargerGridMonitor />
+                : <Navigate to={homeRoute} replace />
+            }
+          />
           {/* Màn hình trụ sạc và điều khiển bắt đầu từ xa (S-24 / T-52 / SCRUM-154) */}
           <Route path="/chargers/:id" element={<ChargerDetail />} />
           <Route path="/charger/:id" element={<ChargerDetail />} />
