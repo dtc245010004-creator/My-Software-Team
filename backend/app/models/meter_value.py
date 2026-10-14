@@ -3,7 +3,10 @@
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, Numeric, String
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class MeterValue(Base):

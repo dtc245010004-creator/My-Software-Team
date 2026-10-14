@@ -16,6 +16,7 @@ from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector, Station
 from app.models.tariff import Tariff
 from app.models.user import User
+from app.models.wallet import Wallet, WalletTransaction
 from app.ocpp.frames import build_call
 from app.ocpp.handlers.start_transaction import handle_start_transaction
 from app.ocpp.handlers.stop_transaction import handle_stop_transaction
@@ -30,6 +31,14 @@ def _create_test_fixture(db_session: Session):
         role="CUSTOMER",
     )
     db_session.add(user)
+    db_session.flush()
+    wallet = Wallet(
+        user_id=user.id,
+        balance=Decimal("100000.00"),
+        is_debt_locked=False,
+        is_reconcile_locked=False,
+    )
+    db_session.add(wallet)
     db_session.flush()
 
     station = Station(
@@ -98,6 +107,7 @@ def _create_test_fixture(db_session: Session):
 
     return {
         "user": user,
+        "wallet": wallet,
         "station": station,
         "tariff": tariff,
         "cp": cp,
@@ -671,3 +681,63 @@ def test_ocpp_websocket_start_and_stop_transaction_flow(
     )
     assert session.status == "COMPLETED"
     assert float(session.total_kwh) == 12.5
+    db_session.refresh(fx["wallet"])
+    assert fx["wallet"].balance == Decimal("100000.00") - session.total_amount
+    ledger_rows = (
+        db_session.query(WalletTransaction)
+        .filter(
+            WalletTransaction.reference_id == f"session_{session.id}",
+            WalletTransaction.transaction_type == "CHARGE_FEE",
+        )
+        .all()
+    )
+    assert len(ledger_rows) == 1
+    assert ledger_rows[0].amount == -session.total_amount
+
+
+def test_ocpp_stop_transaction_debits_once_when_retried(db_session):
+    fx = _create_test_fixture(db_session)
+    start = handle_start_transaction(
+        db_session,
+        fx["cp"],
+        {
+            "connectorId": 1,
+            "idTag": fx["tag_active"].code,
+            "meterStart": 10000,
+            "timestamp": "2026-10-13T10:00:00Z",
+        },
+    )
+    session = (
+        db_session.query(ChargingSession)
+        .filter(ChargingSession.transaction_id == start["transactionId"])
+        .one()
+    )
+    payload = {
+        "transactionId": start["transactionId"],
+        "meterStop": 22500,
+        "timestamp": "2026-10-13T11:00:00Z",
+        "reason": "Local",
+    }
+
+    handle_stop_transaction(db_session, fx["cp"], payload)
+    db_session.refresh(session)
+    db_session.refresh(fx["wallet"])
+    balance_after_first_stop = fx["wallet"].balance
+    reference = f"session_{session.id}"
+    first_count = (
+        db_session.query(WalletTransaction)
+        .filter(WalletTransaction.reference_id == reference)
+        .count()
+    )
+    assert first_count == 1
+    assert balance_after_first_stop == Decimal("100000.00") - session.total_amount
+
+    handle_stop_transaction(db_session, fx["cp"], payload)
+    db_session.refresh(fx["wallet"])
+    assert fx["wallet"].balance == balance_after_first_stop
+    assert (
+        db_session.query(WalletTransaction)
+        .filter(WalletTransaction.reference_id == reference)
+        .count()
+        == first_count
+    )

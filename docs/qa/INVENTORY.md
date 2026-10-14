@@ -26,7 +26,7 @@ Mọi ca kiểm thử trong kho lưu trữ đều tuân thủ các nguyên tắc
 
 ## 3. Test Coverage Summary
 
-Căn cứ full suite backend trong Docker ngày 10/10/2026: **451 passed, 307 warnings**. Các tổng baseline lịch sử 84, 89 và 90 ca vẫn mâu thuẫn `[CẦN XÁC NHẬN]`.
+Căn cứ full run ngày 13/10/2026 trên Windows/Python 3.14.7 sau S-57: **574 tests collected, 573 passed, 1 skipped, 320 warnings**. Lượt Docker ngày 10/10/2026 trước đó đạt 451 passed, 307 warnings. Các số 84, 89 và 90 trong baseline là snapshot lịch sử từ các giai đoạn khác nhau, không phải tổng kiểm thử hiện tại.
 
 | Nhóm chức năng kiểm thử | File mã nguồn kiểm thử | Số ca kiểm thử | Trạng thái xác thực | Độ phủ trọng yếu |
 | :--- | :--- | :---: | :---: | :--- |
@@ -239,8 +239,8 @@ Bảng danh mục chi tiết baseline 89 ca đã ghi nhận trước khi thêm s
 **Kết quả kiểm thử ngày 05/10/2026**: 3 passed; full backend suite đạt 267 passed, 1 skipped, 298 warnings.
 
 * **Kiểm thử tự động**: Lượt full suite backend trong Docker ngày 10/10/2026 đạt 451 passed, 307 warnings; frontend gần nhất có 39 passed và build thành công.
-* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; `alembic heads` ngày 10/10/2026 trả một head `f41a0b7c9d22`. Migration S-41 nâng/hạ/nâng trên PostgreSQL Compose tạm và trigger đã chặn UPDATE/DELETE; không migrate DB ứng dụng.
-* **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
+* **Migration Alembic**: `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; sau pull `origin/main` và migration S-57, `alembic heads` ngày 13/10/2026 trả một head `cca26ecdf5a8`. Migration S-41 trước đó đã nâng/hạ/nâng trên PostgreSQL tạm và trigger đã chặn UPDATE/DELETE; migration S-57 cũng đã nâng/hạ/nâng trên PostgreSQL 16 tạm; không migrate DB ứng dụng.
+* **Đóng gói & CI/CD**: Stack dùng chung Sprint 1–4 chạy bằng `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline `.github/workflows/ci.yml`. Hai file `docker-compose.staging.yml` và `docker-compose.env.example` đã bị gỡ; không dùng chúng để khởi chạy project.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
 * **SCRUM-188/189/190/192 thuộc S-28 (08/10/2026 - chưa commit)**: Thêm phí chiếm trụ theo biểu giá và ân hạn, kiểm tra dữ liệu âm ở schema, lưu thời điểm connector báo `Finishing`/`SuspendedEV` và `Available`, tập trung phép tính vào `billing.py`, lưu `idle_amount`, và áp trần số phút từ `IDLE_FEE_MAX_MINUTES` (mặc định 240). Khi `Available` đến sau billing, không sửa hóa đơn/sổ cái và không tự trừ ví lần hai; mentor cần xác nhận cách quyết toán bổ sung. 20 test billing chọn lọc passed; baseline full suite đạt 298 passed, 1 skipped. Hai migration đã kiểm tra nâng/hạ/nâng trên SQLite tạm.
@@ -304,6 +304,32 @@ Kiểm tra volume SQLite cũ nhận cột khóa đối soát, chỉ mục duy nh
 
 ---
 
+### 4.25. Tìm trạm gần và đầu nối rảnh S-47 — `test_station_nearby_s47.py` (8 ca)
+
+* Kiểm tra thứ tự Haversine, phản hồi chỉ có trường công khai, bộ đếm đầu nối và trạng thái heartbeat/OCPP/internal.
+* Kiểm tra loại trừ trạm ngừng, tìm tên/địa chỉ không phân biệt hoa thường, yêu cầu đủ tọa độ hoặc từ khóa, và validation tọa độ.
+* Kiểm tra giá TOU theo thời điểm/phiên bản hiệu lực, giá null khi chưa có tariff, trang giới hạn 50 và trạm thiếu tọa độ vẫn có thể tìm bằng `q`.
+
+**Kết quả ngày 13/10/2026**: 8/8 ca passed; full backend suite đạt **546 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7. Code đã đẩy lên nhánh `Duong` trong commit `3d98b39`.
+
+### 4.26. Nhật ký thao tác ví S-56 — `test_wallet_audit_s56.py` (11 ca)
+
+* Kiểm tra audit thành công khi Admin nạp tay, nạp ví thường/callback; dữ liệu actor, tài xế, ví, số tiền, lý do/mã phiếu, số dư trước/sau và IP.
+* Kiểm tra nạp tay lỗi do trùng mã phiếu chỉ ghi FAILED sau rollback, không đổi số dư/ledger và không có SUCCESS.
+* Kiểm tra mở khóa có actor/driver/wallet/reason/IP; lý do rỗng, ví vẫn lệch hoặc role không đủ quyền không tạo log SUCCESS.
+* Kiểm tra reconcile ghi audit phát hiện lệch/khóa ví; `driver_id` kết hợp khoảng thời gian, actor và phân trang; ADMIN/ACCOUNTANT có quyền xem, OPERATOR/CUSTOMER không xem log ví.
+
+**Kết quả ngày 13/10/2026**: 11/11 ca passed; toàn bộ backend thu thập **558 tests**, kết quả chạy **557 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7.
+
+### 4.27. Yêu cầu ẩn danh hóa dữ liệu tài xế S-57 — `test_data_erasure_s57.py` (16 ca)
+
+* Kiểm tra tài xế chỉ tạo/xem yêu cầu của mình, request lặp trả 409, role không đủ quyền bị 403, chưa đăng nhập 401; Admin bắt buộc nhập lý do từ chối.
+* Kiểm tra chặn duyệt khi số dư ví dương/âm, đối soát khóa ví, phiên đang sạc/bất thường/cần xem xét hoặc TopupOrder PENDING.
+* Kiểm tra ẩn danh hóa giữ nguyên phiên/hóa đơn/đoạn giá, thời gian, kWh, số tiền, ví và ledger; account không đăng nhập/tái kích hoạt được; rollback giữa chừng giữ nguyên dữ liệu và sinh audit FAILED; duyệt lại COMPLETED idempotent.
+* Migration `cca26ecdf5a8` đã upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; database dự án không bị migrate.
+
+**Kết quả ngày 13/10/2026**: 16/16 ca S-57 passed; toàn bộ backend thu thập **574 tests**, đạt **573 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7.
+
 ## 5. Historical Tests
 
 * **Giai đoạn trước**: 83 test cases đã được xây dựng và duy trì trong quá trình phát triển Giai đoạn 1.
@@ -347,7 +373,7 @@ Khi sửa các file cấu hình nền tảng (`app/core/config.py`, `app/core/da
 
 ## 9. Inventory Verification Metadata
 
-* **Ngày kiểm chứng**: 30/09/2026.
-* **Môi trường thực thi**: Python 3.14 / pytest 8.x, SQLite 3.
-* **Kết quả lịch sử 30/09/2026**: 89 passed; không bao gồm suite OCPP bổ sung ngày 01/10/2026.
+* **Ngày kiểm chứng gần nhất**: 13/10/2026.
+* **Môi trường thực thi**: Windows host, Python 3.14.7; suite dùng DB kiểm thử và thư mục migration tạm trong workspace.
+* **Kết quả gần nhất**: Full run sau S-57 thu thập 574 tests; **573 passed, 1 skipped, 320 warnings**. `ruff check .` đạt.
 * **Người xác thực**: AI Assistant phối hợp cùng Tech Lead dự án.

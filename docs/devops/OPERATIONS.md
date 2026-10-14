@@ -113,7 +113,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
   cd backend
   alembic upgrade head
   ```
-`backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; `alembic heads` ngày 10/10/2026 trả một head `e72b461d9ac3`, nối `5f9249bf58da` và `d8f56c4a911e`. Lượt kiểm tra này chỉ liệt kê head, không chạy upgrade/downgrade. DB dự án không bị migrate. Trước khi nâng cấp môi trường thật, sao lưu cơ sở dữ liệu đích theo đúng loại backend.
+`backend/alembic.ini` trỏ tới nguồn migration duy nhất `backend/alembic/`; sau `git pull origin main` ngày 13/10/2026, `alembic heads` trả duy nhất `cca26ecdf5a8`. Migration S-57 đã kiểm tra upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; DB dự án không bị migrate. Trước khi nâng cấp môi trường thật, sao lưu cơ sở dữ liệu đích theo đúng loại backend.
 
 ---
 
@@ -125,7 +125,7 @@ Căn cứ theo `backend/app/core/config.py:27`, `backend/seed_data.py:28-38` và
 Căn cứ theo `backend/pytest.ini`, `backend/tests/` và `frontend/package.json:9`:
 
 ### Kiểm thử Backend (Pytest)
-Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Tổng lịch sử cũ 84/89/90 vẫn mâu thuẫn `[CẦN XÁC NHẬN]`; lần chạy mới nhất ngày 05/10/2026 đạt 263 passed, 1 skipped, 181 warnings (đã gồm 53 ca OCPP):
+Thực thi toàn bộ bộ test tự động trong `backend/.venv`. Sau S-57, lượt full suite ngày 13/10/2026 thu thập 574 tests và đạt **573 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7; `ruff check .` đạt. Những con số 84/89/90 và kết quả 263 passed ngày 05/10/2026 là các snapshot lịch sử, không đại diện cho tổng hiện tại:
 ```powershell
 cd backend
 pytest
@@ -167,6 +167,7 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `VERSION` | String | `1.0.0` | Phiên bản ứng dụng |
 | `API_V1_STR` | String | `/api/v1` | Tiền tố đường dẫn API v1 |
 | `DATABASE_URL` | String | `sqlite:///./ev_csms.db` | Chuỗi kết nối CSDL (hỗ trợ SQLite / PostgreSQL) |
+| `DATA_ERASURE_IDENTIFIER_PREFIX` | String | `deleted` | Prefix cho username/email/tag đã ẩn danh; config giới hạn 1–30 ký tự |
 | `SECRET_KEY` | String | *(Khóa dev mặc định)* | Khóa bí mật dùng để ký và giải mã JWT token |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Integer | `1440` (24 giờ) | Thời gian hiệu lực của phiên đăng nhập |
 | `MAX_FAILED_LOGIN_ATTEMPTS` | Integer | `5` | Số lần đăng nhập sai tối đa trước khi khóa tạm thời |
@@ -179,6 +180,8 @@ Căn cứ theo `backend/app/core/config.py` và file mẫu `backend/.env.example
 | `GEMINI_API_KEY` | String | `""` | Khóa API dịch vụ AI Google Gemini (tùy chọn) |
 | `AI_MODEL_NAME` | String | `gemini-1.5-flash` | Định danh mô hình AI phân tích tải trạm |
 | `HEARTBEAT_INTERVAL_SECONDS` | Integer | `300` | Chu kỳ heartbeat trả trong BootNotification OCPP 1.6J (giây) |
+| `STATION_NEARBY_DEFAULT_LIMIT` | Integer | `20` | Số trạm mặc định trả về mỗi trang của API công khai tìm trạm gần |
+| `STATION_NEARBY_MAX_LIMIT` | Integer | `50` | Số trạm tối đa cho mỗi trang API tìm trạm gần |
 | `OCPP_CALL_TIMEOUT_SECONDS` | Float | `30.0` | Thời gian chờ CALL do CSMS gửi xuống trụ khi không truyền timeout riêng (giây) |
 | `ABNORMAL_SESSION_THRESHOLD_SECONDS` | Integer | `500` | Ngưỡng thời gian không nhận liên lạc trước khi job gắn cờ phiên đang sạc bất thường (giây); job không tự đóng phiên |
 | `IDLE_FEE_MAX_MINUTES` | Integer | `240` | Trần số phút chịu phí chiếm trụ trong một phiên, sau khi trừ thời gian ân hạn |

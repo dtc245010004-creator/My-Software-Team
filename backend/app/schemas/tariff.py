@@ -47,14 +47,28 @@ class TariffBase(BaseModel):
         ..., min_length=2, max_length=100, description="Tên biểu giá điện"
     )
     price_normal: Decimal = Field(
-        ..., description="Đơn giá giờ bình thường (VNĐ/kWh)"
+        ...,
+        max_digits=10,
+        decimal_places=2,
+        description="Đơn giá giờ bình thường (VNĐ/kWh)",
     )
-    price_peak: Decimal = Field(..., description="Đơn giá giờ cao điểm (VNĐ/kWh)")
+    price_peak: Decimal = Field(
+        ...,
+        max_digits=10,
+        decimal_places=2,
+        description="Đơn giá giờ cao điểm (VNĐ/kWh)",
+    )
     price_offpeak: Decimal = Field(
-        ..., description="Đơn giá giờ thấp điểm (VNĐ/kWh)"
+        ...,
+        max_digits=10,
+        decimal_places=2,
+        description="Đơn giá giờ thấp điểm (VNĐ/kWh)",
     )
     idle_fee_per_minute: Decimal = Field(
-        default=Decimal("0.00"), description="Phí chiếm trụ (VNĐ/phút)"
+        default=Decimal("0.00"),
+        max_digits=10,
+        decimal_places=2,
+        description="Phí chiếm trụ (VNĐ/phút)",
     )
     idle_grace_minutes: int = Field(default=0, description="Thời gian ân hạn chiếm trụ (phút)")
     peak_start: str = Field(default="09:30", max_length=5)
@@ -91,10 +105,12 @@ class TariffCreate(TariffBase):
 class TariffUpdate(BaseModel):
     periods: list[TariffPeriodCreate] | None = None
     name: str | None = None
-    price_normal: Decimal | None = None
-    price_peak: Decimal | None = None
-    price_offpeak: Decimal | None = None
-    idle_fee_per_minute: Decimal | None = None
+    price_normal: Decimal | None = Field(default=None, max_digits=10, decimal_places=2)
+    price_peak: Decimal | None = Field(default=None, max_digits=10, decimal_places=2)
+    price_offpeak: Decimal | None = Field(default=None, max_digits=10, decimal_places=2)
+    idle_fee_per_minute: Decimal | None = Field(
+        default=None, max_digits=10, decimal_places=2
+    )
     idle_grace_minutes: int | None = None
     peak_start: str | None = None
     peak_end: str | None = None

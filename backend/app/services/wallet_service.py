@@ -12,6 +12,7 @@ from app.models.session import ChargingSession
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
 from app.services.audit_service import ghi_nhat_ky
+from app.services.identity_guard_service import lock_user_for_sensitive_operation
 
 logger = logging.getLogger("ev_csms.wallet")
 
@@ -150,11 +151,23 @@ def topup_wallet(
     user_id: int,
     amount: Decimal,
     note: str | None = None,
+    *,
     reference_id: str | None = None,
     reference_type: str = "TOPUP",
     auto_commit: bool = True,
+    full_name: str | None = None,
+    actor_id: int | None = None,
+    actor_type: str = "USER",
+    client_ip: str | None = None,
 ) -> Wallet:
-    """Nạp tiền qua sổ cái append-only rồi commit dòng sổ và số dư cùng nhau."""
+    """Nạp tiền và ghi sổ/audit trong cùng transaction DB.
+
+    Mặc định người nạp là chủ ví. Webhook truyền actor_type=SYSTEM và có thể
+    đặt auto_commit=False để gộp số dư, sổ cái, audit và trạng thái đơn.
+    """
+    user = lock_user_for_sensitive_operation(db, user_id)
+    if full_name and full_name.strip():
+        user.full_name = full_name.strip()
     if db.get_bind().dialect.name == "sqlite":
         db.execute(
             update(Wallet)
@@ -179,7 +192,6 @@ def topup_wallet(
         db.add(wallet)
         db.flush()
 
-
     wallet, _, _ = post_ledger_entry(
         db=db,
         wallet_id=wallet.id,
@@ -188,6 +200,25 @@ def topup_wallet(
         reference_type=reference_type,
         reference_id=reference_id,
         note=note or "Nạp tiền vào ví điện tử",
+    )
+    resolved_actor_id = user_id if actor_type == "USER" and actor_id is None else actor_id
+    ghi_nhat_ky(
+        db,
+        user_id=resolved_actor_id,
+        action="WalletTopup",
+        object_type="wallet",
+        object_id=wallet.id,
+        data={
+            "admin_id": resolved_actor_id if actor_type == "ADMIN" else None,
+            "actor_id": resolved_actor_id,
+            "actor_type": actor_type,
+            "driver_id": wallet.user_id,
+            "wallet_id": wallet.id,
+            "amount": f"{Decimal(str(amount)):.2f}",
+            "reason": note.strip() if note and note.strip() else "Nạp tiền vào ví",
+            "status": "SUCCESS",
+            "ip": client_ip,
+        },
     )
     if auto_commit:
         db.commit()
@@ -230,6 +261,12 @@ def admin_manual_topup(
             detail="Số tiền nạp phải lớn hơn 0.",
         )
 
+    action_reason = (
+        note.strip()
+        if note and note.strip()
+        else f"Nạp tiền theo phiếu {normalized_receipt}"
+    )
+
     def log_failure_audit(error_reason: str):
         try:
             audit_db = SessionLocal()
@@ -246,8 +283,9 @@ def admin_manual_topup(
                         "wallet_id": wallet_id,
                         "amount": str(amount),
                         "receipt_code": normalized_receipt,
+                        "reason": action_reason,
+                        "failure_reason": error_reason,
                         "status": "FAILED",
-                        "reason": error_reason,
                         "ip": client_ip,
                     },
                 )
@@ -258,7 +296,7 @@ def admin_manual_topup(
             logger.warning("Không thể ghi audit log thất bại: %s", audit_exc)
 
     # 1. Tìm ví theo wallet_id hoặc driver_id
-    query = db.query(Wallet).with_for_update()
+    query = db.query(Wallet)
     if wallet_id is not None:
         wallet = query.filter(Wallet.id == wallet_id).first()
     elif driver_id is not None:
@@ -289,6 +327,32 @@ def admin_manual_topup(
             detail=f"Không tìm thấy ví điện tử với ID {wallet_id}.",
         )
 
+    # Chuẩn hoá object_id và chủ ví kể cả khi request chỉ truyền driver_id
+    # hoặc wallet_id, để bộ lọc audit theo tài xế luôn tìm đúng ví.
+    wallet_id = wallet.id
+    driver_id = wallet.user_id
+
+    try:
+        lock_user_for_sensitive_operation(db, driver_id)
+    except HTTPException:
+        db.rollback()
+        log_failure_audit("Tài khoản tài xế đã bị vô hiệu hóa.")
+        raise
+    wallet = (
+        db.query(Wallet)
+        .filter(Wallet.id == wallet_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if wallet is None:
+        db.rollback()
+        log_failure_audit("Không tìm thấy ví điện tử sau khi khóa tài khoản.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy ví điện tử.",
+        )
+
     # 2. Kiểm tra trước xem receipt_code đã tồn tại chưa
     existing_tx = (
         db.query(WalletTransaction)
@@ -296,6 +360,9 @@ def admin_manual_topup(
         .first()
     )
     if existing_tx:
+        # SQLite giữ khóa ghi do lock_user_for_sensitive_operation; nhả khóa
+        # trước khi session riêng ghi audit thất bại.
+        db.rollback()
         log_failure_audit(f"Mã phiếu thu '{normalized_receipt}' đã tồn tại trên hệ thống")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -339,6 +406,7 @@ def admin_manual_topup(
                 "balance_before": f"{balance_before:.2f}",
                 "balance_after": f"{new_balance:.2f}",
                 "receipt_code": normalized_receipt,
+                "reason": action_reason,
                 "status": "SUCCESS",
                 "ip": client_ip,
             },
@@ -456,6 +524,7 @@ def reconcile_wallet_ledger(db: Session | None = None) -> dict[str, int]:
         rows = (
             db.query(
                 Wallet.id,
+                Wallet.user_id,
                 Wallet.balance,
                 Wallet.is_reconcile_locked,
                 func.coalesce(func.sum(WalletTransaction.amount), 0).label(
@@ -463,17 +532,28 @@ def reconcile_wallet_ledger(db: Session | None = None) -> dict[str, int]:
                 ),
             )
             .outerjoin(WalletTransaction, WalletTransaction.wallet_id == Wallet.id)
-            .group_by(Wallet.id, Wallet.balance, Wallet.is_reconcile_locked)
+            .group_by(
+                Wallet.id,
+                Wallet.user_id,
+                Wallet.balance,
+                Wallet.is_reconcile_locked,
+            )
             .all()
         )
 
-        mismatches: list[tuple[int, Decimal, Decimal, bool]] = []
-        for wallet_id, balance, is_locked, ledger_balance in rows:
+        mismatches: list[tuple[int, int, Decimal, Decimal, bool]] = []
+        for wallet_id, driver_id, balance, is_locked, ledger_balance in rows:
             balance_decimal = Decimal(str(balance))
             ledger_decimal = Decimal(str(ledger_balance))
             if balance_decimal != ledger_decimal:
                 mismatches.append(
-                    (wallet_id, balance_decimal, ledger_decimal, is_locked)
+                    (
+                        wallet_id,
+                        driver_id,
+                        balance_decimal,
+                        ledger_decimal,
+                        is_locked,
+                    )
                 )
 
         mismatch_ids = [wallet_id for wallet_id, *_ in mismatches]
@@ -482,7 +562,11 @@ def reconcile_wallet_ledger(db: Session | None = None) -> dict[str, int]:
                 {Wallet.is_reconcile_locked: True}, synchronize_session=False
             )
 
-            for wallet_id, balance, ledger_balance, was_locked in mismatches:
+            for wallet_id, driver_id, balance, ledger_balance, was_locked in mismatches:
+                reason = (
+                    f"Số dư {balance} không khớp tổng sổ cái {ledger_balance}; "
+                    "ví bị khóa giao dịch."
+                )
                 logger.error(
                     "Wallet ledger mismatch detected: wallet_id=%s balance=%s ledger_sum=%s already_locked=%s",
                     wallet_id,
@@ -497,11 +581,33 @@ def reconcile_wallet_ledger(db: Session | None = None) -> dict[str, int]:
                     object_type="wallet",
                     object_id=wallet_id,
                     data={
+                        "admin_id": None,
+                        "actor_type": "SYSTEM",
+                        "driver_id": driver_id,
+                        "wallet_id": wallet_id,
+                        "reason": reason,
+                        "status": "SUCCESS",
                         "balance": str(balance),
                         "ledger_sum": str(ledger_balance),
                         "already_locked": was_locked,
                     },
                 )
+                if not was_locked:
+                    ghi_nhat_ky(
+                        db,
+                        user_id=None,
+                        action="WalletReconciliationLocked",
+                        object_type="wallet",
+                        object_id=wallet_id,
+                        data={
+                            "admin_id": None,
+                            "actor_type": "SYSTEM",
+                            "driver_id": driver_id,
+                            "wallet_id": wallet_id,
+                            "reason": reason,
+                            "status": "SUCCESS",
+                        },
+                    )
 
         db.commit()
         return {"checked": len(rows), "mismatched": len(mismatches)}
@@ -520,8 +626,16 @@ def unlock_wallet_reconciliation(
     *,
     admin_user_id: int,
     reason: str,
+    client_ip: str | None = None,
 ) -> Wallet:
     """Mở khóa giao dịch sau khi Admin xử lý lệch và xác nhận tổng đã khớp."""
+    normalized_reason = reason.strip()
+    if not normalized_reason:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Lý do mở khóa không được để trống.",
+        )
+
     if db.get_bind().dialect.name == "sqlite":
         db.execute(
             update(Wallet)
@@ -565,13 +679,21 @@ def unlock_wallet_reconciliation(
         action="WalletReconciliationUnlocked",
         object_type="wallet",
         object_id=wallet.id,
-        data={"reason": reason.strip(), "balance": str(wallet.balance)},
+        data={
+            "admin_id": admin_user_id,
+            "driver_id": wallet.user_id,
+            "wallet_id": wallet.id,
+            "reason": normalized_reason,
+            "status": "SUCCESS",
+            "balance": str(wallet.balance),
+            "ip": client_ip,
+        },
     )
     logger.warning(
         "Wallet reconciliation lock cleared: wallet_id=%s admin_user_id=%s reason=%s",
         wallet.id,
         admin_user_id,
-        reason.strip(),
+        normalized_reason,
     )
     db.commit()
     db.refresh(wallet)

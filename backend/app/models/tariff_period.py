@@ -3,7 +3,10 @@
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class TariffPeriod(Base):

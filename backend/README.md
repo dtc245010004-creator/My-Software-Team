@@ -59,18 +59,21 @@ uvicorn app.main:app --reload --port 8000
 
 *(Nguồn: `backend/app/api/v1/__init__.py:10-18`, `backend/app/api/v1/endpoints/`)*
 
-Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
+Hệ thống hiện đăng ký 12 router module REST API:
 
 | Endpoint Router | Tiền tố đường dẫn | Chức năng nghiệp vụ chính |
 | :--- | :--- | :--- |
 | **Auth** | `/api/v1/auth` | Đăng ký tài khoản (ép role CUSTOMER), Đăng nhập JWT, Lấy profile (`/me`) |
-| **Stations** | `/api/v1/stations` | CRUD thông tin trạm sạc, đo đếm phụ tải điện theo phút, tìm trạm theo Haversine |
+| **Stations** | `/api/v1/stations` | CRUD thông tin trạm sạc, đo đếm phụ tải điện theo phút, tìm trạm theo Haversine; `GET /nearby` trả kết quả công khai theo GPS hoặc tên/địa chỉ, đầu nối rảnh/tổng và giá hiện tại |
 | **Chargers** | `/api/v1/chargers` | Quản lý danh mục trụ sạc vật lý và cổng sạc (CCS2, Type 2, CHAdeMO) |
 | **Tariffs** | `/api/v1/tariffs` | Cấu hình biểu giá TOU theo trạm, phí chiếm trụ theo phút và thời gian ân hạn; POST/PUT trả HTTP 422 tiếng Việt nếu đơn giá, phí hoặc ân hạn âm |
 | **Wallet** | `/api/v1/wallet` | Xem số dư, nạp tiền và lịch sử append-only; `POST /admin/{wallet_id}/reconciliation/unlock` dành riêng cho Admin, cần lý do và chỉ mở khi số dư khớp tổng sổ cái |
 | **Sessions** | `/api/v1/sessions` | Bắt đầu/dừng phiên sạc (chốt cước ACID), xem lịch sử; `GET /{session_id}/invoice` chỉ trả hóa đơn đã chốt, có phân đoạn snapshot, dòng phí chiếm trụ và kiểm tra ownership |
 | **Simulator** | `/api/v1/simulator` | Kích hoạt mô phỏng sạc pin CC-CV, tăng tốc thời gian, ngắt sạc an toàn |
 | **AI** | `/api/v1/ai` | Điều phối chia sẻ công suất sạc thông minh, Heuristic Fallback khi mất mạng |
+| **Data Erasure** | `/api/v1/me/data-erasure-requests`, `/api/v1/admin/data-erasure-requests` | Tài xế tạo/xem yêu cầu của chính mình; Admin lọc, duyệt hoặc từ chối với lý do |
+
+`GET /api/v1/audit-logs` hỗ trợ lọc event ví bằng `driver_id` (kết hợp được với `user_id`, `from`/`to`, `page`/`limit`). ADMIN và ACCOUNTANT xem log ví; OPERATOR không nhận object type `wallet`, CUSTOMER không được gọi endpoint. Event nạp/mở khóa/reconcile thành công được ghi cùng transaction nghiệp vụ.
 
 ### Kết nối trụ sạc OCPP 1.6J
 
@@ -101,7 +104,7 @@ Hệ thống cung cấp 8 phân hệ REST API chuẩn hóa:
 
 *(Nguồn: `backend/pytest.ini`, `backend/tests/`)*
 
-Thực thi backend suite bằng `pytest` trong môi trường ảo backend. Lần chạy ngày 01/10/2026 đạt 163 passed, 1 warning:
+Thực thi backend suite bằng `pytest` trong môi trường ảo backend. Sau S-57 ngày 13/10/2026, suite thu thập 574 tests và đạt **573 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Lượt chạy 163 passed ngày 01/10/2026 bên dưới là kết quả lịch sử:
 
 ```bash
 cd backend

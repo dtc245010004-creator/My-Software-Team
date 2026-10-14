@@ -6,15 +6,20 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
+    UniqueConstraint,
     func,
     text,
 )
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+try:
+    from ..core.database import Base
+except (ImportError, ValueError):
+    from app.core.database import Base
 
 
 class Tariff(Base):
@@ -30,6 +35,16 @@ class Tariff(Base):
         ),
         CheckConstraint(
             "idle_grace_minutes >= 0", name="ck_tariff_idle_grace_non_negative"
+        ),
+        UniqueConstraint(
+            "station_id", "effective_from", name="uq_tariffs_station_effective_from"
+        ),
+        Index(
+            "uq_tariffs_global_effective_from",
+            "effective_from",
+            unique=True,
+            sqlite_where=text("station_id IS NULL"),
+            postgresql_where=text("station_id IS NULL"),
         ),
     )
 

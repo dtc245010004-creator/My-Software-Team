@@ -61,7 +61,14 @@
 | 2026-10-09 | S-33 Backend — SCRUM-222/221/220/223/225 | Lưu snapshot và cung cấp hóa đơn diễn giải từng đoạn | Đã commit `60e801a`, push lên `origin/Duong`; chờ chạy lại full suite trong Docker | `backend/app/models/session_billing_segment.py`, `backend/app/services/billing_segment_service.py`, `backend/app/schemas/invoice.py`, `backend/app/api/v1/endpoints/sessions.py`, migration `d8f56c4a911e`, `backend/tests/test_invoice.py`, hồ sơ `docs/qa/stories/S-33.md` | Full suite hoàn chỉnh trước chỉnh sửa legacy: 411 passed, 303 warnings; sau chỉnh sửa `test_invoice.py`: 8 passed. Full host rerun: 409 passed, 1 skipped, 1 lỗi khởi tạo `tmp_path` do WinError 5; cần chạy lại trong Docker. Migration PostgreSQL Compose tạm đã kiểm tra nâng/hạ/nâng; DB dự án chưa migrate. |
 | 2026-10-09 | S-34 — SCRUM-226/231 | Phiên giữ nguyên biểu giá đã áp dụng dù biểu giá trạm được sửa sau đó | Hoàn thành / đã tích hợp | `backend/app/models/tariff.py`, logic phiên bản tariff, `test_tariff_versioning_s34.py` | Implementation có trong commit `5cda3ca`; giá mới áp dụng cho phiên bắt đầu sau, hóa đơn/đoạn giá phiên trước giữ snapshot cũ. |
 | 2026-10-12 | S-44 Backend — SCRUM-283–290 | Chia lại công suất khi xe rời hoặc chuyển SuspendedEV | Hoàn thành Backend | `backend/app/services/smart_charging.py`, `backend/app/ocpp/gateway.py`, `backend/app/services/scheduler_service.py`, config Compose, `test_smart_charging_s44.py` | Hook sau commit/CALLRESULT; phiên bất thường và SuspendedEV không tham gia phép chia; debounce trailing theo trạm. Ruff đạt, full backend suite **525 passed, 318 warnings**. Không cần migration. |
+| 2026-10-13 | S-47 Backend — tìm trạm gần và đầu nối rảnh | Endpoint công khai tìm theo GPS/tên/địa chỉ, trạng thái đầu nối và giá TOU | Hoàn thành Backend; đã đẩy lên `Duong`; chưa làm UI theo phạm vi | `backend/app/api/v1/endpoints/stations.py`, `backend/app/schemas/station.py`, `backend/app/services/station_discovery_service.py`, `backend/app/core/config.py`, `backend/tests/test_station_nearby_s47.py`, `.env.example`, `docker-compose.yml` | Test mới 8 passed; full backend **546 passed, 1 skipped, 320 warnings**; Ruff đạt. Compose config hợp lệ; Docker Desktop không khởi động được. Không cần migration. Commit `3d98b39`. |
+| 2026-10-13 | S-56 Backend — nhật ký thao tác ví | Audit nạp ví, đối soát/mở khóa và lọc nhật ký theo tài xế | Hoàn thành Backend; đã đẩy lên `Duong` | `backend/app/services/wallet_service.py`, `backend/app/api/v1/endpoints/{wallet.py,payments.py,audit_logs.py}`, `backend/tests/test_wallet_audit_s56.py` | 11 test mới; full backend **557 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Không migration/config mới. Commit `38dd323`. Không có chức năng điều chỉnh ví riêng trong code hiện tại. |
+| 2026-10-13 | S-57 Backend — yêu cầu ẩn danh hóa dữ liệu tài xế | Tạo yêu cầu, kiểm tra điều kiện duyệt, ẩn danh hóa lịch sử và audit | Hoàn thành Backend; chưa commit | `backend/app/api/v1/endpoints/data_erasure.py`, `backend/app/services/data_erasure_service.py`, model/schema/config, migration `cca26ecdf5a8`, `backend/tests/test_data_erasure_s57.py` | Thêm 16 ca; full suite và Ruff được ghi ở nhật ký #19 sau khi hoàn tất. Migration đã chạy upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; không dùng database dự án. Phạm vi dữ liệu cần mentor xác nhận. |
+| 2026-10-13 | Rà soát báo cáo lỗi OCPP và thanh toán | Sửa các lỗi webhook, xác thực ví khi bắt đầu sạc, ghi nợ lúc kết thúc phiên và thông báo thiếu tiền | Hoàn thành; đã kiểm tra toàn bộ backend và frontend | `backend/app/{api/v1/endpoints/payments.py,core/config.py,ocpp/handlers/{start_transaction.py,stop_transaction.py},services/payment_service.py}`, `frontend/src/pages/{Wallet.jsx,ChargerDetail.jsx}`, regression tests | Backend **595 passed, 1 skipped**; Ruff đạt; frontend **52 tests passed**, build đạt. Chi tiết tại nhật ký #21. |
+| 2026-10-13 | README — hướng dẫn Docker Compose | Kiểm tra và sửa liên kết tải Docker Desktop cùng lệnh khởi chạy ở Cách 2 | Hoàn thành | `README.md` | Dùng link cài Windows x64/ARM64 và trang chọn nền tảng chính thức; bổ sung `docker compose up -d --build` trước lệnh xem trạng thái. Người thực hiện: `KimiCoNY`. |
+
 | 2026-10-14 | S-55 Frontend — SCRUM-408 | Nút chốt/mở lại kỳ, hộp thoại xác nhận, hiện danh sách phiên chặn chốt | Hoàn thành Frontend | `frontend/src/pages/Settlement.jsx`, `frontend/src/components/settlement/`, `frontend/src/services/settlementApi.js`, `frontend/src/utils/settlement.js` | Hoàn thành 100% tiêu chí chấp nhận SCRUM-408: route `/settlement`, role guard `ACCOUNTANT` & `ADMIN`, nút Chốt kỳ + cảnh báo chỉ đọc, bắt lỗi 409 `BLOCKED_BY_ABNORMAL_SESSIONS` hiện danh sách phiên chặn + link `/session/:id` & `/abnormal-sessions`, nút Mở lại kỳ cho `ADMIN` bắt buộc lý do có inline validate và cảnh báo audit log. 31 test Vitest mới, full suite 151/151 passed, Vite build pass. |
+
 
 ---
 
@@ -219,7 +226,7 @@
 
 ---
 
-#### 14. Ngày 2026-10-09 | Người thực hiện: Codex theo yêu cầu người dùng
+#### 14. Ngày 2026-10-09 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** Hoàn thiện Backend S-33 — SCRUM-222/221/220/223/225: lưu snapshot giá/tiền các đoạn S-30/S-31 khi chốt phiên và trả hóa đơn đọc từ snapshot.
 * **Nội dung thực hiện:** Thêm metadata snapshot phí chiếm trụ vào phiên; endpoint hóa đơn dùng schema riêng, kiểm tra quyền driver/operator/admin, không trả số tiền tạm khi cần xem xét, trả tổng legacy cho phiên cũ không backfill, và có dòng phí chiếm trụ khi số tiền đã được chốt. Không sửa thuật toán chia đoạn S-30/S-31 và không thêm lần trừ ví thứ hai.
 * **Xác minh:** `test_billing_segments.py` 6 passed; `test_invoice.py` 8 passed. Full backend suite hoàn chỉnh trước chỉnh sửa legacy đạt 411 passed, 303 warnings trong 159.16 giây (container Python 3.12). Sau chỉnh sửa, lượt host full suite đạt 409 passed, 1 skipped nhưng có một lỗi môi trường `WinError 5` khi tạo fixture tạm của test migration; cần chạy lại full suite trong Docker. Migration PostgreSQL Compose tạm `upgrade → downgrade → upgrade`; một Alembic head `d8f56c4a911e`. Mã nguồn đã commit `60e801a` và push lên `origin/Duong`.
@@ -231,15 +238,15 @@
 
 ---
 
-#### 15. Ngày 2026-10-09 | Người thực hiện: Codex theo yêu cầu người dùng
+#### 15. Ngày 2026-10-09 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** Ghi nhận tiến độ Backend Sprint 4 từ S-28 đến S-34 trong ma trận và nhật ký.
 * **Nội dung:** S-28/S-29 đã hoàn thành các thay đổi biểu giá và backend phí chiếm trụ; S-30/S-31 được tích hợp từ `origin/quocdung`; S-32/S-34 đã tích hợp logic breakdown/làm tròn và versioning tariff; S-33 đã lưu snapshot đoạn và cung cấp API hóa đơn.
 * **Trạng thái xác minh:** Các test theo story đã được ghi nhận trong những lượt trước; full suite sau thay đổi legacy S-33 còn cần chạy lại trong Docker. Quyết định mentor về cách thu phí bổ sung S-28 vẫn đang chờ.
-* **Tài liệu/điều phối:** Cập nhật `README.md` và xóa hướng dẫn sử dụng hai cấu hình Compose đã bỏ; cập nhật CI và tài liệu vận hành để dùng Compose chung. Các thay đổi tài liệu/xóa file hiện chưa commit.
+* **Tài liệu/điều phối:** Cập nhật `README.md` và xóa hai cấu hình Compose staging cũ; CI và tài liệu vận hành dùng Compose chung. Các thay đổi đã được tích hợp vào nhánh `Duong`.
 
 ---
 
-#### 16. Ngày 2026-10-12 | Người thực hiện: Codex theo yêu cầu người dùng
+#### 16. Ngày 2026-10-12 | Người thực hiện: KimiCoNY
 * **Nhiệm vụ thực hiện:** Backend S-44 — SCRUM-283/284/285/286/287/288/289/290: chia lại công suất trạm khi xe rời, tạm ngưng, hoặc scheduler đánh dấu phiên bất thường.
 * **Nội dung thực hiện cụ thể:** Thêm cấu hình `REBALANCE_MIN_INTERVAL_SECONDS` (mặc định 5 giây) vào settings, `.env.example` và biến môi trường backend trong Compose. `trigger_rebalance_background` điều phối riêng theo trạm, gom nhiều sự kiện thành tối đa một lượt chạy chờ; lượt chờ đọc trạng thái mới nhất từ DB và không giữ station lock trong thời gian đợi. Không sửa thuật toán fair-share.
 * **Hook OCPP và scheduler:** Gateway gọi rebalance sau commit và gửi CALLRESULT cho StopTransaction có thay đổi phiên; tin trùng đi qua nhánh idempotency và không kích hoạt lại. StatusNotification chỉ hook khi trạng thái đổi vào/ra `SuspendedEV`. Job gắn cờ `is_abnormal` gọi rebalance sau commit cho mỗi trạm bị ảnh hưởng, đồng thời giữ nguyên status phiên CHARGING.
@@ -249,6 +256,58 @@
 
 ---
 
+
+#### 17. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Backend S-47 — API công khai giúp tài xế tìm trạm gần và xem đầu nối rảnh, loại đầu nối cùng đơn giá hiện hành.
+* **Nội dung cụ thể:** Thêm `GET /api/v1/stations/nearby` với GPS hoặc `q` tên/địa chỉ, radius, loại connector, limit/offset; chỉ trả trạm active và dùng DTO công khai riêng. Tính khoảng cách Haversine; trạm thiếu GPS vẫn tìm bằng từ khóa và xếp cuối trong kết quả GPS. Quy tắc rảnh yêu cầu cổng/trụ active, heartbeat còn hạn theo config và hai trạng thái nội bộ/OCPP khớp. Response có số cổng rảnh/tổng, loại, công suất/trạng thái tóm tắt và giá TOU đang hiệu lực dạng Decimal. Lấy trạm/trụ/cổng và biểu giá theo lô; không thêm migration.
+* **Kiểm chứng:** `test_station_nearby_s47.py`: **8 passed**; hồi quy stations/RBAC/versioning tariff: **46 passed**; sau khi đưa giới hạn trang vào config, S-47 cùng `test_stations.py` đạt **25 passed**. Full backend **546 passed, 1 skipped, 320 warnings** trong 224.61 giây trên Windows Python 3.14.7. Test migration cũ dùng thư mục tạm workspace do Windows chặn `tmp_path` mặc định. `ruff check .`: đạt; `docker compose config --quiet`: đạt; Docker Desktop không khởi động nên không chạy suite trong container. `alembic heads` trả duy nhất `c316a2b4d6e8 (head)`.
+* **Giới hạn/đề xuất:** `q` phân biệt hoa thường bằng Unicode casefold nhưng chưa tìm không dấu; endpoint sắp xếp khoảng cách trong ứng dụng sau khi tải danh sách trạm hoạt động; nếu dữ liệu lớn, cân nhắc chỉ mục không gian. Chưa làm frontend, bản đồ, chỉ đường, đặt chỗ hoặc cache giá. Thay đổi đã được đẩy trong commit `3d98b39` trên `Duong`.
+
+#### 18. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Backend S-56 — lưu dấu vết ai thực hiện thao tác nạp/mở khóa ví và truy vấn nhật ký theo tài xế.
+* **Nội dung cụ thể:** Bổ sung reason, actor/driver/wallet và status vào audit nạp tay; log FAILED sau rollback bằng session riêng. Ghi audit trong cùng transaction cho nạp ví thường và callback thanh toán; bổ sung actor, driver, wallet, reason, status, IP cho mở khóa; reconcile ghi log/audit phát hiện lệch và `WalletReconciliationLocked` khi thực sự chuyển sang trạng thái khóa. `/audit-logs` có bộ lọc `driver_id` qua ownership ví, giữ bộ lọc actor/thời gian/trang và giới hạn quyền cho ADMIN/OPERATOR/ACCOUNTANT; OPERATOR không thấy log ví. Không có luồng điều chỉnh ví riêng, không tạo chức năng này và không cần migration.
+* **Kiểm chứng:** `test_wallet_audit_s56.py`: 11 passed; test chọn lọc S-36/S-41/payment: 38 passed; full backend **557 passed, 1 skipped, 320 warnings** trong 224.36 giây trên Windows/Python 3.14.7; `ruff check .` đạt. `alembic heads` sau `git pull origin main` trả một head `c316a2b4d6e8`.
+* **Trạng thái:** Đã commit và đẩy lên `origin/Duong` bằng commit `38dd323`.
+* **Đề xuất:** Mentor chốt thời gian lưu audit theo yêu cầu kế toán; cân nhắc endpoint điều chỉnh ví nếu nghiệp vụ cần; cân nhắc index cho `wallet_id`/thời điểm truy vấn. Chưa thêm job xóa log.
+
+#### 19. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Backend S-57 — tài xế gửi yêu cầu ẩn danh hóa dữ liệu cá nhân và lịch sử sạc; không đưa ra kết luận pháp lý.
+* **API và lưu trạng thái:** Thêm `POST/GET /api/v1/me/data-erasure-requests` cho tài khoản `CUSTOMER` tự thao tác; gửi trùng khi đang chờ trả 409. Admin có API lọc danh sách, duyệt và từ chối với lý do bắt buộc. Request không nhận `user_id` từ client; RBAC chặn các role khác và tài khoản chưa đăng nhập.
+* **Điều kiện duyệt:** Chặn khi ví dương hoặc âm, ví bị khóa đối soát, còn phiên đang sạc/bất thường/cần xem xét, hoặc còn `TopupOrder` `PENDING`; lý do chặn lưu trên request và có audit. Chặn số dư âm là lựa chọn bảo thủ, cần mentor xác nhận.
+* **Ẩn danh hóa nguyên tử:** Khóa user và ví để tuần tự hóa với tạo phiên/nạp tiền; trong một transaction thay username/email/tên/mật khẩu, vô hiệu hóa tài khoản, đặt `data_erased_at`, cắt `ChargingSession.driver_id`, thay idTag bằng token ổn định có HMAC, xóa IdTag/RemoteStartRequest và làm sạch các trường văn bản định danh nhận diện được. Phiên, hóa đơn, đoạn giá, thời gian, kWh, tiền, ví và `wallet_transactions` được giữ nguyên; audit thành công cùng transaction. Lỗi giữa chừng rollback toàn bộ và ghi `DATA_ERASURE_FAILED` bằng session riêng. Duyệt lại yêu cầu `COMPLETED` là idempotent.
+* **Migration và cấu hình:** Thêm bảng `data_erasure_requests`, partial unique index một request `PENDING` mỗi user, cột `users.data_erased_at`, và cấu hình `DATA_ERASURE_IDENTIFIER_PREFIX=deleted`. Migration `cca26ecdf5a8` nối sau `c316a2b4d6e8`; `alembic heads` trả đúng một head `cca26ecdf5a8`. Chu trình migration đã xác minh trên PostgreSQL 16 tạm; không dùng `docker-compose.staging.yml` và không migrate database ứng dụng.
+* **Kiểm chứng:** `backend/tests/test_data_erasure_s57.py` có 16 ca; full backend **573 passed, 1 skipped, 320 warnings** (574 tests, 235.19 giây; Windows/Python 3.14.7); `ruff check .` đạt, file migration mới cũng đạt Ruff. `alembic heads` trả một head `cca26ecdf5a8`. Đã commit tại `a3d70a6` trên `Duong`.
+* **Đề xuất / cần mentor xác nhận:** Phạm vi dữ liệu cần mentor xác nhận, gồm việc giữ địa điểm/thời gian phiên đã tách liên kết người dùng và dữ liệu cũ trong `audit_logs`/sổ cái append-only có thể còn `driver_id`, IP, hoặc nội dung định danh không thể sửa. Mentor cần chốt có chặn số dư âm không, hạn xử lý yêu cầu và cách hoàn tiền số dư dương; tọa độ trạm trong lịch sử có cần ẩn thêm không. S-55 chưa có trong repo; danh sách trường nhận diện được tập trung tại `IDENTITY_FIELDS_TO_ANONYMIZE` để tích hợp whitelist chỉ đổi định danh khi S-55 có mặt.
+
+#### 20. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Đối chiếu các lỗi trong báo cáo kiểm thử biểu giá và DEFECT-11 với code hiện tại; sửa các lỗi còn tái hiện được.
+* **Biểu giá/backend:** Cập nhật phiên bản tariff giữ nguyên `idle_fee_per_minute` và `idle_grace_minutes`; giới hạn Decimal ở schema khớp `Numeric(10,2)`; thêm unique constraint cho `(station_id, effective_from)` cùng migration `6e7b8d9f1023` có bước dò dữ liệu trùng và dừng an toàn; API trả 409 khi đúng xung đột duy nhất. Phí chiếm trụ làm tròn tiền lẻ đến đồng bằng `ROUND_HALF_UP`, vẫn làm tròn phút tính phí lên và giữ trần lấy từ settings.
+* **Biểu giá/frontend:** Chuyển form khỏi mock và URL không tồn tại sang API client dùng chung `/api/v1/tariffs`; ánh xạ các trường khung giờ request/response, chọn phiên bản đang hiệu lực và báo lỗi API. Thêm test cho chọn tariff, fallback, DTO lưu và trường hợp không có tariff.
+* **Hồi quy/test gaps:** Thêm test cho giới hạn giá/phí, bảo toàn cài đặt idle, xung đột thời điểm hiệu lực, quyền sở hữu trạm; bổ sung ca làm tròn tiền lẻ, lặp `SuspendedEV` và `SuspendedEVSE`. Điều chỉnh fixture cũ để các phiên bản tariff cùng trạm có thời điểm hiệu lực riêng.
+* **Phân loại báo cáo:** DEFECT-11 về WebSocket ActiveSession đã được xử lý trước đó trong `telemetryClient.js`/`websocket.js`, không còn tái hiện nên không sửa lại. Hành vi `station_id` không được phép đổi qua schema update được giữ nguyên. Các quyết định nghiệp vụ về grace microseconds, trần 240 phút và datetime naive chưa tự đổi; báo cáo kiểm thử PostgreSQL lịch sử cũng chưa được tái hiện trên database hiện tại.
+* **Kiểm chứng:** Bộ test mục tiêu đạt **42 passed**; full backend đạt **589 passed, 1 skipped, 320 warnings** trong 235.17 giây; frontend đạt **50 passed** và build thành công. Migration PostgreSQL 16 tạm `upgrade → downgrade → upgrade` đạt; `alembic heads` có đúng một head `6e7b8d9f1023`; `ruff check .` đạt. Test full dùng thư mục tạm riêng vì Windows chặn pytest temp mặc định.
+* **Đề xuất:** Chốt các câu hỏi nghiệp vụ trong báo cáo trước khi đổi grace/trần; nếu database hiện hữu có cặp station/time trùng, xử lý thủ công theo quyết định nghiệp vụ trước khi áp migration. Không tự xóa hay gộp biểu giá cũ.
+
+---
+
+#### 21. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Đối chiếu các lỗi trong `Bao_Cao_Loi_He_Thong_OCPP_Va_Thanh_Toan.docx` với code, sửa các lỗi còn tái hiện được và kiểm tra hồi quy.
+* **Lỗi đã sửa:**
+  - Bỏ chữ ký webhook giả `test_valid_signature`; thêm luồng giả lập thanh toán sandbox ký HMAC phía server, chỉ cho phép khi cấu hình bật, đơn thuộc tài khoản đang đăng nhập và còn `PENDING`.
+  - Chặn webhook trạng thái `FAILED`/`CANCELLED` đến muộn ghi đè đơn đã `SUCCESS`.
+  - Kiểm tra ví và trạng thái khóa đối soát trước khi chấp nhận `StartTransaction`, kể cả khi trụ bỏ qua `Authorize`; ví không đủ tiền trả về `Blocked`.
+  - Khi `StopTransaction` chốt phiên, ghi khoản phí phiên vào ví/sổ cái trong cùng luồng giao dịch; retry không tạo khoản trừ thứ hai.
+  - Trên màn hình trạm sạc, hiển thị thông báo cụ thể khi ví không đủ tiền và liên kết sang trang ví; luồng nạp sandbox gọi endpoint backend thay vì gửi chữ ký giả từ frontend.
+* **Kiểm thử:** Bổ sung hồi quy cho chữ ký giả, webhook đến muộn, quyền sandbox, ngưỡng số dư khi bắt đầu sạc, ghi nợ/idempotency khi kết thúc phiên và thông báo thiếu tiền phía frontend. Điều chỉnh fixture reconnect để nạp tiền thử nghiệm qua service ví vì StartTransaction giờ kiểm tra số dư thật.
+* **Xác minh:** Toàn bộ backend **595 passed, 1 skipped, 320 warnings** trong 266.46 giây; `ruff check .` đạt; frontend **52 tests passed** và `npm run build` đạt. Build chỉ có cảnh báo chunk JavaScript lớn hơn 500 KB. Không thêm migration.
+
+---
+
+#### 22. Ngày 2026-10-13 | Người thực hiện: KimiCoNY
+* **Nhiệm vụ thực hiện:** Kiểm tra liên kết tải Docker Desktop và hoàn thiện hướng dẫn “Cách 2” trong README.
+* **Nội dung:** Xác minh trang sản phẩm Docker Desktop chính thức; cập nhật link tải trực tiếp Windows x64 (AMD64), Windows ARM64 và link chọn nền tảng khác. Bổ sung lệnh `docker compose up -d --build` để thật sự khởi động stack trước lệnh `docker compose ps`; ghi rõ chạy từ thư mục gốc và Compose tự nhận `docker-compose.yml`, dùng tên project `ev-csms`.
+* **Kiểm chứng:** Các liên kết tải Windows lấy từ nút Download trên trang Docker Desktop chính thức; không chạy lại stack vì thay đổi chỉ nằm trong hướng dẫn README. Không có migration hay thay đổi code ứng dụng.
+=======
 #### 17. Ngày 2026-10-13 | Người thực hiện: Kỹ sư Frontend (SCRUM-372 / S-49)
 * **Nhiệm vụ thực hiện:** [FE] Hiện thông báo "đã có người đặt" và danh sách trụ gợi ý (Ticket SCRUM-372, thuộc User Story S-49 / SCRUM-353).
 * **Nội dung thực hiện cụ thể:**

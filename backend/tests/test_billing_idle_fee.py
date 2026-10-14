@@ -69,6 +69,19 @@ def test_calculate_idle_fee_caps_chargeable_minutes():
     assert fee == Decimal("240000.00")
 
 
+def test_calculate_idle_fee_rounds_fractional_vnd_half_up():
+    idle_start = datetime(2026, 10, 8, 10, 0, tzinfo=timezone.utc)
+
+    fee = calculate_idle_fee(
+        idle_start,
+        idle_start + timedelta(minutes=5),
+        0,
+        Decimal("1000.50"),
+    )
+
+    assert fee == Decimal("5003")
+
+
 def test_settings_default_idle_fee_cap_is_240_minutes():
     assert Settings.model_fields["IDLE_FEE_MAX_MINUTES"].default == 240
 
@@ -161,6 +174,101 @@ def test_status_notifications_capture_idle_start_and_available_time(db_session):
     assert connector.idle_ended_at == datetime(2026, 10, 8, 10, 7, tzinfo=timezone.utc)
     assert total.idle_amount == Decimal("2000.00")
     assert total.total_amount == Decimal("9000.00")
+
+
+def test_repeated_suspended_ev_keeps_first_idle_start(db_session):
+    station = Station(name="Trạm lặp SuspendedEV", address="Địa chỉ kiểm thử")
+    charging_point = ChargingPoint(
+        station=station, code="CP-BILLING-SUSPENDED-REPEAT", max_power_kw=60
+    )
+    connector = Connector(
+        charging_point=charging_point,
+        connector_number=1,
+        connector_type="CCS2",
+        max_power_kw=60,
+    )
+    db_session.add(charging_point)
+    db_session.commit()
+
+    for timestamp in (
+        "2026-10-08T10:00:00Z",
+        "2026-10-08T10:02:00Z",
+        "2026-10-08T10:07:00Z",
+    ):
+        handle_status_notification(
+            db_session,
+            charging_point,
+            {
+                "connectorId": 1,
+                "status": "Available" if timestamp.endswith("10:07:00Z") else "SuspendedEV",
+                "timestamp": timestamp,
+            },
+        )
+
+    assert connector.idle_started_at == datetime(
+        2026, 10, 8, 10, 0, tzinfo=timezone.utc
+    )
+    assert connector.idle_ended_at == datetime(
+        2026, 10, 8, 10, 7, tzinfo=timezone.utc
+    )
+    total = calculate_session_total(
+        SimpleNamespace(
+            total_kwh=Decimal("0"),
+            applied_price_per_kwh=Decimal("0"),
+            connector=connector,
+        ),
+        SimpleNamespace(
+            idle_fee_per_minute=Decimal("1000.00"), idle_grace_minutes=5
+        ),
+    )
+    assert total.idle_amount == Decimal("2000.00")
+
+
+def test_suspended_evse_does_not_start_idle_fee_clock(db_session):
+    station = Station(name="Trạm SuspendedEVSE", address="Địa chỉ kiểm thử")
+    charging_point = ChargingPoint(
+        station=station, code="CP-BILLING-SUSPENDED-EVSE", max_power_kw=60
+    )
+    connector = Connector(
+        charging_point=charging_point,
+        connector_number=1,
+        connector_type="CCS2",
+        max_power_kw=60,
+    )
+    db_session.add(charging_point)
+    db_session.commit()
+
+    handle_status_notification(
+        db_session,
+        charging_point,
+        {
+            "connectorId": 1,
+            "status": "SuspendedEVSE",
+            "timestamp": "2026-10-08T10:00:00Z",
+        },
+    )
+    handle_status_notification(
+        db_session,
+        charging_point,
+        {
+            "connectorId": 1,
+            "status": "Available",
+            "timestamp": "2026-10-08T10:07:00Z",
+        },
+    )
+
+    total = calculate_session_total(
+        SimpleNamespace(
+            total_kwh=Decimal("0"),
+            applied_price_per_kwh=Decimal("0"),
+            connector=connector,
+        ),
+        SimpleNamespace(
+            idle_fee_per_minute=Decimal("1000.00"), idle_grace_minutes=5
+        ),
+    )
+    assert connector.idle_started_at is None
+    assert total.idle_amount == Decimal("0.00")
 
 
 def test_late_available_only_records_marker_after_session_billing(db_session):

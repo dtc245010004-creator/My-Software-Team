@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
+from app.core.security import create_access_token
 from app.models.payment import TopupOrder
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
@@ -194,7 +195,7 @@ def test_c3_forced_integrity_error_handled_cleanly_returns_200(
 
     # Lần 2: Giả lập kịch bản đua tranh mà order.status vẫn chưa nhìn thấy SUCCESS (ép IntegrityError tại topup_wallet)
     # Lúc này topup_wallet sẽ kích hoạt IntegrityError do trùng unique constraint trên (wallet_id, reference_id, transaction_type)
-    with patch("app.services.wallet_service.topup_wallet", side_effect=IntegrityError("duplicate key", params=None, orig=Exception("unique constraint violated"))):
+    with patch("app.api.v1.endpoints.payments.topup_wallet", side_effect=IntegrityError("duplicate key", params=None, orig=Exception("unique constraint violated"))):
         resp2 = client.post("/api/v1/payments/webhook", json=payload)
         # Bên thua cuộc đua PHẢI trả về 200 'Already processed', KHÔNG ĐƯỢC trả 500
         assert resp2.status_code == 200
@@ -533,6 +534,37 @@ def test_webhook_terminal_state_transition_rules(
     db_session.refresh(order)
     assert order.status == "FAILED"
 
+    successful_order = TopupOrder(
+        user_id=user.id,
+        order_code="ORDER_S39_TERMINAL_SUCCESS",
+        amount=Decimal("15000.00"),
+        status="PENDING",
+    )
+    db_session.add(successful_order)
+    db_session.commit()
+    success_response = client.post(
+        "/api/v1/payments/webhook",
+        json={
+            "order_code": successful_order.order_code,
+            "status": "SUCCESS",
+            "signature": compute_signature(successful_order.order_code, "SUCCESS"),
+        },
+    )
+    assert success_response.status_code == 200
+    late_failure_response = client.post(
+        "/api/v1/payments/webhook",
+        json={
+            "order_code": successful_order.order_code,
+            "status": "FAILED",
+            "signature": compute_signature(successful_order.order_code, "FAILED"),
+        },
+    )
+    assert late_failure_response.status_code == 200
+    db_session.refresh(successful_order)
+    db_session.refresh(wallet)
+    assert successful_order.status == "SUCCESS"
+    assert wallet.balance == Decimal("65000.00")
+
 
 def test_topup_wallet_idempotency_with_same_reference_id(
     db_session, driver_and_wallet_s39
@@ -575,53 +607,47 @@ def test_topup_wallet_idempotency_with_same_reference_id(
     assert len(txs) == 1
 
 
-def test_sandbox_signer_endpoint_allowed_in_dev_and_blocked_in_prod(
+def test_sandbox_simulation_signs_server_side_and_checks_order_ownership(
     client, db_session, driver_and_wallet_s39, monkeypatch
 ):
-    """Kiểm tra endpoint /sandbox/sign:
-    - Trong dev/testing: trả signature hợp lệ và webhook chấp nhận.
-    - Trong production: chặn 403 Forbidden.
-    """
+    """Sandbox ký phía máy chủ và chỉ cho chủ đơn PENDING mô phỏng."""
     user = driver_and_wallet_s39["user"]
+    wallet = driver_and_wallet_s39["wallet"]
+    monkeypatch.setattr(settings, "ALLOW_PAYMENT_SANDBOX_SIMULATION", True)
     order = TopupOrder(
         user_id=user.id,
-        order_code="ORDER_FE_SANDBOX_SIGN_TEST",
-        amount=Decimal("35000.00"),
+        order_code="ORDER_S39_SANDBOX_SIMULATION",
+        amount=Decimal("22000.00"),
         status="PENDING",
     )
     db_session.add(order)
     db_session.commit()
+    token = create_access_token({"sub": str(user.id), "role": user.role})
+    headers = {"Authorization": f"Bearer {token}"}
 
-    # 1. Gọi /sandbox/sign trong dev
-    sign_resp = client.post(
-        "/api/v1/payments/sandbox/sign",
+    response = client.post(
+        "/api/v1/payments/sandbox/simulate",
         json={"order_code": order.order_code, "status": "SUCCESS"},
+        headers=headers,
     )
-    assert sign_resp.status_code == 200
-    data = sign_resp.json()
-    assert "signature" in data
-    assert data["order_code"] == order.order_code
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+    db_session.refresh(wallet)
+    assert wallet.balance == Decimal("72000.00")
 
-    # 2. Gửi signature này lên Webhook -> Phải được chấp nhận 200
-    webhook_resp = client.post(
-        "/api/v1/payments/webhook",
-        json={
-            "order_code": order.order_code,
-            "status": "SUCCESS",
-            "signature": data["signature"],
-        },
+    other = User(
+        username="other_sandbox_driver",
+        email="other_sandbox_driver@test.com",
+        password_hash="hashed_pw",
+        role="CUSTOMER",
     )
-    assert webhook_resp.status_code == 200
-    assert webhook_resp.json()["status"] == "SUCCESS"
-
-    # 3. Khi môi trường là production -> Phải chặn 403
-    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
-    monkeypatch.setattr(settings, "TESTING", False)
-
-    prod_sign_resp = client.post(
-        "/api/v1/payments/sandbox/sign",
-        json={"order_code": "ANY_ORDER", "status": "SUCCESS"},
+    db_session.add(other)
+    db_session.commit()
+    other_token = create_access_token({"sub": str(other.id), "role": other.role})
+    denied = client.post(
+        "/api/v1/payments/sandbox/simulate",
+        json={"order_code": order.order_code, "status": "SUCCESS"},
+        headers={"Authorization": f"Bearer {other_token}"},
     )
-    assert prod_sign_resp.status_code == 403
-    assert prod_sign_resp.json()["detail"] == "Sandbox signing is disabled in production"
+    assert denied.status_code == 404
 

@@ -177,11 +177,33 @@ Kênh WebSocket OCPP `/ocpp/{charge_point_code}` là giao tiếp riêng giữa t
 
 ---
 
+## TC-FB-19: Tìm trạm gần và xem đầu nối rảnh (S-47, Backend)
+* **Hợp đồng API**: `GET /api/v1/stations/nearby` là endpoint công khai; chấp nhận cặp `user_lat`/`user_lon` hoặc từ khóa `q`, tùy chọn `radius_km` và `connector_type`, cùng `limit` (tối đa 50) / `offset`. Không có vị trí và từ khóa thì trả HTTP 422.
+* **Phản hồi công khai**: Chỉ trả trạm `ACTIVE` đang hoạt động, khoảng cách Haversine nếu có tọa độ, số đầu nối rảnh/tổng, loại đầu nối, trạng thái/công suất tóm tắt, và giá TOU hiệu lực hiện tại. Không trả `operator_id`, công suất lưới hay cờ nội bộ. Trạm thiếu GPS vẫn tìm được theo từ khóa và xếp cuối khi tìm kèm GPS; radius loại trạm không có tọa độ.
+* **Bằng chứng kiểm thử backend (13/10/2026, chưa commit)**: `backend/tests/test_station_nearby_s47.py` đạt **8 passed**; full backend suite trên Python 3.14.7 đạt **546 passed, 1 skipped, 320 warnings**. Test migration cũ dùng thư mục `tmp_path` trong workspace do quyền Windows chặn thư mục tạm mặc định. Ruff đạt; chưa kiểm thử trình duyệt vì Story yêu cầu phạm vi Backend.
+
+---
+
+## TC-FB-20: Nhật ký thao tác ví theo tài xế (S-56, Backend)
+* **Hợp đồng API**: `GET /api/v1/audit-logs?driver_id={user_id}&from={datetime}&to={datetime}&page={n}&limit={n}` lọc log ví theo các Wallet thuộc tài xế, có thể kết hợp thời gian, actor `user_id` và phân trang.
+* **Phân quyền**: ADMIN và ACCOUNTANT xem log ví; OPERATOR chỉ nhận log charging point/session/connector thuộc trạm của mình và không nhận object type `wallet`; CUSTOMER bị chặn endpoint.
+* **Tính toàn vẹn**: Log thành công của nạp ví/mở khóa/reconcile cùng transaction với thay đổi nghiệp vụ. Nạp tay thất bại ghi FAILED bằng session mới sau rollback, không ghi SUCCESS giả.
+* **Bằng chứng kiểm thử backend (13/10/2026, chưa commit)**: `test_wallet_audit_s56.py` đạt **11 passed**; full backend suite đạt **557 passed, 1 skipped, 320 warnings**. Chưa kiểm tra thủ công giao diện; không thay đổi frontend.
+
+---
+
+## TC-FB-21: Yêu cầu ẩn danh hóa dữ liệu tài xế (S-57, Backend)
+
+* **Hợp đồng API tài xế**: `POST /api/v1/me/data-erasure-requests` tạo yêu cầu cho user trong token; `GET` cùng đường dẫn chỉ liệt kê yêu cầu của user đó. `CUSTOMER` có quyền; role khác bị 403; chưa đăng nhập 401. Nếu đã có yêu cầu PENDING, POST trả 409.
+* **Hợp đồng Admin**: `GET /api/v1/admin/data-erasure-requests?status=PENDING` lọc yêu cầu; `POST /{request_id}/approve` duyệt và ẩn danh hóa khi đủ điều kiện; `POST /{request_id}/reject` yêu cầu `{ "reason": "..." }` không rỗng. Chỉ ADMIN được phép.
+* **Hành vi dữ liệu**: Duyệt bị chặn khi ví khác 0, ví reconcile-lock, phiên đang sạc/bất thường/cần review hoặc TopupOrder PENDING. Khi duyệt thành công, tài khoản bị vô hiệu hóa, `ChargingSession.driver_id` được đặt NULL, mã tag được thay token ổn định; session/invoice/segment, thời gian, kWh, tiền, wallet và ledger giữ nguyên. Audit thành công cùng transaction; lỗi giữa chừng rollback và ghi audit FAILED riêng.
+* **Bằng chứng kiểm thử backend (13/10/2026, chưa commit)**: `test_data_erasure_s57.py` **16 passed**; full backend **573 passed, 1 skipped, 320 warnings** (574 collected). Migration `cca26ecdf5a8` được xác minh trên PostgreSQL 16 tạm. Chưa làm giao diện; **phạm vi dữ liệu cần mentor xác nhận**.
+
 ## Current Summary
 
 ### Đánh giá mức độ tích hợp Frontend ↔ Backend
   * **Mức độ tương thích**: Hợp đồng API có kiểm thử backend tự động; chưa kiểm tra thủ công giao diện trên trình duyệt sau cập nhật hóa đơn S-33.
-* TC-FB-01 đến TC-FB-18 có mô tả hợp đồng; backend suite hiện đạt 437 passed. Telemetry ngày 10/10/2026 đã qua 39 test frontend, build và runtime WebSocket smoke; chưa kiểm tra trực quan trên trình duyệt.
+* TC-FB-01 đến TC-FB-21 có mô tả hợp đồng; backend suite sau S-57 ngày 13/10/2026 đạt 573 passed, 1 skipped, 320 warnings. Telemetry ngày 10/10/2026 đã qua 39 test frontend, build và runtime WebSocket smoke; chưa kiểm tra trực quan qua trình duyệt.
 * Mã nguồn telemetry dùng WebSocket singleton dùng chung; runtime smoke đã kết nối, đăng ký topic và nhận PONG.
 
 ---

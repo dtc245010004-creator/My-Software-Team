@@ -27,6 +27,7 @@ from app.schemas.wallet import (
     WalletResponse,
     WalletTransactionResponse,
 )
+from app.services.identity_guard_service import lock_user_for_sensitive_operation
 from app.services.payment_service import build_payment_url
 from app.services.wallet_service import (
     admin_manual_topup,
@@ -233,6 +234,7 @@ def get_my_wallet_transactions(
 )
 def topup_my_wallet(
     topup_in: TopupRequest,
+    request: Request,
     current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
@@ -243,15 +245,14 @@ def topup_my_wallet(
     - Tăng số dư, mở khóa nợ nếu số dư >= 0.
     - Lưu bản ghi WalletTransaction loại TOPUP.
     """
-    if topup_in.full_name and topup_in.full_name.strip():
-        current_user.full_name = topup_in.full_name.strip()
-        db.add(current_user)
-        db.commit()
-        db.refresh(current_user)
-
+    display_name = (
+        topup_in.full_name.strip()
+        if topup_in.full_name and topup_in.full_name.strip()
+        else current_user.full_name
+    )
     note_text = (
         topup_in.note
-        or f"Nạp tiền ví chuyển khoản QR ({current_user.full_name or 'Tài xế'})"
+        or f"Nạp tiền ví chuyển khoản QR ({display_name or 'Tài xế'})"
     )
 
     wallet = topup_wallet(
@@ -259,6 +260,10 @@ def topup_my_wallet(
         user_id=current_user.id,
         amount=topup_in.amount,
         note=note_text,
+        full_name=topup_in.full_name,
+        actor_id=current_user.id,
+        actor_type="USER",
+        client_ip=request.client.host if request.client else None,
     )
     return wallet
 
@@ -273,6 +278,7 @@ def create_topup_request(
     current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
+    current_user = lock_user_for_sensitive_operation(db, current_user.id)
     amount_int = int(topup_in.amount)
     if amount_int < settings.TOPUP_MIN_AMOUNT or amount_int > settings.TOPUP_MAX_AMOUNT:
         raise HTTPException(
@@ -351,6 +357,7 @@ def get_topup_request_status(
 def unlock_wallet_reconciliation_lock(
     wallet_id: int,
     request: WalletReconciliationUnlockRequest,
+    http_request: Request,
     current_user: User = Depends(require_roles(["ADMIN"])),
     db: Session = Depends(get_db),
 ):
@@ -359,6 +366,7 @@ def unlock_wallet_reconciliation_lock(
         wallet_id,
         admin_user_id=current_user.id,
         reason=request.reason,
+        client_ip=http_request.client.host if http_request.client else None,
     )
 
 

@@ -52,7 +52,6 @@ def verify_webhook_signature(
             )
             _secret_warning_logged = True
         return False
-
     if not signature or not isinstance(signature, str):
         return False
 
@@ -73,3 +72,7 @@ def verify_webhook_signature(
         return False
 
 
+def create_webhook_signature(order_code: str, status: str, secret: str) -> str:
+    """Tạo chữ ký cho callback sandbox ở phía server, không lộ secret ra trình duyệt."""
+    data = f"{order_code}|{status}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), data, hashlib.sha256).hexdigest()

@@ -10,6 +10,9 @@ def test_upgrades_existing_compose_sqlite_wallet_schema_idempotently():
     try:
         with engine.begin() as connection:
             connection.execute(
+                text("CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(50))")
+            )
+            connection.execute(
                 text(
                     "CREATE TABLE wallets "
                     "(id INTEGER PRIMARY KEY, balance NUMERIC NOT NULL)"
@@ -35,11 +38,14 @@ def test_upgrades_existing_compose_sqlite_wallet_schema_idempotently():
             )
 
         added = upgrade_compose_sqlite_schema(engine)
+        assert "users.data_erased_at" in added
         assert "wallets.is_reconcile_locked" in added
         assert upgrade_compose_sqlite_schema(engine) == []
 
         inspector = inspect(engine)
         wallet_columns = {column["name"] for column in inspector.get_columns("wallets")}
+        user_columns = {column["name"] for column in inspector.get_columns("users")}
+        assert "data_erased_at" in user_columns
         assert "is_reconcile_locked" in wallet_columns
         assert "uq_wallet_transactions_wallet_reference_type" in {
             index["name"] for index in inspector.get_indexes("wallet_transactions")

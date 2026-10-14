@@ -37,12 +37,17 @@ class Settings(BaseSettings):
     ENABLE_DEMO_ACCOUNTS: bool = False
     TESTING: bool = False
     ENVIRONMENT: str = "development"
+    RECONCILE_TOLERANCE_VND: int = 1000  # Ngưỡng lệch tiền chấp nhận được do làm tròn (S-53)
+    DEFAULT_NO_SHOW_FEE: int = 20000  # Phí giữ chỗ không đến mặc định (VND) (S-50 / SCRUM-374)
+
+
 
     # Cổng thanh toán Sandbox & Webhook (S-35)
     TOPUP_MIN_AMOUNT: int = 10000
     TOPUP_MAX_AMOUNT: int = 50000000
     SANDBOX_PAYMENT_SECRET: str = "sandbox_secret"
     PAYMENT_WEBHOOK_SECRET: str = "sandbox_secret"
+    ALLOW_PAYMENT_SANDBOX_SIMULATION: bool = False
 
     # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"
@@ -72,9 +77,14 @@ class Settings(BaseSettings):
 
     # OCPP 1.6J
     HEARTBEAT_INTERVAL_SECONDS: int = 300
+    STATION_NEARBY_DEFAULT_LIMIT: int = Field(default=20, ge=1)
+    STATION_NEARBY_MAX_LIMIT: int = Field(default=50, ge=1)
     OCPP_CALL_TIMEOUT_SECONDS: float = 30.0
     ABNORMAL_SESSION_THRESHOLD_SECONDS: int = 500
     REBALANCE_MIN_INTERVAL_SECONDS: int = Field(default=5, gt=0)
+    DATA_ERASURE_IDENTIFIER_PREFIX: str = Field(
+        default="deleted", min_length=1, max_length=30
+    )
 
     # Cảnh báo trạm & trụ sạc (Story 2: SCRUM-317, SCRUM-319)
     CHARGER_OFFLINE_ALERT_MINUTES: int = 15
