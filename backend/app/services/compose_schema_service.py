@@ -9,6 +9,15 @@ SQLITE_COLUMN_ADDITIONS = {
     "wallets": {
         "is_reconcile_locked": "BOOLEAN NOT NULL DEFAULT 0",
     },
+    "wallet_transactions": {
+        # Các volume SQLite Compose cũ được tạo trước khi lưu snapshot số dư
+        # trước giao dịch và metadata đối soát/nạp tay. Các cột nullable để giữ
+        # nguyên các dòng ledger cũ, không bịa metadata lịch sử.
+        "balance_before": "NUMERIC(12, 2)",
+        "reference_type": "VARCHAR(50)",
+        "created_by_id": "INTEGER",
+        "receipt_code": "VARCHAR(100)",
+    },
     "tariffs": {
         "effective_from": "DATETIME NOT NULL DEFAULT '2000-01-01 00:00:00+00'",
         "idle_fee_per_minute": (
@@ -81,6 +90,15 @@ def upgrade_compose_sqlite_schema(engine: Engine) -> list[str]:
                 index["name"]
                 for index in inspect(connection).get_indexes("wallet_transactions")
             }
+            if "ix_wallet_transactions_receipt_code" not in index_names:
+                connection.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS "
+                        "ix_wallet_transactions_receipt_code "
+                        "ON wallet_transactions (receipt_code)"
+                    )
+                )
+
             if "uq_wallet_transactions_wallet_reference_type" not in index_names:
                 connection.execute(
                     text(
