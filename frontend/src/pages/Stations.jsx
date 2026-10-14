@@ -19,7 +19,8 @@ import {
   Play,
   Clock,
   Trash2,
-  Save
+  Save,
+  Coins,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -27,6 +28,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRestartChargePoint } from '../hooks/useRestartChargePoint';
 import StationLocationPicker from '../components/StationLocationPicker';
 import StationsMapView from '../components/StationsMapView';
+import TariffForm from '../components/TariffForm';
 import { validatePowerLimitSlots } from '../utils/tariffValidation';
 
 export default function Stations() {
@@ -65,6 +67,9 @@ export default function Stations() {
   const [powerLimitSaving, setPowerLimitSaving] = useState(false);
   const [powerLimitServerError, setPowerLimitServerError] = useState('');
   const [powerLimitSubmitted, setPowerLimitSubmitted] = useState(false);
+
+  // State cho màn hình Cấu hình biểu giá linh hoạt theo từng trạm (Tariff)
+  const [tariffStation, setTariffStation] = useState(null);
 
   // Form thêm đầu nối (connector) vào trụ sạc đã có
   const [showAddConnectorModal, setShowAddConnectorModal] = useState(false);
@@ -974,6 +979,19 @@ export default function Stations() {
                   </button>
                   {(role === 'ADMIN' || role === 'OPERATOR') && (
                     <>
+                      <button
+                        type="button"
+                        data-testid={`btn-tariff-station-${st.id}`}
+                        title="Cấu hình biểu giá điện linh hoạt (Tariff) cho trạm này"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTariffStation(st);
+                        }}
+                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-mono font-bold transition-colors"
+                      >
+                        <Coins className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Biểu giá trạm</span>
+                      </button>
                       <button
                         type="button"
                         data-testid={`btn-power-limits-station-${st.id}`}
@@ -2267,6 +2285,29 @@ export default function Stations() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================
+          MODAL CẤU HÌNH BIỂU GIÁ LINH HOẠT CHO TỪNG TRẠM (TARIFF)
+         ============================================================================ */}
+      {tariffStation && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl my-8">
+            <TariffForm
+              stationId={tariffStation.id}
+              stationName={tariffStation.name}
+              isModal={true}
+              onClose={() => setTariffStation(null)}
+              onSaved={() => {
+                showToast(
+                  'success',
+                  'ĐÃ LƯU BIỂU GIÁ TRẠM',
+                  `Cập nhật biểu giá điện thành công cho trạm "${tariffStation.name}".`
+                );
+              }}
+            />
           </div>
         </div>
       )}
