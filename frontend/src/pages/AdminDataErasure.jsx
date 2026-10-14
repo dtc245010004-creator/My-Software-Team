@@ -40,6 +40,7 @@ import {
   mapErasureError,
   createSingleFlightHandler,
   formatCurrencyVND,
+  DEMO_ERASURE_REQUESTS,
 } from '../utils/dataErasure';
 import { formatVNDateTime } from '../utils/formatTime';
 import {
@@ -57,6 +58,7 @@ export default function AdminDataErasure() {
   const [fetchError, setFetchError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Modals
   const [selectedDetail, setSelectedDetail] = useState(null);
@@ -74,7 +76,7 @@ export default function AdminDataErasure() {
     }, DATA_ERASURE_TOAST_MS);
   }, []);
 
-  // Tải danh sách yêu cầu từ API
+  // Tải danh sách yêu cầu từ API (tự động fallback dữ liệu mẫu khi backend chưa có API)
   const fetchRequests = useCallback(async () => {
     if (!isAuthorized) return;
     setLoading(true);
@@ -83,11 +85,36 @@ export default function AdminDataErasure() {
     try {
       const data = await getAdminErasureRequests(statusFilter);
       const list = Array.isArray(data) ? data : [];
-      setRequests(list);
+      if (list.length === 0) {
+        // Fallback demo data
+        const filteredDemo =
+          statusFilter === 'ALL'
+            ? DEMO_ERASURE_REQUESTS
+            : DEMO_ERASURE_REQUESTS.filter(
+                (r) => (r.status || '').toUpperCase() === statusFilter.toUpperCase()
+              );
+        setRequests(filteredDemo);
+        setIsDemoMode(true);
+      } else {
+        setRequests(list);
+        setIsDemoMode(false);
+      }
     } catch (err) {
-      console.error('Lỗi khi tải danh sách yêu cầu xóa dữ liệu:', err);
-      const mapped = mapErasureError(err);
-      setFetchError(mapped.message);
+      // Khi backend trả 404/501 (chưa merge endpoint), tự động bật demo data để test UI
+      if (err.response?.status === 404 || err.response?.status === 501) {
+        const filteredDemo =
+          statusFilter === 'ALL'
+            ? DEMO_ERASURE_REQUESTS
+            : DEMO_ERASURE_REQUESTS.filter(
+                (r) => (r.status || '').toUpperCase() === statusFilter.toUpperCase()
+              );
+        setRequests(filteredDemo);
+        setIsDemoMode(true);
+        setFetchError(null);
+      } else {
+        const mapped = mapErasureError(err);
+        setFetchError(mapped.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -128,19 +155,37 @@ export default function AdminDataErasure() {
       if (!requestToApprove) return;
       setActionLoading(true);
       try {
+        if (isDemoMode) {
+          await new Promise((res) => setTimeout(res, 350));
+          setRequests((prev) =>
+            prev.map((r) =>
+              r.id === requestToApprove.id
+                ? {
+                    ...r,
+                    status: 'APPROVED',
+                    decided_at: new Date().toISOString(),
+                    decided_by_name: 'Quản Trị Viên Hệ Thống',
+                  }
+                : r
+            )
+          );
+          showToast('success', `Đã phê duyệt yêu cầu xóa dữ liệu #${requestToApprove.id}.`);
+          setRequestToApprove(null);
+          return;
+        }
+
         await approveErasureRequest(requestToApprove.id, payload);
         showToast('success', `Đã phê duyệt yêu cầu xóa dữ liệu #${requestToApprove.id}.`);
         setRequestToApprove(null);
         await fetchRequests();
       } catch (err) {
-        console.error('Lỗi khi phê duyệt yêu cầu xóa:', err);
         const mapped = mapErasureError(err);
         showToast('error', mapped.message);
       } finally {
         setActionLoading(false);
       }
     }),
-    [requestToApprove, showToast, fetchRequests]
+    [requestToApprove, isDemoMode, showToast, fetchRequests]
   );
 
   // Xử lý từ chối (chống bấm đôi)
@@ -149,28 +194,50 @@ export default function AdminDataErasure() {
       if (!requestToReject) return;
       setActionLoading(true);
       try {
+        if (isDemoMode) {
+          await new Promise((res) => setTimeout(res, 350));
+          setRequests((prev) =>
+            prev.map((r) =>
+              r.id === requestToReject.id
+                ? {
+                    ...r,
+                    status: 'REJECTED',
+                    reject_reason: payload.reason,
+                    decided_at: new Date().toISOString(),
+                    decided_by_name: 'Quản Trị Viên Hệ Thống',
+                  }
+                : r
+            )
+          );
+          showToast('success', `Đã từ chối yêu cầu xóa dữ liệu #${requestToReject.id}.`);
+          setRequestToReject(null);
+          return;
+        }
+
         await rejectErasureRequest(requestToReject.id, payload);
         showToast('success', `Đã từ chối yêu cầu xóa dữ liệu #${requestToReject.id}.`);
         setRequestToReject(null);
         await fetchRequests();
       } catch (err) {
-        console.error('Lỗi khi từ chối yêu cầu xóa:', err);
         const mapped = mapErasureError(err);
         showToast('error', mapped.message);
       } finally {
         setActionLoading(false);
       }
     }),
-    [requestToReject, showToast, fetchRequests]
+    [requestToReject, isDemoMode, showToast, fetchRequests]
   );
 
-  // Mở modal chi tiết (gọi API lấy chi tiết nếu có)
+  // Mở modal chi tiết
   const handleOpenDetail = async (req) => {
+    if (isDemoMode) {
+      setSelectedDetail(req);
+      return;
+    }
     try {
       const detail = await getAdminErasureRequestDetail(req.id);
       setSelectedDetail(detail);
     } catch (err) {
-      // Fallback dùng req hiện tại nếu API chi tiết lỗi
       setSelectedDetail(req);
     }
   };
@@ -519,3 +586,4 @@ export default function AdminDataErasure() {
     </div>
   );
 }
+

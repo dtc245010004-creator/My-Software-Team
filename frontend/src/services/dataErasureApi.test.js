@@ -23,13 +23,23 @@ describe('dataErasureApi service (SCRUM-418)', () => {
   });
 
   describe('getMyErasureRequest', () => {
-    it('gọi GET /data-erasure/requests/me và trả về object yêu cầu', async () => {
+    it('gọi GET /me/data-erasure-requests và trả về object yêu cầu', async () => {
       const mockData = { id: 1, status: 'PENDING', requested_at: '2026-10-14T08:00:00Z' };
       api.get.mockResolvedValueOnce({ data: mockData });
 
       const res = await getMyErasureRequest();
-      expect(api.get).toHaveBeenCalledWith('/data-erasure/requests/me');
+      expect(api.get).toHaveBeenCalledWith('/me/data-erasure-requests');
       expect(res).toEqual(mockData);
+    });
+
+    it('trả về yêu cầu mới nhất nếu backend trả mảng các yêu cầu', async () => {
+      const older = { id: 1, status: 'REJECTED', requested_at: '2026-10-10T08:00:00Z' };
+      const latest = { id: 2, status: 'PENDING', requested_at: '2026-10-14T08:00:00Z' };
+      api.get.mockResolvedValueOnce({ data: [older, latest] });
+
+      const res = await getMyErasureRequest();
+      expect(api.get).toHaveBeenCalledWith('/me/data-erasure-requests');
+      expect(res).toEqual(latest);
     });
 
     it('trả về null nếu backend trả lỗi 404 (chưa từng có yêu cầu)', async () => {
@@ -49,12 +59,12 @@ describe('dataErasureApi service (SCRUM-418)', () => {
   });
 
   describe('submitErasureRequest', () => {
-    it('gọi POST /data-erasure/requests với reason đã trim', async () => {
+    it('gọi POST /me/data-erasure-requests với reason đã trim', async () => {
       const mockRes = { id: 2, status: 'PENDING', requested_at: '2026-10-14T08:30:00Z' };
       api.post.mockResolvedValueOnce({ data: mockRes });
 
       const res = await submitErasureRequest({ reason: '  Tôi không còn sử dụng xe điện  ' });
-      expect(api.post).toHaveBeenCalledWith('/data-erasure/requests', {
+      expect(api.post).toHaveBeenCalledWith('/me/data-erasure-requests', {
         reason: 'Tôi không còn sử dụng xe điện',
       });
       expect(res).toEqual(mockRes);
@@ -73,12 +83,12 @@ describe('dataErasureApi service (SCRUM-418)', () => {
   });
 
   describe('getAdminErasureRequests', () => {
-    it('gọi GET /admin/data-erasure/requests kèm status param', async () => {
+    it('gọi GET /admin/data-erasure-requests kèm status param', async () => {
       const mockList = [{ id: 1, driver_name: 'Nguyễn Văn A', status: 'PENDING' }];
       api.get.mockResolvedValueOnce({ data: mockList });
 
       const res = await getAdminErasureRequests('PENDING');
-      expect(api.get).toHaveBeenCalledWith('/admin/data-erasure/requests', {
+      expect(api.get).toHaveBeenCalledWith('/admin/data-erasure-requests', {
         params: { status: 'PENDING' },
       });
       expect(res).toEqual(mockList);
@@ -88,7 +98,7 @@ describe('dataErasureApi service (SCRUM-418)', () => {
       api.get.mockResolvedValueOnce({ data: [] });
 
       await getAdminErasureRequests('ALL');
-      expect(api.get).toHaveBeenCalledWith('/admin/data-erasure/requests', {
+      expect(api.get).toHaveBeenCalledWith('/admin/data-erasure-requests', {
         params: {},
       });
     });
@@ -100,12 +110,12 @@ describe('dataErasureApi service (SCRUM-418)', () => {
       expect(api.get).not.toHaveBeenCalled();
     });
 
-    it('gọi GET /admin/data-erasure/requests/{id} thành công', async () => {
+    it('gọi GET /admin/data-erasure-requests/{id} thành công', async () => {
       const mockDetail = { id: 5, driver_name: 'Trần B', status: 'PENDING' };
       api.get.mockResolvedValueOnce({ data: mockDetail });
 
       const res = await getAdminErasureRequestDetail(5);
-      expect(api.get).toHaveBeenCalledWith('/admin/data-erasure/requests/5');
+      expect(api.get).toHaveBeenCalledWith('/admin/data-erasure-requests/5');
       expect(res).toEqual(mockDetail);
     });
   });
@@ -116,11 +126,11 @@ describe('dataErasureApi service (SCRUM-418)', () => {
       expect(api.post).not.toHaveBeenCalled();
     });
 
-    it('gọi POST /admin/data-erasure/requests/{id}/approve với confirm_scope: true', async () => {
+    it('gọi POST /admin/data-erasure-requests/{id}/approve với confirm_scope: true', async () => {
       api.post.mockResolvedValueOnce({ data: { message: 'Đã phê duyệt yêu cầu' } });
 
       const res = await approveErasureRequest(10, { confirm_scope: true });
-      expect(api.post).toHaveBeenCalledWith('/admin/data-erasure/requests/10/approve', {
+      expect(api.post).toHaveBeenCalledWith('/admin/data-erasure-requests/10/approve', {
         confirm_scope: true,
       });
       expect(res).toEqual({ message: 'Đã phê duyệt yêu cầu' });
@@ -135,14 +145,15 @@ describe('dataErasureApi service (SCRUM-418)', () => {
       expect(api.post).not.toHaveBeenCalled();
     });
 
-    it('gọi POST /admin/data-erasure/requests/{id}/reject với reason đã trim', async () => {
+    it('gọi POST /admin/data-erasure-requests/{id}/reject với reason đã trim', async () => {
       api.post.mockResolvedValueOnce({ data: { message: 'Đã từ chối yêu cầu' } });
 
       const res = await rejectErasureRequest(10, { reason: '  Hồ sơ tài xế đang bị điều tra khiếu nại  ' });
-      expect(api.post).toHaveBeenCalledWith('/admin/data-erasure/requests/10/reject', {
+      expect(api.post).toHaveBeenCalledWith('/admin/data-erasure-requests/10/reject', {
         reason: 'Hồ sơ tài xế đang bị điều tra khiếu nại',
       });
       expect(res).toEqual({ message: 'Đã từ chối yêu cầu' });
     });
   });
 });
+

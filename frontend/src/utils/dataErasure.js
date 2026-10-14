@@ -288,3 +288,95 @@ export function formatCurrencyVND(amount) {
   if (isNaN(num)) return '0 ₫';
   return new Intl.NumberFormat('vi-VN').format(num) + ' ₫';
 }
+
+/**
+ * Dữ liệu mẫu kiểm thử UI SCRUM-418 khi backend trên nhánh main chưa triển khai endpoint.
+ * Bao gồm đủ các ca: Chờ duyệt hợp lệ, Chờ duyệt bị chặn ví còn tiền, Đã duyệt, Đã từ chối, Hoàn tất.
+ */
+export const DEMO_ERASURE_REQUESTS = [
+  {
+    id: 101,
+    user_id: 1,
+    driver_name: 'Trần Thị Bích Ngọc (Tài xế VF9)',
+    driver_email: 'driver_vip@gmail.com',
+    status: 'PENDING',
+    requested_at: '2026-10-14T08:15:00Z',
+    wallet_balance: 0,
+    reason: 'Tôi chuyển sang định cư nước ngoài, không còn nhu cầu sử dụng xe điện tại Việt Nam.',
+    scope: {
+      to_anonymize: [
+        'Họ và tên, số điện thoại, email tài xế',
+        'Lịch sử phiên sạc chi tiết và thời điểm sạc',
+        'Lịch sử đặt chỗ và lộ trình di chuyển các trạm sạc',
+      ],
+      to_retain: [
+        'Tổng số kWh điện năng đã tiêu thụ (Sổ cái kế toán)',
+        'Tổng doanh thu phát sinh và chứng từ hạch toán tài chính (Luật Kế toán)',
+      ],
+    },
+  },
+  {
+    id: 102,
+    user_id: 2,
+    driver_name: 'Nguyễn Văn Hùng',
+    driver_email: 'driver1@gmail.com',
+    status: 'PENDING',
+    requested_at: '2026-10-14T07:45:00Z',
+    wallet_balance: 250000, // Kịch bản kiểm thử: Ví còn số dư dương, nút Duyệt bị chặn
+    reason: 'Yêu cầu xóa thông tin tài khoản cá nhân theo Nghị định 13/2023/NĐ-CP.',
+    scope: {
+      to_anonymize: [
+        'Thông tin cá nhân tài xế',
+        'Lịch sử sạc và lộ trình di chuyển',
+      ],
+      to_retain: [
+        'Chứng từ thanh toán ví và hóa đơn tiền điện',
+      ],
+    },
+  },
+  {
+    id: 103,
+    user_id: 3,
+    driver_name: 'Lê Hoàng Nam',
+    driver_email: 'nam.le@example.com',
+    status: 'APPROVED',
+    requested_at: '2026-10-13T14:20:00Z',
+    reviewed_by_id: 1,
+    reviewed_at: '2026-10-13T16:00:00Z',
+    decided_by_name: 'Quản Trị Viên Hệ Thống',
+    decided_at: '2026-10-13T16:00:00Z',
+    wallet_balance: 0,
+    reason: 'Đã bán xe điện không còn sử dụng.',
+  },
+  {
+    id: 104,
+    user_id: 4,
+    driver_name: 'Phạm Minh Tuấn',
+    driver_email: 'tuan.pm@example.com',
+    status: 'REJECTED',
+    requested_at: '2026-10-12T09:30:00Z',
+    reviewed_by_id: 1,
+    reviewed_at: '2026-10-12T11:15:00Z',
+    decided_by_name: 'Quản Trị Viên Hệ Thống',
+    decided_at: '2026-10-12T11:15:00Z',
+    reject_reason: 'Tài khoản đang có khiếu nại bồi thường sự cố sạc tại Trạm Hà Đông chưa giải quyết xong.',
+    wallet_balance: 0,
+    reason: 'Không muốn lưu lại thông tin trên hệ thống.',
+  },
+  {
+    id: 105,
+    user_id: 5,
+    driver_name: 'Vũ Đức Thịnh',
+    driver_email: 'thinh.vu@example.com',
+    status: 'COMPLETED',
+    requested_at: '2026-10-10T10:00:00Z',
+    reviewed_by_id: 1,
+    reviewed_at: '2026-10-10T10:30:00Z',
+    completed_at: '2026-10-10T10:35:00Z',
+    decided_by_name: 'Quản Trị Viên Hệ Thống',
+    decided_at: '2026-10-10T10:30:00Z',
+    wallet_balance: 0,
+    reason: 'Yêu cầu thực hiện quyền bảo vệ dữ liệu cá nhân.',
+  },
+];
+

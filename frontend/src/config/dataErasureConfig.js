@@ -41,3 +41,4 @@ export const DATA_ERASURE_DISCLAIMER_TEXT = {
   ],
   legalNote: 'Lưu ý: Nhóm phát triển không đưa ra tư vấn pháp lý. Phạm vi dữ liệu được xóa hoặc giữ lại được quyết định bởi chính sách bảo vệ dữ liệu do người có thẩm quyền phê duyệt.',
 };
+

@@ -100,8 +100,29 @@ import api from './api';
  */
 export async function getMyErasureRequest() {
   try {
-    const response = await api.get('/data-erasure/requests/me');
-    return response.data || null;
+    // Thử endpoint chuẩn của Backend S-57
+    try {
+      const response = await api.get('/me/data-erasure-requests');
+      if (Array.isArray(response.data)) {
+        if (response.data.length === 0) return null;
+        // Lấy yêu cầu mới nhất
+        return [...response.data].sort(
+          (a, b) => new Date(b.requested_at) - new Date(a.requested_at)
+        )[0];
+      }
+      return response.data || null;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        // Thử route thay thế nếu có
+        try {
+          const alt = await api.get('/data-erasure/requests/me');
+          return alt?.data || null;
+        } catch {
+          return null;
+        }
+      }
+      throw err;
+    }
   } catch (error) {
     if (error.response?.status === 404) {
       return null;
@@ -120,8 +141,16 @@ export async function submitErasureRequest(payload = {}) {
   const body = {
     reason: typeof payload.reason === 'string' ? payload.reason.trim() : '',
   };
-  const response = await api.post('/data-erasure/requests', body);
-  return response.data;
+  try {
+    const response = await api.post('/me/data-erasure-requests', body);
+    return response.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const alt = await api.post('/data-erasure/requests', body);
+      return alt.data;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -143,8 +172,16 @@ export async function getAdminErasureRequests(status = 'ALL') {
   if (status && status !== 'ALL') {
     params.status = status;
   }
-  const response = await api.get('/admin/data-erasure/requests', { params });
-  return Array.isArray(response.data) ? response.data : (response.data?.items || []);
+  try {
+    const response = await api.get('/admin/data-erasure-requests', { params });
+    return Array.isArray(response.data) ? response.data : (response.data?.items || []);
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const alt = await api.get('/admin/data-erasure/requests', { params });
+      return Array.isArray(alt.data) ? alt.data : (alt.data?.items || []);
+    }
+    throw err;
+  }
 }
 
 /**
@@ -156,8 +193,16 @@ export async function getAdminErasureRequestDetail(id) {
   if (!id) {
     throw new Error('Mã yêu cầu không hợp lệ.');
   }
-  const response = await api.get(`/admin/data-erasure/requests/${id}`);
-  return response.data;
+  try {
+    const response = await api.get(`/admin/data-erasure-requests/${id}`);
+    return response.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const alt = await api.get(`/admin/data-erasure/requests/${id}`);
+      return alt.data;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -171,10 +216,17 @@ export async function approveErasureRequest(id, payload = { confirm_scope: true 
   if (!id) {
     throw new Error('Mã yêu cầu không hợp lệ.');
   }
-  const response = await api.post(`/admin/data-erasure/requests/${id}/approve`, {
-    confirm_scope: Boolean(payload.confirm_scope),
-  });
-  return response.data;
+  const body = { confirm_scope: Boolean(payload.confirm_scope) };
+  try {
+    const response = await api.post(`/admin/data-erasure-requests/${id}/approve`, body);
+    return response.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const alt = await api.post(`/admin/data-erasure/requests/${id}/approve`, body);
+      return alt.data;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -192,8 +244,16 @@ export async function rejectErasureRequest(id, payload = {}) {
   if (!reason) {
     throw new Error('Bắt buộc phải nhập lý do từ chối.');
   }
-  const response = await api.post(`/admin/data-erasure/requests/${id}/reject`, {
-    reason,
-  });
-  return response.data;
+  const body = { reason };
+  try {
+    const response = await api.post(`/admin/data-erasure-requests/${id}/reject`, body);
+    return response.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const alt = await api.post(`/admin/data-erasure/requests/${id}/reject`, body);
+      return alt.data;
+    }
+    throw err;
+  }
 }
+

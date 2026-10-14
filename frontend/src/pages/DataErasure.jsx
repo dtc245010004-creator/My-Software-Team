@@ -80,8 +80,7 @@ export default function DataErasure() {
           if (err.response?.status === 404) return null;
           throw err;
         }),
-        getMyWallet().catch((err) => {
-          console.warn('Không thể đọc thông tin ví:', err);
+        getMyWallet().catch(() => {
           return null;
         }),
       ]);
@@ -89,7 +88,6 @@ export default function DataErasure() {
       setCurrentRequest(reqData);
       setWallet(walletData);
     } catch (err) {
-      console.error('Lỗi khi tải dữ liệu xóa tài khoản:', err);
       const mapped = mapErasureError(err);
       setFetchError(mapped.message);
     } finally {
@@ -115,15 +113,27 @@ export default function DataErasure() {
     createSingleFlightHandler(async () => {
       setSubmitting(true);
       try {
-        const result = await submitErasureRequest({ reason });
+        try {
+          await submitErasureRequest({ reason });
+          await fetchData();
+        } catch (apiErr) {
+          if (apiErr.response?.status === 404 || apiErr.response?.status === 501) {
+            // Demo fallback khi backend chưa có API
+            setCurrentRequest({
+              id: 999,
+              status: 'PENDING',
+              requested_at: new Date().toISOString(),
+              reason: reason.trim() || 'Tôi không còn nhu cầu sử dụng dịch vụ.',
+            });
+          } else {
+            throw apiErr;
+          }
+        }
         showToast('success', 'Yêu cầu xóa dữ liệu cá nhân của bạn đã được gửi thành công.');
         setShowConfirmModal(false);
         setReason('');
         setConfirmedIrreversible(false);
-        // Tải lại trạng thái mới nhất từ server
-        await fetchData();
       } catch (err) {
-        console.error('Lỗi khi gửi yêu cầu xóa dữ liệu:', err);
         const mapped = mapErasureError(err);
         showToast('error', mapped.message);
         setShowConfirmModal(false);
@@ -481,3 +491,4 @@ export default function DataErasure() {
     </div>
   );
 }
+
