@@ -16,6 +16,7 @@ import {
   LocateFixed,
   Eye,
   Info,
+  AlertTriangle,
 } from 'lucide-react';
 import api from '../services/api';
 import { MAP_CONFIG } from '../config/mapConfig';
@@ -25,6 +26,7 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Skeleton from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
+import ReservationConflictModal from '../components/reservation/ReservationConflictModal';
 
 // Danh sách thành phố chọn nhanh khi không có GPS
 const QUICK_CITIES = [
@@ -131,6 +133,49 @@ export default function DriverMap() {
   const [connectorFilter, setConnectorFilter] = useState('ALL');
   const [powerFilter, setPowerFilter] = useState('ALL'); // 'ALL' | 'FAST' (>=60kW) | 'ULTRA' (>=120kW)
   const [availableOnly, setAvailableOnly] = useState(false);
+
+  // Trạng thái kiểm thử Hộp thoại Xung đột Đặt chỗ (SCRUM-372 / S-49)
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictSuggestions, setConflictSuggestions] = useState([]);
+  const [conflictDetail, setConflictDetail] = useState('');
+  const [conflictLoading, setConflictLoading] = useState(false);
+
+  // Kích hoạt kiểm thử giao diện SCRUM-372
+  const handleTestReservationConflict = useCallback((st) => {
+    if (st.name.includes('An Bình') || (st.charging_points && st.charging_points.length === 0)) {
+      setConflictSuggestions([]);
+      setConflictDetail(
+        'Rất tiếc! Đầu nối sạc vừa được người khác đặt trước và hiện tại trạm này không còn đầu nối nào trống cùng khung giờ.'
+      );
+    } else {
+      setConflictSuggestions([
+        {
+          connectorId: 101,
+          connectorNumber: 2,
+          chargePointId: 12,
+          chargePointCode: 'CP-ECO-02',
+          stationName: st.name,
+          connectorType: 'CCS2',
+          ratedPowerKw: 60,
+          availableFrom: 'Ngay bây giờ',
+        },
+        {
+          connectorId: 102,
+          connectorNumber: 1,
+          chargePointId: 13,
+          chargePointCode: 'CP-ECO-03',
+          stationName: st.name,
+          connectorType: 'Type 2',
+          ratedPowerKw: 22,
+          availableFrom: 'Còn trống',
+        },
+      ]);
+      setConflictDetail(
+        'Một tài xế khác vừa hoàn tất đặt trước đầu nối sạc này trước bạn vài giây. Bạn có thể chọn ngay một trụ sạc khác đang trống dưới đây:'
+      );
+    }
+    setShowConflictModal(true);
+  }, []);
 
   // Chế độ lớp bản đồ: 'street' (Đường phố rõ nét mặc định) | 'dark' (Bản đồ tối) | 'satellite' (Vệ tinh)
   const [layerMode, setLayerMode] = useState('street');
@@ -801,6 +846,16 @@ export default function DriverMap() {
                   Sạc tại trạm này
                 </Button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => handleTestReservationConflict(selectedStation)}
+                className="w-full mt-2 py-1.5 px-3 rounded-xl border border-sky-300 dark:border-sky-800 bg-sky-50/80 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-700 dark:text-sky-300 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all shadow-sm"
+                title="Đặt trước đầu nối sạc tại trạm này"
+              >
+                <Clock className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                <span>Đặt trước</span>
+              </button>
             </div>
           )}
 
@@ -1056,6 +1111,20 @@ export default function DriverMap() {
                         Sạc tại trạm này
                       </Button>
                     </div>
+
+                    {/* Nút đặt trước chỗ sạc */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTestReservationConflict(st);
+                      }}
+                      className="w-full mt-2 py-1.5 px-3 rounded-xl border border-sky-300 dark:border-sky-800 bg-sky-50/80 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-700 dark:text-sky-300 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all shadow-sm"
+                      title="Đặt trước đầu nối sạc tại trạm này"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                      <span>Đặt trước</span>
+                    </button>
                   </div>
                 );
               })
@@ -1063,6 +1132,24 @@ export default function DriverMap() {
           </div>
         </div>
       </div>
+
+      {/* Component Hộp Thoại Xung Đột Đặt Chỗ SCRUM-372 */}
+      <ReservationConflictModal
+        isOpen={showConflictModal}
+        onClose={() => setShowConflictModal(false)}
+        suggestions={conflictSuggestions}
+        selectedTime="15:30 (Hôm nay)"
+        conflictDetail={conflictDetail}
+        onSelectSuggestion={async (item, time) => {
+          setConflictLoading(true);
+          await new Promise((r) => setTimeout(r, 1000));
+          setConflictLoading(false);
+          setShowConflictModal(false);
+          alert(`🎉 Đặt thành công trụ gợi ý ${item.chargePointCode} (Súng #${item.connectorNumber}) cho khung giờ ${time}!`);
+        }}
+        onBackToStations={() => setShowConflictModal(false)}
+        loading={conflictLoading}
+      />
     </div>
   );
 }
