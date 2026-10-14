@@ -26,7 +26,7 @@ export function getReservationStatusMeta(status) {
         key: 'EXPIRED',
         label: 'QUÁ HẠN',
         badgeClass:
-          'bg-critical-red/20 text-critical-red border border-critical-red/40 dark:bg-rose-950/60 dark:text-rose-400 dark:border-rose-800/60',
+          'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/60',
         isOverdue: true,
         description: 'Quá giờ giữ chỗ không tới nhận trụ. Đặt chỗ bị hủy và tính phí phạt không đến.',
       };
@@ -37,7 +37,7 @@ export function getReservationStatusMeta(status) {
         key: 'ACTIVE',
         label: 'ĐANG GIỮ CHỖ',
         badgeClass:
-          'bg-sky-500/20 text-sky-400 border border-sky-500/40 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/60',
+          'bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/60',
         isOverdue: false,
         description: 'Trụ sạc đang được giữ cho bạn. Vui lòng đến cắm súng trước hạn.',
       };
@@ -47,7 +47,7 @@ export function getReservationStatusMeta(status) {
         key: 'COMPLETED',
         label: 'HOÀN THÀNH',
         badgeClass:
-          'bg-grid-green/20 text-grid-green border border-grid-green/40 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/60',
+          'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60',
         isOverdue: false,
         description: 'Tài xế đã đến cắm súng đúng giờ và bắt đầu phiên sạc. Miễn phí giữ chỗ.',
       };
@@ -56,7 +56,7 @@ export function getReservationStatusMeta(status) {
         key: 'CANCELLED',
         label: 'ĐÃ HỦY',
         badgeClass:
-          'bg-slate-500/20 text-slate-400 border border-slate-500/40 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
+          'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
         isOverdue: false,
         description: 'Đặt chỗ đã được hủy chủ động trước hạn. Không tính phí.',
       };
@@ -64,7 +64,7 @@ export function getReservationStatusMeta(status) {
       return {
         key: st,
         label: st || 'CHƯA RÕ',
-        badgeClass: 'bg-panel border border-hairline text-steel-gray',
+        badgeClass: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
         isOverdue: false,
         description: 'Trạng thái đặt chỗ.',
       };

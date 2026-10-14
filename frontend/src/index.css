@@ -257,6 +257,20 @@ html.dark .leaflet-popup-close-button:hover {
   html:not(.dark) [class*="bg-panel"] {
     background-color: #FFFFFF !important;
   }
+  html:not(.dark) .from-obsidian {
+    --tw-gradient-from: #F8FAFC var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgb(248 250 252 / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+  html:not(.dark) .to-panel,
+  html:not(.dark) [class*="to-panel"] {
+    --tw-gradient-to: #FFFFFF var(--tw-gradient-to-position) !important;
+  }
+  html:not(.dark) .via-panel,
+  html:not(.dark) [class*="via-panel"] {
+    --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), #FFFFFF var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+  }
   html:not(.dark) .hover\:bg-panel-hover:hover,
   html:not(.dark) .hover\:bg-panel:hover {
     background-color: #F1F5F9 !important;
