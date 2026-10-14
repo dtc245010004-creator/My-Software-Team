@@ -7,22 +7,26 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 | Đường dẫn | Vai trò |
 | --- | --- |
 | `backend/app/api/v1/endpoints/` | Router REST và điều phối request/response. |
+| `backend/app/api/v1/endpoints/payments.py` | Nhận callback thanh toán HMAC; endpoint mô phỏng sandbox chỉ ký tại backend và chỉ cho chủ đơn PENDING dùng khi cấu hình bật. |
 | `backend/app/schemas/` | Kiểm tra dữ liệu vào/ra bằng Pydantic. |
 | `backend/app/models/` | Model SQLAlchemy cho trạm, đầu nối, phiên sạc, biểu giá, ví và dòng sổ cái. |
 | `backend/app/services/` | Nghiệp vụ dùng chung như quản lý phiên sạc, biểu giá, ví, sổ cái và billing. |
 | `backend/app/services/billing_segment_service.py` | Chuyển kết quả phân đoạn S-30/S-31 thành snapshot DB khi chốt phiên; không tự commit. |
+| `backend/app/services/station_discovery_service.py` | Tính đầu nối rảnh theo trạng thái OCPP/heartbeat và lấy giá TOU hiện hành theo lô cho API tìm trạm công khai S-47. |
 | `backend/app/services/scheduler_service.py` | Job định kỳ, gồm đối soát sổ cái ví, gắn cờ phiên OCPP bất thường và hết hạn RemoteStart đang PENDING. |
 | `backend/app/ocpp/handlers/` | Xử lý thông điệp OCPP, gồm trạng thái connector và kết thúc phiên. |
 | `backend/alembic/versions/` | Migration Alembic; cấu hình tại `backend/alembic.ini`. |
 | `backend/tests/` | Kiểm thử backend, bao gồm API, ACID và luồng OCPP. |
-| `frontend/src/` | Giao diện React; không thuộc phạm vi thay đổi của phần billing backend này. |
+| `frontend/src/` | Giao diện React và các dịch vụ gọi API chung cho từng khu vực chức năng. |
 | `docs/` | Kiến trúc, vận hành, kế hoạch, QA và hướng dẫn phát triển. |
 
 ## Biểu giá và tính tiền phiên sạc
 
-- `backend/app/models/tariff.py` lưu biểu giá gắn theo `station_id`; các cột giá TOU và giờ cố định vẫn được giữ.
-- `backend/app/schemas/tariff.py` xác thực đơn giá, phí chiếm trụ và thời gian ân hạn không âm trước khi request vào endpoint.
-- `backend/app/services/billing.py` chứa `calculate_idle_fee` và hàm tổng hợp `calculate_session_total`. Phí chiếm trụ lấy khoảng thời gian connector báo `Finishing` hoặc `SuspendedEV` đến khi báo `Available`, trừ ân hạn, làm tròn lên theo phút bằng `Decimal` và giới hạn số phút chịu phí bởi `IDLE_FEE_MAX_MINUTES` (mặc định 240, đọc từ settings).
+- `backend/app/models/tariff.py` lưu biểu giá gắn theo `station_id`; ràng buộc `uq_tariffs_station_effective` ngăn hai phiên bản giá của cùng trạm có cùng `effective_from`.
+- `backend/app/schemas/tariff.py` xác thực đơn giá và phí chiếm trụ không âm, tối đa 8 chữ số nguyên và 2 chữ số thập phân, tương ứng với `Numeric(10,2)` trong DB.
+- `backend/app/api/v1/endpoints/tariffs.py` tạo phiên bản mới khi cập nhật, sao chép cả cấu hình phí chiếm trụ/ân hạn; xung đột hiệu lực trả HTTP 409. Migration kiểm tra dữ liệu trùng trước khi thêm unique constraint và dừng có thông báo nếu cần xử lý dữ liệu hiện hữu.
+- `frontend/src/services/tariffApi.js` dùng API client chung tại `/api/v1/tariffs`, chọn phiên bản hiệu lực, ánh xạ trường khung giờ của backend và không dùng dữ liệu giả.
+- `backend/app/services/billing.py` chứa `calculate_idle_fee` và hàm tổng hợp `calculate_session_total`. Phí chiếm trụ lấy khoảng thời gian connector báo `Finishing` hoặc `SuspendedEV` đến khi báo `Available`, trừ ân hạn, làm tròn số phút lên, làm tròn tiền lẻ đến đồng theo `ROUND_HALF_UP`, và giới hạn số phút chịu phí bởi `IDLE_FEE_MAX_MINUTES` (mặc định 240, đọc từ settings).
 - `backend/app/models/station.py` lưu thời điểm đổi trạng thái cùng mốc bắt đầu/kết thúc chiếm trụ; `backend/app/ocpp/handlers/status_notification.py` ghi nhận các mốc từ `StatusNotification`.
 - `backend/app/models/session.py` lưu riêng `idle_amount` để hóa đơn có thể đọc lại.
 - Bốn điểm kết thúc phiên dùng chung hàm tính tổng: `stop_charging_session`, `reconcile_interrupted_sessions` và `remote_stop_charging_session` trong `backend/app/services/session_service.py`, cùng `handle_stop_transaction` trong `backend/app/ocpp/handlers/stop_transaction.py`.
@@ -38,9 +42,19 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - Giao dịch trừ có tham chiếu `session_{id}`; lặp cùng tham chiếu/loại/số tiền trả lại dòng hiện có, tham chiếu trùng với số tiền khác bị từ chối. Mọi đường cập nhật số dư trong mã ứng dụng đã được rà soát; phép gán số dư duy nhất nằm trong `post_ledger_entry`.
 - Job `reconcile_wallet_ledger_job` chạy theo `RECONCILE_INTERVAL_MINUTES` (mặc định 15), dùng một truy vấn nhóm, ghi log và audit log khi phát hiện lệch, rồi bật cờ khóa đối soát. Nạp, trừ và bắt đầu phiên mới bị chặn khi ví đang khóa.
 - `POST /api/v1/wallet/admin/{wallet_id}/reconciliation/unlock` yêu cầu role `ADMIN` và lý do; chỉ mở khi tổng sổ cái đã khớp số dư. Mỗi lần mở khóa được ghi log và audit log.
+- S-56 bổ sung audit cho nạp ví thường, nạp tay Admin, callback nạp thanh toán, phát hiện/khóa ví lệch và mở khóa. Log thành công được flush trong cùng transaction với thay đổi ledger/số dư/cờ khóa; thất bại nạp tay ghi `ADMIN_MANUAL_TOPUP_FAILED` trong session riêng sau rollback. Trường chuẩn gồm actor, driver_id, wallet_id, amount (nếu có), reason, status và ip (nếu có).
+- `GET /api/v1/audit-logs` nhận `driver_id` để lọc log ví qua subquery bảng Wallet; vẫn kết hợp được actor `user_id`, khoảng thời gian `from`/`to` và phân trang. Chỉ ADMIN/ACCOUNTANT được xem log ví; OPERATOR chỉ xem loại log trạm/phiên/connector thuộc trạm của họ.
 - Migration `backend/alembic/versions/f41a0b7c9d22_wallet_ledger_append_only.py` thêm cờ, chỉ mục duy nhất và trigger append-only. Do `wallet_transactions.wallet_id` và `wallets.user_id` dùng `ON DELETE CASCADE`, trigger cũng làm thao tác xóa ví/người dùng có giao dịch thất bại; giữ lịch sử bằng soft delete. Migration cố REVOKE UPDATE/DELETE cho role kết nối nếu role tồn tại, nhưng quyền của table owner/superuser không thể bị loại bỏ bằng REVOKE; trigger vẫn chặn DML thông thường.
 - Ví cũ thiếu dòng sổ sẽ được job phát hiện và khóa. Chưa backfill số dư đầu kỳ; cần phê duyệt riêng trước khi tạo dữ liệu opening-balance.
 - `[CẦN XÁC NHẬN]` S-37 cho phép phát sinh số dư âm, trong khi DB hiện chặn dưới `-500000` và tầng ứng dụng đặt ngưỡng khóa nợ `-300000`; chưa thay đổi hai ngưỡng này.
+
+## OCPP và toàn vẹn thanh toán
+
+- `backend/app/ocpp/handlers/start_transaction.py` gọi `validate_wallet_balance_for_session` trước khi chấp nhận `StartTransaction`; việc này chặn trụ dùng LocalPreAuthorize/cache thẻ để bỏ qua kiểm tra số dư của `Authorize`.
+- `backend/app/ocpp/handlers/stop_transaction.py` tính hóa đơn và gọi `auto_deduct_session_payment` trước cùng lần commit, tạo một dòng `CHARGE_FEE` tham chiếu `session_{id}`. Phiên cần xem xét không bị tự động thu tiền; lặp StopTransaction không trừ lần hai.
+- `backend/app/services/payment_service.py::verify_webhook_signature` chỉ chấp nhận HMAC hợp lệ từ `PAYMENT_WEBHOOK_SECRET`; chuỗi giả chữ ký cố định không còn ngoại lệ. `payments.py` giữ SUCCESS ở trạng thái kết thúc khi FAILED/CANCELLED đến muộn.
+- `POST /api/v1/payments/sandbox/simulate` tạo HMAC trong backend, chỉ cho phép mô phỏng đơn PENDING của chính tài khoản. Mặc định `ALLOW_PAYMENT_SANDBOX_SIMULATION` tắt trong settings; Compose phát triển bật để các nút sandbox hiện có hoạt động. Khi triển khai môi trường thật phải tắt cờ này.
+- `frontend/src/pages/Wallet.jsx` gọi endpoint mô phỏng có kiểm soát thay vì gửi chữ ký cố định; `frontend/src/pages/ChargerDetail.jsx` hiển thị thông báo số dư thiếu và nút sang `/wallet` khi backend trả `WALLET_INSUFFICIENT_BALANCE`.
 
 ### Đã thay đổi (10/10/2026, code commit `9ceae53`)
 
@@ -50,14 +64,21 @@ Tài liệu này mô tả các khu vực mã nguồn đang dùng; chi tiết c�
 - SCRUM-290: thêm `backend/tests/test_wallet_ledger_s41.py` và test nâng schema Compose SQLite cũ. Full backend suite Docker đạt **451 passed, 307 warnings**; migration tiến/lùi/tiến trên PostgreSQL tạm thành công, trigger đã chặn UPDATE/DELETE. Database tạm đã xóa; database dự án không bị migrate.
 - Lỗi khởi động Compose ngày 10/10: backend dùng volume SQLite cũ thiếu `wallets.is_reconcile_locked`; `compose_schema_service` đã được bổ sung nâng schema idempotent. Sau khi build lại, backend healthy, `/docs` trả 200 và toàn stack Compose đã được khởi động.
 
+### Đã thay đổi S-56 (13/10/2026)
+
+- S-56 chuẩn hóa dữ liệu audit cho nạp tay, nạp ví thường/callback, reconcile và mở khóa. Thêm `WalletReconciliationLocked` khi ví chuyển từ chưa khóa sang khóa; giữ các action cũ.
+- Mở rộng `GET /audit-logs` bằng `driver_id`, chỉ cho ADMIN/OPERATOR/ACCOUNTANT gọi; bộ lọc OPERATOR không trả log ví. Lý do mở khóa rỗng/khoảng trắng bị từ chối; audit thành công cùng transaction nghiệp vụ, audit thất bại nạp tay dùng session riêng sau rollback.
+- Không tìm thấy endpoint/service điều chỉnh số dư riêng; không tự tạo chức năng này. Không có migration/config mới.
+- `backend/tests/test_wallet_audit_s56.py`: 11 ca; full backend **557 passed, 1 skipped, 320 warnings**, Ruff đạt. Test chạy trên Windows host/Python 3.14.7; không chạy trong Docker ở lượt này.
+
 ## Sửa lỗi theo báo cáo EV CSMS (10/10/2026, code commit `0bb5f67`)
 
 - `frontend/src/services/telemetryClient.js` dùng WebSocket singleton từ `frontend/src/services/websocket.js`; ánh xạ tên telemetry backend sang trường mà ActiveSession hiển thị. Frontend có 39 test passed và build thành công; chưa kiểm tra trực quan qua trình duyệt.
 - `backend/app/ocpp/handlers/stop_transaction.py` lưu `transactionData` hợp lệ vào `MeterValue` đã có. Nếu Available đến trước StopTransaction, phiên được đánh dấu cần xem xét; StopTransaction hợp lệ đến sau mới chốt. Không tự hoàn tất phiên chỉ dựa vào Available.
 - Scheduler chuyển RemoteStart quá hạn từ `PENDING` sang `EXPIRED` mỗi phút. RemoteStop trả HTTP 409 khi trụ offline.
 - `ALLOW_REMOTE_START_SIMULATION` mặc định false; khi bật, mô phỏng chỉ dùng được bởi ADMIN ngoài test pytest đang chạy.
-- Trước migration S-41, Alembic có head `e72b461d9ac3`; hiện có một head `f41a0b7c9d22`. Toàn bộ migration lên head, rồi migration mới nhất lùi một revision và nâng lại, đã chạy trên PostgreSQL tạm; database tạm được xóa sau kiểm thử và DB dự án không bị migrate.
-- Kiểm chứng gần nhất ngày 10/10/2026: backend full suite trong Docker **451 passed, 307 warnings**; PostgreSQL trigger chặn UPDATE/DELETE; backend `/docs` trả 200 và backend/DB/frontend/OCPP simulator đều được Compose khởi động. Chưa kiểm tra UI trực quan trên trình duyệt.
+- Trước migration S-57, Alembic có head `c316a2b4d6e8`; sau khi thêm migration `cca26ecdf5a8`, `alembic heads` trả đúng một head mới. S-57 upgrade/downgrade/upgrade trên PostgreSQL 16 tạm; database ứng dụng không bị migrate.
+- Kiểm chứng Docker ngày 10/10/2026: backend full suite **451 passed, 307 warnings**; PostgreSQL trigger chặn UPDATE/DELETE; backend `/docs` trả 200 và backend/DB/frontend/OCPP simulator đều được Compose khởi động. Lượt backend mới nhất sau S-57 ngày 13/10/2026 chạy trên Windows host/Python 3.14.7: **573 passed, 1 skipped, 320 warnings** (574 tests); Ruff đạt. Chưa kiểm tra UI trực quan trên trình duyệt trong lượt này.
 
 ## S-29 — Biểu giá nhiều khung giờ (Backend)
 
@@ -115,3 +136,23 @@ Phạm vi: SCRUM-193, SCRUM-194, SCRUM-195, SCRUM-197.
 - `backend/app/services/scheduler_service.py` sau khi commit cờ `is_abnormal` gọi cùng cơ chế theo từng trạm; giữ nguyên trạng thái phiên CHARGING theo hợp đồng scheduler đang có. Gateway disconnect hiện chỉ dọn registry kết nối, không tự đóng phiên; phiên mất kết nối được scheduler phát hiện theo chu kỳ cấu hình.
 - Không cần migration dữ liệu cho S-44. Chưa đổi luật water-filling hay lưu bền `applied_session_limits`; cache này vẫn ở RAM và sẽ mất khi backend khởi động lại.
 - Kiểm tra S-44 trong Docker: `ruff check .` đạt; nhóm S-42/S-43/S-44 và scheduler đạt **33 passed**. Toàn bộ backend `pytest tests -q` đạt **525 passed, 318 warnings** (Python 3.12); không có test thất bại.
+
+## S-47 — Tìm trạm gần và đầu nối đang rảnh (Backend)
+
+- `GET /api/v1/stations/nearby` trong `backend/app/api/v1/endpoints/stations.py` là endpoint công khai riêng; endpoint `GET /api/v1/stations` hiện có được giữ nguyên. Response dùng `NearbyStationResponse`, không serialize schema `StationResponse` hay trường nội bộ của chủ trạm/lưới điện.
+- GPS phải có đủ vĩ độ/kinh độ; nếu không có GPS phải có `q` không rỗng. Kết quả chỉ gồm trạm `is_active=true` và `status=ACTIVE`, dùng khoảng cách Haversine, radius tùy chọn, `limit` tối đa 50 và `offset`. Trạm thiếu tọa độ tìm được bằng từ khóa, khoảng cách null và xếp cuối khi truy vấn GPS không radius.
+- `is_connector_available` trong `backend/app/services/station_discovery_service.py` là quy tắc duy nhất: connector/trụ hoạt động, heartbeat trụ không quá hạn theo `HEARTBEAT_INTERVAL_SECONDS`, `ocpp_status == "Available"` và internal `status == "AVAILABLE"`. Connector tắt không vào tổng; connector của trụ offline có trong tổng nhưng không rảnh.
+- Giá tại thời điểm request dùng bộ chọn phiên bản `get_effective_tariffs_for_stations` (cùng quy tắc với `get_or_create_default_tariff`) và `resolve_tariff_for_date`/`get_tariff_rate_at_time`; truy vấn tariff/period theo lô, tiền trả dạng Decimal. Không tạo biểu giá mặc định từ endpoint đọc.
+- `HEARTBEAT_INTERVAL_SECONDS=300` và giới hạn trang `STATION_NEARBY_DEFAULT_LIMIT=20` / `STATION_NEARBY_MAX_LIMIT=50` được đọc từ `app/core/config.py`, khai báo trong `.env.example` và truyền qua backend Compose. S-47 không cần migration.
+- `backend/tests/test_station_nearby_s47.py`: **8 passed**. Full backend suite ngày 13/10/2026: **546 passed, 1 skipped, 320 warnings** trên Python 3.14.7; pytest dùng thư mục `tmp_path` trong workspace do Windows chặn thư mục tạm mặc định. `ruff check .` đạt. Docker daemon không hoạt động nên chưa chạy kiểm thử trong container.
+- Đề xuất: hỗ trợ tìm không dấu tiếng Việt, thêm chỉ mục không gian nếu dữ liệu lớn và cân nhắc cache giá hiện hành. Chưa làm bản đồ, chỉ đường hoặc đặt chỗ.
+
+## S-57 — Yêu cầu ẩn danh hóa dữ liệu tài xế (Backend)
+
+- API `backend/app/api/v1/endpoints/data_erasure.py`: tài xế `CUSTOMER` chỉ tạo/xem yêu cầu của mình; Admin lọc, duyệt hoặc từ chối (lý do từ chối bắt buộc). Các request trùng đang chờ trả 409.
+- `backend/app/models/data_erasure_request.py` / `backend/app/schemas/data_erasure.py`: trạng thái yêu cầu, partial unique index cho một `PENDING` mỗi user, DTO riêng cho request/review. `User.data_erased_at` là dấu bền vững để ngăn đăng nhập và tái kích hoạt tài khoản đã ẩn danh.
+- `backend/app/services/data_erasure_service.py`: kiểm tra số dư dương/âm, reconcile lock, phiên CHARGING/ACTIVE/ABNORMAL/NEEDS_REVIEW/flag review và TopupOrder PENDING; khóa user/wallet, làm sạch định danh trong một transaction, audit cùng transaction. Lỗi rollback ghi audit FAILED bằng session riêng. Tiền, kWh, thời gian, hóa đơn/đoạn giá, ví và sổ cái append-only không đổi.
+- `backend/app/services/identity_guard_service.py`: tuần tự hóa tạo phiên OCPP/API, RemoteStart và nạp tiền với quy trình ẩn danh; SQLite dùng khóa ghi không đổi giá trị, PostgreSQL dùng `SELECT FOR UPDATE`. Prefix token/email ẩn danh cấu hình qua `DATA_ERASURE_IDENTIFIER_PREFIX` trong `backend/app/core/config.py` và `.env.example`.
+- Migration `backend/alembic/versions/cca26ecdf5a8_add_driver_data_erasure_requests.py` thêm bảng request, chỉ mục, ràng buộc trạng thái và `users.data_erased_at`. Sau `git pull origin main`, `alembic heads` là một head `cca26ecdf5a8`; PostgreSQL 16 tạm đã qua upgrade → downgrade → upgrade, không migrate DB dự án.
+- Test `backend/tests/test_data_erasure_s57.py`: 16 ca về quyền, yêu cầu lặp, phê duyệt/ẩn danh và giữ nguyên số liệu, blockers, từ chối, rollback, audit và idempotency. Kết quả full suite/ruff sau lần chạy hoàn chỉnh cuối cùng được ghi trong nhật ký tiến độ.
+- Giới hạn: phạm vi dữ liệu cần mentor xác nhận. Audit/sổ cái append-only cũ có thể còn ID/IP/nội dung định danh; lựa chọn chặn số dư âm bảo thủ; cần chốt thời hạn xử lý, hoàn tiền, vị trí lịch sử và tương thích whitelist S-55 (chưa có trong repo). Không có kết luận pháp lý trong code/docs; không làm giao diện.

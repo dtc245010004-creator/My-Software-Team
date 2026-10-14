@@ -12,7 +12,7 @@
 * **Mục tiêu sản phẩm (Product Goal)**: Đơn vị vận hành mạng lưới trạm sạc nắm được mọi phiên sạc theo thời gian thực qua giao thức OCPP, tính đúng tiền theo biểu giá nhiều khung, không để trạm vượt công suất, và đối soát được doanh thu khớp với số kWh đã cấp `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Mô hình Scrum**: Sprint 1 tuần (5 ngày làm việc / sprint). Đơn vị ước lượng: Story Point (Fibonacci) `[nguồn tạm: nentangtramsac_bandaydu.md: Sheet Thông tin]`.
 * **Khung theo dõi 4 chiều**:
-1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi; backend full suite trong Docker ngày 10/10/2026 đạt 451 passed, 307 warnings. Ruff báo `All checks passed`; frontend lần kiểm tra trước đạt 39 test và build thành công (có cảnh báo bundle lớn). Backend, PostgreSQL, frontend và simulator đều chạy; backend healthcheck `/docs` trả 200. Job phát hiện phiên bất thường dùng ngưỡng cấu hình 500 giây. Compose phát triển cung cấp các dịch vụ ở cổng host 8001/8080; dữ liệu giữ trong named volume.
+1. *Hiện trạng (Đã có)*: Sprint 1 hoàn thành 5 User Stories cốt lõi. Backend full suite sau S-57 ngày 13/10/2026: **573 passed, 1 skipped, 320 warnings** trên Windows/Python 3.14.7 (574 tests); Ruff đạt. Lượt Docker ngày 10/10/2026 đạt 451 passed, 307 warnings. Compose dùng chung cung cấp backend, PostgreSQL, frontend và simulator tại các cổng host 8001/8080; dữ liệu giữ trong named volume.
   2. *Đã thay đổi*: Cập nhật CSDL giới hạn tràn nợ `-500.000` VND (trước là `-1.000.000` VND), thêm thông báo khóa nợ khi đăng nhập, tăng số test từ 83 lên 84; chuẩn hóa migration về `backend/alembic/`; đồng bộ nút Admin demo 1-Click với tài khoản `admin / 12345678a`; thêm MeterValues T-40/T-41, lọc số đo lùi/trùng T-42/T-43, phục hồi phiên khi reconnect T-44/T-45/T-46 và đánh dấu phiên bất thường T-53 (commit `7af7b19`); hoàn thành hạ tầng T-55/T-56 cho 20 trụ OCPP ảo và kiểm thử ba vòng reconnect (commit `bfefab8` trên nhánh `Duong`). Cập nhật Compose backend/frontend, cổng host và healthcheck (07/10/2026 - chưa commit).
   3. *Sắp thay đổi*: Kế hoạch Sprint 2 (20 SP) xử lý tin nhắn giao thức OCPP 1.6J và màn hình theo dõi trụ sạc.
   4. *Cần thay đổi / Tồn đọng*: Kết nối phần cứng trạm thật (S-05 AC3), cổng thanh toán thật (R-02), cấu hình Docker môi trường (R-06).
@@ -24,7 +24,7 @@
 Căn cứ theo [nguồn tạm: nentangtramsac_bandaydu.md: Sheet Sprints & Backlog]:
 * **Cam kết Sprint 1**: 12 Story Points (SP).
 * **Danh mục Story**:
-  1. `S-01` (3 SP): Khung ứng dụng chạy được trên máy cá nhân/staging — **ACCEPTED** (Đã đóng gói Docker Backend/Frontend, `docker-compose.staging.yml` và pipeline CI `.github/workflows/ci-staging.yml`).
+  1. `S-01` (3 SP): Khung ứng dụng chạy được trên máy cá nhân/staging — **ACCEPTED** (đã có Docker Backend/Frontend và CI; hiện khởi chạy toàn bộ stack bằng `docker-compose.yml`, còn hai file Compose staging cũ đã được gỡ).
   2. `S-02` (2 SP): Đăng nhập bằng email và mật khẩu, khoá tạm khi sai nhiều lần và khi nợ — **ACCEPTED** (Hoàn thiện cơ chế khóa tạm 15 phút sau 5 lần sai mật khẩu và khóa nợ -300k).
   3. `S-03` (2 SP): Mỗi vai trò chỉ thấy và thao tác được phần việc của mình (RBAC) — **ACCEPTED**.
   4. `S-04` (2 SP): Chủ trạm tạo và sửa thông tin trạm sạc — **ACCEPTED**.
@@ -52,16 +52,19 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 
 ### Hiện trạng thành phần phần mềm
 * **Đợt xử lý báo cáo EV CSMS (10/10/2026, code commit `0bb5f67`)**: sửa telemetry WebSocket, ghi `transactionData`, review khi Available thiếu StopTransaction, hết hạn RemoteStart, RemoteStop offline 409, giới hạn mô phỏng từ xa, CTA cho tài xế và tag simulator. Backend full suite 437 passed, 307 warnings; frontend 39 passed/build thành công; Compose runtime smoke thành công.
-* **Backend API**: 8 router modules REST API; OpenAPI hiện xuất 54 path và 62 operations, cùng kênh WebSocket `/ws/telemetry`.
+* **Backend API**: 12 router modules REST API; OpenAPI hiện xuất **76 path và 87 operations** (đếm sau S-57 ngày 13/10/2026), cùng kênh WebSocket `/ws/telemetry`. S-57 thêm API yêu cầu ẩn danh hóa cho tài xế và Admin.
 * **Phạm vi đọc trạm/trụ**: List/detail/tree/grid dùng chung bộ lọc `Station.operator_id`; Operator chỉ thấy dữ liệu thuộc mình, Admin thấy toàn hệ thống, khách chỉ thấy tài nguyên hoạt động. Trạm không có GPS vẫn xuất hiện trong kết quả không bán kính.
 * **Bộ khung và gateway OCPP 1.6J**: `frames.py` thuần đọc/ghi CALL, CALLRESULT, CALLERROR; `dispatcher.py` chờ phản hồi lệnh máy chủ theo message ID; gateway `/ocpp/{charge_point_code}` xử lý BootNotification, Authorize, MeterValues và idempotency CSDL, tách biệt `/ws/telemetry`. MeterValues chỉ lưu measurand năng lượng nhập và trả CALLRESULT trước thao tác DB. API chargers có lệnh Reset cho Admin/Operator.
 * **Biểu giá và tính tiền phiên sạc**: `backend/app/services/billing.py` tính thống nhất tiền điện và phí chiếm trụ; `Tariff` giữ giá TOU hiện có cùng phí theo phút/ân hạn, `ChargingSession` lưu riêng `idle_amount`. Connector lấy thời điểm trạng thái từ StatusNotification. Phần chịu phí bị chặn bởi `IDLE_FEE_MAX_MINUTES` (mặc định 240 phút).
 * **Timeout lệnh OCPP**: `OCPP_CALL_TIMEOUT_SECONDS = 30.0`; endpoint Reset ghi đè 30 giây theo hợp đồng API.
 * **Frontend SPA**: 6 màn hình nghiệp vụ được triển khai trong 16 file JSX dưới `frontend/src/pages/` (phân biệt số màn hình với số file).
 * **Đăng nhập demo Admin**: Nút 1-Click đọc username/mật khẩu từ `DEMO_USERS.ADMIN`; cấu hình mã nguồn hiện tại là `admin / 12345678a`. Frontend Docker đã build lại; đăng nhập API xác nhận HTTP 200, user `admin`, role `ADMIN` sau khi gỡ khóa tạm.
-* **Kiểm thử tự động**: Lượt full suite backend trong Docker ngày 10/10/2026 đạt 451 passed, 307 warnings. Test sổ cái + wallet ACID đạt 18 passed; test schema SQLite Compose cũ xác nhận nâng lặp an toàn và trigger chặn sửa/xóa.
-* **CSDL và migration**: SQLAlchemy khai báo 18 bảng. `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; `alembic heads` ngày 10/10/2026 trả một head `f41a0b7c9d22`. Toàn chuỗi migration lên head và S-41 nâng/hạ/nâng trên PostgreSQL tạm thành công; database tạm đã xóa và DB dự án không bị migrate.
-* **Đóng gói & CI/CD**: Khung ứng dụng Staging qua `docker-compose.staging.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và pipeline CI `.github/workflows/ci-staging.yml`.
+* **Kiểm thử tự động**: Lượt host mới nhất ngày 13/10/2026 sau S-57 đạt **573 passed, 1 skipped, 320 warnings** (574 tests) trên Python 3.14.7; Ruff đạt. Lượt Docker ngày 10/10/2026 đạt 451 passed, 307 warnings.
+* **CSDL và migration**: SQLAlchemy đăng ký **22 bảng** trong `Base.metadata` sau khi nạp `app.models` (đếm sau S-57 ngày 13/10/2026). `backend/alembic.ini` cấu hình `backend/alembic/` làm nguồn duy nhất; sau pull `origin/main`, migration S-57 tạo một head `cca26ecdf5a8`. Chu trình upgrade/downgrade/upgrade xác minh trên PostgreSQL 16 tạm; DB ứng dụng không bị migrate.
+* **Đóng gói & CI/CD**: Compose dùng chung `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` và workflow `.github/workflows/ci.yml`. Không dùng `docker-compose.staging.yml` hoặc `docker-compose.env.example` vì hai file này đã bị xóa.
+* **S-47 Backend (13/10/2026)**: `GET /api/v1/stations/nearby` tìm trạm active theo GPS hoặc tên/địa chỉ, trả đầu nối rảnh/tổng và giá TOU hiện tại bằng DTO công khai riêng. Test mới 8 passed; toàn backend trên host đạt 546 passed, 1 skipped, 320 warnings; Ruff sạch. Chưa triển khai giao diện theo phạm vi Backend.
+* **S-56 Backend (13/10/2026, commit `38dd323` trên `Duong`)**: Audit nạp ví thường/tay, callback, mở khóa và khóa bởi reconcile; log thành công cùng transaction nghiệp vụ, log thất bại nạp tay sau rollback. `GET /audit-logs?driver_id=...` lọc theo ownership ví; ADMIN/ACCOUNTANT xem log ví, OPERATOR không xem log ví, CUSTOMER bị chặn endpoint. Test mới 11 ca; full backend 557 passed, 1 skipped, 320 warnings; Ruff sạch; không migration.
+* **S-57 Backend (13/10/2026, chưa commit)**: Thêm yêu cầu ẩn danh hóa với một PENDING/user, API tài xế/Admin, blockers số dư/phiên/reconcile/topup, atomic anonymization, audit success/failure và khóa user/wallet để ngăn thao tác mới chen vào. Giữ nguyên phiên/hóa đơn/kWh/tiền/ledger; `ChargingSession.driver_id` thành NULL, dữ liệu định danh được thay/xóa hoặc làm sạch. Migration `cca26ecdf5a8` thêm `data_erasure_requests` và `users.data_erased_at`; prefix `DATA_ERASURE_IDENTIFIER_PREFIX` cấu hình được. 16 test S-57; full suite 573 passed, 1 skipped, 320 warnings; Ruff đạt; không làm UI hoặc kết luận pháp lý; phạm vi dữ liệu cần mentor xác nhận.
 
 ### Phần "Đã thay đổi" (Lịch sử điều chỉnh kỹ thuật)
 * **SCRUM-283–290 thuộc S-41 (10/10/2026, code commit `9ceae53`)**: Thêm helper ghi sổ cái chung, khóa hàng ví khi ghi, đảm bảo tham chiếu phiên không ghi trùng, thêm trigger append-only, job đối soát một truy vấn nhóm, khóa ví lệch, endpoint Admin mở khóa có lý do và log/audit. Cập nhật seed/demo để số dư ban đầu mới có dòng ledger; ví legacy không được tự backfill. Full suite Docker 451 passed, 307 warnings; migration và trigger PostgreSQL đã xác minh trên database tạm.
@@ -69,6 +72,8 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 * **Sửa lỗi theo Báo cáo EV CSMS (10/10/2026, code commit `0bb5f67`)**: dùng WebSocket singleton và ánh xạ telemetry; lưu mẫu transactionData trong MeterValue; đánh dấu review khi Available đến trước StopTransaction; hết hạn RemoteStart; RemoteStop offline trả 409; giới hạn mô phỏng theo cờ môi trường và role; thêm CTA tìm trạm và tag image simulator. Full backend suite 437 passed, 307 warnings; Ruff đạt; frontend 39 passed/build thành công; Compose smoke thành công.
 * **SCRUM-188/189/190/192 thuộc S-28 (08/10/2026 - chưa commit)**: Thêm phí chiếm trụ theo biểu giá và ân hạn, kiểm tra dữ liệu âm ở schema, lưu thời điểm connector báo `Finishing`/`SuspendedEV` và `Available`, tập trung phép tính vào `billing.py`, lưu `idle_amount`, và áp trần số phút từ `IDLE_FEE_MAX_MINUTES` (mặc định 240). Khi `Available` đến sau billing, không sửa hóa đơn/sổ cái và không tự trừ ví lần hai; mentor cần xác nhận cách quyết toán bổ sung. 20 test billing chọn lọc passed; full suite baseline đạt 298 passed, 1 skipped. Hai migration đã kiểm tra nâng/hạ/nâng trên SQLite tạm.
 * **Sửa phân quyền đọc trạm/trụ và hiển thị trạm thiếu GPS (07/10/2026 - chưa commit)**: Dùng chung bộ lọc truy vấn cho API list/detail/tree/grid trạm và list/detail trụ; truy cập ngoài phạm vi trả `404`; chuẩn hóa `Type 2` cũ trong DTO, không ghi DB. 35 test chọn lọc passed, Ruff sạch.
+* **S-56 / SCRUM-283–290 (13/10/2026)**: Chuẩn hóa audit ví với actor/driver/wallet/amount/reason/status/IP, ghi event lock khi đối soát phát hiện lệch, bổ sung bộ lọc audit theo tài xế và chặn quyền CUSTOMER. 11 test mới; full backend 557 passed, 1 skipped, 320 warnings; Ruff đạt. Không migration. Chưa có chức năng điều chỉnh ví riêng.
+* **S-57 (13/10/2026 - chưa commit)**: Thêm model/schema/API/service yêu cầu ẩn danh hóa, `data_erased_at`, khóa đồng thời với phiên/nạp, audit append-only và migration PostgreSQL `cca26ecdf5a8`. Test mới 16 ca; migration upgrade → downgrade → upgrade đạt trên PostgreSQL 16 tạm. Không cập nhật DB dự án. Full suite 573 passed, 1 skipped, 320 warnings; `ruff check .` đạt.
 * **Epic E-05: Biểu giá và tính tiền (S-30 & S-31), nhánh `quocdung` (08/10/2026)**: Thêm hàm thuần `backend/app/services/pricing_engine.py` chia phiên theo khung TOU, nội suy kWh tại ranh giới thiếu số đo, làm tròn từng đoạn rồi cộng (`ROUND_EACH_SEGMENT`), và nhóm hóa đơn theo ngày địa phương khi phiên qua nửa đêm/kéo dài nhiều ngày. Bổ sung API hóa đơn và bộ test `backend/tests/test_pricing_engine.py` gồm 20 ca. Nhánh nguồn ghi nhận suite thời điểm đó 290 passed, 1 skipped; cần chạy lại trên mã đã hợp nhất.
 * **SCRUM-222/221/220/223/225 thuộc S-33 (09/10/2026, commit `60e801a` trên `origin/Duong`)**: Lưu snapshot S-30/S-31 trong giao dịch chốt; endpoint hóa đơn đọc giá đã lưu, kiểm tra ownership, trả `pending_review` không có số tiền, thêm dòng phí chiếm trụ và giữ hóa đơn phiên cũ dạng legacy không backfill. `test_billing_segments.py`: 6 passed; `test_invoice.py`: 8 passed; full suite ngày 10/10/2026 đạt 437 passed, 307 warnings. Migration `d8f56c4a911e` đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL Compose tạm.
 * **T-14/T-15 thuộc S-07 (01/10/2026 - chưa commit)**: Thêm package khung OCPP 1.6J và bộ test parametrize; 20/20 ca OCPP passed riêng và full backend suite đạt 140 passed, 1 warning.
@@ -108,6 +113,8 @@ Căn cứ mã nguồn thực tế tại `backend/app/models/wallet.py` và `back
 
 ---
 
+* **S-47 Backend (13/10/2026, commit `3d98b39` trên `Duong`)**: Thêm endpoint công khai `GET /api/v1/stations/nearby`, DTO riêng, quy tắc trạng thái connector/heartbeat và giá TOU/version theo lô; thêm tìm kiếm GPS/tên/địa chỉ, radius và phân trang. Test mới 8 passed, full backend 546 passed/1 skipped, Ruff đạt; không migration. Docker Desktop không khởi động trong lượt xác minh nên suite chạy trên host Windows/Python 3.14.7. UI, chỉ đường và đặt chỗ không thuộc phạm vi.
+
 ## 4. Sprint 2 — “Trụ ảo nối vào hệ thống được xác thực; vận hành viên thấy đúng trạng thái mọi trụ” (28/9 – 5/10, 20 SP)
 
 Căn cứ theo [nguồn tạm: nentangtramsac_bandaydu.md: Sheet Sprints dòng 23]:
@@ -145,7 +152,7 @@ Căn cứ theo [nguồn tạm: nentangtramsac_bandaydu.md: Sheet Sprints dòng 2
 | **Sprint 5** | Tài xế nạp ví và tiền tự trừ khi sạc xong, số dư khớp sổ cái | 20 | S-35 → S-41 (Cổng thanh toán sandbox, sổ cái ACID) |
 | **Sprint 6** | Trạm không bao giờ vượt hạn mức công suất (Smart Charging) | 19 | S-42 → S-46 (SetChargingProfile, chia tải động) |
 | **Sprint 7** | Tài xế tìm trạm trống và đặt chỗ thành công (ReserveNow) | 19 | S-47 → S-51 (Tìm kiếm vị trí, giữ chỗ, hủy chỗ) |
-| **Sprint 8** | Đối soát doanh thu khớp kWh và chia sẻ đối tác | 20 | S-52 → S-57 (Báo cáo kỳ, chốt sổ, ẩn danh hóa NĐ 13) |
+| **Sprint 8** | Đối soát doanh thu khớp kWh và chia sẻ đối tác | 20 | S-52 → S-57 (Báo cáo kỳ, chốt sổ, yêu cầu ẩn danh hóa dữ liệu) |
 
 ---
 
@@ -161,7 +168,7 @@ Căn cứ theo [nguồn tạm: nentangtramsac_bandaydu.md: Sheet Rủi ro dòng 
 | **R-04** | Bộ tính tiền sai ở ca biên (nửa đêm) | Cao | Viết riêng Story S-32 với bộ test đáp án tính tay | **KẾ HOẠCH SP 4** |
 | **R-05** | Velocity thực tế lệch so với ước lượng | TB | Đo velocity 3 sprint đầu và có 25 SP đệm | **ĐANG THEO DÕI** |
 | **R-06** | Thiếu DevOps, staging hỏng không ai sửa | TB | Tự động hóa qua script và container | **CẦN BỔ SUNG** |
-| **R-07** | Dữ liệu vị trí vi phạm Nghị định 13/2023 | TB | Ẩn danh hóa lịch sử sạc trong S-57 | **KẾ HOẠCH SP 8** |
+| **R-07** | Phạm vi xử lý dữ liệu cá nhân và lịch sử vị trí chưa được xác nhận | TB | Mentor xác nhận phạm vi dữ liệu cần xử lý trong S-57 | **CẦN MENTOR XÁC NHẬN** |
 | **R-08** | Simulator không tôn trọng SetChargingProfile | Cao | Kiểm tra hồ sơ sạc ngay từ khâu thử nghiệm | **KẾ HOẠCH SP 6** |
 | **R-09** | Xung đột merge khi cùng sửa module OCPP | TB | Mỗi handler một file riêng biệt, Daily Scrum | **ÁP DỤNG SP 2** |
 

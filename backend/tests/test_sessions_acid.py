@@ -100,6 +100,9 @@ def setup_data(db_session):
         offpeak_start="22:00",
         offpeak_end="04:00",
         is_active=True,
+        # The station already has a legacy tariff effective from 2000-01-01;
+        # use a distinct effective time now that station versions are unique.
+        effective_from=datetime(2026, 9, 24, 0, 0, 0, tzinfo=timezone.utc),
     )
     db_session.add(tariff)
     db_session.commit()

@@ -43,21 +43,22 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("Đã đồng bộ schema CSDL qua Base.metadata.create_all")
 
+    from app.services.compose_schema_service import upgrade_compose_sqlite_schema
+
+    added_columns = upgrade_compose_sqlite_schema(engine)
+    if added_columns:
+        logger.info(
+            "Đã nâng bổ sung schema SQLite phát triển: %s",
+            ", ".join(added_columns),
+        )
+
     if os.getenv("ENABLE_DEMO_ACCOUNTS", "").strip().lower() in {
         "1",
         "true",
         "yes",
         "on",
     }:
-        from app.services.compose_schema_service import upgrade_compose_sqlite_schema
         from app.services.demo_account_service import ensure_demo_accounts
-
-        added_columns = upgrade_compose_sqlite_schema(engine)
-        if added_columns:
-            logger.info(
-                "Đã nâng bổ sung schema SQLite phát triển: %s",
-                ", ".join(added_columns),
-            )
 
         with SessionLocal() as db:
             created_accounts = ensure_demo_accounts(db)

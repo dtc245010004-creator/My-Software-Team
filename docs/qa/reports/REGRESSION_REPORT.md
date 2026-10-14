@@ -160,3 +160,22 @@ Bộ kiểm thử hồi quy được kích hoạt sau đợt cập nhật logic 
 * Backend full suite trong Docker: **451 passed, 307 warnings**. Bộ test schema SQLite Compose cũ cùng S-41/wallet ACID: **19 passed**.
 * PostgreSQL tạm đạt `upgrade head → downgrade -1 → upgrade head`; trigger thực tế từ chối UPDATE và DELETE trên `wallet_transactions`. Database tạm đã xóa.
 * Sửa lỗi startup từ SQLite volume cũ thiếu `wallets.is_reconcile_locked`; nâng schema idempotent bổ sung cột, chỉ mục duy nhất và trigger. Backend healthy, `/docs` trả 200 và toàn bộ services Compose được khởi động; DB dự án không chạy Alembic.
+
+## S-47 — Tìm trạm gần và đầu nối rảnh (13/10/2026, chưa commit)
+
+* Bộ mới `test_station_nearby_s47.py`: **8 passed**; nhóm S-47 cùng test stations, ownership RBAC và tariff versioning đạt **46 passed** trước lần đổi giới hạn thành cấu hình.
+* Sau khi chuyển default/max page size thành settings, nhóm S-47 và `test_stations.py` đạt **25 passed**; full backend suite đạt **546 passed, 1 skipped, 320 warnings**.
+* `ruff check .` đạt. Suite chạy trên Windows/Python 3.14.7, với thư mục tạm migration nằm trong workspace do ACL Windows chặn pytest temp mặc định. Docker Compose cấu hình hợp lệ; Docker daemon không hoạt động nên không chạy suite trong container.
+
+## S-56 — Audit thao tác ví và lọc nhật ký theo tài xế (13/10/2026, chưa commit)
+
+* `test_wallet_audit_s56.py`: **11 passed**; nhóm S-56 + S-36 + S-41 + payment regression: **38 passed**.
+* Full backend suite: **557 passed, 1 skipped, 320 warnings** trong 224.36 giây; 558 tests được thu thập. Môi trường Windows host/Python 3.14.7; không chạy Docker ở lượt này.
+* `ruff check .`: **All checks passed**. Không có migration mới; Alembic chỉ có head `c316a2b4d6e8`.
+
+## S-57 — Yêu cầu ẩn danh hóa dữ liệu tài xế (13/10/2026, chưa commit)
+
+* `test_data_erasure_s57.py`: **16 passed**; bao phủ request ownership/duplicate, admin RBAC, chặn duyệt vì số dư/phiên/reconcile/topup, từ chối có lý do, anonymization, giữ nguyên session/invoice/ledger, rollback và idempotency.
+* Hồi quy toàn bộ backend: **573 passed, 1 skipped, 320 warnings**, 574 tests được thu thập, 235.19 giây; Windows host/Python 3.14.7. `ruff check .` đạt; migration S-57 kiểm tra Ruff riêng.
+* Alembic sau pull `origin/main` có một head `cca26ecdf5a8`. Migration chạy upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; DB ứng dụng không bị migrate. Suite host cần dùng basetemp trong workspace để test migration con truy cập DB tạm.
+* Cần mentor xác nhận phạm vi dữ liệu; log audit/sổ cái append-only cũ không được sửa, lựa chọn chặn số dư âm, thời hạn xử lý/hoàn tiền và việc ẩn vị trí lịch sử. S-55 chưa có trong repo.

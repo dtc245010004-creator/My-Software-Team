@@ -9,12 +9,13 @@
 
 - **Backend**: Python 3.12+ / FastAPI, SQLAlchemy ORM, SQLite WAL mode (`sqlite:///./ev_csms.db`). *(Nguồn: `backend/app/core/config.py`)*
 - **Frontend**: React 18, Vite, Tailwind CSS, Recharts. *(Nguồn: `frontend/package.json`)*
-- **Kiểm thử tự động**: Backend full suite trong Docker gần nhất đạt **451 passed, 307 warnings**. Lỗi khởi động Compose do SQLite volume cũ thiếu cột khóa đối soát đã được sửa và backend healthy trở lại.
+- **Kiểm thử tự động**: Sau S-57, backend full suite Windows/Python 3.14.7 thu thập 574 tests và đạt **573 passed, 1 skipped, 320 warnings**; `ruff check .` đạt. Lượt Docker ngày 10/10/2026 trước đó đạt 451 passed, 307 warnings.
 - **Chức năng OCPP**: Bao gồm MeterValues, chống số đo lùi/trùng, khôi phục phiên khi reconnect, RemoteStart/RemoteStop và audit log giới hạn theo quyền sở hữu trạm.
-- **Kiến trúc dữ liệu**: SQLAlchemy khai báo 18 bảng; các bảng kỹ thuật gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. Bảng mới giữ nguyên giá/kWh và thành tiền của từng đoạn phiên. *(Nguồn: `backend/app/models/`)*
-- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; `alembic heads` ngày 10/10/2026 xác nhận head duy nhất `f41a0b7c9d22`. Đã kiểm tra toàn chuỗi migration và trigger trên PostgreSQL tạm; DB dự án không bị migrate.
+- **Kiến trúc dữ liệu**: Các module model hiện đăng ký **22 bảng** trong `Base.metadata`, gồm `data_erasure_requests`. Các bảng kỹ thuật khác gồm `ocpp_messages`, `id_tags`, `meter_values`, `remote_start_requests`, `audit_logs` và `session_billing_segments`. *(Nguồn: nạp `app.models`, đếm `Base.metadata.tables` ngày 13/10/2026.)*
+- **Migration Alembic**: `backend/alembic.ini` trỏ tới `backend/alembic/`; sau `git pull origin main`, `alembic heads` xác nhận duy nhất `cca26ecdf5a8`. Migration S-57 đã kiểm tra upgrade/downgrade/upgrade trên PostgreSQL 16 tạm; DB dự án không bị migrate.
 - **Biểu giá và billing S-28**: `billing.py` gom bốn điểm tính tiền phiên; phí chiếm trụ chỉ tính khi billing đã biết cả mốc bắt đầu và `Available`, chịu trần `IDLE_FEE_MAX_MINUTES` (mặc định 240). Nếu `Available` đến muộn, không sửa hóa đơn/sổ cái hoặc tự trừ ví lần hai; mentor cần xác nhận cơ chế quyết toán phí bổ sung.
-- **Sổ cái ví S-41**: Nạp/trừ được ghi qua một hàm append-only; job đối soát chạy mỗi `RECONCILE_INTERVAL_MINUTES` (mặc định 15) và khóa ví lệch. Compose mặc định dùng SQLite và tự bổ sung schema còn thiếu trên volume cũ; không backfill ví legacy.
+- **Sổ cái/audit ví S-41/S-56**: Nạp/trừ được ghi qua một hàm append-only; job đối soát khóa ví lệch. Nạp tay/thường, callback, phát hiện khóa và mở khóa được audit; `GET /audit-logs?driver_id=...` lọc event ví theo tài xế. Không có chức năng điều chỉnh ví riêng.
+- **Ẩn danh hóa dữ liệu S-57 (Backend)**: Tài xế tạo/xem yêu cầu của mình; Admin duyệt/từ chối có lý do. Khi đủ điều kiện, hệ thống ẩn danh thông tin tài khoản và liên kết ID với lịch sử sạc trong một transaction; giữ nguyên phiên, hóa đơn, tiền, kWh, ví và sổ cái. **Phạm vi dữ liệu cần mentor xác nhận**; không đưa ra kết luận pháp lý.
 - **Realtime theo dõi phiên**: ActiveSession nhận dữ liệu qua WebSocket singleton dùng cùng-origin `/ws/telemetry` và ánh xạ tên trường backend (`energy_kwh`, `cost_estimate`, `soc`, `temp_c`) sang giao diện. Đã có test frontend cho mapper và smoke WebSocket runtime `CONNECTED/SUBSCRIBED/PONG`; chưa kiểm tra trực quan qua trình duyệt.
 - **Mô phỏng RemoteStart/RemoteStop**: mặc định tắt (`ALLOW_REMOTE_START_SIMULATION=false`); khi được chủ động bật, chỉ ADMIN dùng được ngoài pytest. `TESTING` mặc định false và không được bật trong triển khai.
 - **Docker & CI/CD**: `docker-compose.yml` chạy stack Backend, Frontend, PostgreSQL và simulator 20 trụ dùng chung cho Sprint 1–4. CI cấu hình tại `.github/workflows/`.
@@ -48,18 +49,20 @@ npm run dev
 - Giao diện Web: `http://localhost:5173` (hoặc cổng được Vite cấp phát)
 
 ### Cách 2: Khởi chạy toàn bộ hệ thống bằng Docker Compose
-`link tải docker desktop: https://www.docker.com/products/docker-desktop/`
+**Tải Docker Desktop:** [Windows x64 (AMD64)](https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe) · [Windows ARM64](https://desktop.docker.com/win/main/arm64/Docker%20Desktop%20Installer.exe) · [Chọn nền tảng khác](https://www.docker.com/products/docker-desktop/).
 
-Mở terminal tại thư mục gốc. Compose tự nhận `docker-compose.yml`; tên project dùng chung `ev-csms` cho toàn bộ Sprint 1–4(maybe). Hai volume dữ liệu phát triển hiện có vẫn được giữ nguyên.
+Sau khi cài đặt, mở Docker Desktop và chờ Docker Engine khởi động. Mở terminal tại thư mục gốc của project rồi chạy:
 
 ```powershell
-
+docker compose up -d --build
 docker compose ps
 ```
 
+Compose tự nhận `docker-compose.yml` và dùng tên project `ev-csms`; không cần chỉ định `-f` hoặc `--project-name`. Các volume dữ liệu có tên cố định trong file Compose nên vẫn được dùng lại giữa các lần chạy.
+
 - Giao diện: `http://localhost:8080`
 - API Swagger: `http://localhost:8001/docs`
-- Backend, frontend, PostgreSQL và 20 trụ OCPP ảo dùng chung một cấu hình cho toàn bộ code Sprint 1–4.
+- Backend, frontend, PostgreSQL và 20 trụ OCPP ảo dùng chung cấu hình hiện tại của project.
 - Tài khoản demo được khởi tạo an toàn khi backend Compose phát triển khởi động.
 - Dừng và giữ dữ liệu: `docker compose down` (không thêm `-v`).
 
@@ -101,6 +104,12 @@ curl -X GET "http://localhost:8000/api/v1/health"
 curl -X POST "http://localhost:8000/api/v1/auth/login" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=operator&password=OpPass123"
+
+# 3. Tìm trạm gần vị trí Hà Nội (không cần đăng nhập)
+curl "http://localhost:8000/api/v1/stations/nearby?user_lat=21.0285&user_lon=105.8542&radius_km=15&limit=20"
+
+# 4. Tìm theo tên hoặc địa chỉ khi không có GPS
+curl --get "http://localhost:8000/api/v1/stations/nearby" --data-urlencode "q=Hà Nội"
 ```
 
 ### Dữ liệu demo
@@ -139,7 +148,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 - `test_simulator.py`: 10 passed (Đường cong CC-CV, ngắt nhiệt độ >75°C, Checkpoint 30s)
 - `test_stations.py`: 16 passed (CRUD hạ tầng, tính khoảng cách Haversine, công suất trạm)
 - `test_wallet_acid.py`: 5 passed (Khóa bi quan `with_for_update`, nợ ví -300k, chặn nợ)
-**Lượt full suite hoàn chỉnh gần nhất trong Docker (10/10/2026, code commit `9ceae53`):** `451 passed, 307 warnings` trong container Python 3.12. Migration S-41 đã được kiểm tra upgrade/downgrade/upgrade trên PostgreSQL tạm; trigger chặn UPDATE/DELETE. Compose khởi động backend, PostgreSQL, frontend và OCPP simulator; backend healthcheck và `/docs` đều đạt. DB dự án không bị migrate hoặc backfill. Frontend lần kiểm chứng trước đạt 39 passed/build; chưa kiểm tra UI trực quan trên trình duyệt.
+**Lượt full suite gần nhất (13/10/2026, S-57):** 574 tests thu thập; **573 passed, 1 skipped, 320 warnings** trong 235.19 giây trên Windows host/Python 3.14.7; `ruff check .` đạt. Migration `cca26ecdf5a8` được kiểm tra tiến/lùi/tiến trên PostgreSQL 16 tạm, không áp dụng vào DB dự án. Lượt Docker hoàn chỉnh trước đó (10/10/2026, code commit `9ceae53`) đạt 451 passed, 307 warnings trong Python 3.12. Frontend không đổi trong S-57.
 
 ---
 
@@ -182,7 +191,7 @@ Kết quả đo kiểm backend dưới đây là baseline đã ghi nhận trư�
 *(Nguồn: `backend/app/api/v1/__init__.py:10-18`)*
 Hệ thống cung cấp 9 nhóm router REST API tại tiền tố `/api/v1`:
 1. `/api/v1/auth`: Đăng ký, đăng nhập JWT, lấy thông tin cá nhân.
-2. `/api/v1/stations`: Quản lý trạm sạc, đo đếm phụ tải trạm.
+2. `/api/v1/stations`: Quản lý trạm sạc, đo đếm phụ tải trạm; `GET /nearby` tìm trạm công khai theo GPS hoặc tên/địa chỉ, xem đầu nối rảnh và giá hiện tại.
 3. `/api/v1/chargers`: Quản lý trụ sạc và cổng sạc vật lý.
 4. `/api/v1/tariffs`: Quản lý biểu giá điện TOU 3 khung giờ.
 5. `/api/v1/wallet`: Quản lý ví điện tử, nạp tiền, trừ cước.

@@ -1,6 +1,5 @@
-import hashlib
-import hmac
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -9,10 +8,15 @@ from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user_or_driver_guest
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.payment import TopupOrder
-from app.services.payment_service import verify_webhook_signature
+from app.models.user import User
+from app.services.payment_service import (
+    create_webhook_signature,
+    verify_webhook_signature,
+)
 from app.services.wallet_service import topup_wallet
 
 logger = logging.getLogger("ev_csms.payments")
@@ -27,59 +31,14 @@ class WebhookPayload(BaseModel):
     signature: str | None = None
 
 
+class SandboxSimulationPayload(BaseModel):
+    order_code: str
+    status: Literal["SUCCESS", "FAILED", "CANCELLED"]
+    message: str | None = None
+
+
 # Alias hỗ trợ quy chuẩn đặt tên PaymentWebhookRequest
 PaymentWebhookRequest = WebhookPayload
-
-
-class SandboxSignRequest(BaseModel):
-    order_code: str
-    status: str = "SUCCESS"
-
-
-class SandboxSignResponse(BaseModel):
-    order_code: str
-    status: str
-    signature: str
-
-
-def is_sandbox_signing_allowed() -> bool:
-    env = getattr(settings, "ENVIRONMENT", "development").lower()
-    return env in ("development", "testing", "staging", "dev", "local") or getattr(
-        settings, "TESTING", False
-    )
-
-
-@router.post(
-    "/sandbox/sign",
-    response_model=SandboxSignResponse,
-    summary="Tạo chữ ký HMAC-SHA256 giả lập cho môi trường Sandbox (Chỉ dùng cho Dev/Testing)",
-)
-def sign_sandbox_webhook(payload: SandboxSignRequest):
-    """Hỗ trợ Frontend Sandbox tạo chữ ký hợp lệ khi giả lập thanh toán (SCRUM-269).
-
-    Chỉ khả dụng trong môi trường phát triển / thử nghiệm.
-    """
-    if not is_sandbox_signing_allowed():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sandbox signing is disabled in production",
-        )
-
-    secret_key = settings.PAYMENT_WEBHOOK_SECRET
-    if not secret_key:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="PAYMENT_WEBHOOK_SECRET is not configured",
-        )
-
-    raw_data = f"{payload.order_code}|{payload.status}".encode("utf-8")
-    sig = hmac.new(secret_key.encode("utf-8"), raw_data, hashlib.sha256).hexdigest()
-
-    return SandboxSignResponse(
-        order_code=payload.order_code,
-        status=payload.status,
-        signature=sig,
-    )
 
 
 def verify_signature(payload: WebhookPayload) -> bool:
@@ -89,6 +48,56 @@ def verify_signature(payload: WebhookPayload) -> bool:
     data = f"{payload.order_code}|{payload.status}"
     return verify_webhook_signature(data, payload.signature, secret_key)
 
+
+@router.post(
+    "/sandbox/simulate",
+    summary="Mô phỏng callback thanh toán trong môi trường phát triển",
+)
+async def simulate_sandbox_webhook(
+    payload: SandboxSimulationPayload,
+    request: Request,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """Ký callback sandbox phía server cho đơn PENDING của tài khoản hiện tại."""
+    if not settings.ALLOW_PAYMENT_SANDBOX_SIMULATION:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chức năng mô phỏng thanh toán sandbox đang tắt.",
+        )
+
+    order = (
+        db.query(TopupOrder)
+        .filter(
+            TopupOrder.order_code == payload.order_code,
+            TopupOrder.user_id == current_user.id,
+        )
+        .first()
+    )
+    if order is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy giao dịch.")
+    if order.status != "PENDING":
+        return {
+            "status": order.status,
+            "message": "Giao dịch đã được xử lý.",
+            "order_code": order.order_code,
+        }
+
+    signature = create_webhook_signature(
+        order.order_code,
+        payload.status,
+        settings.PAYMENT_WEBHOOK_SECRET,
+    )
+    return await payment_webhook(
+        request=request,
+        payload=WebhookPayload(
+            order_code=order.order_code,
+            status=payload.status,
+            message=payload.message or "Phản hồi mô phỏng từ cổng thanh toán Sandbox",
+            signature=signature,
+        ),
+        db=db,
+    )
 
 
 @router.post("/webhook", summary="Xử lý Webhook từ cổng thanh toán")
@@ -208,6 +217,8 @@ async def payment_webhook(
                 note=note,
                 reference_id=order.order_code,
                 reference_type="TOPUP",
+                actor_type="SYSTEM",
+                client_ip=client_ip,
                 auto_commit=False,
             )
             db.commit()

@@ -179,6 +179,12 @@ def enable_user(
             detail="Không tìm thấy tài khoản.",
         )
 
+    if user.data_erased_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Không thể mở lại tài khoản đã ẩn danh hóa.",
+        )
+
     user.is_active = True
 
     db.commit()

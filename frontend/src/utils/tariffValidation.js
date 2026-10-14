@@ -207,5 +207,3 @@ export const validatePowerLimitSlots = (slots = []) => {
       : 'Vui lòng sửa các lỗi khung giờ hạn mức công suất bên dưới trước khi lưu.',
   };
 };
-
-

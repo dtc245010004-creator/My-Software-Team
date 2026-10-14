@@ -6,7 +6,17 @@
 
 ---
 
-## Latest Completed Full Backend Run (09/10/2026)
+## Latest Completed Full Backend Run (13/10/2026, S-57)
+
+* **Lệnh**: `python -m pytest tests -q --basetemp .pytest-s57-full-elevated-20261013 -p no:cacheprovider` trong thư mục backend.
+* **Môi trường**: Windows host, Python 3.14.7. Full run được phép tiến trình migration test mở database tạm trong workspace; ứng dụng DB không bị migrate.
+* **Kết quả**: **573 passed, 1 skipped, 320 warnings**; 574 tests được thu thập, hoàn tất trong 235.19 giây. `ruff check .` và Ruff trên file migration S-57 đạt.
+* **S-47**: `test_station_nearby_s47.py` có 8 ca về tìm GPS/tên/địa chỉ, trạng thái đầu nối, giới hạn công khai, giá TOU và phân trang; cả 8 passed.
+* **S-56**: `test_wallet_audit_s56.py` có 11 ca về log nạp tay/thường, lỗi rollback, reconcile lock/unlock, lọc tài xế và RBAC; cả 11 passed. Nhóm S-56 cùng S-36/S-41/payment đạt 38 passed.
+* **S-57**: `test_data_erasure_s57.py` có 16 ca về ownership/RBAC, blockers, ẩn danh hóa và bảo toàn tài chính, rollback/audit FAILED, idempotency; cả 16 passed.
+* Sau `git pull origin main`, `alembic heads` trả duy nhất `cca26ecdf5a8`. Migration S-57 đã upgrade → downgrade → upgrade trên PostgreSQL 16 tạm; DB dự án không bị migrate.
+
+## Lần chạy hoàn chỉnh trước S-47 (09/10/2026)
 
 * **Lệnh**: `python -m pytest tests -q` trong backend container, gắn mã nguồn và fixture OCPP từ workspace.
 * **Môi trường**: Docker backend, Python 3.12.

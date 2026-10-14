@@ -12,6 +12,7 @@ from app.models.tariff import Tariff
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.ocpp.handlers.authorize import handle_authorize
+from app.ocpp.handlers.start_transaction import handle_start_transaction
 from app.services.wallet_service import (
     topup_wallet,
     validate_wallet_balance_for_session,
@@ -178,6 +179,42 @@ def test_authorize_ocpp_accepted_when_balance_exact_or_above_threshold(
     topup_wallet(db_session, driver.id, Decimal("50000.00"))
     resp2 = handle_authorize(db_session, cp, {"idTag": id_tag.code})
     assert resp2["idTagInfo"]["status"] == "Accepted"
+
+
+def test_start_transaction_blocks_when_authorize_was_skipped(db_session, env_s38):
+    """LocalPreAuthorize không được bỏ qua kiểm tra số dư của StartTransaction."""
+    response = handle_start_transaction(
+        db_session,
+        env_s38["cp"],
+        {
+            "connectorId": 1,
+            "idTag": env_s38["id_tag"].code,
+            "meterStart": 0,
+            "timestamp": "2026-10-13T10:00:00Z",
+        },
+    )
+
+    assert response["transactionId"] == 0
+    assert response["idTagInfo"]["status"] == "Blocked"
+
+
+def test_start_transaction_accepts_when_balance_meets_threshold(db_session, env_s38):
+    driver = env_s38["driver"]
+    topup_wallet(db_session, driver.id, Decimal("50000.00"))
+
+    response = handle_start_transaction(
+        db_session,
+        env_s38["cp"],
+        {
+            "connectorId": 1,
+            "idTag": env_s38["id_tag"].code,
+            "meterStart": 0,
+            "timestamp": "2026-10-13T10:00:00Z",
+        },
+    )
+
+    assert response["transactionId"] > 0
+    assert response["idTagInfo"]["status"] == "Accepted"
 
 
 def test_api_start_session_rejected_when_balance_below_threshold(

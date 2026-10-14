@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.id_tag import IdTag
@@ -11,6 +12,8 @@ from app.models.remote_start_request import RemoteStartRequest
 from app.models.session import ChargingSession
 from app.models.station import ChargingPoint, Connector
 from app.models.tariff import Tariff
+from app.services.identity_guard_service import lock_user_for_sensitive_operation
+from app.services.wallet_service import validate_wallet_balance_for_session
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +69,14 @@ def handle_start_transaction(
             "idTagInfo": {"status": "Invalid"},
         }
 
+    try:
+        lock_user_for_sensitive_operation(db, id_tag.user_id)
+    except HTTPException:
+        return {"transactionId": 0, "idTagInfo": {"status": "Blocked"}}
+    id_tag = db.query(IdTag).filter(IdTag.code == id_tag_code).populate_existing().first()
+    if id_tag is None:
+        return {"transactionId": 0, "idTagInfo": {"status": "Invalid"}}
+
     if id_tag.status == "blocked":
         logger.warning("StartTransaction bị từ chối do thẻ bị khóa: %s", id_tag_code)
         return {
@@ -87,6 +98,24 @@ def handle_start_transaction(
         logger.warning(
             "StartTransaction bị từ chối do trạm sạc đang ngưng hoạt động: %s",
             charging_point.station.name,
+        )
+        return {
+            "transactionId": 0,
+            "idTagInfo": {"status": "Blocked"},
+        }
+
+    # OCPP không bắt buộc trụ gửi Authorize trước StartTransaction; kiểm tra lại
+    # ngưỡng ví ở đây để LocalPreAuthorize/cache thẻ không bỏ qua S-38.
+    wallet_valid, wallet_error, current_balance, required_balance = (
+        validate_wallet_balance_for_session(db, id_tag.user_id)
+    )
+    if not wallet_valid:
+        logger.warning(
+            "StartTransaction bị chặn bởi kiểm tra ví: user_id=%s code=%s balance=%s required=%s",
+            id_tag.user_id,
+            wallet_error,
+            current_balance,
+            required_balance,
         )
         return {
             "transactionId": 0,

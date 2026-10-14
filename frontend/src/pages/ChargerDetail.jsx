@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { getChargerWalletError } from '../utils/chargerWalletError';
 
 export default function ChargerDetail() {
   const { id } = useParams();
@@ -252,9 +253,17 @@ export default function ChargerDetail() {
 
       const status = err.response?.status;
       const detail = err.response?.data?.detail || err.message;
+      const walletError = getChargerWalletError(err);
 
       // Xử lý 4 ca lỗi của S-24 hiển thị thông báo rõ ràng:
-      if (
+      if (walletError) {
+        setAlertInfo({
+          type: 'error',
+          title: 'SỐ DƯ VÍ CHƯA ĐỦ ĐỂ SẠC',
+          message: walletError.message,
+          code: 'WALLET_INSUFFICIENT_BALANCE',
+        });
+      } else if (
         simulateCondition === 'REJECTED' ||
         detail.includes('từ chối') ||
         detail.includes('Rejected')
@@ -428,6 +437,16 @@ export default function ChargerDetail() {
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Thử lại ngay</span>
+              </button>
+            )}
+            {alertInfo.code === 'WALLET_INSUFFICIENT_BALANCE' && (
+              <button
+                type="button"
+                onClick={() => navigate('/wallet')}
+                className="mt-2.5 inline-flex items-center space-x-1.5 px-3 py-1 rounded bg-electric-cyan text-tech-white font-bold text-xs hover:bg-electric-cyan-hover transition-colors shadow-sm"
+              >
+                <span>Nạp tiền vào ví</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
