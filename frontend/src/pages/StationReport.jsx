@@ -303,13 +303,10 @@ export default function StationReport() {
               <BarChart3 className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center space-x-2">
-                <span>BÁO CÁO DOANH THU &amp; SẢN LƯỢNG THEO TRỤ</span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full font-mono font-medium bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60">
-                  SCRUM-384 / SCRUM-392
-                </span>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
+                <span>Báo Cáo Doanh Thu &amp; Sản Lượng Theo Trụ</span>
               </h1>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Báo cáo doanh thu tiền điện và phí chiếm trụ theo ngày, tuần, tháng, phân bổ theo từng trụ sạc.
               </p>
             </div>
@@ -322,7 +319,7 @@ export default function StationReport() {
             type="button"
             onClick={() => fetchStationData(selectedStationId)}
             disabled={loading}
-            className="px-3.5 py-2 rounded-xl text-xs font-mono font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors flex items-center space-x-1.5 shadow-sm"
+            className="px-3.5 py-2 rounded-xl text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors flex items-center space-x-1.5 shadow-sm"
             title="Tải lại dữ liệu"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -333,21 +330,11 @@ export default function StationReport() {
             type="button"
             onClick={handleExportCsv}
             disabled={chargerRows.length === 0}
-            className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors flex items-center space-x-1.5 shadow-sm disabled:opacity-50"
+            className="px-3.5 py-2 rounded-xl text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors flex items-center space-x-1.5 shadow-sm disabled:opacity-50"
             title="Xuất bảng số liệu ra file CSV"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>Xuất CSV</span>
-          </button>
-
-          {/* Nút kiểm thử nhanh ca 403 Forbidden theo tiêu chí chấp nhận */}
-          <button
-            type="button"
-            onClick={handleTestForbiddenAccess}
-            className="px-2.5 py-2 rounded-xl text-xs font-mono text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700/60 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-            title="Kiểm tra ca AC: Chủ trạm A gọi trạm B trả lỗi 403"
-          >
-            Test 403
           </button>
         </div>
       </div>
@@ -387,9 +374,9 @@ export default function StationReport() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               {/* Chọn Trạm Sạc */}
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2 text-xs font-mono font-bold text-slate-600 dark:text-slate-400 uppercase shrink-0">
+                <div className="flex items-center space-x-2 text-xs font-semibold text-slate-600 dark:text-slate-400 shrink-0">
                   <Building2 className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                  <span>TRẠM SẠC:</span>
+                  <span>Trạm sạc:</span>
                 </div>
                 <select
                   value={selectedStationId}
@@ -398,7 +385,7 @@ export default function StationReport() {
                     setSelectedStationId(id);
                     setSearchParams({ station_id: id, period });
                   }}
-                  className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 max-w-xs sm:max-w-md"
+                  className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 max-w-xs sm:max-w-md"
                 >
                   {stations.map((st) => (
                     <option key={st.id} value={st.id}>
@@ -407,7 +394,7 @@ export default function StationReport() {
                   ))}
                 </select>
                 {currentStation && (
-                  <span className="hidden sm:inline-block text-[11px] font-mono text-slate-500">
+                  <span className="hidden sm:inline-block text-xs text-slate-500">
                     • {currentStation.address || 'TP.HCM'}
                   </span>
                 )}
@@ -415,9 +402,9 @@ export default function StationReport() {
 
               {/* Bộ chọn kỳ (Period Selector: Ngày / Tuần / Tháng / Tự chọn) */}
               <div className="flex items-center space-x-2 flex-wrap">
-                <div className="flex items-center space-x-1 text-xs font-mono font-bold text-slate-600 dark:text-slate-400 uppercase mr-1">
+                <div className="flex items-center space-x-1 text-xs font-semibold text-slate-600 dark:text-slate-400 mr-1">
                   <Calendar className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>CHỌN KỲ:</span>
+                  <span>Chọn kỳ:</span>
                 </div>
 
                 {[
@@ -432,9 +419,9 @@ export default function StationReport() {
                       key={item.key}
                       type="button"
                       onClick={() => setPeriod(item.key)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${
                         isSelected
-                          ? 'bg-sky-600 text-white shadow-sm'
+                          ? 'bg-sky-600 text-white font-semibold shadow-sm'
                           : 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/60'
                       }`}
                     >
@@ -447,15 +434,15 @@ export default function StationReport() {
 
             {/* Khung nhập ngày nếu chọn CUSTOM */}
             {period === REPORT_PERIODS.CUSTOM && (
-              <div className="flex items-center space-x-3 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-600 dark:text-slate-400">
-                <span className="font-bold text-slate-900 dark:text-slate-100">Từ ngày:</span>
+              <div className="flex items-center space-x-3 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+                <span className="font-semibold text-slate-900 dark:text-slate-100">Từ ngày:</span>
                 <input
                   type="date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
                   className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl px-2.5 py-1 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
                 />
-                <span className="font-bold text-slate-900 dark:text-slate-100">Đến ngày:</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">Đến ngày:</span>
                 <input
                   type="date"
                   value={customEndDate}
@@ -466,12 +453,12 @@ export default function StationReport() {
             )}
 
             {/* Dòng nhãn kỳ hiển thị hiện tại */}
-            <div className="flex items-center justify-between text-[11px] font-mono text-slate-600 dark:text-slate-400 pt-1">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
               <span>
-                Khoảng thời gian áp dụng: <strong className="text-sky-700 dark:text-sky-300 font-bold">{dateRange.label}</strong>
+                Khoảng thời gian áp dụng: <strong className="text-sky-700 dark:text-sky-300 font-semibold">{dateRange.label}</strong>
               </span>
               <span>
-                Cập nhật lúc: <strong className="text-slate-800 dark:text-slate-200">{new Date().toLocaleTimeString('vi-VN')}</strong>
+                Cập nhật lúc: <strong className="text-slate-700 dark:text-slate-300">{new Date().toLocaleTimeString('vi-VN')}</strong>
               </span>
             </div>
           </div>
@@ -481,13 +468,13 @@ export default function StationReport() {
             {/* Tổng số phiên */}
             <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between">
               <div>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-mono font-semibold block">
-                  TỔNG SỐ PHIÊN
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">
+                  Tổng số phiên
                 </span>
-                <span className="text-xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5 block">
+                <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1 block">
                   {stationTotal.sessionsCount} <span className="text-xs text-slate-500 font-normal">phiên</span>
                 </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Toàn bộ trạm</span>
+                <span className="text-xs text-slate-400">Toàn bộ trạm</span>
               </div>
               <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60">
                 <Clock className="w-4 h-4" />
@@ -497,13 +484,13 @@ export default function StationReport() {
             {/* Tổng sản lượng kWh */}
             <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between">
               <div>
-                <span className="text-[10px] text-sky-800 dark:text-sky-400 uppercase font-mono font-semibold block">
-                  TỔNG SẢN LƯỢNG
+                <span className="text-xs font-medium text-sky-700 dark:text-sky-400 block">
+                  Tổng sản lượng
                 </span>
-                <span className="text-xl font-bold text-sky-700 dark:text-sky-300 font-mono mt-0.5 block">
+                <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 mt-1 block">
                   {stationTotal.totalKwh.toLocaleString('vi-VN')} <span className="text-xs font-normal">kWh</span>
                 </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Điện năng bán ra</span>
+                <span className="text-xs text-slate-400">Điện năng bán ra</span>
               </div>
               <div className="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-950/50 flex items-center justify-center text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
                 <Zap className="w-4 h-4" />
@@ -513,13 +500,13 @@ export default function StationReport() {
             {/* Tiền sạc điện */}
             <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between">
               <div>
-                <span className="text-[10px] text-emerald-800 dark:text-emerald-400 uppercase font-mono font-semibold block">
-                  TIỀN SẠC ĐIỆN
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 block">
+                  Tiền sạc điện
                 </span>
-                <span className="text-lg font-bold text-emerald-800 dark:text-emerald-300 font-mono mt-0.5 block">
+                <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mt-1 block">
                   {formatCurrencyVND(stationTotal.chargingFee)}
                 </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Giá theo kWh</span>
+                <span className="text-xs text-slate-400">Giá theo kWh</span>
               </div>
               <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
                 <DollarSign className="w-4 h-4" />
@@ -530,13 +517,13 @@ export default function StationReport() {
             <div className="bg-white dark:bg-[#151D2A] border border-amber-200 dark:border-amber-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500" />
               <div>
-                <span className="text-[10px] text-amber-800 dark:text-amber-400 uppercase font-mono font-bold block">
-                  PHÍ CHIẾM TRỤ
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-400 block">
+                  Phí chiếm trụ
                 </span>
-                <span className="text-lg font-bold text-amber-800 dark:text-amber-300 font-mono mt-0.5 block">
+                <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 mt-1 block">
                   {formatCurrencyVND(stationTotal.idleFee)}
                 </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Phạt quá giờ cắm súng</span>
+                <span className="text-xs text-slate-400">Phạt quá giờ cắm súng</span>
               </div>
               <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
                 <Clock className="w-4 h-4" />
@@ -547,13 +534,13 @@ export default function StationReport() {
             <div className="bg-white dark:bg-[#151D2A] border border-sky-300 dark:border-sky-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between relative overflow-hidden col-span-2 md:col-span-1">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-sky-600" />
               <div>
-                <span className="text-[10px] text-sky-800 dark:text-sky-400 uppercase font-mono font-bold block">
-                  TỔNG DOANH THU
+                <span className="text-xs font-medium text-sky-700 dark:text-sky-400 block">
+                  Tổng doanh thu
                 </span>
-                <span className="text-xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5 block">
+                <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1 block">
                   {formatCurrencyVND(stationTotal.totalRevenue)}
                 </span>
-                <span className="text-[10px] text-sky-700 dark:text-sky-300 font-mono font-bold">100% trạm</span>
+                <span className="text-xs text-sky-600 dark:text-sky-400 font-medium">100% trạm</span>
               </div>
               <div className="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-950/50 flex items-center justify-center text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
                 <TrendingUp className="w-4 h-4" />
@@ -561,40 +548,40 @@ export default function StationReport() {
             </div>
           </div>
 
-          {/* 4. BẢNG BÁO CÁO CHI TIẾT THEO TỪNG TRỤ VÀ DÒNG TỔNG (SCRUM-392 Core Requirement) */}
+          {/* 4. BẢNG BÁO CÁO CHI TIẾT THEO TỪNG TRỤ VÀ DÒNG TỔNG */}
           <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-5 rounded-2xl shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100 font-mono">
-                  BẢNG DOANH THU &amp; SẢN LƯỢNG THEO TỪNG TRỤ SẠC
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Bảng Doanh Thu &amp; Sản Lượng Theo Từng Trụ Sạc
                 </h2>
-                <span className="text-[11px] px-2.5 py-0.5 rounded-lg font-mono bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 font-semibold">
+                <span className="text-xs px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 font-medium">
                   {chargerRows.length} trụ sạc
                 </span>
               </div>
-              <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono">
-                Kỳ: <strong className="text-slate-900 dark:text-slate-100 font-bold">{period}</strong>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Kỳ: <strong className="text-slate-900 dark:text-slate-100 font-semibold">{REPORT_PERIODS[period]?.label || period}</strong>
               </span>
             </div>
 
             <div className="overflow-x-auto">
               {chargerRows.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-500 font-mono">
+                <div className="py-12 text-center text-xs text-slate-500">
                   Không tìm thấy trụ sạc nào tại trạm này.
                 </div>
               ) : (
-                <table className="w-full text-left font-mono text-xs">
+                <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/60 font-bold">
-                      <th className="py-3 px-3">MÃ TRỤ</th>
-                      <th className="py-3 px-3">MODEL / LOẠI</th>
-                      <th className="py-3 px-3 text-center">CỔNG</th>
-                      <th className="py-3 px-3 text-right">SỐ PHIÊN</th>
-                      <th className="py-3 px-3 text-right">SẢN LƯỢNG (kWh)</th>
-                      <th className="py-3 px-3 text-right">TIỀN SẠC ĐIỆN (đ)</th>
-                      <th className="py-3 px-3 text-right">PHÍ CHIẾM TRỤ (đ)</th>
-                      <th className="py-3 px-3 text-right">TỔNG TIỀN (đ)</th>
-                      <th className="py-3 px-3 text-right">TỶ TRỌNG</th>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 font-semibold text-xs">
+                      <th className="py-3 px-3">Mã trụ</th>
+                      <th className="py-3 px-3">Loại trụ</th>
+                      <th className="py-3 px-3 text-center">Cổng</th>
+                      <th className="py-3 px-3 text-right">Số phiên</th>
+                      <th className="py-3 px-3 text-right">Sản lượng (kWh)</th>
+                      <th className="py-3 px-3 text-right">Tiền sạc điện (đ)</th>
+                      <th className="py-3 px-3 text-right">Phí chiếm trụ (đ)</th>
+                      <th className="py-3 px-3 text-right">Tổng tiền (đ)</th>
+                      <th className="py-3 px-3 text-right">Tỷ trọng</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -605,14 +592,14 @@ export default function StationReport() {
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                       >
                         {/* Mã trụ */}
-                        <td className="py-3 px-3 font-bold">
-                          <span className="px-2 py-0.5 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/60 font-mono">
+                        <td className="py-3 px-3 font-semibold">
+                          <span className="px-2 py-0.5 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/60 text-xs">
                             #{row.chargerCode}
                           </span>
                         </td>
 
                         {/* Loại trụ */}
-                        <td className="py-3 px-3 text-slate-600 dark:text-slate-400 text-[11px]">
+                        <td className="py-3 px-3 text-slate-600 dark:text-slate-400 text-xs">
                           {row.model}
                         </td>
 
@@ -622,7 +609,7 @@ export default function StationReport() {
                         </td>
 
                         {/* Số phiên */}
-                        <td className="py-3 px-3 text-right text-slate-900 dark:text-slate-100 font-bold">
+                        <td className="py-3 px-3 text-right text-slate-900 dark:text-slate-100 font-bold tabular-nums">
                           {row.sessionsCount}
                         </td>
 
@@ -655,7 +642,7 @@ export default function StationReport() {
                                 style={{ width: `${Math.min(100, row.percentage)}%` }}
                               />
                             </div>
-                            <span className="text-[11px] text-slate-600 dark:text-slate-400 font-bold">
+                            <span className="text-xs text-slate-600 dark:text-slate-400 font-semibold tabular-nums">
                               {row.percentage}%
                             </span>
                           </div>
@@ -664,31 +651,31 @@ export default function StationReport() {
                     ))}
                   </tbody>
 
-                  {/* DÒNG TỔNG CỦA TRẠM (AC: Tổng các dòng trụ bằng tổng của trạm) */}
+                  {/* DÒNG TỔNG CỦA TRẠM */}
                   <tfoot>
                     <tr
                       id="station-total-row"
                       className="border-t-2 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 font-bold text-xs"
                     >
-                      <td className="py-3.5 px-3 uppercase tracking-wider text-sky-800 dark:text-sky-300 font-extrabold" colSpan={3}>
-                        TỔNG CỘNG CỦA TRẠM ({currentStation?.name || 'TRẠM'})
+                      <td className="py-3.5 px-3 text-sky-800 dark:text-sky-300 font-bold" colSpan={3}>
+                        Tổng cộng của trạm ({currentStation?.name || 'Toàn trạm'})
                       </td>
-                      <td className="py-3.5 px-3 text-right font-extrabold text-sm text-slate-900 dark:text-slate-100 tabular-nums">
+                      <td className="py-3.5 px-3 text-right font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                         {stationTotal.sessionsCount}
                       </td>
-                      <td className="py-3.5 px-3 text-right font-extrabold text-sm text-sky-700 dark:text-sky-300 tabular-nums">
+                      <td className="py-3.5 px-3 text-right font-bold text-sky-700 dark:text-sky-300 tabular-nums">
                         {stationTotal.totalKwh.toLocaleString('vi-VN')}
                       </td>
-                      <td className="py-3.5 px-3 text-right font-extrabold text-slate-800 dark:text-slate-200 tabular-nums">
+                      <td className="py-3.5 px-3 text-right font-bold text-slate-800 dark:text-slate-200 tabular-nums">
                         {stationTotal.chargingFee.toLocaleString('vi-VN')}
                       </td>
-                      <td className="py-3.5 px-3 text-right font-extrabold text-amber-800 dark:text-amber-300 tabular-nums">
+                      <td className="py-3.5 px-3 text-right font-bold text-amber-800 dark:text-amber-300 tabular-nums">
                         {stationTotal.idleFee.toLocaleString('vi-VN')}
                       </td>
-                      <td className="py-3.5 px-3 text-right font-extrabold text-base text-emerald-700 dark:text-emerald-400 tabular-nums">
+                      <td className="py-3.5 px-3 text-right font-bold text-sm text-emerald-700 dark:text-emerald-400 tabular-nums">
                         {formatCurrencyVND(stationTotal.totalRevenue)}
                       </td>
-                      <td className="py-3.5 px-3 text-right font-extrabold text-sky-700 dark:text-sky-300">
+                      <td className="py-3.5 px-3 text-right font-bold text-sky-700 dark:text-sky-300 tabular-nums">
                         100.0%
                       </td>
                     </tr>
@@ -698,11 +685,11 @@ export default function StationReport() {
             </div>
 
             {/* Ghi chú ràng buộc nghiệp vụ */}
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] font-mono text-slate-600 dark:text-slate-400 gap-2">
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-2">
               <span className="flex items-center space-x-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>
-                  Bảo toàn số học: <strong>Tổng các dòng trụ = Tổng của trạm</strong> (Doanh thu = Tiền điện + Phí chiếm trụ).
+                  Ghi chú: <strong>Tổng tiền = Tiền sạc điện + Phí chiếm trụ</strong>.
                 </span>
               </span>
               <span>
@@ -716,9 +703,9 @@ export default function StationReport() {
             {/* Biểu đồ Doanh Thu */}
             <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100 font-mono flex items-center space-x-1.5">
+                <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-1.5">
                   <BarChart3 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                  <span>DOANH THU THEO TỪNG TRỤ (NGHÌN VNĐ)</span>
+                  <span>Doanh thu theo từng trụ (nghìn VNĐ)</span>
                 </h3>
               </div>
               <div className="h-64 w-full">
@@ -734,14 +721,13 @@ export default function StationReport() {
                         borderRadius: '8px',
                         color: '#F8FAFC',
                         fontSize: '11px',
-                        fontFamily: 'monospace',
                       }}
                       formatter={(val, name) => [
                         `${val.toLocaleString('vi-VN')} nghìn đ`,
                         name === 'doanhThu' ? 'Tổng doanh thu' : 'Phí chiếm trụ',
                       ]}
                     />
-                    <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'monospace' }} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Bar dataKey="doanhThu" name="Tổng doanh thu" fill="#0284C7" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="phiChiemTru" name="Phí chiếm trụ" fill="#F59E0B" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -752,9 +738,9 @@ export default function StationReport() {
             {/* Biểu đồ Sản Lượng Điện kWh */}
             <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100 font-mono flex items-center space-x-1.5">
+                <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-1.5">
                   <Zap className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                  <span>SẢN LƯỢNG ĐIỆN NĂNG THEO TỪNG TRỤ (kWh)</span>
+                  <span>Sản lượng điện năng theo từng trụ (kWh)</span>
                 </h3>
               </div>
               <div className="h-64 w-full">
@@ -770,7 +756,6 @@ export default function StationReport() {
                         borderRadius: '8px',
                         color: '#F8FAFC',
                         fontSize: '11px',
-                        fontFamily: 'monospace',
                       }}
                       formatter={(val) => [`${val.toLocaleString('vi-VN')} kWh`, 'Sản lượng']}
                     />

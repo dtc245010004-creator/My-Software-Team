@@ -56,29 +56,29 @@ export default function MetricBox({
       <div className="pointer-events-none absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-white/10 dark:from-sky-500/5 to-transparent" />
 
       {/* Top Header: Nhãn & Icon trong hộp màu */}
-      <div className="flex items-center justify-between mb-3 relative z-10">
-        <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 tracking-wide uppercase">
+      <div className="flex items-center justify-between mb-2 relative z-10">
+        <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
           {label}
         </span>
         {Icon && (
           <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${selected.iconBg}`}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 ${selected.iconBg}`}
           >
-            <Icon className="w-5 h-5" />
+            <Icon className="w-4 h-4" />
           </div>
         )}
       </div>
 
       {/* Main Stat: Số to rõ nét */}
-      <div className="my-1.5 relative z-10">
-        <div className="flex items-baseline space-x-2">
+      <div className="my-1 relative z-10">
+        <div className="flex items-baseline space-x-1.5">
           <span
-            className={`text-3xl sm:text-4xl font-extrabold tracking-tight font-mono tabular-nums ${selected.text}`}
+            className={`text-2xl sm:text-3xl font-bold tabular-nums ${selected.text}`}
           >
             {value}
           </span>
           {unit && (
-            <span className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400">
+            <span className="text-xs sm:text-sm font-normal text-slate-500 dark:text-slate-400">
               {unit}
             </span>
           )}
@@ -87,11 +87,11 @@ export default function MetricBox({
 
       {/* Footer Subtext: Đảm bảo độ tương phản cao trong Light Mode */}
       {subtext && (
-        <div className="text-xs text-slate-600 dark:text-slate-400 mt-2 flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/70 relative z-10">
-          <span className="line-clamp-1 font-medium">{subtext}</span>
+        <div className="text-xs text-slate-500 dark:text-slate-400 mt-2 flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800/70 relative z-10">
+          <span className="line-clamp-1 font-normal">{subtext}</span>
           {trend && (
             <span
-              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ml-2 shrink-0 ${selected.badge}`}
+              className={`text-xs font-medium px-2 py-0.5 rounded-full ml-2 shrink-0 ${selected.badge}`}
             >
               {trend}
             </span>

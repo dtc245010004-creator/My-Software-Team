@@ -390,10 +390,7 @@ export default function Reservations() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center space-x-2">
-                <span>LỊCH SỬ ĐẶT CHỖ &amp; QUẢN LÝ GIỮ CHỖ</span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60">
-                  S-50 / SCRUM-378
-                </span>
+                <span>Lịch sử đặt chỗ &amp; Quản lý giữ chỗ</span>
               </h1>
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                 Theo dõi thời hạn giữ chỗ trụ sạc và chi tiết các khoản phí phạt nếu quá giờ không tới nhận trụ.
@@ -412,40 +409,30 @@ export default function Reservations() {
               setBookingSuccess(null);
               setIsBookingModalOpen(true);
             }}
-            className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors flex items-center space-x-1.5 shadow-sm"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors flex items-center space-x-1.5 shadow-sm"
             title="Tạo lượt đặt giữ chỗ trước đầu nối sạc"
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            <span>+ Đặt Chỗ Mới</span>
+            <span>Đặt chỗ mới</span>
           </button>
 
           <button
             type="button"
             onClick={fetchReservations}
             disabled={loading}
-            className="px-3.5 py-2 rounded-xl text-xs font-mono font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors flex items-center space-x-1.5 shadow-sm"
+            className="px-3.5 py-2 rounded-xl text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors flex items-center space-x-1.5 shadow-sm"
             title="Làm mới danh sách đặt chỗ"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Làm mới</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleSimulateExpiredReservation}
-            className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 dark:bg-amber-950/50 dark:hover:bg-amber-900/50 dark:text-amber-300 dark:border-amber-800/60 transition-colors flex items-center space-x-1.5 shadow-sm"
-            title="Tạo giả lập 1 lượt đặt chỗ quá hạn bị tính phí để kiểm thử đối soát với ví"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>+ Giả Lập Quá Hạn (Demo)</span>
-          </button>
-
           <Link
             to="/wallet"
-            className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-sky-600 hover:bg-sky-500 text-white transition-colors flex items-center space-x-1.5 shadow-sm"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white transition-colors flex items-center space-x-1.5 shadow-sm"
           >
             <Wallet className="w-3.5 h-3.5" />
-            <span>Ví Cá Nhân</span>
+            <span>Ví cá nhân</span>
           </Link>
         </div>
       </div>
@@ -455,10 +442,10 @@ export default function Reservations() {
         {/* Tổng đặt chỗ */}
         <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-mono font-semibold block">
-              TỔNG ĐẶT CHỖ
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">
+              Tổng đặt chỗ
             </span>
-            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-1 block">
+            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums mt-1 block">
               {stats.total}
             </span>
           </div>
@@ -470,10 +457,10 @@ export default function Reservations() {
         {/* Đang giữ chỗ */}
         <div className="bg-white dark:bg-[#151D2A] border border-sky-200 dark:border-sky-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[11px] text-sky-800 dark:text-sky-400 uppercase font-mono font-semibold block">
-              ĐANG GIỮ CHỖ (ACTIVE)
+            <span className="text-xs font-medium text-sky-700 dark:text-sky-300 block">
+              Đang giữ chỗ
             </span>
-            <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 font-mono mt-1 block">
+            <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 tabular-nums mt-1 block">
               {stats.active}
             </span>
           </div>
@@ -486,10 +473,10 @@ export default function Reservations() {
         <div className="bg-white dark:bg-[#151D2A] border border-rose-200 dark:border-rose-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-rose-600" />
           <div>
-            <span className="text-[11px] text-rose-800 dark:text-rose-400 uppercase font-mono font-bold block">
-              QUÁ HẠN KHÔNG ĐẾN
+            <span className="text-xs font-medium text-rose-700 dark:text-rose-300 block">
+              Quá hạn không đến
             </span>
-            <span className="text-2xl font-bold text-rose-700 dark:text-rose-300 font-mono mt-1 block">
+            <span className="text-2xl font-bold text-rose-700 dark:text-rose-300 tabular-nums mt-1 block">
               {stats.expiredCount}
             </span>
           </div>
@@ -502,10 +489,10 @@ export default function Reservations() {
         <div className="bg-white dark:bg-[#151D2A] border border-amber-200 dark:border-amber-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500" />
           <div>
-            <span className="text-[11px] text-amber-800 dark:text-amber-400 uppercase font-mono font-bold block">
-              PHÍ PHẠT ĐÃ TRỪ VÍ
+            <span className="text-xs font-medium text-amber-700 dark:text-amber-300 block">
+              Phí phạt đã trừ ví
             </span>
-            <span className="text-xl font-bold text-amber-800 dark:text-amber-300 font-mono mt-1 block">
+            <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums mt-1 block">
               -{stats.totalPenaltyFee.toLocaleString('vi-VN')} đ
             </span>
           </div>
@@ -516,15 +503,15 @@ export default function Reservations() {
       </div>
 
       {/* Banner thông báo chính sách giữ chỗ */}
-      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-4 text-xs font-mono text-amber-900 dark:text-amber-200 flex items-start space-x-3 shadow-sm">
+      <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-4 text-xs text-amber-900 dark:text-amber-200 flex items-start space-x-3 shadow-sm">
         <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />
         <div className="space-y-1">
-          <strong className="block text-amber-900 dark:text-amber-300 font-bold uppercase tracking-wider text-[11px]">
-            CHÍNH SÁCH THU PHÍ KHI GIỮ CHỖ QUÁ GIỜ KHÔNG TỚI NHẬN TRỤ (TIÊU CHUẨN S-50):
+          <strong className="block text-amber-900 dark:text-amber-300 font-semibold text-xs mb-0.5">
+            Chính sách giữ chỗ &amp; Phí quá hạn:
           </strong>
-          <p className="text-slate-700 dark:text-slate-300 leading-relaxed font-sans text-xs">
-            Mỗi lượt đặt chỗ có hiệu lực trong <strong>15 phút</strong>. Nếu tài xế đến cắm súng và bắt đầu sạc trước hạn: <strong>HOÀN TOÀN MIỄN PHÍ</strong>.
-            Nếu quá hạn giữ mà chưa cắm súng, hệ thống sẽ tự động chuyển trạng thái sang <span className="text-rose-700 dark:text-rose-400 font-bold">QUÁ HẠN (EXPIRED)</span>, gửi lệnh hủy giữ chỗ mở lại đầu súng cho xe khác, và <strong>tự động trừ phí phạt không đến ({DEFAULT_NO_SHOW_FEE.toLocaleString('vi-VN')} đ)</strong> vào Ví cá nhân qua một dòng sổ cái bất biến (S-41).
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-xs">
+            Mỗi lượt đặt chỗ có hiệu lực trong <strong className="font-semibold">15 phút</strong>. Nếu tài xế đến cắm súng và bắt đầu sạc trước hạn: <strong className="font-semibold text-emerald-700 dark:text-emerald-400">hoàn toàn miễn phí</strong>.
+            Nếu quá hạn giữ mà chưa cắm súng, hệ thống sẽ tự động chuyển trạng thái sang <span className="text-rose-700 dark:text-rose-400 font-semibold">Quá hạn</span>, mở lại cổng sạc cho xe khác và tự động trừ phí phạt không đến (<strong className="font-semibold">{DEFAULT_NO_SHOW_FEE.toLocaleString('vi-VN')} đ</strong>) vào ví cá nhân.
           </p>
         </div>
       </div>
@@ -535,16 +522,16 @@ export default function Reservations() {
           {/* Tab chọn trạng thái */}
           <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
             {[
-              { key: 'ALL', label: 'TẤT CẢ', count: stats.total },
-              { key: 'ACTIVE', label: 'ĐANG GIỮ CHỖ', count: stats.active },
+              { key: 'ALL', label: 'Tất cả', count: stats.total },
+              { key: 'ACTIVE', label: 'Đang giữ chỗ', count: stats.active },
               {
                 key: 'EXPIRED',
-                label: 'QUÁ HẠN & TÍNH PHÍ',
+                label: 'Quá hạn & Tính phí',
                 count: stats.expiredCount,
                 highlight: true,
               },
-              { key: 'COMPLETED', label: 'ĐÃ HOÀN THÀNH', count: stats.completed },
-              { key: 'CANCELLED', label: 'ĐÃ HỦY', count: reservations.filter((r) => r.status === 'CANCELLED').length },
+              { key: 'COMPLETED', label: 'Đã hoàn thành', count: stats.completed },
+              { key: 'CANCELLED', label: 'Đã hủy', count: reservations.filter((r) => r.status === 'CANCELLED').length },
             ].map((tab) => {
               const isSelected = activeTab === tab.key;
               return (
@@ -552,7 +539,7 @@ export default function Reservations() {
                   key={tab.key}
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 transition-all whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition-all whitespace-nowrap ${
                     isSelected
                       ? tab.highlight
                         ? 'bg-rose-600 text-white shadow-sm'
@@ -564,7 +551,7 @@ export default function Reservations() {
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                    className={`text-xs px-1.5 py-0.5 rounded-full font-medium tabular-nums ${
                       isSelected ? 'bg-black/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                     }`}
                   >
@@ -583,7 +570,7 @@ export default function Reservations() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Tìm mã đặt, tên trạm, trụ..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl text-xs font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
             />
           </div>
         </div>
@@ -592,10 +579,10 @@ export default function Reservations() {
       {/* Danh sách các lượt đặt chỗ (Thẻ chi tiết) */}
       <div className="space-y-3">
         {filteredList.length === 0 ? (
-          <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 rounded-2xl p-12 text-center text-slate-500 font-mono text-xs space-y-2 shadow-sm">
+          <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 rounded-2xl p-12 text-center text-slate-500 text-xs space-y-2 shadow-sm">
             <Clock className="w-8 h-8 mx-auto text-slate-400 opacity-60 mb-2" />
             <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">Không có lượt đặt chỗ nào phù hợp</p>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               {activeTab === 'EXPIRED'
                 ? 'Tuyệt vời! Bạn không có lượt đặt chỗ nào bị quá hạn tính phí.'
                 : 'Thử đổi bộ lọc trạng thái hoặc từ khóa tìm kiếm.'}
@@ -623,13 +610,13 @@ export default function Reservations() {
                   {/* Cột 1: Thông tin mã đặt chỗ & Trạm sạc */}
                   <div className="space-y-1.5 flex-1">
                     <div className="flex items-center space-x-2 flex-wrap">
-                      <span className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100">
+                      <span className="font-bold text-sm text-slate-900 dark:text-slate-100 tabular-nums">
                         #{res.reservation_code || `RES-${res.id}`}
                       </span>
 
                       {/* Badge trạng thái */}
                       <span
-                        className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${meta.badgeClass}`}
+                        className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${meta.badgeClass}`}
                       >
                         {meta.isOverdue && <AlertTriangle className="w-3 h-3" />}
                         {meta.key === 'ACTIVE' && <Clock className="w-3 h-3 animate-pulse" />}
@@ -641,7 +628,7 @@ export default function Reservations() {
                       {/* Đếm ngược nếu đang ACTIVE */}
                       {meta.key === 'ACTIVE' && (
                         <span
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                          className={`text-xs px-2 py-0.5 rounded-full font-semibold tabular-nums ${
                             remaining.isExpired
                               ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
                               : 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300'
@@ -658,48 +645,48 @@ export default function Reservations() {
                         <MapPin className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
                         <span>{res.station_name}</span>
                       </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400 pl-5">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 pl-5">
                         {res.station_address || 'Khu đô thị VinHomes, TP. Hồ Chí Minh'}
                       </p>
                     </div>
 
                     {/* Trụ & Đầu súng */}
-                    <div className="flex items-center space-x-3 text-xs font-mono text-slate-600 dark:text-slate-400 pl-5 pt-0.5">
+                    <div className="flex items-center space-x-3 text-xs text-slate-600 dark:text-slate-400 pl-5 pt-0.5">
                       <span className="flex items-center space-x-1 text-slate-900 dark:text-slate-100 font-semibold">
                         <Zap className="w-3.5 h-3.5 text-amber-500" />
                         <strong>Trụ #{res.charger_code}</strong>
                       </span>
                       <span>•</span>
-                      <span>Súng #{res.connector_number} ({res.connector_type})</span>
+                      <span>Cổng #{res.connector_number} ({res.connector_type})</span>
                       <span>•</span>
                       <span>Công suất: {res.max_power_kw || 60} kW</span>
                     </div>
                   </div>
 
                   {/* Cột 2: Thời gian đặt & Hạn chót giữ chỗ */}
-                  <div className="text-left md:text-right font-mono text-xs space-y-1 shrink-0 border-t md:border-t-0 pt-2 md:pt-0 border-slate-100 dark:border-slate-800">
-                    <div className="text-slate-600 dark:text-slate-400 text-[11px]">
+                  <div className="text-left md:text-right text-xs space-y-1 shrink-0 border-t md:border-t-0 pt-2 md:pt-0 border-slate-100 dark:border-slate-800">
+                    <div className="text-slate-600 dark:text-slate-400">
                       <span>Đặt lúc: </span>
-                      <strong className="text-slate-900 dark:text-slate-100 font-semibold">{formatVNDateTime(res.created_at)}</strong>
+                      <strong className="text-slate-900 dark:text-slate-100 font-semibold tabular-nums">{formatVNDateTime(res.created_at)}</strong>
                     </div>
-                    <div className="text-slate-600 dark:text-slate-400 text-[11px]">
+                    <div className="text-slate-600 dark:text-slate-400">
                       <span>Hạn giữ chỗ: </span>
-                      <strong className={meta.isOverdue ? 'text-rose-700 dark:text-rose-400 font-bold' : 'text-sky-700 dark:text-sky-300 font-bold'}>
+                      <strong className={`tabular-nums ${meta.isOverdue ? 'text-rose-700 dark:text-rose-400 font-bold' : 'text-sky-700 dark:text-sky-300 font-bold'}`}>
                         {formatVNDateTime(res.valid_until)}
                       </strong>
                     </div>
                   </div>
 
-                  {/* Cột 3: Khung hiển thị KHOẢN PHÍ & THAO TÁC (SCRUM-378 Core Element) */}
+                  {/* Cột 3: Khung hiển thị KHOẢN PHÍ & THAO TÁC */}
                   <div className="flex flex-col items-start md:items-end justify-center shrink-0 min-w-[200px] border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-slate-800">
                     {/* Khoản phí phạt hoặc miễn phí */}
                     <div className="text-right w-full">
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-mono font-semibold block">
-                        KHOẢN PHÍ GIỮ CHỖ
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">
+                        Phí giữ chỗ
                       </span>
                       <div className="flex items-center md:justify-end space-x-1.5 mt-0.5">
                         <span
-                          className={`text-base font-mono font-bold tabular-nums ${
+                          className={`text-base font-bold tabular-nums ${
                             feeInfo.isPenalty
                               ? 'text-rose-700 dark:text-rose-400'
                               : meta.key === 'COMPLETED'
@@ -711,7 +698,7 @@ export default function Reservations() {
                         </span>
                       </div>
                       <span
-                        className={`text-[10px] font-mono block mt-0.5 ${
+                        className={`text-xs block mt-0.5 ${
                           feeInfo.isPenalty ? 'text-rose-600 dark:text-rose-400 font-medium' : 'text-slate-500 dark:text-slate-400'
                         }`}
                       >
@@ -724,10 +711,10 @@ export default function Reservations() {
                       {meta.isOverdue && (
                         <Link
                           to={`/wallet?highlight=${res.wallet_transaction_id || 'penalty'}`}
-                          className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/50 dark:hover:bg-amber-900/50 dark:text-amber-300 dark:border-amber-800/60 text-[11px] font-mono font-bold transition-all shadow-sm inline-flex items-center space-x-1"
+                          className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/50 dark:hover:bg-amber-900/50 dark:text-amber-300 dark:border-amber-800/60 text-xs font-medium transition-all shadow-sm inline-flex items-center space-x-1"
                         >
                           <Wallet className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                          <span>Xem Trừ Ví</span>
+                          <span>Xem trừ ví</span>
                           <ChevronRight className="w-3 h-3 text-amber-700 dark:text-amber-400" />
                         </Link>
                       )}
@@ -738,19 +725,19 @@ export default function Reservations() {
                             type="button"
                             onClick={() => handleCancelReservation(res.id)}
                             disabled={cancellingId === res.id}
-                            className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 dark:bg-rose-950/50 dark:hover:bg-rose-900/50 dark:text-rose-300 dark:border-rose-800/60 text-[11px] font-mono font-bold transition-all shadow-sm inline-flex items-center space-x-1"
+                            className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 dark:bg-rose-950/50 dark:hover:bg-rose-900/50 dark:text-rose-300 dark:border-rose-800/60 text-xs font-medium transition-all shadow-sm inline-flex items-center space-x-1"
                             title="Hủy giữ chỗ trước hạn (Miễn phí)"
                           >
                             <X className="w-3 h-3 text-rose-600 dark:text-rose-400" />
-                            <span>{cancellingId === res.id ? 'Đang hủy...' : 'Hủy Giữ Chỗ'}</span>
+                            <span>{cancellingId === res.id ? 'Đang hủy...' : 'Hủy giữ chỗ'}</span>
                           </button>
 
                           <Link
                             to={`/chargers/${res.charge_point_id || res.charger_id}`}
-                            className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-mono font-bold transition-all shadow-sm inline-flex items-center space-x-1"
+                            className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-all shadow-sm inline-flex items-center space-x-1"
                           >
                             <Zap className="w-3 h-3" />
-                            <span>Đến Trụ Sạc</span>
+                            <span>Đến trụ sạc</span>
                             <ChevronRight className="w-3 h-3" />
                           </Link>
                         </div>
@@ -759,9 +746,9 @@ export default function Reservations() {
                       {meta.key === 'COMPLETED' && res.session_id && (
                         <Link
                           to={`/session/${res.session_id}`}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700/60 text-[11px] font-mono font-medium transition-all shadow-sm inline-flex items-center space-x-1"
+                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700/60 text-xs font-medium transition-all shadow-sm inline-flex items-center space-x-1"
                         >
-                          <span>Xem Phiên Sạc</span>
+                          <span>Xem phiên sạc</span>
                           <ChevronRight className="w-3 h-3" />
                         </Link>
                       )}
@@ -772,7 +759,7 @@ export default function Reservations() {
                 {/* Dòng lý do / giải thích chi tiết */}
                 {res.reason && (
                   <div
-                    className={`mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/60 text-[11px] font-mono flex items-center justify-between ${
+                    className={`mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/60 text-xs flex items-center justify-between ${
                       meta.isOverdue ? 'text-rose-700 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'
                     }`}
                   >
@@ -781,8 +768,8 @@ export default function Reservations() {
                       <span>{res.reason}</span>
                     </div>
                     {res.wallet_transaction_id && (
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0 pl-2">
-                        Mã giao dịch ví: <strong className="text-slate-900 dark:text-slate-100 font-semibold">#{res.wallet_transaction_id}</strong>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0 pl-2">
+                        Mã giao dịch ví: <strong className="text-slate-900 dark:text-slate-100 font-semibold tabular-nums">#{res.wallet_transaction_id}</strong>
                       </span>
                     )}
                   </div>
@@ -810,10 +797,10 @@ export default function Reservations() {
                 </div>
                 <div>
                   <h3 id="booking-modal-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
-                    Đặt Chỗ Trước Đầu Nối Sạc
+                    Đặt chỗ trước cổng sạc
                   </h3>
                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Bảo đảm giữ trụ độc quyền qua giao thức OCPP 1.6 ReserveNow
+                    Giữ cổng sạc độc quyền trước khi xe di chuyển tới trạm
                   </p>
                 </div>
               </div>
@@ -831,7 +818,7 @@ export default function Reservations() {
             <form onSubmit={handleCreateReservation} className="p-5 space-y-4">
               {/* Thông báo thành công */}
               {bookingSuccess && (
-                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 dark:bg-emerald-950/50 dark:border-emerald-800/60 dark:text-emerald-200 text-xs font-mono flex items-center space-x-2">
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 dark:bg-emerald-950/50 dark:border-emerald-800/60 dark:text-emerald-200 text-xs flex items-center space-x-2">
                   <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   <span>{bookingSuccess}</span>
                 </div>
@@ -839,16 +826,16 @@ export default function Reservations() {
 
               {/* Thông báo lỗi */}
               {bookingError && (
-                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 dark:bg-rose-950/50 dark:border-rose-800/60 dark:text-rose-200 text-xs font-mono space-y-2">
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 dark:bg-rose-950/50 dark:border-rose-800/60 dark:text-rose-200 text-xs space-y-2">
                   <div className="flex items-center space-x-2">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
                     <span>{bookingError}</span>
                   </div>
 
-                  {/* Gợi ý trụ thay thế nếu gặp xung đột 409 (S-49) */}
+                  {/* Gợi ý trụ thay thế nếu gặp xung đột */}
                   {suggestedConnectors.length > 0 && (
                     <div className="pt-2 border-t border-rose-200 dark:border-rose-800/60 space-y-1.5">
-                      <span className="block font-bold text-[11px] text-rose-950 dark:text-rose-300">
+                      <span className="block font-semibold text-xs text-rose-950 dark:text-rose-300">
                         Gợi ý đầu nối khả dụng thay thế trong cùng trạm:
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -860,17 +847,17 @@ export default function Reservations() {
                               setSelectedConnectorId(String(sug.id));
                               setBookingError(null);
                             }}
-                            className="p-2 text-left rounded-xl bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-700 hover:border-emerald-500 hover:bg-emerald-50/20 text-slate-800 dark:text-slate-200 text-[11px] transition-all flex items-center justify-between"
+                            className="p-2 text-left rounded-xl bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-700 hover:border-emerald-500 hover:bg-emerald-50/20 text-slate-800 dark:text-slate-200 text-xs transition-all flex items-center justify-between"
                           >
                             <div>
-                              <span className="font-bold block text-slate-900 dark:text-white">
+                              <span className="font-semibold block text-slate-900 dark:text-white">
                                 {sug.charge_point_code} • Cổng #{sug.connector_number || sug.connector_id}
                               </span>
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
                                 {sug.connector_type || sug.type || 'CCS2'} • {sug.rated_power_kw || 60} kW
                               </span>
                             </div>
-                            <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                            <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">
                               Chọn cổng này
                             </span>
                           </button>
@@ -883,12 +870,12 @@ export default function Reservations() {
 
               {/* 1. Chọn Trạm Sạc */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
                   <MapPin className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                   <span>1. Chọn Trạm Sạc:</span>
                 </label>
                 {stationsLoading ? (
-                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-mono text-slate-500 flex items-center space-x-2">
+                  <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 flex items-center space-x-2">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     <span>Đang tải danh sách trạm khả dụng...</span>
                   </div>
@@ -901,7 +888,7 @@ export default function Reservations() {
                       setBookingError(null);
                       setSuggestedConnectors([]);
                     }}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
                   >
                     {stationsList.map((st) => (
                       <option key={st.id} value={st.id}>
@@ -914,12 +901,12 @@ export default function Reservations() {
 
               {/* 2. Chọn Đầu Nối Sạc (Connector) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
                   <span className="flex items-center space-x-1.5">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
                     <span>2. Chọn Đầu Nối Sạc:</span>
                   </span>
-                  <span className="text-[11px] font-normal text-slate-500">
+                  <span className="text-xs text-slate-500">
                     {availableConnectors.length} cổng sạc tại trạm
                   </span>
                 </label>
@@ -946,7 +933,7 @@ export default function Reservations() {
                             setSelectedConnectorId(String(conn.id));
                             setBookingError(null);
                           }}
-                          className={`p-3 text-left rounded-2xl border text-xs font-mono transition-all relative ${
+                          className={`p-3 text-left rounded-2xl border text-xs transition-all relative ${
                             isSelected
                               ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/30'
                               : isAvailable
@@ -955,13 +942,13 @@ export default function Reservations() {
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center space-x-1">
+                            <span className="font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-1">
                               <span>Trụ #{conn.charger_code}</span>
                               <span className="text-slate-400">•</span>
                               <span>Cổng #{conn.connector_number || conn.connector_id}</span>
                             </span>
                             <span
-                              className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                 isAvailable
                                   ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60'
                                   : 'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/60'
@@ -971,7 +958,7 @@ export default function Reservations() {
                             </span>
                           </div>
 
-                          <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center justify-between">
+                          <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between">
                             <span>Chuẩn: <strong>{conn.connector_type || conn.type || 'Type 2'}</strong></span>
                             <span>Công suất: <strong>{conn.max_power_kw || conn.max_kw || 22} kW</strong></span>
                           </div>
@@ -984,7 +971,7 @@ export default function Reservations() {
 
               {/* 3. Thời gian giữ chỗ */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
                   <Clock className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                   <span>3. Thời Hạn Giữ Chỗ:</span>
                 </label>
@@ -996,7 +983,7 @@ export default function Reservations() {
                         key={mins}
                         type="button"
                         onClick={() => setDurationMinutes(mins)}
-                        className={`py-2 px-2.5 rounded-xl text-center text-xs font-mono font-bold transition-all border ${
+                        className={`py-2 px-2.5 rounded-xl text-center text-xs font-medium transition-all border ${
                           isSelected
                             ? 'bg-sky-50 dark:bg-sky-950/60 border-sky-500 text-sky-800 dark:text-sky-300 ring-2 ring-sky-500/20'
                             : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300'
@@ -1004,7 +991,7 @@ export default function Reservations() {
                       >
                         {mins} phút
                         {mins === 15 && (
-                          <span className="block text-[9px] font-normal text-sky-700 dark:text-sky-400">
+                          <span className="block text-[10px] font-normal text-sky-700 dark:text-sky-400">
                             Khuyên dùng
                           </span>
                         )}
@@ -1015,13 +1002,13 @@ export default function Reservations() {
               </div>
 
               {/* Banner điều khoản chính sách & cảnh báo phí phạt */}
-              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-[11px] font-mono text-amber-900 dark:text-amber-200 space-y-1">
-                <div className="flex items-center space-x-1.5 font-bold">
+              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                <div className="flex items-center space-x-1.5 font-semibold">
                   <Info className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
                   <span>Chính sách giữ chỗ tiêu chuẩn:</span>
                 </div>
-                <p className="text-slate-700 dark:text-slate-300 leading-relaxed font-sans text-xs">
-                  Miễn phí hoàn toàn nếu bạn đến cắm sạc trước hạn. Nếu quá {durationMinutes} phút không tới nhận trụ, hệ thống sẽ mở lại trụ cho xe khác và tự động thu phí phạt không đến <strong>20.000 đ</strong> trừ vào ví cá nhân.
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-xs">
+                  Miễn phí hoàn toàn nếu bạn đến cắm sạc trước hạn. Nếu quá {durationMinutes} phút không tới nhận trụ, hệ thống sẽ mở lại trụ cho xe khác và tự động thu phí phạt không đến <strong className="font-semibold">20.000 đ</strong> trừ vào ví cá nhân.
                 </p>
               </div>
 
@@ -1030,24 +1017,24 @@ export default function Reservations() {
                 <button
                   type="button"
                   onClick={() => setIsBookingModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
-                  Hủy Bỏ
+                  Hủy bỏ
                 </button>
                 <button
                   type="submit"
                   disabled={bookingLoading || !selectedConnectorId}
-                  className="px-5 py-2 rounded-xl text-xs font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1.5"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1.5"
                 >
                   {bookingLoading ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Đang Xử Lý Giữ Chỗ...</span>
+                      <span>Đang xử lý giữ chỗ...</span>
                     </>
                   ) : (
                     <>
                       <Check className="w-3.5 h-3.5" />
-                      <span>Xác Nhận Giữ Chỗ ({durationMinutes}p)</span>
+                      <span>Xác nhận giữ chỗ ({durationMinutes} phút)</span>
                     </>
                   )}
                 </button>

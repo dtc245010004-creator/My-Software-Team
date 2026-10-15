@@ -53,11 +53,11 @@ export default function Header() {
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-base tracking-tight text-slate-900 dark:text-white">
+              <span className="font-bold text-base text-slate-900 dark:text-white">
                 EV CSMS
               </span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
-                Console
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
+                Hệ Thống
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
@@ -90,14 +90,14 @@ export default function Header() {
                 }`}
               />
             </span>
-            <span className="text-[11px] font-mono font-semibold">
-              {wsOnline ? 'LIVE' : 'DISCONNECTED'}
+            <span className="text-xs font-semibold">
+              {wsOnline ? 'Trực tuyến' : 'Mất kết nối'}
             </span>
           </div>
 
           {/* 1-Click Role Switcher for Demo / Defense */}
           <div className="hidden lg:flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
-            <span className="px-2 text-slate-500 dark:text-slate-400 text-[11px] font-medium">Vai trò:</span>
+            <span className="px-2 text-slate-500 dark:text-slate-400 text-xs font-medium">Vai trò:</span>
             <button
               onClick={() => handleRoleChange('ADMIN')}
               disabled={switching}
@@ -161,7 +161,7 @@ export default function Header() {
                 <p className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[110px]">
                   {rawUser.full_name || rawUser.username}
                 </p>
-                <p className="text-[10px] text-sky-600 dark:text-sky-400 font-medium">
+                <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">
                   {getRoleLabel(rawUser.role)}
                 </p>
               </div>

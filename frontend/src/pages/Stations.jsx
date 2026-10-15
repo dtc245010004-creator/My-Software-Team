@@ -737,36 +737,36 @@ export default function Stations() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Hạ Tầng Trạm Sạc &amp; Điểm Cấp Nguồn</h1>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 font-mono">
-            QUẢN LÝ MÁY BIẾN ÁP, CÔNG SUẤT ĐỊNH MỨC &amp; CÁC CỔNG SẠC VẬT LÝ
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+            Quản lý máy biến áp, công suất định mức &amp; các cổng sạc vật lý
           </p>
         </div>
         <div className="flex items-center space-x-2">
           {/* Bộ chuyển đổi chế độ xem: DANH SÁCH | BẢN ĐỒ */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl p-1 text-xs font-mono">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl p-1 text-xs font-medium">
             <button
               type="button"
               onClick={() => handleToggleViewMode('list')}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-sm'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-semibold shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <ListIcon className="w-3.5 h-3.5" />
-              <span>DANH SÁCH</span>
+              <span>Danh sách</span>
             </button>
             <button
               type="button"
               onClick={() => handleToggleViewMode('map')}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors ${
                 viewMode === 'map'
-                  ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 font-bold shadow-sm'
+                  ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 font-semibold shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
-              <span>BẢN ĐỒ</span>
+              <span>Bản đồ</span>
             </button>
           </div>
 
@@ -776,7 +776,7 @@ export default function Stations() {
               className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>THÊM TRẠM SẠC</span>
+              <span>Thêm trạm sạc</span>
             </button>
           )}
         </div>
@@ -800,28 +800,28 @@ export default function Stations() {
       ) : (
         <div className="space-y-6">
           {/* KPI Summary Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm">
-              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase font-semibold block">Tổng trạm sạc</span>
-              <span className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 block">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Tổng trạm sạc</span>
+              <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1 block">
                 {stationStats.total} <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">trạm</span>
               </span>
             </div>
-            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm">
-              <span className="text-[11px] font-mono text-emerald-800 dark:text-emerald-400 uppercase font-semibold block">Đang hoạt động</span>
-              <span className="text-xl font-bold font-mono text-emerald-800 dark:text-emerald-300 mt-1 block">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 block">Đang hoạt động</span>
+              <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mt-1 block">
                 {stationStats.active}
               </span>
             </div>
-            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm">
-              <span className="text-[11px] font-mono text-amber-800 dark:text-amber-400 uppercase font-semibold block">Bảo trì</span>
-              <span className="text-xl font-bold font-mono text-amber-800 dark:text-amber-300 mt-1 block">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-400 block">Bảo trì</span>
+              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 mt-1 block">
                 {stationStats.maintenance}
               </span>
             </div>
-            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm">
-              <span className="text-[11px] font-mono text-sky-800 dark:text-sky-400 uppercase font-semibold block">Tổng công suất nguồn</span>
-              <span className="text-xl font-bold font-mono text-sky-800 dark:text-sky-300 mt-1 block">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
+              <span className="text-xs font-medium text-sky-700 dark:text-sky-400 block">Tổng công suất nguồn</span>
+              <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 mt-1 block">
                 {stationStats.totalKw} <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">kW</span>
               </span>
             </div>
@@ -836,7 +836,7 @@ export default function Stations() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm theo tên trạm hoặc địa chỉ..."
-                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 font-mono"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
               />
               {searchQuery && (
                 <button
@@ -849,25 +849,25 @@ export default function Stations() {
             </div>
 
             <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mr-1 hidden md:inline font-semibold">Lọc trạng thái:</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 mr-1 hidden md:inline font-medium">Lọc trạng thái:</span>
               {[
-                { id: 'ALL', label: 'TẤT CẢ', count: stationStats.total },
-                { id: 'ACTIVE', label: 'HOẠT ĐỘNG', count: stationStats.active, color: 'text-emerald-700 dark:text-emerald-300' },
-                { id: 'MAINTENANCE', label: 'BẢO TRÌ', count: stationStats.maintenance, color: 'text-amber-700 dark:text-amber-300' },
+                { id: 'ALL', label: 'Tất cả', count: stationStats.total },
+                { id: 'ACTIVE', label: 'Hoạt động', count: stationStats.active, color: 'text-emerald-700 dark:text-emerald-300' },
+                { id: 'MAINTENANCE', label: 'Bảo trì', count: stationStats.maintenance, color: 'text-amber-700 dark:text-amber-300' },
               ].map((item) => {
                 const active = statusFilter === item.id;
                 return (
                   <button
                     key={item.id}
                     onClick={() => setStatusFilter(item.id)}
-                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-xl text-[11px] font-mono font-medium transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
                       active
-                        ? 'bg-sky-600 text-white font-bold shadow-sm'
+                        ? 'bg-sky-600 text-white font-semibold shadow-sm'
                         : 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/60'
                     }`}
                   >
                     <span>{item.label}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${active ? 'bg-black/25 text-white' : item.color || 'text-slate-500'}`}>
+                    <span className={`px-1.5 py-0.2 rounded-full text-xs font-semibold ${active ? 'bg-black/25 text-white' : item.color || 'text-slate-500'}`}>
                       {item.count}
                     </span>
                   </button>
@@ -917,8 +917,8 @@ export default function Stations() {
                   <div>
                     <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                       <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">{st.name}</h2>
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60 font-semibold">
-                        MÃ: ST-{st.id}
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60 font-medium">
+                        Mã: ST-{st.id}
                       </span>
                       <StatusBadge
                         variant={st.status === 'ACTIVE' ? 'success' : st.status === 'MAINTENANCE' ? 'warning' : 'neutral'}
@@ -928,7 +928,7 @@ export default function Stations() {
                         {st.status === 'ACTIVE' ? 'Hoạt động' : st.status}
                       </StatusBadge>
                       {role === 'ADMIN' && (
-                        <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border font-semibold ${
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${
                           st.operator_id
                             ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50'
                             : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60'
@@ -937,7 +937,7 @@ export default function Stations() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center space-x-3 text-xs text-slate-600 dark:text-slate-400 mt-1 font-mono">
+                    <div className="flex items-center space-x-3 text-xs text-slate-600 dark:text-slate-400 mt-1">
                       <span className="flex items-center">
                         <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400 dark:text-slate-500" />
                         {st.address}
@@ -945,7 +945,7 @@ export default function Stations() {
                       {st.latitude != null && st.longitude != null && (
                         <>
                           <span>•</span>
-                          <span className="text-[11px] text-sky-600 dark:text-sky-400">
+                          <span className="text-xs text-sky-600 dark:text-sky-400 font-medium">
                             GPS: {st.latitude.toFixed(4)}, {st.longitude.toFixed(4)}
                           </span>
                         </>
@@ -957,8 +957,8 @@ export default function Stations() {
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  <div className="text-right font-mono">
-                    <div className="text-xs text-slate-500 dark:text-slate-400">CÔNG SUẤT LƯỚI ĐỊNH MỨC</div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Công suất nguồn lưới</div>
                     <div className="text-base font-bold text-sky-600 dark:text-sky-400 tabular-nums">
                       {st.total_grid_capacity_kw} kW
                     </div>
@@ -992,7 +992,7 @@ export default function Stations() {
                           e.stopPropagation();
                           setTariffStation(st);
                         }}
-                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800/50 text-[11px] font-mono font-bold transition-colors shadow-sm"
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800/50 text-xs font-medium transition-colors shadow-sm"
                       >
                         <Coins className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Biểu giá trạm</span>
@@ -1000,12 +1000,12 @@ export default function Stations() {
                       <button
                         type="button"
                         data-testid={`btn-power-limits-station-${st.id}`}
-                        title="Cấu hình hạn mức công suất theo khung giờ (SCRUM-294 / SCRUM-314)"
+                        title="Cấu hình hạn mức công suất theo khung giờ"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOpenPowerLimitModal(st);
                         }}
-                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 dark:bg-sky-950/50 dark:hover:bg-sky-900/50 dark:text-sky-300 dark:border-sky-800/50 text-[11px] font-mono font-bold transition-colors shadow-sm"
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 dark:bg-sky-950/50 dark:hover:bg-sky-900/50 dark:text-sky-300 dark:border-sky-800/50 text-xs font-medium transition-colors shadow-sm"
                       >
                         <Clock className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Hạn mức khung giờ</span>
@@ -1031,8 +1031,8 @@ export default function Stations() {
               {isExpanded && (
                 <div className="border-t border-slate-200 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/40 p-4 sm:p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">
-                      DANH SÁCH TRỤ SẠC (EVSE BAYS) — {chargers.length} TRỤ VẬT LÝ
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Danh sách trụ sạc ({chargers.length} trụ)
                     </span>
                     {canManageChargers && (
                       <button
@@ -1040,10 +1040,10 @@ export default function Stations() {
                           e.stopPropagation();
                           handleOpenAddCharger(st);
                         }}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-mono font-semibold transition-all shadow-sm hover:shadow"
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-medium transition-all shadow-sm hover:shadow"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>GẮN TRỤ SẠC</span>
+                        <span>Thêm trụ sạc</span>
                       </button>
                     )}
                   </div>
@@ -1072,7 +1072,7 @@ export default function Stations() {
                           className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200"
                         >
                           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                            <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">{ch.code}</span>
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{ch.code}</span>
                             <div className="flex items-center space-x-1.5 flex-wrap gap-1">
                               <StatusBadge
                                 variant={
@@ -1105,7 +1105,7 @@ export default function Stations() {
                                     e.stopPropagation();
                                     handleToggleChargerStatus(ch.id, ch.status);
                                   }}
-                                  className={`text-[11px] font-mono px-2 py-0.5 rounded-lg border font-semibold transition-colors ${
+                                  className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${
                                     ch.status === 'CHARGING'
                                       ? 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
                                       : ch.status === 'AVAILABLE'
@@ -1125,7 +1125,7 @@ export default function Stations() {
                                     setRestartingCharger({ id: ch.id, code: ch.code, status: ch.status });
                                     resetResult();
                                   }}
-                                  className="text-[11px] font-mono flex items-center space-x-1 px-2 py-0.5 rounded-lg border border-sky-200 dark:border-sky-800/60 text-sky-800 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 transition-colors font-semibold"
+                                  className="text-xs flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800/60 text-sky-800 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 transition-colors font-medium"
                                 >
                                   <RefreshCw className="w-3 h-3" />
                                   <span>Khởi động lại</span>
@@ -1133,12 +1133,12 @@ export default function Stations() {
                               )}
                               <button
                                 type="button"
-                                title="Màn hình trụ & điều khiển bắt đầu sạc (S-24 / T-52)"
+                                title="Màn hình trụ & điều khiển bắt đầu sạc"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigate(`/chargers/${ch.id}`);
                                 }}
-                                className="text-[11px] font-mono flex items-center space-x-1 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/70 hover:bg-slate-200 transition-colors font-semibold"
+                                className="text-xs flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/70 hover:bg-slate-200 transition-colors font-medium"
                               >
                                 <Play className="w-3 h-3 fill-current" />
                                 <span>Màn hình trụ</span>
@@ -1149,7 +1149,7 @@ export default function Stations() {
                           {/* Khu vực thông báo trạng thái restart */}
                           {(restartLoading || restartResult?.chargerId === ch.id) && (
                             <div 
-                              className={`mb-3 text-xs p-2 rounded border font-mono ${
+                              className={`mb-3 text-xs p-2 rounded border ${
                                 restartLoading 
                                   ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
                                   : restartResult?.type === 'success'
@@ -1178,7 +1178,7 @@ export default function Stations() {
                                         e.stopPropagation();
                                         restart(ch.id, restartResult.type); // Giữ nguyên mock status nếu đang test, hoặc mặc định
                                       }}
-                                      className="mt-1 self-start text-[10px] underline hover:text-white"
+                                      className="mt-1 self-start text-xs underline hover:text-white"
                                     >
                                       Thử lại
                                     </button>
@@ -1188,38 +1188,38 @@ export default function Stations() {
                             </div>
                           )}
 
-                          <div className="text-xs text-slate-600 dark:text-slate-400 font-mono mb-2">
-                            Hãng: {ch.vendor} • Định mức: <span className="text-slate-900 dark:text-slate-100 font-bold">{ch.max_power_kw} kW</span>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mb-2 font-normal">
+                            Thiết bị: {ch.vendor} • Định mức: <span className="text-slate-900 dark:text-slate-100 font-bold">{ch.max_power_kw} kW</span>
                           </div>
 
                           {/* Connectors list */}
                           <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/60">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-semibold block">CỔNG SẠC (CONNECTORS):</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Cổng sạc:</span>
                               {canManageChargers && (
                                 <button
                                   type="button"
-                                  title={`Thêm đầu nối mới vào trụ ${ch.code}`}
+                                  title={`Thêm cổng sạc mới vào trụ ${ch.code}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleOpenAddConnector(ch);
                                   }}
-                                  className="flex items-center space-x-0.5 text-[10px] font-mono px-2 py-0.5 rounded-lg border border-sky-300 dark:border-sky-800/60 text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 transition-colors font-semibold"
+                                  className="flex items-center space-x-0.5 text-xs px-2.5 py-0.5 rounded-lg border border-sky-300 dark:border-sky-800/60 text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 transition-colors font-medium"
                                 >
                                   <Plus className="w-3 h-3" />
-                                  <span>ĐẦU NỐI</span>
+                                  <span>Thêm cổng</span>
                                 </button>
                               )}
                             </div>
                             {(ch.connectors || []).length === 0 && (
-                              <div className="text-[11px] text-slate-500 font-mono italic">Trụ chưa có đầu nối nào.</div>
+                              <div className="text-xs text-slate-500 italic">Trụ chưa có cổng sạc nào.</div>
                             )}
                             {(ch.connectors || []).map((conn) => (
                               <div
                                 key={conn.id}
-                                className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/60 px-2.5 py-1.5 rounded-xl flex items-center justify-between text-xs font-mono text-slate-800 dark:text-slate-200"
+                                className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/60 px-3 py-2 rounded-xl flex items-center justify-between text-xs text-slate-800 dark:text-slate-200"
                               >
-                                <span>Súng #{conn.connector_number} ({conn.connector_type}) • {conn.max_power_kw} kW</span>
+                                <span>Cổng #{conn.connector_number} ({conn.connector_type}) • {conn.max_power_kw} kW</span>
                                 <StatusBadge
                                   variant={
                                     conn.status === 'CHARGING'
@@ -1233,7 +1233,7 @@ export default function Stations() {
                                   size="sm"
                                   dot
                                 >
-                                  {conn.status}
+                                  {conn.status === 'AVAILABLE' ? 'Sẵn sàng' : conn.status === 'CHARGING' ? 'Đang sạc' : conn.status === 'FAULTED' ? 'Lỗi' : conn.status}
                                 </StatusBadge>
                               </div>
                             ))}
@@ -1254,12 +1254,12 @@ export default function Stations() {
           <div id="stations-overview-map" className="pt-6 border-t border-slate-200 dark:border-slate-800/60 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase font-mono flex items-center space-x-2">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
                   <MapIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                  <span>BẢN ĐỒ TỔNG QUÁT MẠNG LƯỚI TRẠM SẠC</span>
+                  <span>Bản đồ tổng quát mạng lưới trạm sạc</span>
                 </h2>
-                <p className="text-xs text-slate-600 dark:text-slate-400 font-mono mt-0.5">
-                  VỊ TRÍ GPS VÀ TRẠNG THÁI HOẠT ĐỘNG THỜI GIAN THỰC CỦA TOÀN BỘ {stations.length} TRẠM SẠC
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  Vị trí GPS và trạng thái hoạt động thời gian thực của toàn bộ {stations.length} trạm sạc
                 </p>
               </div>
             </div>

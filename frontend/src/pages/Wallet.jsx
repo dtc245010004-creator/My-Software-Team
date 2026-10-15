@@ -1718,12 +1718,12 @@ export default function Wallet() {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
-                      <th className="pb-3 font-semibold">MÃ ĐƠN</th>
-                      <th className="pb-3 font-semibold">TÀI XẾ / KHÁCH HÀNG</th>
-                      <th className="pb-3 font-semibold">SỐ TIỀN</th>
-                      <th className="pb-3 font-semibold">THỜI GIAN GỬI</th>
-                      <th className="pb-3 font-semibold">TRẠNG THÁI</th>
-                      <th className="pb-3 font-semibold text-right">THAO TÁC DUYỆT</th>
+                      <th className="pb-3 font-semibold">Mã đơn</th>
+                      <th className="pb-3 font-semibold">Tài xế / Khách hàng</th>
+                      <th className="pb-3 font-semibold">Số tiền</th>
+                      <th className="pb-3 font-semibold">Thời gian gửi</th>
+                      <th className="pb-3 font-semibold">Trạng thái</th>
+                      <th className="pb-3 font-semibold text-right">Thao tác duyệt</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
@@ -1735,26 +1735,26 @@ export default function Wallet() {
                           key={order.order_code}
                           className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                         >
-                          <td className="py-3.5 font-bold font-mono text-slate-900 dark:text-slate-100">
+                          <td className="py-3.5 font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                             {order.order_code}
                           </td>
                           <td className="py-3.5">
-                            <div className="font-bold text-slate-900 dark:text-slate-100">
+                            <div className="font-semibold text-slate-900 dark:text-slate-100">
                               {order.full_name || order.username}
                             </div>
-                            <div className="text-[11px] text-slate-400 font-mono">
+                            <div className="text-xs text-slate-400">
                               @{order.username} &bull; {order.email}
                             </div>
                           </td>
-                          <td className="py-3.5 font-extrabold text-sm text-sky-600 dark:text-sky-400 tabular-nums">
+                          <td className="py-3.5 font-bold text-sm text-sky-600 dark:text-sky-400 tabular-nums">
                             +{formatVND(order.amount)}
                           </td>
-                          <td className="py-3.5 text-slate-500 text-[11px]">
+                          <td className="py-3.5 text-slate-500 text-xs tabular-nums">
                             {formatVNDateTime(order.created_at)}
                           </td>
                           <td className="py-3.5">
                             {order.status === 'PENDING' ? (
-                              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                                 <Clock className="w-3.5 h-3.5 animate-spin text-amber-500" />
                                 <span>Chờ đối soát</span>
                               </span>

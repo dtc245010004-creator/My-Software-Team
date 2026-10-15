@@ -42,7 +42,7 @@ export default function Navigation() {
     { to: '/data-erasure', label: 'Xóa Dữ Liệu', icon: UserX, roles: ['CUSTOMER'] },
     { to: '/sessions', label: 'Nhật Ký Phiên Sạc', icon: History, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CUSTOMER'] },
     { to: '/audit-logs', label: 'Tra Cứu Nhật Ký', icon: ScrollText, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
-    { to: '/ai-advisor', label: 'AI Cố Vấn & Bảo Trì', icon: Cpu, roles: ['ADMIN', 'OPERATOR'] },
+    { to: '/ai-advisor', label: 'Tư Vấn & Bảo Trì', icon: Cpu, roles: ['ADMIN', 'OPERATOR'] },
     { to: '/admin', label: 'Quản Trị Hệ Thống', icon: Shield, roles: ['ADMIN'] },
     { to: '/admin/data-erasure', label: 'Duyệt Xóa Dữ Liệu', icon: ShieldAlert, roles: ['ADMIN'] },
   ];

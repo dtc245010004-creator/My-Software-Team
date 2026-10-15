@@ -279,25 +279,25 @@ export default function Sessions() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-tech-white">Nhật Ký Phiên Sạc & Hóa Đơn Điện Tử</h1>
-          <p className="text-xs text-steel-gray mt-0.5 font-mono">
+          <p className="text-xs text-steel-gray mt-0.5">
             {role === 'ADMIN'
-              ? 'QUẢN LÝ TOÀN MẠNG LƯỚI — THỐNG KÊ DOANH THU & PHÂN TÍCH PHỤ TẢI THEO NGÀY/TRẠM'
+              ? 'Quản lý toàn mạng lưới — Thống kê doanh thu & phân tích phụ tải theo ngày/trạm'
               : role === 'OPERATOR'
-              ? 'BÁO CÁO CÁC TRẠM CỦA BẠN — THEO DÕI SẢN LƯỢNG & DOANH THU THEO NGÀY/THÁNG'
-              : 'LỊCH SỬ NẠP ĐIỆN, ĐO ĐẾM ĐIỆN NĂNG KWH & HÓA ĐƠN CHI TIẾT'}
+              ? 'Báo cáo các trạm của bạn — Theo dõi sản lượng & doanh thu theo ngày/tháng'
+              : 'Lịch sử nạp điện, đo đếm điện năng kWh & hóa đơn chi tiết'}
           </p>
         </div>
 
         {/* Bộ lọc phạm vi trạm & trạng thái */}
         <div className="flex flex-wrap items-center gap-2">
           {(role === 'ADMIN' || role === 'OPERATOR') && accessibleStations.length > 0 && (
-            <div className="flex items-center space-x-1.5 bg-panel border border-hairline rounded px-2.5 py-1 text-xs font-mono">
+            <div className="flex items-center space-x-1.5 bg-panel border border-hairline rounded-lg px-2.5 py-1 text-xs">
               <Filter className="w-3.5 h-3.5 text-steel-gray" />
               <span className="text-steel-gray">Phạm vi:</span>
               <select
                 value={selectedStationId}
                 onChange={(e) => setSelectedStationId(e.target.value)}
-                className="bg-obsidian border border-hairline text-tech-white rounded px-2 py-0.5 text-xs focus:outline-none focus:border-electric-cyan font-mono"
+                className="bg-obsidian border border-hairline text-tech-white rounded px-2 py-0.5 text-xs focus:outline-none focus:border-electric-cyan font-medium"
               >
                 <option value="ALL">
                   {role === 'ADMIN'
@@ -306,7 +306,7 @@ export default function Sessions() {
                 </option>
                 {accessibleStations.map((st) => (
                   <option key={st.id} value={st.id}>
-                    [ST-{st.id}] {st.name}
+                    {st.name}
                   </option>
                 ))}
               </select>
@@ -314,18 +314,23 @@ export default function Sessions() {
           )}
 
           {viewMode === 'DETAIL' && (
-            <div className="flex items-center bg-panel border border-hairline rounded p-0.5 text-xs font-mono">
-              {['ALL', 'ACTIVE', 'COMPLETED', 'INTERRUPTED'].map((st) => (
+            <div className="flex items-center bg-panel border border-hairline rounded-lg p-0.5 text-xs">
+              {[
+                { key: 'ALL', label: 'Tất cả' },
+                { key: 'ACTIVE', label: 'Đang sạc' },
+                { key: 'COMPLETED', label: 'Hoàn thành' },
+                { key: 'INTERRUPTED', label: 'Gián đoạn' },
+              ].map((tab) => (
                 <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1 rounded transition-colors ${
-                    statusFilter === st
-                      ? 'bg-obsidian text-tech-white font-bold border border-hairline'
+                  key={tab.key}
+                  onClick={() => setStatusFilter(tab.key)}
+                  className={`px-3 py-1 rounded-md transition-colors font-medium ${
+                    statusFilter === tab.key
+                      ? 'bg-obsidian text-tech-white font-semibold border border-hairline shadow-sm'
                       : 'text-steel-gray hover:text-tech-white'
                   }`}
                 >
-                  {st}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -335,48 +340,48 @@ export default function Sessions() {
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-panel border border-hairline p-3.5 rounded-sm flex items-center space-x-3">
-          <div className="p-2.5 rounded bg-electric-cyan/10 border border-electric-cyan/30 text-electric-cyan">
+        <div className="bg-panel border border-hairline p-4 rounded-xl flex items-center space-x-3.5 shadow-sm">
+          <div className="p-2.5 rounded-xl bg-electric-cyan/10 border border-electric-cyan/30 text-electric-cyan">
             <Layers className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-[11px] font-mono text-steel-gray uppercase">Tổng Số Phiên Sạc</div>
-            <div className="text-lg font-bold font-mono text-tech-white tabular-nums">
+            <div className="text-xs font-medium text-steel-gray">Tổng số phiên sạc</div>
+            <div className="text-2xl font-bold text-tech-white tabular-nums mt-0.5">
               {displayKpi.total_sessions} <span className="text-xs font-normal text-steel-gray">phiên</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-3.5 rounded-sm flex items-center space-x-3">
-          <div className="p-2.5 rounded bg-grid-green/10 border border-grid-green/30 text-grid-green">
+        <div className="bg-panel border border-hairline p-4 rounded-xl flex items-center space-x-3.5 shadow-sm">
+          <div className="p-2.5 rounded-xl bg-grid-green/10 border border-grid-green/30 text-grid-green">
             <Zap className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-[11px] font-mono text-steel-gray uppercase">Tổng Sản Lượng Điện Năng</div>
-            <div className="text-lg font-bold font-mono text-grid-green tabular-nums">
+            <div className="text-xs font-medium text-steel-gray">Tổng sản lượng điện năng</div>
+            <div className="text-2xl font-bold text-grid-green tabular-nums mt-0.5">
               {Number(displayKpi.total_kwh || 0).toFixed(2)} <span className="text-xs font-normal text-steel-gray">kWh</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-3.5 rounded-sm flex items-center space-x-3">
-          <div className="p-2.5 rounded bg-caution-amber/10 border border-caution-amber/30 text-caution-amber">
+        <div className="bg-panel border border-hairline p-4 rounded-xl flex items-center space-x-3.5 shadow-sm">
+          <div className="p-2.5 rounded-xl bg-caution-amber/10 border border-caution-amber/30 text-caution-amber">
             <TrendingUp className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-[11px] font-mono text-steel-gray uppercase">Tổng Doanh Thu Hóa Đơn</div>
-            <div className="text-lg font-bold font-mono text-caution-amber tabular-nums">
+            <div className="text-xs font-medium text-steel-gray">Tổng doanh thu hóa đơn</div>
+            <div className="text-2xl font-bold text-caution-amber tabular-nums mt-0.5">
               {Number(displayKpi.total_revenue || 0).toLocaleString()} <span className="text-xs font-normal text-steel-gray">VND</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Thông báo kết quả dừng từ xa (S-23 / SCRUM-146) */}
+      {/* Thông báo kết quả dừng từ xa */}
       {alertNotification && (
         <div
           id="remote-stop-alert-banner"
-          className={`p-4 rounded-sm border font-mono text-xs flex items-start justify-between shadow-lg transition-all ${
+          className={`p-4 rounded-xl border text-xs flex items-start justify-between shadow-lg transition-all ${
             alertNotification.type === 'success'
               ? 'bg-grid-green/10 border-grid-green/40 text-grid-green'
               : alertNotification.type === 'warning'
@@ -397,10 +402,10 @@ export default function Sessions() {
               )}
             </div>
             <div>
-              <div className="font-bold text-sm tracking-wide mb-1">
+              <div className="font-semibold text-sm mb-1">
                 {alertNotification.title}
               </div>
-              <p className="text-tech-white leading-relaxed">{alertNotification.message}</p>
+              <p className="text-tech-white leading-relaxed text-xs">{alertNotification.message}</p>
             </div>
           </div>
           <button
@@ -413,36 +418,36 @@ export default function Sessions() {
         </div>
       )}
 
-      {/* Màn hình giám sát phiên đang chạy & Nút dừng từ xa (S-23 / T-48 / T-50) */}
+      {/* Màn hình giám sát phiên đang chạy & Nút dừng từ xa */}
       {canRemoteStop && activeSessions.length > 0 && (
-        <div className="bg-panel border border-electric-cyan/40 p-4 rounded-sm space-y-3 font-mono">
+        <div className="bg-panel border border-electric-cyan/40 p-4 rounded-xl space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-hairline pb-2.5">
             <div className="flex items-center space-x-2">
               <span className="flex h-2.5 w-2.5 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-electric-cyan opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-electric-cyan"></span>
               </span>
-              <span className="font-bold text-xs text-tech-white tracking-wider uppercase">
-                Giám Sát Phiên Đang Sạc & Lệnh Dừng Từ Xa (RemoteStopTransaction)
+              <span className="font-semibold text-xs text-tech-white">
+                Giám sát phiên đang sạc &amp; Lệnh dừng từ xa
               </span>
-              <span className="text-[10px] bg-electric-cyan/20 text-electric-cyan px-2 py-0.5 rounded font-bold">
+              <span className="text-xs bg-electric-cyan/20 text-electric-cyan px-2 py-0.5 rounded-full font-semibold">
                 {activeSessions.length} phiên đang chạy
               </span>
             </div>
 
             {/* Điều khiển kịch bản kiểm thử mô phỏng */}
             <div className="flex items-center space-x-2 text-xs">
-              <span className="text-steel-gray text-[11px]">Chế độ thử nghiệm:</span>
+              <span className="text-steel-gray">Chế độ thử nghiệm:</span>
               <select
                 id="sim-condition-select"
                 value={selectedSimCondition}
                 onChange={(e) => setSelectedSimCondition(e.target.value)}
-                className="bg-obsidian border border-hairline text-tech-white rounded px-2 py-1 text-xs focus:outline-none focus:border-electric-cyan font-mono"
+                className="bg-obsidian border border-hairline text-tech-white rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-electric-cyan font-medium"
               >
-                <option value="NORMAL">✅ Bình thường (Thành công)</option>
-                <option value="REJECTED">⚠️ Ca 1: Trụ từ chối (Rejected)</option>
-                <option value="OFFLINE">🚫 Ca 2: Trụ ngoại tuyến (Offline)</option>
-                <option value="TIMEOUT">⏱️ Ca 3: Hết thời gian chờ (Timeout)</option>
+                <option value="NORMAL">Bình thường (Thành công)</option>
+                <option value="REJECTED">Trụ từ chối (Rejected)</option>
+                <option value="OFFLINE">Trụ ngoại tuyến (Offline)</option>
+                <option value="TIMEOUT">Hết thời gian chờ (Timeout)</option>
               </select>
             </div>
           </div>
@@ -454,23 +459,23 @@ export default function Sessions() {
               return (
                 <div
                   key={actSess.id}
-                  className="bg-obsidian border border-hairline p-3.5 rounded flex flex-col justify-between space-y-3"
+                  className="bg-obsidian border border-hairline p-3.5 rounded-xl flex flex-col justify-between space-y-3"
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-bold text-tech-white text-sm">#SES-{actSess.id}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-electric-cyan/20 text-electric-cyan animate-pulse">
-                          CHARGING
+                        <span className="font-bold text-tech-white text-sm tabular-nums">#SES-{actSess.id}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-electric-cyan/20 text-electric-cyan animate-pulse">
+                          Đang sạc
                         </span>
                       </div>
-                      <div className="text-[11px] text-steel-gray mt-1">
-                        Trụ: <span className="text-tech-white font-bold">{actSess.charger_code || 'EVSE-1'}</span> (Cổng #{actSess.connector_id})
+                      <div className="text-xs text-steel-gray mt-1">
+                        Trụ: <span className="text-tech-white font-semibold">{actSess.charger_code || 'EVSE-1'}</span> (Cổng #{actSess.connector_id})
                         {actSess.station_name && <span> — {actSess.station_name}</span>}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[11px] text-steel-gray">Điện năng nạp:</div>
+                      <div className="text-xs text-steel-gray">Điện năng nạp:</div>
                       <div className="text-base font-bold text-electric-cyan tabular-nums">
                         {Number(actSess.total_kwh || 0).toFixed(2)} kWh
                       </div>
@@ -479,7 +484,7 @@ export default function Sessions() {
 
                   {/* Nút dừng từ xa có đồng hồ đếm */}
                   <div className="flex items-center justify-between border-t border-hairline pt-2.5">
-                    <div className="text-[11px] text-steel-gray">
+                    <div className="text-xs text-steel-gray tabular-nums">
                       Bắt đầu: {formatVNDateTime(actSess.start_time)}
                     </div>
 
@@ -487,7 +492,7 @@ export default function Sessions() {
                       id={`live-remote-stop-btn-${actSess.id}`}
                       onClick={() => handleRemoteStop(actSess)}
                       disabled={isStoppingThis}
-                      className={`px-3 py-1.5 rounded text-xs font-bold border transition-all inline-flex items-center space-x-2 shadow-sm ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all inline-flex items-center space-x-2 shadow-sm ${
                         isStoppingThis
                           ? 'bg-critical-red/25 border-critical-red text-critical-red cursor-wait'
                           : 'bg-critical-red/20 border-critical-red/60 hover:bg-critical-red hover:text-white text-critical-red'
@@ -496,7 +501,7 @@ export default function Sessions() {
                       {isStoppingThis ? (
                         <>
                           <Clock className="w-3.5 h-3.5 animate-spin text-critical-red" />
-                          <span className="font-mono">
+                          <span className="tabular-nums">
                             Đang dừng... ({String(Math.floor(stopElapsedSeconds / 60)).padStart(2, '0')}:{String(stopElapsedSeconds % 60).padStart(2, '0')} / 02:00)
                           </span>
                         </>
@@ -517,57 +522,57 @@ export default function Sessions() {
 
       {/* View Mode Switcher for Admin & Operator */}
       {(role === 'ADMIN' || role === 'OPERATOR') && (
-        <div className="flex items-center space-x-2 border-b border-hairline pb-2 font-mono text-xs">
+        <div className="flex items-center space-x-2 border-b border-hairline pb-2 text-xs">
           <span className="text-steel-gray mr-1">Chế độ xem:</span>
           <button
             type="button"
             onClick={() => setViewMode('DETAIL')}
-            className={`px-3 py-1 rounded transition-colors ${
+            className={`px-3 py-1 rounded-lg transition-colors font-medium ${
               viewMode === 'DETAIL'
-                ? 'bg-panel text-electric-cyan font-bold border border-electric-cyan/40 shadow-sm'
+                ? 'bg-panel text-electric-cyan font-semibold border border-electric-cyan/40 shadow-sm'
                 : 'text-steel-gray hover:text-tech-white border border-transparent'
             }`}
           >
-            DANH SÁCH CHI TIẾT
+            Danh sách chi tiết
           </button>
           <button
             type="button"
             onClick={() => setViewMode('GROUP_DATE')}
-            className={`px-3 py-1 rounded transition-colors flex items-center space-x-1.5 ${
+            className={`px-3 py-1 rounded-lg transition-colors flex items-center space-x-1.5 font-medium ${
               viewMode === 'GROUP_DATE'
-                ? 'bg-panel text-electric-cyan font-bold border border-electric-cyan/40 shadow-sm'
+                ? 'bg-panel text-electric-cyan font-semibold border border-electric-cyan/40 shadow-sm'
                 : 'text-steel-gray hover:text-tech-white border border-transparent'
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
-            <span>NHÓM THEO NGÀY</span>
+            <span>Nhóm theo ngày</span>
           </button>
           {role === 'ADMIN' && (
             <button
               type="button"
               onClick={() => setViewMode('GROUP_STATION')}
-              className={`px-3 py-1 rounded transition-colors flex items-center space-x-1.5 ${
+              className={`px-3 py-1 rounded-lg transition-colors flex items-center space-x-1.5 font-medium ${
                 viewMode === 'GROUP_STATION'
-                  ? 'bg-panel text-electric-cyan font-bold border border-electric-cyan/40 shadow-sm'
+                  ? 'bg-panel text-electric-cyan font-semibold border border-electric-cyan/40 shadow-sm'
                   : 'text-steel-gray hover:text-tech-white border border-transparent'
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>NHÓM THEO TRẠM</span>
+              <span>Nhóm theo trạm</span>
             </button>
           )}
           {role === 'OPERATOR' && (
             <button
               type="button"
               onClick={() => setViewMode('GROUP_MONTH')}
-              className={`px-3 py-1 rounded transition-colors flex items-center space-x-1.5 ${
+              className={`px-3 py-1 rounded-lg transition-colors flex items-center space-x-1.5 font-medium ${
                 viewMode === 'GROUP_MONTH'
-                  ? 'bg-panel text-electric-cyan font-bold border border-electric-cyan/40 shadow-sm'
+                  ? 'bg-panel text-electric-cyan font-semibold border border-electric-cyan/40 shadow-sm'
                   : 'text-steel-gray hover:text-tech-white border border-transparent'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>NHÓM THEO THÁNG</span>
+              <span>Nhóm theo tháng</span>
             </button>
           )}
         </div>
@@ -575,14 +580,14 @@ export default function Sessions() {
 
       {/* Main Content: Grouped View OR Detailed Table */}
       {viewMode !== 'DETAIL' ? (
-        <div className="bg-panel border border-hairline rounded-sm overflow-hidden">
-          <div className="p-3 border-b border-hairline bg-obsidian flex items-center justify-between font-mono text-xs">
-            <span className="text-steel-gray uppercase font-semibold">
+        <div className="bg-panel border border-hairline rounded-xl overflow-hidden shadow-sm">
+          <div className="p-3.5 border-b border-hairline bg-obsidian flex items-center justify-between text-xs">
+            <span className="text-steel-gray font-semibold">
               {viewMode === 'GROUP_DATE'
-                ? 'TỔNG HỢP THEO NGÀY HOẠT ĐỘNG'
+                ? 'Tổng hợp theo ngày hoạt động'
                 : viewMode === 'GROUP_STATION'
-                ? 'TỔNG HỢP THEO TRẠM SẠC HỆ THỐNG'
-                : 'TỔNG HỢP THEO THÁNG VẬN HÀNH'}
+                ? 'Tổng hợp theo trạm sạc hệ thống'
+                : 'Tổng hợp theo tháng vận hành'}
             </span>
             <span className="text-steel-gray">
               {summaryData.groups.length} nhóm dữ liệu
@@ -590,51 +595,51 @@ export default function Sessions() {
           </div>
 
           {summaryLoading ? (
-            <div className="text-xs text-steel-gray text-center py-12 font-mono">
+            <div className="text-xs text-steel-gray text-center py-12">
               Đang tải dữ liệu tổng hợp...
             </div>
           ) : summaryData.groups.length === 0 ? (
-            <div className="text-xs text-steel-gray text-center py-12 font-mono">
+            <div className="text-xs text-steel-gray text-center py-12">
               Chưa có dữ liệu phiên sạc phù hợp cho nhóm này.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left font-mono text-xs">
+              <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-hairline bg-obsidian/60 text-steel-gray">
-                    <th className="py-3 px-4">
+                    <th className="py-3 px-4 font-semibold">
                       {viewMode === 'GROUP_DATE'
-                        ? 'NGÀY GHI NHẬN'
+                        ? 'Ngày ghi nhận'
                         : viewMode === 'GROUP_STATION'
-                        ? 'TRẠM SẠC'
-                        : 'THÁNG GHI NHẬN'}
+                        ? 'Trạm sạc'
+                        : 'Tháng ghi nhận'}
                     </th>
-                    <th className="py-3 px-4">SỐ PHIÊN</th>
-                    <th className="py-3 px-4">TỔNG ĐIỆN NĂNG</th>
-                    <th className="py-3 px-4">TỔNG DOANH THU</th>
-                    <th className="py-3 px-4 text-right">CHI TIẾT</th>
+                    <th className="py-3 px-4 font-semibold">Số phiên</th>
+                    <th className="py-3 px-4 font-semibold">Tổng điện năng</th>
+                    <th className="py-3 px-4 font-semibold">Tổng doanh thu</th>
+                    <th className="py-3 px-4 text-right font-semibold">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
                   {summaryData.groups.map((group) => (
                     <tr key={group.key} className="hover:bg-panel-hover transition-colors">
-                      <td className="py-3 px-4 font-bold text-tech-white">
+                      <td className="py-3 px-4 font-semibold text-tech-white">
                         {group.label}
                       </td>
                       <td className="py-3 px-4 text-steel-gray tabular-nums">
                         {group.total_sessions} phiên
                       </td>
-                      <td className="py-3 px-4 tabular-nums font-bold text-electric-cyan">
+                      <td className="py-3 px-4 tabular-nums font-semibold text-electric-cyan">
                         {Number(group.total_kwh || 0).toFixed(2)} kWh
                       </td>
-                      <td className="py-3 px-4 tabular-nums font-bold text-caution-amber">
+                      <td className="py-3 px-4 tabular-nums font-semibold text-caution-amber">
                         {Number(group.total_revenue || 0).toLocaleString()} VND
                       </td>
                       <td className="py-3 px-4 text-right">
                         <button
                           type="button"
                           onClick={() => handleDrilldownGroup(group)}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-obsidian border border-hairline hover:border-electric-cyan text-steel-gray hover:text-tech-white text-[11px] transition-colors"
+                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-obsidian border border-hairline hover:border-electric-cyan text-steel-gray hover:text-tech-white text-xs transition-colors font-medium"
                         >
                           <span>Xem chi tiết</span>
                           <ArrowRight className="w-3 h-3 text-electric-cyan" />
@@ -648,13 +653,13 @@ export default function Sessions() {
           )}
         </div>
       ) : (
-        <div className="bg-panel border border-hairline rounded-sm overflow-hidden">
+        <div className="bg-panel border border-hairline rounded-xl overflow-hidden shadow-sm">
           {loading ? (
-            <div className="text-xs text-steel-gray text-center py-12 font-mono">
+            <div className="text-xs text-steel-gray text-center py-12">
               Đang tải danh sách phiên sạc...
             </div>
           ) : filteredSessions.length === 0 ? (
-            <div className="text-xs text-steel-gray text-center py-12 font-mono">
+            <div className="text-xs text-steel-gray text-center py-12">
               {role === 'CUSTOMER' ? (
                 <div className="flex flex-col items-center gap-3">
                   <span>Bạn chưa có phiên sạc nào phù hợp với bộ lọc.</span>
@@ -671,24 +676,24 @@ export default function Sessions() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left font-mono text-xs">
+              <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-hairline bg-obsidian text-steel-gray">
-                    <th className="py-3 px-4">MÃ PHIÊN</th>
+                    <th className="py-3 px-4 font-semibold">Mã phiên</th>
                     {(role === 'ADMIN' || role === 'OPERATOR') && (
                       <>
-                        <th className="py-3 px-4">TRẠM SẠC</th>
-                        <th className="py-3 px-4">TRỤ SẠC</th>
+                        <th className="py-3 px-4 font-semibold">Trạm sạc</th>
+                        <th className="py-3 px-4 font-semibold">Trụ sạc</th>
                       </>
                     )}
-                    <th className="py-3 px-4">CỔNG SẠC</th>
-                    <th className="py-3 px-4">ĐƠN GIÁ TOU</th>
-                    <th className="py-3 px-4">ĐIỆN NĂNG</th>
-                    <th className="py-3 px-4">TỔNG TIỀN</th>
-                    <th className="py-3 px-4">TRẠNG THÁI</th>
-                    <th className="py-3 px-4">LÝ DO DỪNG</th>
-                    <th className="py-3 px-4">THỜI GIAN</th>
-                    <th className="py-3 px-4 text-right">CHI TIẾT</th>
+                    <th className="py-3 px-4 font-semibold">Cổng sạc</th>
+                    <th className="py-3 px-4 font-semibold">Đơn giá</th>
+                    <th className="py-3 px-4 font-semibold">Điện năng</th>
+                    <th className="py-3 px-4 font-semibold">Tổng tiền</th>
+                    <th className="py-3 px-4 font-semibold">Trạng thái</th>
+                    <th className="py-3 px-4 font-semibold">Lý do dừng</th>
+                    <th className="py-3 px-4 font-semibold">Thời gian</th>
+                    <th className="py-3 px-4 text-right font-semibold">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
@@ -698,13 +703,13 @@ export default function Sessions() {
 
                     return (
                       <tr key={sess.id} className="hover:bg-panel-hover transition-colors">
-                        <td className="py-3 px-4 font-bold text-tech-white">#{sess.id}</td>
+                        <td className="py-3 px-4 font-bold text-tech-white tabular-nums">#{sess.id}</td>
                         {(role === 'ADMIN' || role === 'OPERATOR') && (
                           <>
                             <td className="py-3 px-4 text-tech-white truncate max-w-[140px]" title={sess.station_name || `Trạm #${sess.station_id}`}>
                               {sess.station_name || `Trạm #${sess.station_id || 'N/A'}`}
                             </td>
-                            <td className="py-3 px-4 text-steel-gray font-mono">
+                            <td className="py-3 px-4 text-steel-gray">
                               {sess.charger_code || 'N/A'}
                             </td>
                           </>
@@ -713,7 +718,7 @@ export default function Sessions() {
                         <td className="py-3 px-4 tabular-nums text-steel-gray">
                           {Number(sess.applied_price_per_kwh).toLocaleString()} đ/kWh
                         </td>
-                        <td className="py-3 px-4 tabular-nums font-bold text-electric-cyan">
+                        <td className="py-3 px-4 tabular-nums font-semibold text-electric-cyan">
                           {Number(sess.total_kwh).toFixed(2)} kWh
                         </td>
                         <td className="py-3 px-4 tabular-nums font-bold text-tech-white">
@@ -721,7 +726,7 @@ export default function Sessions() {
                         </td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                               isActive
                                 ? 'bg-electric-cyan/20 text-electric-cyan animate-pulse'
                                 : isCompleted
@@ -729,13 +734,13 @@ export default function Sessions() {
                                 : 'bg-critical-red/20 text-critical-red'
                             }`}
                           >
-                            {sess.status}
+                            {isActive ? 'Đang sạc' : isCompleted ? 'Hoàn thành' : 'Gián đoạn'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-[11px] text-steel-gray">
+                        <td className="py-3 px-4 text-xs text-steel-gray">
                           {sess.stop_reason || (isActive ? 'Đang cấp dòng' : 'N/A')}
                         </td>
-                        <td className="py-3 px-4 text-[11px] text-steel-gray">
+                        <td className="py-3 px-4 text-xs text-steel-gray tabular-nums">
                           {formatVNDateTime(sess.start_time)}
                         </td>
                         <td className="py-3 px-4 text-right">
@@ -745,17 +750,17 @@ export default function Sessions() {
                                 id={`remote-stop-btn-${sess.id}`}
                                 onClick={() => handleRemoteStop(sess)}
                                 disabled={stoppingSessionId === sess.id}
-                                className={`px-2.5 py-1 rounded text-[11px] font-bold border transition-all inline-flex items-center space-x-1 ${
+                                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all inline-flex items-center space-x-1 ${
                                   stoppingSessionId === sess.id
                                     ? 'bg-critical-red/25 border-critical-red text-critical-red cursor-wait'
                                     : 'bg-critical-red/15 border-critical-red/40 hover:bg-critical-red hover:text-white text-critical-red'
                                 }`}
-                                title="Dừng phiên sạc từ xa (RemoteStopTransaction)"
+                                title="Dừng phiên sạc từ xa"
                               >
                                 {stoppingSessionId === sess.id ? (
                                   <>
                                     <Clock className="w-3 h-3 animate-spin text-critical-red" />
-                                    <span className="font-mono">
+                                    <span className="tabular-nums">
                                       {String(Math.floor(stopElapsedSeconds / 60)).padStart(2, '0')}:{String(stopElapsedSeconds % 60).padStart(2, '0')}
                                     </span>
                                   </>
@@ -769,7 +774,7 @@ export default function Sessions() {
                             )}
                             <button
                               onClick={() => setSelectedSession(sess)}
-                              className="px-2 py-1 rounded bg-obsidian border border-hairline hover:bg-hairline text-steel-gray hover:text-tech-white text-[11px]"
+                              className="px-2.5 py-1 rounded-lg bg-obsidian border border-hairline hover:bg-hairline text-steel-gray hover:text-tech-white text-xs font-medium transition-colors"
                             >
                               Hóa đơn
                             </button>

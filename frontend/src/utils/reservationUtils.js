@@ -24,7 +24,7 @@ export function getReservationStatusMeta(status) {
     case 'CANCELLED_NO_SHOW':
       return {
         key: 'EXPIRED',
-        label: 'QUÁ HẠN',
+        label: 'Quá hạn',
         badgeClass:
           'bg-rose-50 text-rose-800 text-critical-red border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/60',
         isOverdue: true,
@@ -35,7 +35,7 @@ export function getReservationStatusMeta(status) {
     case 'PENDING':
       return {
         key: 'ACTIVE',
-        label: 'ĐANG GIỮ CHỖ',
+        label: 'Đang giữ chỗ',
         badgeClass:
           'bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/60',
         isOverdue: false,
@@ -45,7 +45,7 @@ export function getReservationStatusMeta(status) {
     case 'STARTED':
       return {
         key: 'COMPLETED',
-        label: 'HOÀN THÀNH',
+        label: 'Hoàn thành',
         badgeClass:
           'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60',
         isOverdue: false,
@@ -54,7 +54,7 @@ export function getReservationStatusMeta(status) {
     case 'CANCELLED':
       return {
         key: 'CANCELLED',
-        label: 'ĐÃ HỦY',
+        label: 'Đã hủy',
         badgeClass:
           'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
         isOverdue: false,
