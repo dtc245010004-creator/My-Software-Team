@@ -26,7 +26,7 @@ export function getReservationStatusMeta(status) {
         key: 'EXPIRED',
         label: 'QUÁ HẠN',
         badgeClass:
-          'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/60',
+          'bg-rose-50 text-rose-800 text-critical-red border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/60',
         isOverdue: true,
         description: 'Quá giờ giữ chỗ không tới nhận trụ. Đặt chỗ bị hủy và tính phí phạt không đến.',
       };
