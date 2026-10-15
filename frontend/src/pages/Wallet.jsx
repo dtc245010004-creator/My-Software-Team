@@ -31,6 +31,8 @@ import {
   FileCheck2,
   Filter,
   Search,
+  Eye,
+  Ban,
 } from 'lucide-react';
 import api from '../services/api';
 import { telemetryWs } from '../services/websocket';
@@ -401,6 +403,9 @@ export default function Wallet() {
   const [rejectingOrder, setRejectingOrder] = useState(null);
   const [rejectReason, setRejectReason] = useState('Chưa nhận được chuyển khoản hoặc thông tin sai lệch');
 
+  // Modal Chi Tiết Dòng Tiền & Trạng Thái Giao Dịch
+  const [flowInspectionOrder, setFlowInspectionOrder] = useState(null);
+
   // Kênh thanh toán được chọn
   const [selectedChannel, setSelectedChannel] = useState('VIETQR');
 
@@ -653,6 +658,26 @@ export default function Wallet() {
     setAmountError(validation.isValid ? '' : validation.error);
   };
 
+  // Hàm trợ giúp submit form chuyển hướng trực tiếp tới Cổng thanh toán SePay
+  const submitSepayForm = (actionUrl, fields) => {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = actionUrl;
+    form.target = '_blank';
+
+    Object.entries(fields).forEach(([key, value]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = value;
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  };
+
   const handleCreateTopupOrder = async (e) => {
     if (e) e.preventDefault();
 
@@ -689,10 +714,31 @@ export default function Wallet() {
 
       setActiveGatewayTab(selectedChannel);
       setSandboxCheckout(parsedGateway);
-      setCheckoutStep('INPUT');
       setSuccessOrderInfo(null);
       setSubmittedOrderInfo(null);
       setCheckoutCountdown(900);
+
+      // TỰ ĐỘNG CHUYỂN HƯỚNG SANG CỔNG THANH TOÁN SEPAY (Theo yêu cầu người dùng)
+      try {
+        const sepayRes = await api.post('/payments/sepay/checkout-init', {
+          amount: validation.amount,
+          order_code: parsedGateway.orderCode,
+        });
+        const { action_url, fields } = sepayRes.data;
+
+        submitSepayForm(action_url, fields);
+
+        setSandboxCheckout({
+          ...parsedGateway,
+          sepayActionUrl: action_url,
+          sepayFields: fields,
+        });
+        setCheckoutStep('CHECKING');
+        setCheckingSecondsLeft(30);
+      } catch (sepayErr) {
+        console.warn('Lỗi kết nối cổng SePay, hiển thị mã QR dự phòng:', sepayErr);
+        setCheckoutStep('INPUT');
+      }
     } catch (err) {
       const detail = err.response?.data?.detail || err.message;
       setAmountError(`Không thể khởi tạo đơn nạp: ${detail}`);
@@ -709,31 +755,34 @@ export default function Wallet() {
     checkOrderStatusNow(sandboxCheckout.orderCode);
   };
 
-  // Timer kiểm tra biến động số dư SePay (Đếm ngược 15s nếu trễ mới chuyển Admin)
+  // Timer kiểm tra biến động số dư SePay (Đếm ngược 30s nếu trễ mới chuyển Admin)
   useEffect(() => {
-    if (checkoutStep !== 'CHECKING' || !sandboxCheckout) return undefined;
+    if (checkoutStep !== 'CHECKING' || !sandboxCheckout?.orderCode) return undefined;
+
+    const codeToPoll = sandboxCheckout.orderCode;
+    checkOrderStatusNow(codeToPoll);
 
     const timer = setInterval(() => {
+      checkOrderStatusNow(codeToPoll);
       setCheckingSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Hết 15 giây mà ngân hàng chưa xác nhận -> Chuyển sang hàng đợi Admin duyệt thủ công
+          // Hết thời gian mà ngân hàng chưa xác nhận -> Chuyển sang hàng đợi Admin duyệt thủ công
           setCheckoutStep('TIMEOUT_OR_ERROR');
           setSubmittedOrderInfo({
-            orderCode: sandboxCheckout.orderCode,
+            orderCode: codeToPoll,
             amount: sandboxCheckout.amount,
             channelName:
               PAYMENT_CHANNELS.find((c) => c.id === activeGatewayTab)?.name || 'Chuyển khoản VietQR',
           });
           return 0;
         }
-        checkOrderStatusNow(sandboxCheckout.orderCode);
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [checkoutStep, sandboxCheckout, activeGatewayTab, checkOrderStatusNow]);
+  }, [checkoutStep, sandboxCheckout?.orderCode, checkOrderStatusNow, activeGatewayTab]);
 
   // Test runners handlers cho automated tests
   const handleSandboxPaySuccess = () => handleDriverConfirmPayment();
@@ -750,30 +799,46 @@ export default function Wallet() {
         order_code: sandboxCheckout?.orderCode,
       });
       const { action_url, fields } = res.data;
-
-      // Tạo và submit form chuyển hướng trực tiếp tới trang thanh toán của SePay
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = action_url;
-      form.target = '_blank';
-
-      Object.entries(fields).forEach(([key, value]) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = value;
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
+      submitSepayForm(action_url, fields);
     } catch (err) {
       console.error('Lỗi khởi tạo cổng SePay:', err);
       setAmountError(
         'Không thể kết nối Cổng thanh toán SePay: ' +
           (err.response?.data?.detail || err.message)
       );
+    } finally {
+      setProcessingGatewayAction(false);
+    }
+  };
+
+  // Hủy đơn nạp tiền đang chờ duyệt / đang thanh toán (SCRUM-SEPAY-CANCEL)
+  const handleCancelTopupOrder = async (orderCode) => {
+    if (!orderCode) return;
+    try {
+      setProcessingGatewayAction(true);
+      await api.post(`/wallet/topup-requests/${orderCode}/cancel`);
+      setTopupOrders((prev) =>
+        prev.map((o) => (o.order_code === orderCode ? { ...o, status: 'CANCELLED' } : o))
+      );
+      if (sandboxCheckout && sandboxCheckout.orderCode === orderCode) {
+        setSandboxCheckout(null);
+        setCheckoutStep('INPUT');
+      }
+      if (
+        flowInspectionOrder &&
+        (flowInspectionOrder.order_code === orderCode ||
+          flowInspectionOrder.reference_id === orderCode)
+      ) {
+        setFlowInspectionOrder((prev) => ({ ...prev, status: 'CANCELLED' }));
+      }
+      setBannerAlert({
+        type: 'INFO',
+        title: `Đã hủy giao dịch #${orderCode}`,
+        detail: 'Giao dịch nạp tiền đã được hủy và lưu vào lịch sử giao dịch với trạng thái ĐÃ HỦY.',
+      });
+      await fetchWalletData(true);
+    } catch (err) {
+      alert('Không thể hủy đơn: ' + (err.response?.data?.detail || err.message));
     } finally {
       setProcessingGatewayAction(false);
     }
@@ -860,10 +925,57 @@ export default function Wallet() {
     sandboxCheckout?.amount || currentAmountNum
   }&addInfo=${encodeURIComponent(transferContent)}&accountName=CONG%20TY%20EV%20CSMS`;
 
+  // Hợp nhất Lịch sử giao dịch sổ cái với tất cả các Đơn nạp tiền (kể cả ĐÃ HỦY, THẤT BẠI, ĐANG CHỜ)
+  const unifiedTransactions = useMemo(() => {
+    const list = Array.isArray(transactions) ? [...transactions] : [];
+    const ledgerRefIds = new Set(
+      list.map((tx) => String(tx.reference_id || '').trim()).filter(Boolean)
+    );
+
+    if (Array.isArray(topupOrders)) {
+      topupOrders.forEach((o) => {
+        const orderCode = String(o.order_code || '').trim();
+        const status = String(o.status || 'PENDING').toUpperCase();
+
+        const alreadyInLedger =
+          ledgerRefIds.has(orderCode) ||
+          list.some((tx) => tx.note && tx.note.includes(orderCode));
+
+        if (!alreadyInLedger) {
+          list.push({
+            id: `topup-${orderCode}`,
+            wallet_id: wallet?.id,
+            amount: Number(o.amount || 0),
+            transaction_type: 'TOPUP',
+            status: status, // 'PENDING' | 'CANCELLED' | 'FAILED' | 'SUCCESS'
+            failure_reason: o.failure_reason,
+            balance_before: null,
+            balance_after: null,
+            reference_type: 'TOPUP_ORDER',
+            reference_id: orderCode,
+            receipt_code: null,
+            note:
+              status === 'CANCELLED'
+                ? `Yêu cầu nạp tiền #${orderCode} (Đã hủy)`
+                : status === 'FAILED'
+                ? `Yêu cầu nạp tiền #${orderCode} (${o.failure_reason || 'Bị từ chối'})`
+                : status === 'PENDING'
+                ? `Yêu cầu nạp tiền #${orderCode} (Chờ đối soát)`
+                : `Nạp tiền qua SePay #${orderCode}`,
+            created_at: o.created_at || new Date().toISOString(),
+            rawOrder: o,
+          });
+        }
+      });
+    }
+
+    return list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  }, [transactions, topupOrders, wallet]);
+
   // SCRUM-378: Lọc giao dịch
   const penaltyTxs = useMemo(
-    () => (Array.isArray(transactions) ? transactions.filter(isPenaltyTransaction) : []),
-    [transactions]
+    () => (Array.isArray(unifiedTransactions) ? unifiedTransactions.filter(isPenaltyTransaction) : []),
+    [unifiedTransactions]
   );
   const totalPenaltyAmount = useMemo(() => {
     return penaltyTxs.reduce((sum, tx) => sum + Math.abs(Number(tx.amount || 0)), 0);
@@ -871,31 +983,31 @@ export default function Wallet() {
 
   const topupTxsCount = useMemo(
     () =>
-      Array.isArray(transactions)
-        ? transactions.filter((tx) => tx.transaction_type === 'TOPUP').length
+      Array.isArray(unifiedTransactions)
+        ? unifiedTransactions.filter((tx) => tx.transaction_type === 'TOPUP').length
         : 0,
-    [transactions]
+    [unifiedTransactions]
   );
   const chargeTxsCount = useMemo(
     () =>
-      Array.isArray(transactions)
-        ? transactions.filter(
+      Array.isArray(unifiedTransactions)
+        ? unifiedTransactions.filter(
             (tx) => tx.transaction_type === 'CHARGE_FEE' && !isPenaltyTransaction(tx)
           ).length
         : 0,
-    [transactions]
+    [unifiedTransactions]
   );
 
   const filteredTransactions = useMemo(() => {
-    if (!Array.isArray(transactions)) return [];
-    if (txFilter === 'TOPUP') return transactions.filter((tx) => tx.transaction_type === 'TOPUP');
+    if (!Array.isArray(unifiedTransactions)) return [];
+    if (txFilter === 'TOPUP') return unifiedTransactions.filter((tx) => tx.transaction_type === 'TOPUP');
     if (txFilter === 'CHARGE_FEE')
-      return transactions.filter(
+      return unifiedTransactions.filter(
         (tx) => tx.transaction_type === 'CHARGE_FEE' && !isPenaltyTransaction(tx)
       );
     if (txFilter === 'PENALTY') return penaltyTxs;
-    return transactions;
-  }, [transactions, txFilter, penaltyTxs]);
+    return unifiedTransactions;
+  }, [unifiedTransactions, txFilter, penaltyTxs]);
 
   // Các đơn nạp đang chờ duyệt của cá nhân
   const pendingOrders = useMemo(
@@ -1318,10 +1430,11 @@ export default function Wallet() {
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => checkOrderStatusNow(pendingOrders[0].order_code)}
-                  className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors shadow-sm"
+                  onClick={() => setFlowInspectionOrder(pendingOrders[0])}
+                  className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors shadow-sm flex items-center space-x-1.5"
                 >
-                  Kiểm tra trạng thái
+                  <Eye className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Kiểm tra trạng thái</span>
                 </button>
               </div>
             </div>
@@ -1632,6 +1745,10 @@ export default function Wallet() {
                         const isCredit = tx.transaction_type === 'TOPUP';
                         const isPenalty = isPenaltyTransaction(tx);
                         const amountNum = Number(tx.amount);
+                        const status = String(tx.status || 'SUCCESS').toUpperCase();
+                        const isCancelled = status === 'CANCELLED';
+                        const isFailed = status === 'FAILED';
+                        const isPending = status === 'PENDING';
 
                         const targetLink = isCredit
                           ? '/wallet'
@@ -1639,22 +1756,38 @@ export default function Wallet() {
                           ? `/reservations?highlight=${tx.reference_id || tx.id}`
                           : `/session/${tx.reference_id || tx.id}`;
 
+                        const isTopupType = isCredit || isCancelled || isFailed || isPending;
+
                         return (
                           <div
                             key={tx.id}
-                            className="py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 px-2 rounded-xl transition-colors"
+                            className={`py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 px-2 rounded-xl transition-colors ${
+                              isCancelled ? 'opacity-75' : ''
+                            }`}
                           >
                             <div className="flex items-center space-x-3 min-w-0">
                               <div
                                 className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                                  isCredit
+                                  isCancelled
+                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700'
+                                    : isFailed
+                                    ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+                                    : isPending
+                                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
+                                    : isCredit
                                     ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
                                     : isPenalty
                                     ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                                 }`}
                               >
-                                {isCredit ? (
+                                {isCancelled ? (
+                                  <XCircle className="w-4 h-4 text-slate-400" />
+                                ) : isFailed ? (
+                                  <AlertTriangle className="w-4 h-4 text-rose-500" />
+                                ) : isPending ? (
+                                  <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
+                                ) : isCredit ? (
                                   <ArrowDownLeft className="w-4 h-4" />
                                 ) : isPenalty ? (
                                   <Clock className="w-4 h-4" />
@@ -1664,12 +1797,36 @@ export default function Wallet() {
                               </div>
 
                               <div className="min-w-0">
-                                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                                  {isCredit
-                                    ? 'Nạp tiền vào ví'
-                                    : isPenalty
-                                    ? 'Phí giữ chỗ quá hạn'
-                                    : 'Cước sạc xe điện'}
+                                <div className="flex items-center space-x-2">
+                                  <span
+                                    className={`text-xs font-bold truncate ${
+                                      isCancelled
+                                        ? 'line-through text-slate-500'
+                                        : 'text-slate-900 dark:text-slate-100'
+                                    }`}
+                                  >
+                                    {isCredit
+                                      ? 'Nạp tiền vào ví'
+                                      : isPenalty
+                                      ? 'Phí giữ chỗ quá hạn'
+                                      : 'Cước sạc xe điện'}
+                                  </span>
+
+                                  {isCancelled && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-300 dark:border-slate-700">
+                                      ĐÃ HỦY
+                                    </span>
+                                  )}
+                                  {isFailed && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                                      TỪ CHỐI
+                                    </span>
+                                  )}
+                                  {isPending && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                      CHỜ DUYỆT
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                                   {tx.note || `Mã tham chiếu: #${tx.reference_id || tx.id}`} &bull;{' '}
@@ -1681,23 +1838,40 @@ export default function Wallet() {
                             <div className="text-right shrink-0">
                               <div
                                 className={`text-sm font-extrabold tabular-nums ${
-                                  isCredit
+                                  isCancelled
+                                    ? 'line-through text-slate-400'
+                                    : isFailed
+                                    ? 'line-through text-rose-500'
+                                    : isPending
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : isCredit
                                     ? 'text-emerald-600 dark:text-emerald-400'
                                     : isPenalty
                                     ? 'text-amber-600 dark:text-amber-400'
                                     : 'text-slate-900 dark:text-slate-100'
                                 }`}
                               >
-                                {isCredit ? '+' : '-'}
+                                {isCancelled ? '±' : isCredit ? '+' : '-'}
                                 {formatVND(Math.abs(amountNum))}
                               </div>
-                              <Link
-                                to={targetLink}
-                                className="inline-flex items-center text-[10px] text-sky-600 hover:text-sky-700 font-semibold mt-0.5"
-                              >
-                                <span>Chi tiết</span>
-                                <ChevronRight className="w-3 h-3 ml-0.5" />
-                              </Link>
+                              {isTopupType ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setFlowInspectionOrder(tx.rawOrder || tx)}
+                                  className="inline-flex items-center text-[10px] text-sky-600 hover:text-sky-700 font-semibold mt-0.5 cursor-pointer"
+                                >
+                                  <span>Chi tiết</span>
+                                  <ChevronRight className="w-3 h-3 ml-0.5" />
+                                </button>
+                              ) : (
+                                <Link
+                                  to={targetLink}
+                                  className="inline-flex items-center text-[10px] text-sky-600 hover:text-sky-700 font-semibold mt-0.5"
+                                >
+                                  <span>Chi tiết</span>
+                                  <ChevronRight className="w-3 h-3 ml-0.5" />
+                                </Link>
+                              )}
                             </div>
                           </div>
                         );
@@ -1756,7 +1930,7 @@ export default function Wallet() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Đơn hàng #{sandboxCheckout.orderCode} &bull; Hết hạn sau:{' '}
+                    Đơn hàng #<span data-testid="checkout-order-code">{sandboxCheckout.orderCode}</span> &bull; Hết hạn sau:{' '}
                     <span className="text-amber-400 font-mono font-bold">
                       {formatCountdown(checkoutCountdown)}
                     </span>
@@ -1850,28 +2024,53 @@ export default function Wallet() {
                   <span>Đang mở cổng lắng nghe Webhook ngân hàng thời gian thực...</span>
                 </div>
 
-                <div className="flex items-center space-x-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setCheckoutStep('INPUT')}
-                    className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
-                  >
-                    Xem Lại Mã QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCheckoutStep('TIMEOUT_OR_ERROR');
-                      setSubmittedOrderInfo({
-                        orderCode: sandboxCheckout.orderCode,
-                        amount: sandboxCheckout.amount,
-                        channelName: 'Chuyển khoản VietQR',
-                      });
-                    }}
-                    className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-colors shadow-sm"
-                  >
-                    Chuyển Admin Duyệt Ngay
-                  </button>
+                <div className="space-y-2 pt-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={processingGatewayAction}
+                      onClick={handleOpenSepayGateway}
+                      className="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors shadow-sm"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Mở Lại Trang SePay</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutStep('INPUT')}
+                      className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors flex items-center justify-center space-x-1.5"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>Xem Mã VietQR</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={processingGatewayAction}
+                      onClick={() => handleCancelTopupOrder(sandboxCheckout.orderCode)}
+                      className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:text-slate-400 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 text-xs font-semibold transition-colors flex items-center justify-center space-x-1"
+                    >
+                      <Ban className="w-3.5 h-3.5" />
+                      <span>Hủy Đơn Nạp</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCheckoutStep('TIMEOUT_OR_ERROR');
+                        setSubmittedOrderInfo({
+                          orderCode: sandboxCheckout.orderCode,
+                          amount: sandboxCheckout.amount,
+                          channelName: 'Chuyển khoản VietQR',
+                        });
+                      }}
+                      className="py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-semibold transition-colors flex items-center justify-center space-x-1"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Chờ Admin Duyệt</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : checkoutStep === 'TIMEOUT_OR_ERROR' || submittedOrderInfo ? (
@@ -1905,16 +2104,30 @@ export default function Wallet() {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSandboxCheckout(null);
-                    setCheckoutStep('INPUT');
-                  }}
-                  className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-sky-600/20"
-                >
-                  ĐÃ HIỂU &amp; VỀ VÍ CỦA TÔI
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSandboxCheckout(null);
+                      setCheckoutStep('INPUT');
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-sky-600/20"
+                  >
+                    ĐÃ HIỂU &amp; VỀ VÍ CỦA TÔI
+                  </button>
+                  <button
+                    type="button"
+                    disabled={processingGatewayAction}
+                    onClick={() =>
+                      handleCancelTopupOrder(
+                        sandboxCheckout?.orderCode || submittedOrderInfo?.orderCode
+                      )
+                    }
+                    className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:text-slate-300 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-300 font-bold text-xs transition-colors"
+                  >
+                    HỦY ĐƠN
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -2355,6 +2568,267 @@ export default function Wallet() {
           </div>
         </div>
       )}
+
+      {/* ============================================================================
+          MODAL CHI TIẾT DÒNG TIỀN & TRẠNG THÁI GIAO DỊCH (SCRUM-SEPAY-FLOW)
+         ============================================================================ */}
+      {flowInspectionOrder && (() => {
+        const orderCode =
+          flowInspectionOrder.order_code ||
+          flowInspectionOrder.reference_id ||
+          flowInspectionOrder.id;
+        const amount = Number(flowInspectionOrder.amount || 0);
+        const rawStatus = String(flowInspectionOrder.status || 'SUCCESS').toUpperCase();
+        const isCancelled = rawStatus === 'CANCELLED';
+        const isFailed = rawStatus === 'FAILED';
+        const isPending = rawStatus === 'PENDING';
+        const isSuccess = rawStatus === 'SUCCESS';
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden my-auto animate-scaleUp">
+              {/* Header Modal */}
+              <div className="bg-slate-900 text-white p-5 flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-400/30">
+                    <Radio className="w-4 h-4 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm tracking-wide uppercase">
+                      Chi Tiết Dòng Tiền &amp; Trạng Thái
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Mã giao dịch: <span className="font-mono text-sky-300 font-semibold">#{orderCode}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFlowInspectionOrder(null)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Thẻ tóm tắt số tiền & Trạng thái hiện tại */}
+              <div className="p-6 space-y-6">
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
+                      Số tiền giao dịch
+                    </div>
+                    <div
+                      className={`text-2xl font-extrabold tabular-nums mt-0.5 ${
+                        isCancelled
+                          ? 'line-through text-slate-400'
+                          : isFailed
+                          ? 'line-through text-rose-500'
+                          : isPending
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {isCancelled ? '±' : isSuccess ? '+' : ''}
+                      {formatVND(Math.abs(amount))}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold mb-1">
+                      Trạng thái hiện tại
+                    </div>
+                    {isSuccess && (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>HOÀN TẤT</span>
+                      </span>
+                    )}
+                    {isPending && (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                        <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                        <span>CHỜ ĐỐI SOÁT</span>
+                      </span>
+                    )}
+                    {isCancelled && (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                        <XCircle className="w-3.5 h-3.5 text-slate-500" />
+                        <span>ĐÃ HỦY</span>
+                      </span>
+                    )}
+                    {isFailed && (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>TỪ CHỐI</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* TIMELINE SƠ ĐỒ DÒNG TIỀN (3 BƯỚC MINH BẠCH) */}
+                <div className="space-y-4">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Tiến Trình Di Chuyển Dòng Tiền (Audit Trail):
+                  </div>
+
+                  <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-700">
+                    {/* Bước 1: Khởi tạo */}
+                    <div className="relative">
+                      <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center ring-4 ring-white dark:ring-slate-900 shadow-sm">
+                        <Check className="w-3 h-3" />
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                        1. Khởi tạo yêu cầu nạp tiền
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Đơn nạp #{orderCode} được tạo vào lúc{' '}
+                        {flowInspectionOrder.created_at
+                          ? formatVNDateTime(flowInspectionOrder.created_at)
+                          : 'vừa xong'}.
+                      </p>
+                    </div>
+
+                    {/* Bước 2: SePay & Ngân hàng */}
+                    <div className="relative">
+                      <div
+                        className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-white dark:ring-slate-900 shadow-sm ${
+                          isSuccess
+                            ? 'bg-emerald-500 text-white'
+                            : isPending
+                            ? 'bg-sky-500 text-white animate-pulse'
+                            : isCancelled
+                            ? 'bg-slate-400 text-white'
+                            : 'bg-rose-500 text-white'
+                        }`}
+                      >
+                        {isSuccess ? (
+                          <Check className="w-3 h-3" />
+                        ) : isPending ? (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        ) : isCancelled ? (
+                          <X className="w-3 h-3" />
+                        ) : (
+                          <AlertTriangle className="w-3 h-3" />
+                        )}
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                        2. Cổng thanh toán SePay &amp; Biến động số dư ngân hàng
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        {isSuccess
+                          ? 'Ngân hàng đã xác nhận chuyển khoản thành công và SePay phát Webhook HMAC-SHA256 chuẩn chỉ.'
+                          : isPending
+                          ? 'Đang chờ ngân hàng phát hiện giao dịch chuyển khoản VietQR 24/7 từ tài khoản của bạn.'
+                          : isCancelled
+                          ? 'Giao dịch nạp tiền đã hủy theo yêu cầu. Không phát sinh trừ tiền ngân hàng.'
+                          : `Thất bại / Bị từ chối: ${
+                              flowInspectionOrder.failure_reason || 'Không khớp thông tin chuyển khoản'
+                            }.`}
+                      </p>
+                    </div>
+
+                    {/* Bước 3: Ghi nhận số dư ví */}
+                    <div className="relative">
+                      <div
+                        className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center ring-4 ring-white dark:ring-slate-900 shadow-sm ${
+                          isSuccess
+                            ? 'bg-emerald-500 text-white'
+                            : isPending
+                            ? 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                            : isCancelled
+                            ? 'bg-slate-400 text-white'
+                            : 'bg-rose-400 text-white'
+                        }`}
+                      >
+                        {isSuccess ? (
+                          <Check className="w-3 h-3" />
+                        ) : (
+                          <Shield className="w-3 h-3" />
+                        )}
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                        3. Ghi có số dư ví EV CSMS
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        {isSuccess
+                          ? 'Tiền đã được tự động cộng vào số dư ví của tài xế ngay lập tức, không qua khâu duyệt tay.'
+                          : isPending
+                          ? 'Sẵn sàng tự động ghi có ngay khi SePay gửi tín hiệu xác nhận hoặc Ban quản trị duyệt đối soát.'
+                          : isCancelled
+                          ? 'Số dư ví được bảo toàn nguyên vẹn, không phát sinh bất kỳ khoản trừ hay nợ phí nào.'
+                          : 'Số dư ví không thay đổi.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Các nút tương tác cho người dùng */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                  {isPending && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          disabled={isPolling}
+                          onClick={async () => {
+                            const res = await checkOrderStatusNow(orderCode);
+                            if (res?.order) {
+                              setFlowInspectionOrder(res.order);
+                            }
+                          }}
+                          className="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors shadow-sm"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isPolling ? 'animate-spin' : ''}`} />
+                          <span>Kiểm Tra SePay Ngay</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={processingGatewayAction}
+                          onClick={async () => {
+                            try {
+                              const sepayRes = await api.post('/payments/sepay/checkout-init', {
+                                amount,
+                                order_code: orderCode,
+                              });
+                              const { action_url, fields } = sepayRes.data;
+                              submitSepayForm(action_url, fields);
+                            } catch (err) {
+                              alert('Không thể mở SePay: ' + (err.response?.data?.detail || err.message));
+                            }
+                          }}
+                          className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors shadow-sm"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Mở Lại SePay</span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={processingGatewayAction}
+                        onClick={() => handleCancelTopupOrder(orderCode)}
+                        className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:text-slate-300 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 hover:border-rose-300 font-semibold text-xs flex items-center justify-center space-x-1.5 transition-colors"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Hủy Yêu Cầu Nạp Tiền Này</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setFlowInspectionOrder(null)}
+                    className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
+                  >
+                    Đóng cửa sổ
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Hidden Table for Automated Tests */}
       <div className="sr-only" aria-hidden="true">

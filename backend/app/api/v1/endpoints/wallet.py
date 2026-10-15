@@ -346,6 +346,40 @@ def get_topup_request_status(
 
 
 @router.post(
+    "/topup-requests/{order_code}/cancel",
+    response_model=TopupOrderStatusResponse,
+    summary="Hủy yêu cầu nạp tiền đang chờ duyệt",
+)
+def cancel_my_topup_request(
+    order_code: str,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    order = db.query(TopupOrder).filter(TopupOrder.order_code == order_code).first()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Topup order not found"
+        )
+    if order.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this order",
+        )
+    if order.status != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel order with status {order.status}",
+        )
+    order.status = "CANCELLED"
+    order.failure_reason = "Người dùng tự hủy yêu cầu nạp tiền"
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+
+@router.post(
     "/admin/{wallet_id}/reconciliation/unlock",
     response_model=WalletResponse,
     summary="Admin mở khóa giao dịch ví sau khi xử lý lệch sổ cái",
