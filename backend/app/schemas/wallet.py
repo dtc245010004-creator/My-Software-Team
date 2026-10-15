@@ -160,3 +160,34 @@ class TopupOrderRejectRequest(BaseModel):
         description="Lý do từ chối yêu cầu nạp tiền",
     )
 
+
+class RevenueTimeframeStats(BaseModel):
+    """Thống kê doanh thu theo mốc thời gian (Hôm nay, 7 ngày, 30 ngày)."""
+
+    charging_revenue: Decimal
+    topup_revenue: Decimal
+    total_revenue: Decimal
+    session_count: int
+    topup_count: int
+
+
+class RevenueDayData(BaseModel):
+    """Dữ liệu doanh thu từng ngày phục vụ biểu đồ."""
+
+    date: str
+    label: str
+    charging_revenue: Decimal
+    topup_revenue: Decimal
+    total_revenue: Decimal
+
+
+class RevenueSummaryResponse(BaseModel):
+    """Tổng quan doanh thu hằng ngày, 7 ngày và 30 ngày cho Admin, Chủ trạm và Kế toán."""
+
+    today: RevenueTimeframeStats
+    last_7_days: RevenueTimeframeStats
+    last_30_days: RevenueTimeframeStats
+    chart_7d: list[RevenueDayData] = Field(default_factory=list)
+    chart_30d: list[RevenueDayData] = Field(default_factory=list)
+    currency: str = "VND"
+

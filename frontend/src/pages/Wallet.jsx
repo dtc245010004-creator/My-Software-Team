@@ -14,6 +14,8 @@ import {
   CreditCard,
   Lock,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   Clock,
   XCircle,
@@ -33,6 +35,10 @@ import {
   Search,
   Eye,
   Ban,
+  BarChart3,
+  TrendingUp,
+  Layers,
+  Calendar,
 } from 'lucide-react';
 import api from '../services/api';
 import { telemetryWs } from '../services/websocket';
@@ -399,6 +405,12 @@ export default function Wallet() {
   const [adminSearch, setAdminSearch] = useState('');
   const [processingOrderId, setProcessingOrderId] = useState(null);
 
+  // Thống kê Doanh thu (Hằng ngày, 7 ngày, 30 ngày) cho Admin, Chủ trạm (CPO) & Kế toán
+  const [revenueStats, setRevenueStats] = useState(null);
+  const [revenueLoading, setRevenueLoading] = useState(false);
+  const [revenuePeriod, setRevenuePeriod] = useState('7D'); // 'TODAY' | '7D' | '30D'
+  const [showRevenueChart, setShowRevenueChart] = useState(true);
+
   // Modal Từ chối nạp tiền
   const [rejectingOrder, setRejectingOrder] = useState(null);
   const [rejectReason, setRejectReason] = useState('Chưa nhận được chuyển khoản hoặc thông tin sai lệch');
@@ -531,6 +543,20 @@ export default function Wallet() {
     }
   }, [canApprove]);
 
+  // Tải thống kê tổng doanh thu (Hôm nay, 7 ngày, 30 ngày) cho Admin, Chủ trạm (CPO) và Kế toán
+  const fetchRevenueStats = useCallback(async () => {
+    if (!canApprove) return;
+    try {
+      setRevenueLoading(true);
+      const res = await api.get('/wallet/admin/revenue-summary');
+      setRevenueStats(res.data);
+    } catch (err) {
+      console.error('Lỗi tải thống kê tổng doanh thu:', err);
+    } finally {
+      setRevenueLoading(false);
+    }
+  }, [canApprove]);
+
   // Tải dữ liệu ví của cá nhân
   const fetchWalletData = useCallback(async (silent = false) => {
     try {
@@ -567,7 +593,10 @@ export default function Wallet() {
     setTopupOrders,
     onConfirmedSuccess: async (confirmedOrder) => {
       await fetchWalletData(true);
-      if (canApprove) await fetchAdminOrders();
+      if (canApprove) {
+        await fetchAdminOrders();
+        await fetchRevenueStats();
+      }
       setCheckoutStep('SUCCESS');
       setSuccessOrderInfo(confirmedOrder);
       setBannerAlert({
@@ -600,8 +629,9 @@ export default function Wallet() {
     fetchWalletData();
     if (canApprove) {
       fetchAdminOrders();
+      fetchRevenueStats();
     }
-  }, [token, user, fetchWalletData, fetchAdminOrders, canApprove]);
+  }, [token, user, fetchWalletData, fetchAdminOrders, fetchRevenueStats, canApprove]);
 
   // Xử lý Callback Return URL
   useEffect(() => {
@@ -857,6 +887,7 @@ export default function Wallet() {
         detail: res.data?.message || `Đã duyệt đơn nạp #${orderCode} vào ví tài xế.`,
       });
       await fetchAdminOrders();
+      await fetchRevenueStats();
       await fetchWalletData(true);
     } catch (err) {
       alert('Lỗi phê duyệt: ' + (err.response?.data?.detail || err.message));
@@ -1182,6 +1213,389 @@ export default function Wallet() {
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TỔNG DOANH THU (HÔM NAY / 7 NGÀY / 30 NGÀY) CHO ADMIN, CHỦ TRẠM, KẾ TOÁN */}
+      {/* ========================================================================= */}
+      {canApprove && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
+          {/* Header & Bộ lọc thời gian */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+                    Tổng Doanh Thu Hệ Thống &amp; Trạm Sạc
+                  </h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                    {user?.role === 'ADMIN'
+                      ? 'Toàn Hệ Thống'
+                      : user?.role === 'ACCOUNTANT'
+                      ? 'Kế Toán CSMS'
+                      : 'Trạm Quản Lý'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Doanh thu sạc xe thực tế &amp; dòng tiền nạp ví theo 3 mốc: Hôm nay (hằng ngày), 7 ngày và 30 ngày qua.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 self-start sm:self-auto">
+              {/* Tab chuyển đổi chu kỳ xem biểu đồ */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setRevenuePeriod('TODAY')}
+                  className={`px-3 py-1 rounded-lg transition-all ${
+                    revenuePeriod === 'TODAY'
+                      ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Hôm Nay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRevenuePeriod('7D')}
+                  className={`px-3 py-1 rounded-lg transition-all ${
+                    revenuePeriod === '7D'
+                      ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  7 Ngày
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRevenuePeriod('30D')}
+                  className={`px-3 py-1 rounded-lg transition-all ${
+                    revenuePeriod === '30D'
+                      ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  30 Ngày
+                </button>
+              </div>
+
+              {/* Toggle Biểu đồ */}
+              <button
+                type="button"
+                onClick={() => setShowRevenueChart(!showRevenueChart)}
+                className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                title={showRevenueChart ? 'Thu gọn biểu đồ' : 'Mở rộng biểu đồ'}
+              >
+                {showRevenueChart ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+
+              {/* Nút Làm Mới */}
+              <button
+                type="button"
+                onClick={fetchRevenueStats}
+                disabled={revenueLoading}
+                className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                title="Làm mới thống kê doanh thu"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${revenueLoading ? 'animate-spin text-sky-500' : ''}`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* 3 Thẻ Chỉ Số Doanh Thu Chính (Hôm Nay, 7 Ngày, 30 Ngày) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* THẺ 1: HÔM NAY (HẰNG NGÀY) */}
+            <div
+              onClick={() => setRevenuePeriod('TODAY')}
+              className={`p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
+                revenuePeriod === 'TODAY'
+                  ? 'border-sky-500 bg-sky-50/40 dark:bg-sky-950/20 shadow-sm ring-1 ring-sky-500'
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-bold">
+                <span className="flex items-center space-x-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-sky-500" />
+                  <span>DOANH THU HÔM NAY</span>
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 font-semibold">
+                  Hằng Ngày
+                </span>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2.5 tabular-nums">
+                {revenueLoading && !revenueStats ? (
+                  <div className="h-8 w-32 bg-slate-200 dark:bg-slate-800 animate-pulse rounded" />
+                ) : (
+                  formatVND(revenueStats?.today?.total_revenue || 0)
+                )}
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/80 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="flex items-center space-x-1">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 inline-block" />
+                    <span>Sạc xe:</span>
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">
+                    {formatVND(revenueStats?.today?.charging_revenue || 0)}{' '}
+                    <span className="font-normal text-[11px] text-slate-500">
+                      ({revenueStats?.today?.session_count || 0} phiên)
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="flex items-center space-x-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                    <span>Nạp ví:</span>
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">
+                    {formatVND(revenueStats?.today?.topup_revenue || 0)}{' '}
+                    <span className="font-normal text-[11px] text-slate-500">
+                      ({revenueStats?.today?.topup_count || 0} đơn)
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* THẺ 2: 7 NGÀY GẦN NHẤT */}
+            <div
+              onClick={() => setRevenuePeriod('7D')}
+              className={`p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
+                revenuePeriod === '7D'
+                  ? 'border-sky-500 bg-sky-50/40 dark:bg-sky-950/20 shadow-sm ring-1 ring-sky-500'
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-bold">
+                <span className="flex items-center space-x-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-sky-500" />
+                  <span>DOANH THU 7 NGÀY QUA</span>
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 font-semibold">
+                  7 Ngày
+                </span>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2.5 tabular-nums">
+                {revenueLoading && !revenueStats ? (
+                  <div className="h-8 w-32 bg-slate-200 dark:bg-slate-800 animate-pulse rounded" />
+                ) : (
+                  formatVND(revenueStats?.last_7_days?.total_revenue || 0)
+                )}
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/80 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="flex items-center space-x-1">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 inline-block" />
+                    <span>Sạc xe:</span>
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">
+                    {formatVND(revenueStats?.last_7_days?.charging_revenue || 0)}{' '}
+                    <span className="font-normal text-[11px] text-slate-500">
+                      ({revenueStats?.last_7_days?.session_count || 0} phiên)
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="flex items-center space-x-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                    <span>Nạp ví:</span>
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">
+                    {formatVND(revenueStats?.last_7_days?.topup_revenue || 0)}{' '}
+                    <span className="font-normal text-[11px] text-slate-500">
+                      ({revenueStats?.last_7_days?.topup_count || 0} đơn)
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* THẺ 3: 30 NGÀY GẦN NHẤT */}
+            <div
+              onClick={() => setRevenuePeriod('30D')}
+              className={`p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
+                revenuePeriod === '30D'
+                  ? 'border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 shadow-sm ring-1 ring-indigo-500'
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-bold">
+                <span className="flex items-center space-x-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>DOANH THU 30 NGÀY QUA</span>
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300 font-semibold">
+                  30 Ngày
+                </span>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2.5 tabular-nums">
+                {revenueLoading && !revenueStats ? (
+                  <div className="h-8 w-32 bg-slate-200 dark:bg-slate-800 animate-pulse rounded" />
+                ) : (
+                  formatVND(revenueStats?.last_30_days?.total_revenue || 0)
+                )}
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/80 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="flex items-center space-x-1">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 inline-block" />
+                    <span>Sạc xe:</span>
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">
+                    {formatVND(revenueStats?.last_30_days?.charging_revenue || 0)}{' '}
+                    <span className="font-normal text-[11px] text-slate-500">
+                      ({revenueStats?.last_30_days?.session_count || 0} phiên)
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="flex items-center space-x-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                    <span>Nạp ví:</span>
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-200">
+                    {formatVND(revenueStats?.last_30_days?.topup_revenue || 0)}{' '}
+                    <span className="font-normal text-[11px] text-slate-500">
+                      ({revenueStats?.last_30_days?.topup_count || 0} đơn)
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Biểu Đồ Cột Xu Hướng Doanh Thu Hằng Ngày */}
+          {showRevenueChart && (
+            <div className="mt-2 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Biểu Đồ Xu Hướng Doanh Thu ({revenuePeriod === '30D' ? '30 Ngày Gần Nhất' : '7 Ngày Gần Nhất'})
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    (VND &bull; Giờ VN UTC+7)
+                  </span>
+                </div>
+                <div className="flex items-center space-x-4 text-xs">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-cyan-500" />
+                    <span className="text-slate-600 dark:text-slate-400 text-[11px]">Sạc xe</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+                    <span className="text-slate-600 dark:text-slate-400 text-[11px]">Nạp ví</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bar visualization */}
+              {(() => {
+                const currentChartData =
+                  revenuePeriod === '30D'
+                    ? revenueStats?.chart_30d || []
+                    : revenueStats?.chart_7d || [];
+
+                if (currentChartData.length === 0) {
+                  return (
+                    <div className="py-8 text-center text-xs text-slate-400 italic">
+                      Chưa có dữ liệu giao dịch trong kỳ này.
+                    </div>
+                  );
+                }
+
+                const maxTotal = Math.max(
+                  ...currentChartData.map((d) => Number(d.total_revenue || 0)),
+                  1
+                );
+
+                return (
+                  <div className="space-y-1">
+                    <div className="h-44 flex items-end gap-1.5 sm:gap-2 pt-4 pb-2 px-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
+                      {currentChartData.map((day, idx) => {
+                        const total = Number(day.total_revenue || 0);
+                        const charging = Number(day.charging_revenue || 0);
+                        const topup = Number(day.topup_revenue || 0);
+                        const heightPercent =
+                          total > 0 ? Math.max(8, Math.round((total / maxTotal) * 100)) : 4;
+                        const chargingPercent =
+                          total > 0 ? Math.round((charging / total) * 100) : 0;
+                        const topupPercent = total > 0 ? 100 - chargingPercent : 0;
+
+                        return (
+                          <div
+                            key={day.date || idx}
+                            className="flex-1 min-w-[28px] sm:min-w-[34px] flex flex-col items-center justify-end h-full group relative"
+                          >
+                            {/* Hover Tooltip */}
+                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col z-30 pointer-events-none bg-slate-900 text-white text-[10px] p-2.5 rounded-lg shadow-xl whitespace-nowrap min-w-[140px] border border-slate-700">
+                              <div className="font-bold border-b border-slate-700 pb-1 mb-1 text-slate-200">
+                                Ngày: {day.date}
+                              </div>
+                              <div className="flex justify-between gap-2 text-cyan-300">
+                                <span>Sạc xe:</span>
+                                <span className="font-semibold">{formatVND(charging)}</span>
+                              </div>
+                              <div className="flex justify-between gap-2 text-emerald-300">
+                                <span>Nạp ví:</span>
+                                <span className="font-semibold">{formatVND(topup)}</span>
+                              </div>
+                              <div className="flex justify-between gap-2 border-t border-slate-700 pt-1 mt-1 font-bold text-amber-300">
+                                <span>Tổng:</span>
+                                <span>{formatVND(total)}</span>
+                              </div>
+                            </div>
+
+                            {/* Bar Stack */}
+                            <div
+                              style={{ height: `${heightPercent}%` }}
+                              className="w-full max-w-[26px] rounded-t-md overflow-hidden flex flex-col-reverse transition-all duration-300 group-hover:opacity-90 shadow-sm bg-slate-100 dark:bg-slate-800"
+                            >
+                              {topup > 0 && (
+                                <div
+                                  style={{ height: `${topupPercent}%` }}
+                                  className="w-full bg-emerald-500 hover:bg-emerald-400 transition-colors"
+                                  title={`Nạp ví: ${formatVND(topup)}`}
+                                />
+                              )}
+                              {charging > 0 && (
+                                <div
+                                  style={{ height: `${chargingPercent}%` }}
+                                  className="w-full bg-cyan-500 hover:bg-cyan-400 transition-colors"
+                                  title={`Sạc xe: ${formatVND(charging)}`}
+                                />
+                              )}
+                              {total === 0 && (
+                                <div className="w-full h-1 bg-slate-200 dark:bg-slate-700" />
+                              )}
+                            </div>
+
+                            {/* Date Label */}
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 truncate w-full text-center">
+                              {day.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 
