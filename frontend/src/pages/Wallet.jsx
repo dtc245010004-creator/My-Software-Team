@@ -708,6 +708,12 @@ export default function Wallet() {
     }, 600);
   };
 
+  // Test runners handlers cho automated tests
+  const handleSandboxPaySuccess = () => handleDriverConfirmPayment();
+  const handleSandboxReturnBeforeWebhook = () => handleDriverConfirmPayment();
+  const handleSandboxPayFailed = () => setSandboxCheckout(null);
+  const handleSandboxCancel = () => setSandboxCheckout(null);
+
   // ============================================================================
   // HÀNH ĐỘNG CỦA ADMIN & CHỦ TRẠM (CPO): PHÊ DUYỆT & TỪ CHỐI ĐƠN NẠP
   // ============================================================================

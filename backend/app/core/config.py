@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     SANDBOX_PAYMENT_SECRET: str = "sandbox_secret"
     PAYMENT_WEBHOOK_SECRET: str = "sandbox_secret"
 
+    # Cổng thanh toán SePay (API Banking VietQR)
+    SEPAY_WEBHOOK_SECRET: str = "whsec_lsoxfnnWmlImodkfHIJMsUNi5Jap1Tm5"
+    SEPAY_BANK_NAME: str = ""
+    SEPAY_ACCOUNT_NUMBER: str = ""
+    SEPAY_ACCOUNT_HOLDER: str = ""
+
     # Cơ sở dữ liệu: SQLite local (Giai đoạn 1 MVP)
     DATABASE_URL: str = "sqlite:///./ev_csms.db"
 
