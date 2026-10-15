@@ -17,6 +17,7 @@ from app.schemas.reservation import (
 from app.services.reservation_service import (
     cancel_reservation,
     create_reservation,
+    get_all_reservations,
     get_my_reservations,
     get_reservation_by_id,
 )
@@ -24,6 +25,19 @@ from app.services.reservation_service import (
 logger = logging.getLogger("ev_csms.reservations_api")
 
 router = APIRouter(prefix="/reservations", tags=["Đặt chỗ trước trụ sạc (Reservations)"])
+
+
+@router.get(
+    "",
+    response_model=List[ReservationResponse],
+    summary="Xem danh sách đặt chỗ theo phân quyền người dùng",
+)
+def get_reservations_endpoint(
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """Tra cứu các lượt đặt chỗ (tài xế xem của mình, admin/operator xem theo phạm vi quản lý)."""
+    return get_all_reservations(db=db, user=current_user)
 
 
 @router.post(

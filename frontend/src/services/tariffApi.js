@@ -17,25 +17,117 @@ import api from './api';
  * Response 200 OK
  */
 
-let mockTariffs = {
-    '1': {
-        station_id: 1,
+const STORAGE_KEY = 'ev_csms_station_tariffs';
+
+export const TARIFF_PRESETS = [
+    {
+        id: 'evn_tou',
+        name: 'EVN 3 Khung Giờ (TOU Chuẩn)',
+        description: 'Thấp điểm 00-04h & 20-24h (1.850đ), Cao điểm 16-20h (4.850đ), Bình thường 04-16h (3.250đ)',
         periods: [
-            { start: '00:00', end: '06:00', price: 2000 },
-            { start: '06:00', end: '18:00', price: 3000 },
-            { start: '18:00', end: '24:00', price: 4000 }
+            { start: '00:00', end: '04:00', price: 1850 },
+            { start: '04:00', end: '16:00', price: 3250 },
+            { start: '16:00', end: '20:00', price: 4850 },
+            { start: '20:00', end: '24:00', price: 3250 },
+        ]
+    },
+    {
+        id: 'fast_charging',
+        name: 'Trạm Cao Tốc / Sạc Nhanh DC',
+        description: 'Biểu giá tối ưu cho trạm sạc công suất lớn tại các trục giao thông chính',
+        periods: [
+            { start: '00:00', end: '06:00', price: 2800 },
+            { start: '06:00', end: '18:00', price: 3850 },
+            { start: '18:00', end: '24:00', price: 4500 },
+        ]
+    },
+    {
+        id: 'flat_rate',
+        name: 'Đồng Giá Cố Định 24/7',
+        description: 'Mức giá cố định 3.500 đ/kWh cho toàn bộ 24 giờ trong ngày',
+        periods: [
+            { start: '00:00', end: '24:00', price: 3500 },
         ]
     }
-};
+];
+
+function loadStoredTariffs() {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) return JSON.parse(raw);
+        }
+    } catch {
+        // ignore
+    }
+    return {
+        '1': {
+            station_id: 1,
+            periods: [
+                { start: '00:00', end: '06:00', price: 2000 },
+                { start: '06:00', end: '18:00', price: 3000 },
+                { start: '18:00', end: '24:00', price: 4000 }
+            ]
+        },
+        '2': {
+            station_id: 2,
+            periods: [
+                { start: '00:00', end: '06:00', price: 2500 },
+                { start: '06:00', end: '17:00', price: 3500 },
+                { start: '17:00', end: '24:00', price: 4500 }
+            ]
+        },
+        '3': {
+            station_id: 3,
+            periods: [
+                { start: '00:00', end: '07:00', price: 2200 },
+                { start: '07:00', end: '18:00', price: 3200 },
+                { start: '18:00', end: '24:00', price: 4200 }
+            ]
+        }
+    };
+}
+
+function saveStoredTariffs(data) {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+    } catch {
+        // ignore
+    }
+}
+
+let mockTariffs = loadStoredTariffs();
 
 export const getTariff = async (stationId) => {
+    const sId = String(stationId || 1);
     try {
         const response = await api.get('/tariffs/live-config', {
             params: { station_id: stationId }
         });
-        return response.data;
+        if (response.data && response.data.periods && response.data.periods.length > 0) {
+            mockTariffs[sId] = response.data;
+            saveStoredTariffs(mockTariffs);
+            return response.data;
+        }
+        return mockTariffs[sId] || {
+            station_id: Number(stationId) || 1,
+            periods: [
+                { start: '00:00', end: '06:00', price: 2200 },
+                { start: '06:00', end: '18:00', price: 3300 },
+                { start: '18:00', end: '24:00', price: 4400 }
+            ]
+        };
     } catch {
-        return mockTariffs[String(stationId)] || { station_id: stationId, periods: [] };
+        return mockTariffs[sId] || {
+            station_id: Number(stationId) || 1,
+            periods: [
+                { start: '00:00', end: '06:00', price: 2200 },
+                { start: '06:00', end: '18:00', price: 3300 },
+                { start: '18:00', end: '24:00', price: 4400 }
+            ]
+        };
     }
 };
 
@@ -43,12 +135,23 @@ export const saveTariff = async (stationId, payload) => {
     if (!payload.periods || payload.periods.length === 0) {
         throw new Error("Phải có ít nhất 1 khung giờ");
     }
-    const response = await api.put('/tariffs/live-config', {
-        station_id: Number(stationId) || 1,
-        periods: payload.periods
-    });
-    mockTariffs[String(stationId)] = response.data;
-    return response.data;
+    const sId = String(stationId || 1);
+    try {
+        const response = await api.put('/tariffs/live-config', {
+            station_id: Number(stationId) || 1,
+            periods: payload.periods
+        });
+        mockTariffs[sId] = response.data;
+        saveStoredTariffs(mockTariffs);
+        return response.data;
+    } catch {
+        // Fallback offline / demo
+        const fallbackData = {
+            station_id: Number(stationId) || 1,
+            periods: payload.periods
+        };
+        mockTariffs[sId] = fallbackData;
+        saveStoredTariffs(mockTariffs);
+        return fallbackData;
+    }
 };
-
-

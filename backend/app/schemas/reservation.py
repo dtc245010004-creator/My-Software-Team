@@ -59,6 +59,20 @@ class ReservationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Thông tin mở rộng đồng bộ với giao diện Tài xế (S-50 / SCRUM-378)
+    reservation_code: Optional[str] = None
+    station_id: Optional[int] = None
+    station_name: Optional[str] = None
+    station_address: Optional[str] = None
+    charger_id: Optional[int] = None
+    charger_code: Optional[str] = None
+    connector_type: Optional[str] = None
+    max_power_kw: Optional[float] = None
+    valid_until: Optional[datetime] = None
+    no_show_fee: Optional[float] = 20000.0
+    wallet_transaction_id: Optional[str] = None
+    reason: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -29,6 +29,8 @@ def filter_station_access(query, user):
         return query
     if role == "OPERATOR":
         return query.filter(Station.operator_id == user.id)
+    if role == "ACCOUNTANT":
+        return query.filter(Station.accountant_id == user.id)
     if user is None or role == "CUSTOMER":
         return query.filter(Station.is_active.is_(True))
     return query.filter(false())
@@ -56,16 +58,34 @@ def get_accessible_station_ids(user: User, db: Session) -> List[int]:
     Trả về danh sách ID các trạm sạc mà user có quyền truy cập / quản lý / xem báo cáo:
     - ADMIN: Toàn bộ trạm sạc active (kể cả trạm chưa gán chủ operator_id=None).
     - OPERATOR (Chủ trạm): Chỉ các trạm active có operator_id == user.id.
+    - ACCOUNTANT (Kế toán phụ trách): Chỉ các trạm active có accountant_id == user.id.
     - CUSTOMER (Tài xế) hoặc khác: Trả về danh sách rỗng.
     """
-    if user.role not in ("ADMIN", "OPERATOR"):
+    if not user or user.role not in ("ADMIN", "OPERATOR", "ACCOUNTANT"):
         return []
-    stations = (
-        filter_station_access(db.query(Station), user)
-        .filter(Station.is_active.is_(True))
-        .with_entities(Station.id)
-        .all()
-    )
+    if user.role == "ADMIN":
+        stations = (
+            db.query(Station)
+            .filter(Station.is_active.is_(True))
+            .with_entities(Station.id)
+            .all()
+        )
+    elif user.role == "OPERATOR":
+        stations = (
+            db.query(Station)
+            .filter(Station.operator_id == user.id, Station.is_active.is_(True))
+            .with_entities(Station.id)
+            .all()
+        )
+    elif user.role == "ACCOUNTANT":
+        stations = (
+            db.query(Station)
+            .filter(Station.accountant_id == user.id, Station.is_active.is_(True))
+            .with_entities(Station.id)
+            .all()
+        )
+    else:
+        return []
     return [station_id for (station_id,) in stations]
 
 
@@ -74,6 +94,7 @@ def assert_station_accessible(station_id: int, user: User, db: Session) -> Stati
     Kiểm tra quyền truy cập trên một trạm cụ thể:
     - Nếu không tìm thấy trạm -> 404 NOT FOUND.
     - Nếu user là OPERATOR và station.operator_id != user.id -> 403 FORBIDDEN.
+    - Nếu user là ACCOUNTANT và station.accountant_id != user.id -> 403 FORBIDDEN.
     - Nếu user là CUSTOMER -> 403 FORBIDDEN.
     - Hợp lệ -> Trả về đối tượng Station.
     """
@@ -96,6 +117,13 @@ def assert_station_accessible(station_id: int, user: User, db: Session) -> Stati
                 detail="Bạn không có quyền thao tác trên trạm sạc này.",
             )
         return station
+    if user.role == "ACCOUNTANT":
+        if station.accountant_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền thao tác trên trạm sạc này.",
+            )
+        return station
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Quyền hạn không đủ để truy cập trạm sạc này.",
@@ -103,12 +131,17 @@ def assert_station_accessible(station_id: int, user: User, db: Session) -> Stati
 
 
 def verify_station_ownership(station: Station, user: User) -> None:
-    """Kiểm tra quyền sở hữu trạm (IDOR Guard): Admin có toàn quyền, Operator chỉ sở hữu trạm của mình."""
+    """Kiểm tra quyền sở hữu trạm (IDOR Guard): Admin có toàn quyền, Operator/Accountant chỉ sở hữu trạm của mình."""
     if user.role != "ADMIN":
-        if station.operator_id is None or station.operator_id != user.id:
+        if user.role == "OPERATOR" and (station.operator_id is None or station.operator_id != user.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bạn không có quyền thao tác trên trạm sạc này.",
+                detail="Chỉ chủ sở hữu trạm mới có quyền thao tác này.",
+            )
+        if user.role == "ACCOUNTANT" and (station.accountant_id is None or station.accountant_id != user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ kế toán phụ trách trạm mới có quyền thao tác này.",
             )
 
 
@@ -197,6 +230,18 @@ def enrich_station_response(station: Station) -> StationResponse:
 
     resp = StationResponse.model_validate(station)
     resp.owner_id = resp.operator_id
+    resp.operator_id = station.operator_id
+    resp.accountant_id = station.accountant_id
+    resp.operator_name = (
+        station.operator.full_name or station.operator.username
+        if getattr(station, "operator", None)
+        else None
+    )
+    resp.accountant_name = (
+        station.accountant.full_name or station.accountant.username
+        if getattr(station, "accountant", None)
+        else None
+    )
     resp.charging_points = chargers_resp
     resp.max_power_kw = station.total_grid_capacity_kw
     resp.total_installed_power_kw = total_installed_power

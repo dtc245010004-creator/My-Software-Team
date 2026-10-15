@@ -293,10 +293,10 @@ export default function Settlement() {
             <Card padding="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     Tổng số kỳ
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
                     {loading ? '...' : stats.total}
                   </p>
                 </div>
@@ -309,10 +309,10 @@ export default function Settlement() {
             <Card padding="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     Kỳ đang mở
                   </p>
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 tabular-nums">
                     {loading ? '...' : stats.openCount}
                   </p>
                 </div>
@@ -325,10 +325,10 @@ export default function Settlement() {
             <Card padding="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     Kỳ đã chốt
                   </p>
-                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300 mt-1">
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300 mt-1 tabular-nums">
                     {loading ? '...' : stats.closedCount}
                   </p>
                 </div>

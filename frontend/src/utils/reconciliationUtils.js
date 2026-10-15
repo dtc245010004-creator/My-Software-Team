@@ -66,7 +66,7 @@ export function detectSessionAnomaly(session, tolerance = DEFAULT_TOLERANCE_VND)
     return {
       isAnomaly: true,
       type: RECONCILIATION_ANOMALY_TYPES.MISSING_INVOICE,
-      typeLabel: '(1) CÓ kWh CHƯA LẬP HÓA ĐƠN',
+      typeLabel: '(1) Có kWh chưa lập hóa đơn',
       badgeClass: 'bg-critical-red/20 text-critical-red border border-critical-red/30',
       kwh,
       actualAmount: 0,
@@ -85,7 +85,7 @@ export function detectSessionAnomaly(session, tolerance = DEFAULT_TOLERANCE_VND)
     return {
       isAnomaly: true,
       type: RECONCILIATION_ANOMALY_TYPES.MISSING_LEDGER,
-      typeLabel: '(2) CÓ HÓA ĐƠN THIẾU SỔ CÁI VÍ',
+      typeLabel: '(2) Có hóa đơn thiếu sổ cái ví',
       badgeClass: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
       kwh,
       actualAmount: 0,
@@ -104,7 +104,7 @@ export function detectSessionAnomaly(session, tolerance = DEFAULT_TOLERANCE_VND)
       return {
         isAnomaly: true,
         type: RECONCILIATION_ANOMALY_TYPES.PRICE_MISMATCH,
-        typeLabel: '(3) LỆCH TIỀN SO VỚI BIỂU GIÁ',
+        typeLabel: '(3) Lệch tiền so với biểu giá',
         badgeClass: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
         kwh,
         actualAmount: billedAmount,
@@ -122,7 +122,7 @@ export function detectSessionAnomaly(session, tolerance = DEFAULT_TOLERANCE_VND)
   return {
     isAnomaly: false,
     type: RECONCILIATION_ANOMALY_TYPES.MATCHED,
-    typeLabel: 'KHỚP HOÀN TOÀN',
+    typeLabel: 'Khớp hoàn toàn',
     badgeClass: 'bg-grid-green/20 text-grid-green border border-grid-green/30',
     kwh,
     actualAmount: actual,

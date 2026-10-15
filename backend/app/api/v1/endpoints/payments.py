@@ -1,17 +1,23 @@
+import base64
 import hashlib
 import hmac
 import logging
+import re
+import uuid
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user_or_driver_guest
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.payment import TopupOrder
+from app.models.user import User
 from app.services.payment_service import verify_webhook_signature
 from app.services.wallet_service import topup_wallet
 
@@ -246,3 +252,299 @@ def payment_return(order_code: str, db: Session = Depends(get_db)):
     redirect_url = f"{frontend_url}?order_code={order.order_code}&status={order.status}"
     
     return RedirectResponse(url=redirect_url)
+
+
+class SepayWebhookPayload(BaseModel):
+    id: int | None = None
+    gateway: str | None = None
+    transactionDate: str | None = None
+    accountNumber: str | None = None
+    code: str | None = None
+    content: str | None = ""
+    transferType: str | None = "in"
+    transferAmount: float | None = 0.0
+    accumulated: float | None = 0.0
+    subAccount: str | None = None
+    referenceCode: str | None = None
+    description: str | None = None
+
+
+@router.post("/sepay-webhook", summary="Webhook nạp tiền tự động từ SePay (API Banking)")
+async def sepay_webhook(
+    request: Request,
+    payload: SepayWebhookPayload,
+    db: Session = Depends(get_db),
+):
+    """
+    Xử lý Webhook tự động từ SePay khi có biến động số dư ngân hàng:
+    1. Kiểm tra xác thực (HMAC-SHA256 hoặc Authorization Header nếu đã cấu hình).
+    2. Bỏ qua giao dịch tiền ra (transferType != 'in').
+    3. Trích xuất mã đơn nạp (ORDER_xxxx hoặc EV_xxxx) từ nội dung chuyển khoản.
+    4. Nếu khớp đơn và số tiền hợp lệ: Tự động cộng tiền ví tài xế qua ACID transaction (topup_wallet).
+    5. Nếu có sai sót (sai số tiền, sai cú pháp): Lưu trạng thái đơn PENDING/FLAGGED để Admin/Chủ trạm duyệt thủ công.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    logger.info(
+        "SePay Webhook received: id=%s, gateway=%s, amount=%s, content='%s', ip=%s",
+        payload.id,
+        payload.gateway,
+        payload.transferAmount,
+        payload.content,
+        client_ip,
+    )
+
+    # 1. Xác thực HMAC-SHA256 nếu có chữ ký hoặc header
+    sepay_sig = (
+        request.headers.get("x-sepay-signature")
+        or request.headers.get("sepay-signature")
+        or request.headers.get("x-signature")
+        or ""
+    )
+    secret_key = getattr(settings, "SEPAY_WEBHOOK_SECRET", None) or getattr(
+        settings, "PAYMENT_WEBHOOK_SECRET", ""
+    )
+
+    if secret_key and sepay_sig:
+        raw_body = await request.body()
+        computed_sig = hmac.new(
+            secret_key.encode("utf-8"), raw_body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(computed_sig.lower(), sepay_sig.lower()):
+            logger.warning("SePay signature mismatch from IP %s", client_ip)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid SePay signature",
+            )
+
+    # Nếu chỉ là ping kiểm tra webhook hoặc không có nội dung
+    if not payload.content and (not payload.transferAmount or payload.transferAmount <= 0):
+        return {
+            "success": True,
+            "message": "SePay webhook ping received successfully",
+        }
+
+    # 2. Chỉ xử lý tiền vào (in)
+    if payload.transferType and payload.transferType.lower() != "in":
+        logger.info("Ignoring SePay transferType=%s", payload.transferType)
+        return {
+            "success": True,
+            "message": f"Ignored non-incoming transfer: {payload.transferType}",
+        }
+
+    # 3. Trích xuất mã đơn nạp từ content
+    # Cú pháp hỗ trợ: ORDER_xxxxxxxx, EV_xxxxxxxx, hoặc EVxxxxxxxx
+    content = payload.content or ""
+    order_code = None
+
+    match = re.search(r"(ORDER_[A-F0-9]+|EV_[A-F0-9]+)", content, re.IGNORECASE)
+    if match:
+        order_code = match.group(1).upper()
+    else:
+        # Thử tìm ORDER_... dạng đơn giản
+        match_simple = re.search(r"ORDER\s*([A-F0-9]+)", content, re.IGNORECASE)
+        if match_simple:
+            order_code = f"ORDER_{match_simple.group(1).upper()}"
+
+    if not order_code and payload.code:
+        order_code = payload.code.strip().upper()
+
+    if not order_code:
+        logger.warning(
+            "Could not parse order code from SePay content: '%s'. Kept for manual review.",
+            content,
+        )
+        return {
+            "success": True,
+            "status": "MANUAL_REVIEW_REQUIRED",
+            "message": "Transaction recorded but order code could not be determined. Routed to Admin approval.",
+        }
+
+    # 4. Tìm đơn nạp trong CSDL
+    order = (
+        db.query(TopupOrder)
+        .filter(TopupOrder.order_code == order_code)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+
+    if not order:
+        logger.warning("TopupOrder not found for code: %s", order_code)
+        return {
+            "success": True,
+            "status": "ORDER_NOT_FOUND",
+            "message": f"Order {order_code} not found. Kept for manual admin reconciliation.",
+        }
+
+    # Nếu đơn đã thành công từ trước
+    if order.status == "SUCCESS":
+        return {
+            "success": True,
+            "status": "SUCCESS",
+            "message": "Order already processed",
+            "order_code": order.order_code,
+        }
+
+    # 5. Kiểm tra số tiền chuyển vào
+    transfer_amount = payload.transferAmount or 0.0
+    if transfer_amount < float(order.amount):
+        logger.warning(
+            "Amount mismatch for order %s: expected %s, got %s",
+            order.order_code,
+            order.amount,
+            transfer_amount,
+        )
+        order.status = "PENDING"  # Giữ ở PENDING để Admin/Chủ trạm đối soát duyệt thủ công
+        order.failure_reason = f"Số tiền thực nhận ({transfer_amount:,.0f}đ) ít hơn số tiền đơn ({order.amount:,.0f}đ)"
+        db.add(order)
+        db.commit()
+        return {
+            "success": True,
+            "status": "AMOUNT_MISMATCH",
+            "message": "Amount is less than requested. Order flagged for manual review.",
+            "order_code": order.order_code,
+        }
+
+    # 6. Tự động cộng tiền vào ví (ACID Transaction)
+    try:
+        order.status = "SUCCESS"
+        order.failure_reason = None
+        db.add(order)
+
+        note = f"Nạp ví tự động qua SePay ({payload.gateway or 'Banking'} - GD {payload.id or payload.referenceCode or order.order_code})"
+        topup_wallet(
+            db=db,
+            user_id=order.user_id,
+            amount=order.amount,
+            note=note,
+            reference_id=order.order_code,
+            reference_type="TOPUP",
+            auto_commit=False,
+        )
+        db.commit()
+        logger.info(
+            "Successfully auto-credited %s VND to user %s for order %s via SePay",
+            order.amount,
+            order.user_id,
+            order.order_code,
+        )
+        return {
+            "success": True,
+            "status": "SUCCESS",
+            "message": "Wallet credited automatically via SePay",
+            "order_code": order.order_code,
+        }
+    except IntegrityError:
+        db.rollback()
+        logger.warning("Duplicate topup detected for order: %s", order.order_code)
+        return {
+            "success": True,
+            "status": "SUCCESS",
+            "message": "Already processed",
+            "order_code": order.order_code,
+        }
+    except Exception:
+        db.rollback()
+        logger.exception("Error processing SePay topup")
+        return {
+            "success": False,
+            "status": "ERROR",
+            "message": "Internal error, routed to Admin manual approval",
+            "order_code": order.order_code,
+        }
+
+
+class SepayCheckoutInitRequest(BaseModel):
+    amount: int = Field(..., gt=0, description="Số tiền nạp (VND)")
+    order_code: str | None = Field(default=None, description="Mã đơn nạp (nếu có)")
+    description: str | None = Field(default=None, description="Mô tả đơn hàng")
+
+
+class SepayCheckoutInitResponse(BaseModel):
+    action_url: str
+    fields: dict[str, str]
+    order_code: str
+
+
+@router.post(
+    "/sepay/checkout-init",
+    response_model=SepayCheckoutInitResponse,
+    summary="Khởi tạo dữ liệu chuyển hướng Cổng thanh toán SePay PG (Phương án 2)",
+)
+def init_sepay_checkout(
+    payload: SepayCheckoutInitRequest,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    Tạo chữ ký bảo mật HMAC-SHA256 chuẩn SePay PG và trả về form parameters
+    để frontend tự động submit chuyển hướng người dùng sang trang checkout của SePay:
+    https://pay.sepay.vn/v1/checkout/init (hoặc sandbox)
+    """
+    order_code = payload.order_code or f"ORDER_{uuid.uuid4().hex[:8].upper()}"
+    existing = db.query(TopupOrder).filter(TopupOrder.order_code == order_code).first()
+    if not existing:
+        existing = TopupOrder(
+            user_id=current_user.id,
+            order_code=order_code,
+            amount=Decimal(payload.amount),
+            status="PENDING",
+        )
+        db.add(existing)
+        db.commit()
+        db.refresh(existing)
+
+    merchant_id = getattr(settings, "SEPAY_MERCHANT_ID", "SP-TEST-XXXXXXXX")
+    secret_key = getattr(
+        settings, "SEPAY_MERCHANT_SECRET", "spsk_test_xxxxxxxxxxqE2z5EFvH8MBUj9ZMbHr3EN"
+    )
+    env = getattr(settings, "SEPAY_ENV", "sandbox").lower()
+
+    action_url = (
+        "https://pay-sandbox.sepay.vn/v1/checkout/init"
+        if env == "sandbox"
+        else "https://pay.sepay.vn/v1/checkout/init"
+    )
+
+    amount_str = str(int(payload.amount))
+    desc = payload.description or f"Nap tien vi {order_code}"
+    base_fe = "http://localhost:8080"
+    success_url = f"{base_fe}/wallet?status=SUCCESS&order_code={order_code}"
+    error_url = f"{base_fe}/wallet?status=FAILED&order_code={order_code}"
+    cancel_url = f"{base_fe}/wallet?status=CANCELLED&order_code={order_code}"
+
+    # Thứ tự các tham số ký theo chuẩn tài liệu SePay:
+    # order_amount, merchant, currency, operation, order_description, order_invoice_number, success_url, error_url, cancel_url
+    data_to_sign = {
+        "order_amount": amount_str,
+        "merchant": merchant_id,
+        "currency": "VND",
+        "operation": "PURCHASE",
+        "order_description": desc,
+        "order_invoice_number": order_code,
+        "success_url": success_url,
+        "error_url": error_url,
+        "cancel_url": cancel_url,
+    }
+
+    signed_string = ",".join(f"{k}={v}" for k, v in data_to_sign.items())
+    signature = base64.b64encode(
+        hmac.new(
+            secret_key.encode("utf-8"), signed_string.encode("utf-8"), hashlib.sha256
+        ).digest()
+    ).decode("utf-8")
+
+    fields = dict(data_to_sign)
+    fields["signature"] = signature
+
+    return SepayCheckoutInitResponse(
+        action_url=action_url,
+        fields=fields,
+        order_code=order_code,
+    )
+
+

@@ -27,20 +27,20 @@ import AlertBanner from '../components/ui/AlertBanner';
 import { ALERT_THRESHOLDS } from '../config/chargerAlertConfig';
 import { buildChargerAlerts } from '../services/chargerAlertAdapter';
 
-// Định nghĩa cấu hình trạng thái: Nhãn chữ, Icon và Mã ký hiệu trợ năng WCAG
+// Định nghĩa cấu hình trạng thái: Nhãn chữ, Icon và Mã ký hiệu trợ năng WCAG (Đạt chuẩn WCAG AA/AAA)
 const STATUS_CONFIG = {
   AVAILABLE: {
     label: 'SẴN SÀNG',
     englishLabel: 'AVAILABLE',
     code: '[OK]',
     icon: CheckCircle2,
-    badgeBg: 'bg-emerald-950/80',
-    badgeText: 'text-emerald-400',
-    badgeBorder: 'border-emerald-500/50',
+    badgeBg: 'bg-emerald-50 dark:bg-emerald-950/80',
+    badgeText: 'text-emerald-800 dark:text-emerald-300',
+    badgeBorder: 'border-emerald-200 dark:border-emerald-800/60',
     dotColor: 'bg-emerald-500',
-    cardBorder: 'border-hairline hover:border-emerald-500/60',
-    cbCardBorder: 'border-2 border-solid border-emerald-400',
-    cbBadgeBg: 'bg-emerald-900 text-tech-white border-2 border-emerald-400 font-bold',
+    cardBorder: 'border-slate-200 dark:border-slate-800/60 hover:border-emerald-500/60',
+    cbCardBorder: 'border-2 border-solid border-emerald-500',
+    cbBadgeBg: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-white border-2 border-emerald-500 font-bold',
     description: 'Trụ sạc sẵn sàng tiếp nhận xe',
   },
   CHARGING: {
@@ -48,13 +48,13 @@ const STATUS_CONFIG = {
     englishLabel: 'CHARGING',
     code: '[CHG]',
     icon: Zap,
-    badgeBg: 'bg-sky-950/80',
-    badgeText: 'text-sky-300',
-    badgeBorder: 'border-sky-500/50',
-    dotColor: 'bg-sky-400',
-    cardBorder: 'border-hairline hover:border-sky-400/70 shadow-[0_0_15px_rgba(2,132,199,0.15)]',
-    cbCardBorder: 'border-2 border-solid border-sky-400',
-    cbBadgeBg: 'bg-sky-900 text-tech-white border-2 border-sky-400 font-bold',
+    badgeBg: 'bg-sky-50 dark:bg-sky-950/80',
+    badgeText: 'text-sky-800 dark:text-sky-300',
+    badgeBorder: 'border-sky-200 dark:border-sky-800/60',
+    dotColor: 'bg-sky-500',
+    cardBorder: 'border-slate-200 dark:border-slate-800/60 hover:border-sky-400/70 shadow-[0_0_15px_rgba(2,132,199,0.15)]',
+    cbCardBorder: 'border-2 border-solid border-sky-500',
+    cbBadgeBg: 'bg-sky-100 text-sky-900 dark:bg-sky-900 dark:text-white border-2 border-sky-500 font-bold',
     description: 'Đang truyền năng lượng vào xe điện',
   },
   FAULTED: {
@@ -62,13 +62,13 @@ const STATUS_CONFIG = {
     englishLabel: 'FAULTED',
     code: '[ERR]',
     icon: AlertTriangle,
-    badgeBg: 'bg-rose-950/80',
-    badgeText: 'text-rose-400',
-    badgeBorder: 'border-rose-500/60',
+    badgeBg: 'bg-rose-50 dark:bg-rose-950/80',
+    badgeText: 'text-rose-800 dark:text-rose-300',
+    badgeBorder: 'border-rose-200 dark:border-rose-800/60',
     dotColor: 'bg-rose-500',
-    cardBorder: 'border-hairline hover:border-rose-500/70',
+    cardBorder: 'border-slate-200 dark:border-slate-800/60 hover:border-rose-500/70',
     cbCardBorder: 'border-2 border-dashed border-rose-500',
-    cbBadgeBg: 'bg-rose-900 text-tech-white border-2 border-rose-400 font-bold',
+    cbBadgeBg: 'bg-rose-100 text-rose-900 dark:bg-rose-900 dark:text-white border-2 border-rose-500 font-bold',
     description: 'Sự cố phần cứng hoặc kết nối',
   },
   UNAVAILABLE: {
@@ -76,13 +76,13 @@ const STATUS_CONFIG = {
     englishLabel: 'UNAVAILABLE',
     code: '[OFF]',
     icon: Ban,
-    badgeBg: 'bg-amber-950/70',
-    badgeText: 'text-amber-400',
-    badgeBorder: 'border-amber-500/50',
+    badgeBg: 'bg-amber-50 dark:bg-amber-950/80',
+    badgeText: 'text-amber-800 dark:text-amber-300',
+    badgeBorder: 'border-amber-200 dark:border-amber-800/60',
     dotColor: 'bg-amber-500',
-    cardBorder: 'border-hairline hover:border-amber-500/60',
-    cbCardBorder: 'border-2 border-dotted border-amber-400',
-    cbBadgeBg: 'bg-amber-900 text-tech-white border-2 border-amber-400 font-bold',
+    cardBorder: 'border-slate-200 dark:border-slate-800/60 hover:border-amber-500/60',
+    cbCardBorder: 'border-2 border-dotted border-amber-500',
+    cbBadgeBg: 'bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-white border-2 border-amber-500 font-bold',
     description: 'Tạm dừng phục vụ hoặc bảo trì',
   },
   PREPARING: {
@@ -90,13 +90,13 @@ const STATUS_CONFIG = {
     englishLabel: 'PREPARING',
     code: '[RDY]',
     icon: Clock,
-    badgeBg: 'bg-indigo-950/80',
-    badgeText: 'text-indigo-300',
-    badgeBorder: 'border-indigo-500/50',
-    dotColor: 'bg-indigo-400',
-    cardBorder: 'border-hairline hover:border-indigo-500/60',
-    cbCardBorder: 'border-2 border-double border-indigo-400',
-    cbBadgeBg: 'bg-indigo-900 text-tech-white border-2 border-indigo-400 font-bold',
+    badgeBg: 'bg-indigo-50 dark:bg-indigo-950/80',
+    badgeText: 'text-indigo-800 dark:text-indigo-300',
+    badgeBorder: 'border-indigo-200 dark:border-indigo-800/60',
+    dotColor: 'bg-indigo-500',
+    cardBorder: 'border-slate-200 dark:border-slate-800/60 hover:border-indigo-500/60',
+    cbCardBorder: 'border-2 border-double border-indigo-500',
+    cbBadgeBg: 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900 dark:text-white border-2 border-indigo-500 font-bold',
     description: 'Đang xác thực thẻ hoặc cắm súng sạc',
   },
 };
@@ -452,79 +452,79 @@ export default function ChargerGridMonitor() {
 
       {/* 2. Dải KPI Thống Kê Nhanh (KPI Summary Strip) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
-        <div className="bg-panel border border-hairline p-2.5 rounded-lg flex flex-col justify-between">
-          <div className="text-[11px] font-mono text-steel-gray uppercase">Tổng số trụ</div>
-          <div className="text-xl font-bold font-mono text-tech-white mt-1">
-            {kpiStats.total} <span className="text-xs font-normal text-steel-gray">trụ</span>
+        <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-semibold">Tổng số trụ</div>
+          <div className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1">
+            {kpiStats.total} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">trụ</span>
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-2.5 rounded-lg flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] font-mono text-emerald-400 uppercase">
+        <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] font-mono text-emerald-800 dark:text-emerald-300 uppercase font-semibold">
             <span>Sẵn sàng</span>
             <CheckCircle2 className="w-3.5 h-3.5" />
           </div>
-          <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
+          <div className="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-300 mt-1">
             {kpiStats.available}
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-2.5 rounded-lg flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] font-mono text-sky-400 uppercase">
+        <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] font-mono text-sky-800 dark:text-sky-300 uppercase font-semibold">
             <span>Đang sạc</span>
             <Zap className="w-3.5 h-3.5 animate-pulse" />
           </div>
-          <div className="text-xl font-bold font-mono text-sky-400 mt-1">
+          <div className="text-xl font-bold font-mono text-sky-700 dark:text-sky-300 mt-1">
             {kpiStats.charging}
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-2.5 rounded-lg flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] font-mono text-rose-400 uppercase">
+        <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] font-mono text-rose-800 dark:text-rose-300 uppercase font-semibold">
             <span>Bị lỗi</span>
             <AlertTriangle className="w-3.5 h-3.5" />
           </div>
-          <div className="text-xl font-bold font-mono text-rose-400 mt-1">
+          <div className="text-xl font-bold font-mono text-rose-700 dark:text-rose-300 mt-1">
             {kpiStats.faulted}
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-2.5 rounded-lg flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[11px] font-mono text-amber-400 uppercase">
+        <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] font-mono text-amber-800 dark:text-amber-300 uppercase font-semibold">
             <span>Tạm ngưng</span>
             <Ban className="w-3.5 h-3.5" />
           </div>
-          <div className="text-xl font-bold font-mono text-amber-400 mt-1">
+          <div className="text-xl font-bold font-mono text-amber-800 dark:text-amber-300 mt-1">
             {kpiStats.unavailable}
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-2.5 rounded-lg flex flex-col justify-between">
-          <div className="text-[11px] font-mono text-electric-cyan uppercase">Công suất tải</div>
-          <div className="text-xl font-bold font-mono text-electric-cyan mt-1">
-            {kpiStats.totalLivePower} <span className="text-xs font-normal text-steel-gray">kW</span>
+        <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div className="text-[11px] font-mono text-sky-800 dark:text-sky-300 uppercase font-semibold">Công suất tải</div>
+          <div className="text-xl font-bold font-mono text-sky-700 dark:text-sky-300 mt-1">
+            {kpiStats.totalLivePower} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">kW</span>
           </div>
         </div>
       </div>
 
       {/* 3. Thanh Công Cụ Bộ Lọc (Filter Toolbar) */}
-      <div className="bg-panel/90 border border-hairline p-3 rounded-xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         {/* Tìm kiếm & Trạm */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
           {/* Ô tìm kiếm */}
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 text-steel-gray absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm mã trụ EVSE, hãng, model..."
-              className="w-full bg-obsidian border border-hairline rounded-lg pl-9 pr-3 py-1.5 text-xs text-tech-white placeholder-steel-gray/60 focus:outline-none focus:border-electric-cyan transition-colors font-mono"
+              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 transition-colors font-mono"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-steel-gray hover:text-tech-white"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -532,16 +532,16 @@ export default function ChargerGridMonitor() {
           </div>
 
           {/* Chọn Trạm sạc */}
-          <div className="flex items-center space-x-1.5 bg-obsidian border border-hairline rounded-lg px-2.5 py-1">
-            <Layers className="w-3.5 h-3.5 text-steel-gray" />
+          <div className="flex items-center space-x-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1 text-slate-800 dark:text-slate-200">
+            <Layers className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <select
               value={selectedStationId}
               onChange={(e) => setSelectedStationId(e.target.value)}
-              className="bg-transparent text-xs text-tech-white focus:outline-none cursor-pointer pr-2"
+              className="bg-transparent text-xs text-slate-900 dark:text-slate-100 font-semibold focus:outline-none cursor-pointer pr-2"
             >
-              <option value="ALL" className="bg-obsidian">Tất cả trạm sạc ({stations.length})</option>
+              <option value="ALL" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Tất cả trạm sạc ({stations.length})</option>
               {stations.map((s) => (
-                <option key={s.id} value={s.id} className="bg-obsidian">
+                <option key={s.id} value={s.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                   {s.name}
                 </option>
               ))}
@@ -550,31 +550,31 @@ export default function ChargerGridMonitor() {
         </div>
 
         {/* Các nút bấm lọc nhanh Trạng thái */}
-        <div className="flex items-center space-x-1 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
-          <span className="text-[11px] font-mono text-steel-gray mr-1 hidden sm:inline">Trạng thái:</span>
+        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
+          <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400 font-medium mr-1 hidden sm:inline">Trạng thái:</span>
           {[
             { id: 'ALL', label: 'TẤT CẢ', count: kpiStats.total },
-            { id: 'AVAILABLE', label: 'SẴN SÀNG', count: kpiStats.available, color: 'text-emerald-400' },
-            { id: 'CHARGING', label: 'ĐANG SẠC', count: kpiStats.charging, color: 'text-sky-400' },
-            { id: 'FAULTED', label: 'BỊ LỖI', count: kpiStats.faulted, color: 'text-rose-400' },
-            { id: 'UNAVAILABLE', label: 'TẠM NGƯNG', count: kpiStats.unavailable, color: 'text-amber-400' },
-            { id: 'PREPARING', label: 'CHUẨN BỊ', count: kpiStats.preparing, color: 'text-indigo-400' },
+            { id: 'AVAILABLE', label: 'SẴN SÀNG', count: kpiStats.available, color: 'text-emerald-700 dark:text-emerald-300' },
+            { id: 'CHARGING', label: 'ĐANG SẠC', count: kpiStats.charging, color: 'text-sky-700 dark:text-sky-300' },
+            { id: 'FAULTED', label: 'BỊ LỖI', count: kpiStats.faulted, color: 'text-rose-700 dark:text-rose-300' },
+            { id: 'UNAVAILABLE', label: 'TẠM NGƯNG', count: kpiStats.unavailable, color: 'text-amber-800 dark:text-amber-300' },
+            { id: 'PREPARING', label: 'CHUẨN BỊ', count: kpiStats.preparing, color: 'text-indigo-700 dark:text-indigo-300' },
           ].map((item) => {
             const active = selectedStatus === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setSelectedStatus(item.id)}
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-medium transition-all whitespace-nowrap ${
                   active
-                    ? 'bg-electric-cyan text-tech-white font-bold shadow-sm'
-                    : 'bg-obsidian/70 text-steel-gray hover:text-tech-white hover:bg-obsidian border border-hairline'
+                    ? 'bg-sky-600 text-white font-bold shadow-sm'
+                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/60'
                 }`}
               >
                 <span>{item.label}</span>
                 <span
-                  className={`px-1 rounded text-[10px] ${
-                    active ? 'bg-black/30 text-white' : item.color || 'text-steel-gray'
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    active ? 'bg-black/25 text-white' : item.color || 'text-slate-500'
                   }`}
                 >
                   {item.count}
@@ -638,30 +638,30 @@ export default function ChargerGridMonitor() {
               <div
                 key={charger.id}
                 onClick={() => setSelectedCharger(charger)}
-                className={`relative group bg-panel rounded-xl p-3 cursor-pointer transition-all duration-200 flex flex-col justify-between select-none ${
+                className={`relative group bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 rounded-2xl p-3.5 shadow-sm hover:shadow-md cursor-pointer transition-all duration-200 flex flex-col justify-between select-none ${
                   colorBlindMode
                     ? config.cbCardBorder
                     : `border ${config.cardBorder}`
                 } ${
                   isJustUpdated
-                    ? 'ring-2 ring-electric-cyan bg-electric-cyan/10 animate-pulse'
+                    ? 'ring-2 ring-sky-500 bg-sky-50/50 dark:bg-sky-950/20 animate-pulse'
                     : ''
                 }`}
-                style={{ minHeight: '142px' }}
+                style={{ minHeight: '148px' }}
                 title={`Nhấn để xem chi tiết trụ sạc ${charger.code}`}
               >
                 {/* Header card: Mã trụ sạc & Tên trạm */}
                 <div>
                   <div className="flex items-start justify-between gap-1">
-                    <span className="font-mono font-bold text-xs text-tech-white tracking-wide group-hover:text-electric-cyan transition-colors">
+                    <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 tracking-wide group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
                       {charger.code}
                     </span>
-                    <span className="text-[10px] font-mono text-steel-gray shrink-0">
+                    <span className="text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400 shrink-0">
                       {charger.max_power_kw}kW
                     </span>
                   </div>
 
-                  <div className="text-[11px] text-steel-gray truncate mt-0.5" title={charger.station_name}>
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400 truncate mt-0.5" title={charger.station_name}>
                     {charger.station_name || 'Chưa gán trạm'}
                   </div>
                 </div>
@@ -669,7 +669,7 @@ export default function ChargerGridMonitor() {
                 {/* Phần Nhãn Trạng Thái Chính (WCAG Text Badge + Icon + Color-Blind Code) */}
                 <div className="my-2">
                   <div
-                    className={`flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-lg text-center transition-all ${
+                    className={`flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-xl text-center transition-all ${
                       colorBlindMode
                         ? config.cbBadgeBg
                         : `${config.badgeBg} ${config.badgeText} border ${config.badgeBorder}`
@@ -677,7 +677,7 @@ export default function ChargerGridMonitor() {
                   >
                     <StatusIcon
                       className={`w-3.5 h-3.5 shrink-0 ${
-                        stKey === 'CHARGING' ? 'animate-bounce text-sky-400' : ''
+                        stKey === 'CHARGING' ? 'animate-bounce text-sky-600 dark:text-sky-400' : ''
                       }`}
                     />
                     <span className="font-bold text-[11px] tracking-wider uppercase font-mono">
@@ -687,7 +687,7 @@ export default function ChargerGridMonitor() {
 
                   {/* Hiển thị số liệu khi đang sạc */}
                   {stKey === 'CHARGING' && (
-                    <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-sky-300 px-1">
+                    <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-sky-700 dark:text-sky-300 px-1 font-semibold">
                       <span className="flex items-center space-x-1">
                         <Activity className="w-2.5 h-2.5 animate-pulse" />
                         <span>Tải thực:</span>
@@ -699,23 +699,23 @@ export default function ChargerGridMonitor() {
                   )}
                 </div>
 
-                {/* Footer card: Danh sách loại cổng & Model */}
-                <div className="pt-1.5 border-t border-hairline/60 flex items-center justify-between text-[10px] font-mono text-steel-gray">
-                  <div className="flex items-center space-x-1 truncate max-w-[80%]">
+                {/* Footer card: Danh sách loại cổng & Model (Sửa triệt để chữ trắng tàng hình) */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[10px] font-mono text-slate-600 dark:text-slate-400">
+                  <div className="flex items-center space-x-1.5 truncate max-w-[85%]">
                     {charger.connectors && charger.connectors.length > 0 ? (
                       charger.connectors.map((conn) => (
                         <span
                           key={conn.id}
-                          className="px-1 py-0.2 bg-obsidian rounded border border-hairline text-[9px] text-tech-white/80"
+                          className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700/60 text-[10px] font-semibold text-slate-800 dark:text-slate-200 font-mono"
                         >
                           #{conn.connector_number} {conn.connector_type}
                         </span>
                       ))
                     ) : (
-                      <span>{charger.vendor || 'EVSE'}</span>
+                      <span className="font-medium text-slate-500">{charger.vendor || 'EVSE'}</span>
                     )}
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-steel-gray/60 group-hover:text-tech-white group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
               </div>
             );

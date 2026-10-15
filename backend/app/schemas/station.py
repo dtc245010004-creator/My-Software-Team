@@ -206,6 +206,9 @@ class StationCreate(StationBase):
     operator_id: Optional[int] = Field(
         default=None, description="ID Chủ trạm sạc (chỉ Admin được gán)"
     )
+    accountant_id: Optional[int] = Field(
+        default=None, description="ID Kế toán phụ trách trạm (chỉ Admin được gán)"
+    )
 
 
 class StationUpdate(BaseModel):
@@ -219,6 +222,9 @@ class StationUpdate(BaseModel):
     status: Optional[str] = None
     operator_id: Optional[int] = Field(
         default=None, description="ID Chủ trạm sạc (chỉ Admin được gán/đổi)"
+    )
+    accountant_id: Optional[int] = Field(
+        default=None, description="ID Kế toán phụ trách trạm (chỉ Admin được gán/đổi)"
     )
 
     @field_validator("status")
@@ -287,6 +293,9 @@ class StationPowerLimitsUpdate(BaseModel):
 class StationResponse(StationBase):
     id: int
     operator_id: Optional[int] = None
+    accountant_id: Optional[int] = None
+    operator_name: Optional[str] = None
+    accountant_name: Optional[str] = None
     owner_id: Optional[int] = None
     is_active: bool
     created_at: UTCDateTime

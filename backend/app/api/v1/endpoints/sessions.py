@@ -70,7 +70,7 @@ def list_sessions(
             query = query.filter(ChargingSession.status == status_filter.upper())
         return query.order_by(ChargingSession.id.desc()).all()
 
-    if current_user.role == "OPERATOR":
+    if current_user.role in ("OPERATOR", "ACCOUNTANT"):
         accessible_ids = get_accessible_station_ids(current_user, db)
         if station_id is not None:
             if station_id not in accessible_ids:
@@ -117,12 +117,12 @@ def get_sessions_summary(
     """
     Trả về KPI tổng quan và danh sách gom nhóm:
     - ADMIN: Toàn bộ hệ thống.
-    - OPERATOR: Chỉ các trạm thuộc quyền sở hữu.
+    - OPERATOR / ACCOUNTANT: Chỉ các trạm thuộc quyền quản lý / bàn giao.
     - CUSTOMER: Các phiên của chính mình.
     """
     if current_user.role == "ADMIN":
         query = db.query(ChargingSession)
-    elif current_user.role == "OPERATOR":
+    elif current_user.role in ("OPERATOR", "ACCOUNTANT"):
         accessible_ids = get_accessible_station_ids(current_user, db)
         if not accessible_ids:
             return SessionSummaryResponse(
@@ -409,7 +409,7 @@ def list_abnormal_sessions(
         ChargingSession.status.in_(["INTERRUPTED", "FAILED", "CANCELLED"])
     )
 
-    if current_user.role == "OPERATOR":
+    if current_user.role in ("OPERATOR", "ACCOUNTANT"):
         accessible_ids = get_accessible_station_ids(current_user, db)
         if station_id is not None:
             if station_id not in accessible_ids:
