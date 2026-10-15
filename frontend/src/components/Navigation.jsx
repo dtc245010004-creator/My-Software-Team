@@ -38,7 +38,7 @@ export default function Navigation() {
     { to: '/abnormal-sessions', label: 'Phiên Bất Thường', icon: AlertOctagon, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
     { to: '/simulator', label: 'Bảng Giả Lập Sạc', icon: Gauge, roles: ['CUSTOMER'] },
     { to: '/reservations', label: 'Đặt Chỗ', icon: Clock, roles: ['CUSTOMER', 'ADMIN', 'OPERATOR'] },
-    { to: '/wallet', label: 'Ví Cá Nhân', icon: Wallet, roles: ['CUSTOMER', 'ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
+    { to: '/wallet', label: 'Ví & Nạp Tiền', icon: Wallet, roles: ['CUSTOMER', 'ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CPO'] },
     { to: '/data-erasure', label: 'Xóa Dữ Liệu', icon: UserX, roles: ['CUSTOMER'] },
     { to: '/sessions', label: 'Nhật Ký Phiên Sạc', icon: History, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CUSTOMER'] },
     { to: '/audit-logs', label: 'Tra Cứu Nhật Ký', icon: ScrollText, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },

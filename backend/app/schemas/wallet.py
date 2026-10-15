@@ -131,3 +131,32 @@ class WalletReconciliationUnlockRequest(BaseModel):
         if not cleaned:
             raise ValueError("Lý do mở khóa không được để trống.")
         return cleaned
+
+
+class TopupOrderReviewResponse(BaseModel):
+    """Chi tiết yêu cầu nạp tiền phục vụ Admin và Chủ trạm CPO đối soát duyệt tiền."""
+
+    id: int
+    user_id: int
+    username: str
+    full_name: str | None = None
+    email: str | None = None
+    order_code: str
+    amount: Decimal
+    status: str
+    failure_reason: str | None = None
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TopupOrderRejectRequest(BaseModel):
+    """Lý do từ chối đơn nạp tiền."""
+
+    reason: str = Field(
+        default="Chưa nhận được tiền vào tài khoản hoặc thông tin sai lệch",
+        max_length=255,
+        description="Lý do từ chối yêu cầu nạp tiền",
+    )
+

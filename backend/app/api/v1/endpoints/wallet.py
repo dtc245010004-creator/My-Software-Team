@@ -22,6 +22,8 @@ from app.schemas.wallet import (
     StandardizedWalletTransactionResponse,
     TopupOrderResponse,
     TopupOrderStatusResponse,
+    TopupOrderReviewResponse,
+    TopupOrderRejectRequest,
     TopupRequest,
     WalletReconciliationUnlockRequest,
     WalletResponse,
@@ -372,3 +374,155 @@ async def wallet_webhook(
     db: Session = Depends(get_db),
 ):
     return await payment_webhook(request=request, payload=payload, db=db)
+
+
+@router.get(
+    "/admin/pending-topups",
+    response_model=list[TopupOrderReviewResponse],
+    summary="Danh sách yêu cầu nạp tiền cần phê duyệt (Dành cho Admin, Chủ trạm CPO, Kế toán)",
+)
+def get_pending_topups_for_admin(
+    status_filter: str | None = Query(
+        None, description="Lọc trạng thái: ALL, PENDING, SUCCESS, FAILED"
+    ),
+    current_admin: User = Depends(
+        require_roles(["ADMIN", "CPO", "ACCOUNTANT", "OPERATOR"])
+    ),
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(TopupOrder, User)
+        .join(User, TopupOrder.user_id == User.id)
+        .order_by(TopupOrder.created_at.desc(), TopupOrder.id.desc())
+    )
+    if status_filter and status_filter.upper() != "ALL":
+        query = query.filter(TopupOrder.status == status_filter.upper())
+
+    results = query.limit(100).all()
+
+    out = []
+    for order, user in results:
+        out.append(
+            TopupOrderReviewResponse(
+                id=order.id,
+                user_id=order.user_id,
+                username=user.username,
+                full_name=user.full_name or user.username,
+                email=user.email,
+                order_code=order.order_code,
+                amount=order.amount,
+                status=order.status,
+                failure_reason=order.failure_reason,
+                created_at=order.created_at,
+                updated_at=order.updated_at,
+            )
+        )
+    return out
+
+
+@router.post(
+    "/admin/topup/{order_code}/approve",
+    summary="Phê duyệt yêu cầu nạp tiền vào ví tài xế (Admin & Chủ trạm CPO)",
+)
+def approve_topup_order(
+    order_code: str,
+    current_admin: User = Depends(
+        require_roles(["ADMIN", "CPO", "ACCOUNTANT", "OPERATOR"])
+    ),
+    db: Session = Depends(get_db),
+):
+    order = (
+        db.query(TopupOrder)
+        .filter(TopupOrder.order_code == order_code)
+        .with_for_update()
+        .first()
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy đơn nạp tiền #{order_code}",
+        )
+
+    if order.status == "SUCCESS":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Đơn nạp #{order_code} đã được phê duyệt trước đó.",
+        )
+
+    if order.status in ["FAILED", "CANCELLED"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Đơn nạp #{order_code} đã ở trạng thái kết thúc ({order.status}).",
+        )
+
+    order.status = "SUCCESS"
+    order.failure_reason = None
+    db.add(order)
+
+    note = f"Phê duyệt nạp tiền #{order.order_code} bởi {current_admin.full_name or current_admin.username} ({current_admin.role})"
+    wallet = topup_wallet(
+        db=db,
+        user_id=order.user_id,
+        amount=order.amount,
+        note=note,
+        reference_id=order.order_code,
+        reference_type="TOPUP",
+        auto_commit=False,
+    )
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Đã phê duyệt thành công +{int(order.amount):,} VND cho tài xế.",
+        "order_code": order.order_code,
+        "new_balance": float(wallet.balance),
+    }
+
+
+@router.post(
+    "/admin/topup/{order_code}/reject",
+    summary="Từ chối yêu cầu nạp tiền (Admin & Chủ trạm CPO)",
+)
+def reject_topup_order(
+    order_code: str,
+    payload: TopupOrderRejectRequest,
+    current_admin: User = Depends(
+        require_roles(["ADMIN", "CPO", "ACCOUNTANT", "OPERATOR"])
+    ),
+    db: Session = Depends(get_db),
+):
+    order = (
+        db.query(TopupOrder)
+        .filter(TopupOrder.order_code == order_code)
+        .with_for_update()
+        .first()
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy đơn nạp tiền #{order_code}",
+        )
+
+    if order.status != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Chỉ có thể từ chối đơn hàng đang ở trạng thái chờ duyệt (PENDING). Đơn hiện tại là {order.status}.",
+        )
+
+    reason = (
+        payload.reason.strip()
+        or "Ban quản trị từ chối giao dịch do không nhận được sao kê hợp lệ."
+    )
+    order.status = "FAILED"
+    order.failure_reason = reason
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "status": "FAILED",
+        "message": f"Đã từ chối đơn nạp tiền #{order.order_code}.",
+        "order_code": order.order_code,
+        "reason": reason,
+    }
