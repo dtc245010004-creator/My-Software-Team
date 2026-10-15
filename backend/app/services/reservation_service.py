@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -230,7 +231,7 @@ async def create_reservation(
                 .where(Connector.id == payload.connector_id)
                 .values(updated_at=func.now())
             )
-        except Exception as lock_err:
+        except SQLAlchemyError as lock_err:
             logger.debug("SQLite soft row update lock: %s", lock_err)
 
     query = db.query(Connector).filter(Connector.id == payload.connector_id)

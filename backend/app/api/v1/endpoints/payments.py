@@ -298,7 +298,6 @@ async def sepay_webhook(
     )
 
     # 1. Xác thực HMAC-SHA256 nếu có chữ ký hoặc header
-    auth_header = request.headers.get("Authorization", "")
     sepay_sig = (
         request.headers.get("x-sepay-signature")
         or request.headers.get("sepay-signature")
@@ -310,21 +309,16 @@ async def sepay_webhook(
     )
 
     if secret_key and sepay_sig:
-        try:
-            raw_body = await request.body()
-            computed_sig = hmac.new(
-                secret_key.encode("utf-8"), raw_body, hashlib.sha256
-            ).hexdigest()
-            if not hmac.compare_digest(computed_sig.lower(), sepay_sig.lower()):
-                logger.warning("SePay signature mismatch from IP %s", client_ip)
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid SePay signature",
-                )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.warning("Error verifying SePay signature: %s", exc)
+        raw_body = await request.body()
+        computed_sig = hmac.new(
+            secret_key.encode("utf-8"), raw_body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(computed_sig.lower(), sepay_sig.lower()):
+            logger.warning("SePay signature mismatch from IP %s", client_ip)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid SePay signature",
+            )
 
     # Nếu chỉ là ping kiểm tra webhook hoặc không có nội dung
     if not payload.content and (not payload.transferAmount or payload.transferAmount <= 0):
@@ -453,9 +447,9 @@ async def sepay_webhook(
             "message": "Already processed",
             "order_code": order.order_code,
         }
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        logger.exception("Error processing SePay topup: %s", exc)
+        logger.exception("Error processing SePay topup")
         return {
             "success": False,
             "status": "ERROR",
