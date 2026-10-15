@@ -315,6 +315,7 @@ export function useTopupRealtimeSync({
 
 export default function Wallet() {
   const { user, token, isGuest, updateGuestName, guestName } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -394,7 +395,7 @@ export default function Wallet() {
       await fetchWalletData(true);
       setBannerAlert({
         type: 'SUCCESS',
-        title: 'Webhook xác nhận nạp tiền thành công!',
+        title: isAdmin ? 'Webhook xác nhận nạp tiền thành công!' : 'Nạp tiền thành công',
         detail: `Đơn nạp #${confirmedOrder.order_code} với số tiền +${Number(
           confirmedOrder.amount
         ).toLocaleString('vi-VN')} VND đã được cộng vào số dư khả dụng của bạn.`,
@@ -441,9 +442,12 @@ export default function Wallet() {
     if (clientHintStatus === 'PENDING') {
       setBannerAlert({
         type: 'PENDING',
-        title: `Đang chờ xác nhận Webhook cho đơn #${orderCode}...`,
-        detail:
-          'Bạn đã quay về ứng dụng trước khi Webhook hoàn tất. Số dư ví chưa thay đổi và sẽ tự động cập nhật ngay khi hệ thống nhận được tín hiệu xác nhận từ cổng Sandbox.',
+        title: isAdmin
+          ? `Đang chờ xác nhận Webhook cho đơn #${orderCode}...`
+          : `Đang chờ thanh toán đơn #${orderCode}`,
+        detail: isAdmin
+          ? 'Bạn đã quay về ứng dụng trước khi Webhook hoàn tất. Số dư ví chưa thay đổi và sẽ tự động cập nhật ngay khi hệ thống nhận được tín hiệu xác nhận từ cổng Sandbox.'
+          : 'Số dư chưa thay đổi. Ví sẽ tự cập nhật khi thanh toán được xác nhận.',
       });
     } else if (clientHintStatus === 'FAILED' || clientHintStatus === 'CANCELLED') {
       setBannerAlert({
@@ -459,8 +463,12 @@ export default function Wallet() {
     } else {
       setBannerAlert({
         type: 'PENDING',
-        title: `Đang đồng bộ kết quả giao dịch #${orderCode}...`,
-        detail: 'Hệ thống đang xác thực chữ ký số Webhook trước khi cập nhật số dư ví.',
+        title: isAdmin
+          ? `Đang đồng bộ kết quả giao dịch #${orderCode}...`
+          : `Đang kiểm tra giao dịch #${orderCode}...`,
+        detail: isAdmin
+          ? 'Hệ thống đang xác thực chữ ký số Webhook trước khi cập nhật số dư ví.'
+          : 'Số dư sẽ cập nhật sau khi thanh toán được xác nhận.',
       });
     }
 
@@ -543,6 +551,16 @@ export default function Wallet() {
     }
   };
 
+  const openSandboxCheckoutForOrder = (order) => {
+    if (!order?.order_code) return;
+    setSandboxCheckout({
+      orderCode: order.order_code,
+      amount: Number(order.amount) || 0,
+      signature: '',
+      rawUrl: '',
+    });
+  };
+
   // ============================================================================
   // CÁC HÀNH ĐỘNG TRÊN CỔNG THANH TOÁN SANDBOX (4 KỊCH BẢN AC CỦA SCRUM-232)
   // ============================================================================
@@ -569,7 +587,8 @@ export default function Wallet() {
       setSandboxCheckout(null);
       navigate(`/wallet/topup/result?order_code=${orderCode}&status=SUCCESS`);
     } catch (err) {
-      alert('Lỗi gửi Webhook Sandbox: ' + (err.response?.data?.detail || err.message));
+      const detail = err.response?.data?.detail || err.message;
+      alert(isAdmin ? `Lỗi gửi Webhook Sandbox: ${detail}` : `Không thể xác nhận thanh toán: ${detail}`);
     } finally {
       setProcessingGatewayAction(false);
     }
@@ -617,7 +636,8 @@ export default function Wallet() {
         )}`
       );
     } catch (err) {
-      alert('Lỗi gửi Webhook thất bại: ' + (err.response?.data?.detail || err.message));
+      const detail = err.response?.data?.detail || err.message;
+      alert(isAdmin ? `Lỗi gửi Webhook thất bại: ${detail}` : `Không thể xử lý giao dịch: ${detail}`);
     } finally {
       setProcessingGatewayAction(false);
     }
@@ -656,7 +676,8 @@ export default function Wallet() {
       );
       await checkOrderStatusNow(orderCode);
     } catch (err) {
-      alert('Không thể gửi Webhook: ' + (err.response?.data?.detail || err.message));
+      const detail = err.response?.data?.detail || err.message;
+      alert(isAdmin ? `Không thể gửi Webhook: ${detail}` : `Không thể hoàn tất thanh toán: ${detail}`);
     }
   };
 
@@ -767,7 +788,7 @@ export default function Wallet() {
       return (
         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-grid-green/20 text-grid-green border border-grid-green/30">
           <CheckCircle2 className="w-3 h-3" />
-          <span>THÀNH CÔNG (SUCCESS)</span>
+          <span>{isAdmin ? 'THÀNH CÔNG (SUCCESS)' : 'Thành công'}</span>
         </span>
       );
     }
@@ -775,7 +796,7 @@ export default function Wallet() {
       return (
         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-critical-red/20 text-critical-red border border-critical-red/30">
           <XCircle className="w-3 h-3" />
-          <span>THẤT BẠI (FAILED)</span>
+          <span>{isAdmin ? 'THẤT BẠI (FAILED)' : 'Thất bại'}</span>
         </span>
       );
     }
@@ -783,14 +804,14 @@ export default function Wallet() {
       return (
         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-steel-gray/20 text-steel-gray border border-steel-gray/30">
           <X className="w-3 h-3" />
-          <span>ĐÃ HỦY (CANCELLED)</span>
+          <span>{isAdmin ? 'ĐÃ HỦY (CANCELLED)' : 'Đã hủy'}</span>
         </span>
       );
     }
     return (
       <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-caution-amber/20 text-caution-amber border border-caution-amber/40 animate-pulse">
         <Clock className="w-3 h-3 animate-spin" />
-        <span>ĐANG CHỜ (PENDING)</span>
+        <span>{isAdmin ? 'ĐANG CHỜ (PENDING)' : 'Đang chờ thanh toán'}</span>
       </span>
     );
   };
@@ -801,14 +822,17 @@ export default function Wallet() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-tech-white">
-            Ví Điện Tử Nạp Tiền &amp; Cổng Thanh Toán Sandbox
+            {isAdmin ? 'Ví điện tử & cổng thanh toán Sandbox' : 'Ví điện tử'}
           </h1>
           <p className="text-xs text-steel-gray mt-0.5 font-mono">
-            BẢO TOÀN GIAO DỊCH NFR: CHỈ CẬP NHẬT SỐ DƯ KHI NHẬN WEBHOOK XÁC THỰC CHỮ KÝ SỐ TỪ SERVER
+            {isAdmin
+              ? 'BẢO TOÀN GIAO DỊCH: CHỈ CẬP NHẬT SỐ DƯ SAU KHI SERVER XÁC THỰC CHỮ KÝ'
+              : 'Quản lý số dư và nạp tiền vào ví của bạn.'}
           </p>
         </div>
 
         {/* Trạng thái kết nối Realtime Polling */}
+        {isAdmin && (
         <div className="flex items-center space-x-2 text-xs font-mono bg-panel border border-hairline px-3 py-1.5 rounded-sm">
           <Radio
             className={`w-3.5 h-3.5 ${
@@ -821,6 +845,7 @@ export default function Wallet() {
               : 'ĐỒNG BỘ SỐ DƯ REALTIME SẴN SÀNG'}
           </span>
         </div>
+        )}
       </div>
 
       {/* Banner thông báo kết quả Callback / Webhook (SCRUM-239, SCRUM-240, SCRUM-245) */}
@@ -847,7 +872,7 @@ export default function Wallet() {
             <div className="space-y-1">
               <div className="font-bold text-sm">{bannerAlert.title}</div>
               <div className="opacity-90 leading-relaxed">{bannerAlert.detail}</div>
-              {delayedWebhookCountdown > 0 && bannerAlert.type === 'PENDING' && (
+          {isAdmin && delayedWebhookCountdown > 0 && bannerAlert.type === 'PENDING' && (
                 <div className="text-[11px] font-bold underline pt-1">
                   ⏳ Webhook Sandbox đang xử lý ngầm, sẽ tự động bắn về Server sau{' '}
                   {delayedWebhookCountdown} giây...
@@ -912,7 +937,7 @@ export default function Wallet() {
             {/* Financial Policy Box */}
             <div className="border-t border-hairline pt-3 text-[11px] font-mono text-steel-gray space-y-1">
               <div>
-                • Hạn mức nạp Sandbox:{' '}
+                • Hạn mức nạp {isAdmin ? 'Sandbox' : 'tiền'}:{' '}
                 <span className="text-tech-white">10,000 - 50,000,000 VND</span>
               </div>
               <div>
@@ -934,17 +959,20 @@ export default function Wallet() {
               <div className="flex items-center space-x-2">
                 <CreditCard className="w-4 h-4 text-electric-cyan" />
                 <h2 className="text-xs font-bold uppercase tracking-wider text-tech-white font-mono">
-                  NẠP TIỀN QUA CỔNG SANDBOX
+                  {isAdmin ? 'NẠP TIỀN QUA CỔNG SANDBOX' : 'NẠP TIỀN VÀO VÍ'}
                 </h2>
               </div>
-              <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-electric-cyan/20 text-electric-cyan">
+              {isAdmin && <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-electric-cyan/20 text-electric-cyan">
                 SANDBOX GATEWAY
-              </span>
+              </span>}
             </div>
 
             <p className="text-xs text-steel-gray font-mono leading-relaxed">
-              Tạo giao dịch chờ (<span className="text-caution-amber font-bold">PENDING</span>) và
-              chuyển hướng sang Cổng thanh toán Sandbox. Số dư chỉ tăng khi Webhook báo thành công.
+              {isAdmin ? (
+                <>Tạo giao dịch chờ (<span className="text-caution-amber font-bold">PENDING</span>) và chuyển hướng sang Cổng thanh toán Sandbox. Số dư chỉ tăng sau khi server xác nhận giao dịch.</>
+              ) : (
+                'Chọn số tiền cần nạp, sau đó chọn kịch bản thanh toán thử nghiệm. Số dư chỉ đổi khi giao dịch thành công.'
+              )}
             </p>
 
             {/* Chọn nhanh mệnh giá */}
@@ -1025,12 +1053,12 @@ export default function Wallet() {
               {creatingOrder ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>ĐANG KHỞI TẠO ĐƠN HÀNG &amp; CHỮ KÝ HMAC...</span>
+                  <span>{isAdmin ? 'ĐANG KHỞI TẠO ĐƠN HÀNG & CHỮ KÝ HMAC...' : 'ĐANG TẠO GIAO DỊCH...'}</span>
                 </>
               ) : (
                 <>
                   <ExternalLink className="w-4 h-4" />
-                  <span>NẠP TIỀN QUA CỔNG SANDBOX</span>
+                  <span>{isAdmin ? 'NẠP TIỀN QUA CỔNG SANDBOX' : 'TIẾP TỤC NẠP TIỀN'}</span>
                 </>
               )}
             </button>
@@ -1061,7 +1089,7 @@ export default function Wallet() {
               <div className="flex items-center space-x-2">
                 <Sparkles className="w-4 h-4 text-electric-cyan" />
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-tech-white font-mono">
-                  TRẠNG THÁI ĐƠN NẠP CỔNG SANDBOX (REALTIME / POLLING)
+                  {isAdmin ? 'TRẠNG THÁI ĐƠN NẠP SANDBOX (REALTIME / POLLING)' : 'LỊCH SỬ NẠP TIỀN'}
                 </h2>
               </div>
               <div className="flex items-center space-x-2">
@@ -1086,11 +1114,11 @@ export default function Wallet() {
                 <table className="w-full text-left font-mono text-xs">
                   <thead>
                     <tr className="border-b border-hairline text-steel-gray">
-                      <th className="pb-2">MÃ ĐƠN (ORDER CODE)</th>
+                      <th className="pb-2">{isAdmin ? 'MÃ ĐƠN (ORDER CODE)' : 'MÃ GIAO DỊCH'}</th>
                       <th className="pb-2">SỐ TIỀN NẠP</th>
                       <th className="pb-2">TRẠNG THÁI</th>
-                      <th className="pb-2">GHI CHÚ / LÝ DO</th>
-                      <th className="pb-2 text-right">THAO TÁC</th>
+                      <th className="pb-2">{isAdmin ? 'GHI CHÚ / LÝ DO' : 'GHI CHÚ'}</th>
+                      <th className="pb-2 text-right">{isAdmin ? 'THAO TÁC' : 'NGÀY TẠO'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-hairline">
@@ -1110,12 +1138,16 @@ export default function Wallet() {
                           <td className="py-2.5 text-[11px] text-steel-gray max-w-xs">
                             {statusUpper === 'PENDING' && (
                               <span className="text-caution-amber">
-                                Đang chờ Webhook xác nhận chữ ký... (Số dư chưa cộng)
+                                {isAdmin
+                                  ? 'Đang chờ Webhook xác nhận chữ ký... (Số dư chưa cộng)'
+                                  : 'Đang chờ thanh toán xác nhận (Số dư chưa thay đổi)'}
                               </span>
                             )}
                             {statusUpper === 'SUCCESS' && (
                               <span className="text-grid-green">
-                                Đã xác thực Webhook &amp; cộng tiền vào sổ cái ví
+                                {isAdmin
+                                  ? 'Đã xác thực Webhook & cộng tiền vào sổ cái ví'
+                                  : 'Đã thanh toán, tiền đã được cộng vào ví'}
                               </span>
                             )}
                             {(statusUpper === 'FAILED' || statusUpper === 'CANCELLED') && (
@@ -1127,21 +1159,33 @@ export default function Wallet() {
                           <td className="py-2.5 text-right">
                             {statusUpper === 'PENDING' ? (
                               <div className="inline-flex items-center space-x-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleTriggerWebhookForOrder(order.order_code)}
-                                  className="px-2 py-1 rounded bg-grid-green/20 hover:bg-grid-green/30 text-grid-green border border-grid-green/40 text-[10px] font-bold transition-colors"
-                                  title="Giả lập cổng Sandbox bắn Webhook thành công ngay"
-                                >
-                                  Bắn Webhook OK
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => checkOrderStatusNow(order.order_code)}
-                                  className="px-2 py-1 rounded bg-obsidian hover:bg-hairline text-steel-gray hover:text-tech-white border border-hairline text-[10px] transition-colors"
-                                >
-                                  Poll
-                                </button>
+                                {isAdmin ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleTriggerWebhookForOrder(order.order_code)}
+                                      className="px-2 py-1 rounded bg-grid-green/20 hover:bg-grid-green/30 text-grid-green border border-grid-green/40 text-[10px] font-bold transition-colors"
+                                      title="Giả lập cổng Sandbox bắn Webhook thành công ngay"
+                                    >
+                                      Bắn Webhook OK
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => checkOrderStatusNow(order.order_code)}
+                                      className="px-2 py-1 rounded bg-obsidian hover:bg-hairline text-steel-gray hover:text-tech-white border border-hairline text-[10px] transition-colors"
+                                    >
+                                      Poll
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => openSandboxCheckoutForOrder(order)}
+                                    className="px-2 py-1 rounded bg-electric-cyan/20 hover:bg-electric-cyan/30 text-electric-cyan border border-electric-cyan/40 text-[10px] font-bold transition-colors"
+                                  >
+                                    Tiếp tục
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <span className="text-[11px] text-steel-gray">
@@ -1281,7 +1325,7 @@ export default function Wallet() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-panel border border-electric-cyan/60 max-w-lg w-full rounded-sm p-6 space-y-5 font-mono text-xs shadow-2xl relative animate-scaleUp">
             {/* Thanh địa chỉ giả lập trình duyệt / WebView */}
-            <div className="bg-obsidian border border-hairline px-3 py-2 rounded flex items-center justify-between text-[11px] text-steel-gray">
+            {isAdmin && <div className="bg-obsidian border border-hairline px-3 py-2 rounded flex items-center justify-between text-[11px] text-steel-gray">
               <div className="flex items-center space-x-2 truncate">
                 <Lock className="w-3.5 h-3.5 text-grid-green shrink-0" />
                 <span className="text-grid-green font-bold">https://</span>
@@ -1290,7 +1334,7 @@ export default function Wallet() {
               <span className="ml-2 px-1.5 py-0.5 rounded bg-electric-cyan/20 text-electric-cyan text-[10px] font-bold shrink-0">
                 SANDBOX
               </span>
-            </div>
+            </div>}
 
             {/* Header Cổng Sandbox */}
             <div className="flex items-center justify-between border-b border-hairline pb-3">
@@ -1300,18 +1344,23 @@ export default function Wallet() {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-tech-white">
-                    CỔNG THANH TOÁN SANDBOX EV-PAY
+                    {isAdmin ? 'CỔNG THANH TOÁN SANDBOX EV-PAY' : 'Cổng thanh toán thử nghiệm EV-PAY'}
                   </h3>
                   <p className="text-[10px] text-steel-gray">
-                    Môi trường kiểm thử tích hợp Webhook &amp; Return URL (SCRUM-232)
+                    {isAdmin
+                      ? 'Môi trường kiểm thử tích hợp Webhook & Return URL (SCRUM-232)'
+                      : 'Chọn cách xử lý giao dịch. Số dư chỉ cập nhật khi thanh toán thành công.'}
                   </p>
                 </div>
               </div>
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-electric-cyan/20 text-electric-cyan text-[10px] font-bold shrink-0">
+                SANDBOX
+              </span>
               <button
                 type="button"
                 onClick={() => setSandboxCheckout(null)}
                 className="text-steel-gray hover:text-tech-white p-1 rounded hover:bg-hairline transition-colors"
-                title="Đóng cửa sổ Sandbox (Giữ nguyên trạng thái PENDING)"
+                title={isAdmin ? 'Đóng cửa sổ Sandbox (Giữ nguyên trạng thái PENDING)' : 'Đóng'}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1320,7 +1369,7 @@ export default function Wallet() {
             {/* Thông tin đơn hàng & chữ ký HMAC-SHA256 */}
             <div className="bg-obsidian border border-hairline p-4 rounded space-y-2.5 text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-steel-gray">Mã đơn hàng (order_code):</span>
+                <span className="text-steel-gray">{isAdmin ? 'Mã đơn hàng (order_code):' : 'Mã giao dịch:'}</span>
                 <span className="font-bold text-tech-white">{sandboxCheckout.orderCode}</span>
               </div>
               <div className="flex justify-between items-center">
@@ -1332,23 +1381,23 @@ export default function Wallet() {
               <div className="flex justify-between items-center">
                 <span className="text-steel-gray">Trạng thái hiện tại:</span>
                 <span className="px-2 py-0.5 rounded bg-caution-amber/20 text-caution-amber font-bold text-[10px]">
-                  ĐANG CHỜ THANH TOÁN (PENDING)
+                  {isAdmin ? 'ĐANG CHỜ THANH TOÁN (PENDING)' : 'Đang chờ thanh toán'}
                 </span>
               </div>
-              <div className="pt-2 border-t border-hairline">
+              {isAdmin && <div className="pt-2 border-t border-hairline">
                 <div className="text-[10px] text-steel-gray mb-1">
                   Chữ ký bảo mật HMAC-SHA256 (Signature):
                 </div>
                 <div className="bg-panel p-1.5 rounded border border-hairline text-[10px] text-steel-gray break-all">
                   {sandboxCheckout.signature || 'hmac_sha256_verified'}
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* 4 Kịch bản Kiểm thử Nghiệp vụ (AC1 -> AC4) */}
             <div className="space-y-2.5">
               <div className="text-[11px] font-bold text-steel-gray uppercase">
-                CHỌN KỊCH BẢN PHẢN HỒI TỪ CỔNG SANDBOX:
+                {isAdmin ? 'CHỌN KỊCH BẢN PHẢN HỒI TỪ CỔNG SANDBOX:' : 'CHỌN KỊCH BẢN THANH TOÁN:'}
               </div>
 
               {/* 1. AC1 & AC2: Thanh toán thành công chuẩn */}
@@ -1362,9 +1411,13 @@ export default function Wallet() {
                 <div className="flex items-center space-x-2 text-left">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <div>
-                    <div>1. Thanh toán Thành công (AC1 &amp; AC2)</div>
+                    <div>
+                      {isAdmin ? '1. Thanh toán Thành công (AC1 &amp; AC2)' : '1. Thanh toán thành công'}
+                    </div>
                     <div className="text-[10px] font-normal opacity-90">
-                      Gửi Webhook có chữ ký hợp lệ &rarr; Cộng tiền ví &rarr; Quay về Return URL
+                      {isAdmin
+                        ? 'Gửi Webhook có chữ ký hợp lệ → Cộng tiền ví → Quay về Return URL'
+                        : 'Xác nhận thanh toán thành công → Cộng tiền vào ví → Trở về ví'}
                     </div>
                   </div>
                 </div>
@@ -1382,10 +1435,15 @@ export default function Wallet() {
                 <div className="flex items-center space-x-2 text-left">
                   <Clock className="w-4 h-4 shrink-0" />
                   <div>
-                    <div>2. Quay về App TRƯỚC khi Webhook xử lý xong (AC3 - NFR)</div>
+                    <div>
+                      {isAdmin
+                        ? '2. Quay về App TRƯỚC khi Webhook xử lý xong (AC3 - NFR)'
+                        : '2. Quay về Ví trước khi thanh toán được xác nhận'}
+                    </div>
                     <div className="text-[10px] font-normal opacity-90">
-                      Ví hiển thị ĐANG CHỜ (số dư chưa tăng) &rarr; 4 giây sau Webhook tới tự cộng
-                      số dư
+                      {isAdmin
+                        ? 'Ví hiển thị ĐANG CHỜ (số dư chưa tăng) → 4 giây sau Webhook tới tự cộng số dư'
+                        : 'Giao dịch tạm ở trạng thái chờ → vài giây sau hệ thống tự xác nhận'}
                     </div>
                   </div>
                 </div>
@@ -1403,9 +1461,15 @@ export default function Wallet() {
                 <div className="flex items-center space-x-2 text-left">
                   <XCircle className="w-4 h-4 shrink-0" />
                   <div>
-                    <div>3. Giả lập Cổng báo lỗi Thất bại (AC4 - Failed)</div>
+                    <div>
+                      {isAdmin
+                        ? '3. Giả lập Cổng báo lỗi Thất bại (AC4 - Failed)'
+                        : '3. Mô phỏng thanh toán thất bại'}
+                    </div>
                     <div className="text-[10px] font-normal opacity-90">
-                      Báo lỗi ngân hàng từ chối &rarr; Lưu lý do thất bại, số dư không đổi
+                      {isAdmin
+                        ? 'Báo lỗi ngân hàng từ chối → Lưu lý do thất bại, số dư không đổi'
+                        : 'Ngân hàng từ chối giao dịch → Hiển thị lý do, số dư không đổi'}
                     </div>
                   </div>
                 </div>
@@ -1423,9 +1487,15 @@ export default function Wallet() {
                 <div className="flex items-center space-x-2 text-left">
                   <X className="w-4 h-4 shrink-0" />
                   <div>
-                    <div>4. Tài xế chủ động Hủy giao dịch (AC4 - Cancelled)</div>
+                    <div>
+                      {isAdmin
+                        ? '4. Tài xế chủ động Hủy giao dịch (AC4 - Cancelled)'
+                        : '4. Hủy giao dịch nạp tiền'}
+                    </div>
                     <div className="text-[10px] font-normal opacity-90">
-                      Hủy thanh toán và quay về ví &rarr; Hiển thị lý do hủy, số dư không đổi
+                      {isAdmin
+                        ? 'Hủy thanh toán và quay về ví → Hiển thị lý do hủy, số dư không đổi'
+                        : 'Hủy thanh toán → Quay về ví, số dư không đổi'}
                     </div>
                   </div>
                 </div>

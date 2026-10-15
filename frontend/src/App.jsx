@@ -75,14 +75,14 @@ function AppLayout() {
           <Route
             path="/wallet"
             element={
-              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
+              ['ADMIN', 'CUSTOMER'].includes(role) ? <Wallet /> : <Navigate to={homeRoute} replace />
             }
           />
           {/* Return URL / Callback từ cổng thanh toán Sandbox (SCRUM-239 & SCRUM-240) */}
           <Route
             path="/wallet/topup/result"
             element={
-              role === 'CUSTOMER' ? <Wallet /> : <Navigate to={homeRoute} replace />
+              ['ADMIN', 'CUSTOMER'].includes(role) ? <Wallet /> : <Navigate to={homeRoute} replace />
             }
           />
           <Route path="/sessions" element={<Sessions />} />
