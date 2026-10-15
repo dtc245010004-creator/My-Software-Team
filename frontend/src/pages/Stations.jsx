@@ -168,6 +168,7 @@ export default function Stations() {
   });
 
   const [owners, setOwners] = useState([]);
+  const [accountants, setAccountants] = useState([]);
 
   // Form tạo trạm mới (mặc định chưa có ghim, tọa độ null để nhìn toàn Việt Nam)
   const [formData, setFormData] = useState({
@@ -179,6 +180,7 @@ export default function Stations() {
     operating_hours: '24/7',
     status: 'ACTIVE',
     operator_id: null,
+    accountant_id: null,
   });
 
   // Form sửa trạm
@@ -191,6 +193,7 @@ export default function Stations() {
     operating_hours: '24/7',
     status: 'ACTIVE',
     operator_id: null,
+    accountant_id: null,
   });
 
   useEffect(() => {
@@ -199,6 +202,9 @@ export default function Stations() {
       api.get('/stations/owners')
         .then((res) => setOwners(res.data || []))
         .catch((err) => console.error('Lỗi tải danh sách chủ trạm:', err));
+      api.get('/stations/accountants')
+        .then((res) => setAccountants(res.data || []))
+        .catch((err) => console.error('Lỗi tải danh sách kế toán:', err));
     }
   }, [role]);
 
@@ -228,6 +234,7 @@ export default function Stations() {
       operating_hours: '24/7',
       status: 'ACTIVE',
       operator_id: null,
+      accountant_id: null,
     });
     setFormErrors({});
     setStationValidationError(null);
@@ -256,6 +263,7 @@ export default function Stations() {
         operating_hours: formData.operating_hours || '24/7',
         status: formData.status || 'ACTIVE',
         operator_id: formData.operator_id ? parseInt(formData.operator_id, 10) : null,
+        accountant_id: formData.accountant_id ? parseInt(formData.accountant_id, 10) : null,
       };
       const res = await api.post('/stations', payload);
       setShowAddModal(false);
@@ -268,6 +276,7 @@ export default function Stations() {
         operating_hours: '24/7',
         status: 'ACTIVE',
         operator_id: null,
+        accountant_id: null,
       });
       setFormErrors({});
       setStationValidationError(null);
@@ -298,6 +307,7 @@ export default function Stations() {
       operating_hours: st.operating_hours || '24/7',
       status: st.status || 'ACTIVE',
       operator_id: st.operator_id || null,
+      accountant_id: st.accountant_id || null,
     });
     setEditFormErrors({});
     setStationValidationError(null);
@@ -329,9 +339,11 @@ export default function Stations() {
       if (role === 'ADMIN') {
         payload.total_grid_capacity_kw = parseFloat(editFormData.total_grid_capacity_kw) || editingStation.total_grid_capacity_kw;
         payload.operator_id = editFormData.operator_id ? parseInt(editFormData.operator_id, 10) : null;
+        payload.accountant_id = editFormData.accountant_id ? parseInt(editFormData.accountant_id, 10) : null;
       } else {
         payload.total_grid_capacity_kw = editingStation.total_grid_capacity_kw;
         payload.operator_id = editingStation.operator_id;
+        payload.accountant_id = editingStation.accountant_id;
       }
       const res = await api.put(`/stations/${editingStation.id}`, payload);
       setShowEditModal(false);
@@ -927,14 +939,36 @@ export default function Stations() {
                       >
                         {st.status === 'ACTIVE' ? 'Hoạt động' : st.status}
                       </StatusBadge>
-                      {role === 'ADMIN' && (
-                        <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${
-                          st.operator_id
-                            ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50'
-                            : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60'
-                        }`}>
-                          {st.operator_id ? `Chủ trạm: ${st.operator_name || `ID #${st.operator_id}`}` : 'Chưa gán chủ'}
-                        </span>
+                      {role === 'ADMIN' ? (
+                        <>
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${
+                            st.operator_id
+                              ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50'
+                              : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60'
+                          }`}>
+                            {st.operator_id ? `Chủ trạm: ${st.operator_name || `ID #${st.operator_id}`}` : 'Chưa gán chủ'}
+                          </span>
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${
+                            st.accountant_id
+                              ? 'bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-800/50'
+                              : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60'
+                          }`}>
+                            {st.accountant_id ? `Kế toán: ${st.accountant_name || `ID #${st.accountant_id}`}` : 'Chưa gán kế toán'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {st.operator_name && (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full border font-medium bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50">
+                              Chủ trạm: {st.operator_name}
+                            </span>
+                          )}
+                          {st.accountant_name && (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full border font-medium bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-800/50">
+                              Kế toán: {st.accountant_name}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                     <div className="flex items-center space-x-3 text-xs text-slate-600 dark:text-slate-400 mt-1">
@@ -1420,20 +1454,37 @@ export default function Stations() {
               </div>
 
               {role === 'ADMIN' && (
-                <div>
-                  <label className="text-steel-gray block mb-1 font-bold">GÁN CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
-                  <select
-                    value={formData.operator_id || ''}
-                    onChange={(e) => setFormData({ ...formData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
-                  >
-                    <option value="">Chưa gán chủ (Trạm tự do / Admin quản lý)</option>
-                    {owners.map((ow) => (
-                      <option key={ow.id} value={ow.id}>
-                        [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-steel-gray block mb-1 font-bold">GÁN CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
+                    <select
+                      value={formData.operator_id || ''}
+                      onChange={(e) => setFormData({ ...formData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                    >
+                      <option value="">Chưa gán chủ (Admin quản lý)</option>
+                      {owners.map((ow) => (
+                        <option key={ow.id} value={ow.id}>
+                          [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-steel-gray block mb-1 font-bold">GÁN KẾ TOÁN PHỤ TRÁCH (CHỈ DÀNH CHO ADMIN)</label>
+                    <select
+                      value={formData.accountant_id || ''}
+                      onChange={(e) => setFormData({ ...formData, accountant_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                    >
+                      <option value="">Chưa gán kế toán (Không có phụ trách riêng)</option>
+                      {accountants.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          [ID #{acc.id}] {acc.full_name || acc.username} ({acc.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -1613,20 +1664,37 @@ export default function Stations() {
               </div>
 
               {role === 'ADMIN' && (
-                <div>
-                  <label className="text-steel-gray block mb-1 font-bold">GÁN / ĐỔI CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
-                  <select
-                    value={editFormData.operator_id || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
-                  >
-                    <option value="">Chưa gán chủ (Trạm tự do / Admin quản lý)</option>
-                    {owners.map((ow) => (
-                      <option key={ow.id} value={ow.id}>
-                        [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-steel-gray block mb-1 font-bold">GÁN / ĐỔI CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
+                    <select
+                      value={editFormData.operator_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                    >
+                      <option value="">Chưa gán chủ (Admin quản lý)</option>
+                      {owners.map((ow) => (
+                        <option key={ow.id} value={ow.id}>
+                          [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-steel-gray block mb-1 font-bold">GÁN / ĐỔI KẾ TOÁN PHỤ TRÁCH (CHỈ DÀNH CHO ADMIN)</label>
+                    <select
+                      value={editFormData.accountant_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, accountant_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                    >
+                      <option value="">Chưa gán kế toán (Không có phụ trách riêng)</option>
+                      {accountants.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          [ID #{acc.id}] {acc.full_name || acc.username} ({acc.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 

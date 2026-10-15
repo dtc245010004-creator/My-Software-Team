@@ -75,6 +75,30 @@ def list_station_owners(
 
 
 @router.get(
+    "/accountants",
+    response_model=List[Dict[str, Any]],
+    summary="Lấy danh sách các kế toán phụ trách trạm sạc (Dành riêng cho Quản trị viên)",
+)
+def list_station_accountants(
+    current_user: User = Depends(require_roles(["ADMIN"])),
+    db: Session = Depends(get_db),
+):
+    """Admin lấy danh sách tài khoản Kế toán (Role: ACCOUNTANT) để gán cho trạm."""
+    accountants = (
+        db.query(User).filter(User.role == "ACCOUNTANT", User.is_active.is_(True)).all()
+    )
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "full_name": u.full_name or u.username,
+            "email": u.email,
+        }
+        for u in accountants
+    ]
+
+
+@router.get(
     "",
     response_model=List[Union[StationDistanceResponse, StationResponse]],
     summary="Tìm kiếm, lọc danh sách trạm sạc (Hỗ trợ định vị Haversine & Phân trang)",
@@ -776,6 +800,7 @@ def create_station(
     """
     new_station = Station(
         operator_id=station_in.operator_id,
+        accountant_id=station_in.accountant_id,
         name=station_in.name,
         address=station_in.address,
         latitude=station_in.latitude,
@@ -860,6 +885,16 @@ def update_station(
                 detail="Chỉ Quản trị viên (Admin) mới có quyền gán hoặc thay đổi Chủ trạm.",
             )
         update_data.pop("operator_id", None)
+        # Chặn thay đổi kế toán phụ trách nếu không phải ADMIN
+        if (
+            "accountant_id" in update_data
+            and update_data["accountant_id"] != station.accountant_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ Quản trị viên (Admin) mới có quyền gán hoặc thay đổi Kế toán phụ trách trạm.",
+            )
+        update_data.pop("accountant_id", None)
 
     # Nếu có cập nhật max_power_kw hoặc total_grid_capacity_kw -> Dùng hàm dùng chung (S-42)
     new_power_limit = update_data.pop("max_power_kw", None)

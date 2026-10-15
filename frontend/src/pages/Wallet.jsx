@@ -4,6 +4,7 @@ import {
   PlusCircle,
   ShieldCheck,
   AlertOctagon,
+  AlertCircle,
   User,
   QrCode,
   X,
@@ -1228,20 +1229,24 @@ export default function Wallet() {
                 <BarChart3 className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                   <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                    Tổng Doanh Thu Hệ Thống &amp; Trạm Sạc
+                    {revenueStats?.scope === 'MANAGED'
+                      ? 'Doanh Thu Trạm Được Bàn Giao Quản Lý'
+                      : 'Tổng Doanh Thu Toàn Hệ Thống'}
                   </h2>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                    {user?.role === 'ADMIN'
-                      ? 'Toàn Hệ Thống'
-                      : user?.role === 'ACCOUNTANT'
-                      ? 'Kế Toán CSMS'
-                      : 'Trạm Quản Lý'}
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                    {revenueStats?.scope === 'MANAGED'
+                      ? revenueStats?.managed_stations?.length > 0
+                        ? `Trạm Quản Lý: ${revenueStats.managed_stations.join(', ')}`
+                        : 'Chưa được bàn giao trạm'
+                      : 'Toàn Hệ Thống'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Doanh thu sạc xe thực tế &amp; dòng tiền nạp ví theo 3 mốc: Hôm nay (hằng ngày), 7 ngày và 30 ngày qua.
+                  {revenueStats?.scope === 'MANAGED'
+                    ? 'Doanh thu sạc xe thực tế tại các trạm được bàn giao quản lý theo 3 mốc: Hôm nay (hằng ngày), 7 ngày và 30 ngày qua.'
+                    : 'Doanh thu sạc xe thực tế & dòng tiền nạp ví theo 3 mốc: Hôm nay (hằng ngày), 7 ngày và 30 ngày qua.'}
                 </p>
               </div>
             </div>
@@ -1313,6 +1318,16 @@ export default function Wallet() {
             </div>
           </div>
 
+          {/* Cảnh báo chưa được bàn giao trạm nếu scope là MANAGED và danh sách trạm rỗng */}
+          {revenueStats?.scope === 'MANAGED' && (!revenueStats?.managed_stations || revenueStats.managed_stations.length === 0) && (
+            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>
+                Tài khoản của bạn hiện chưa được Quản trị viên bàn giao quản lý trạm sạc nào. Doanh thu hiển thị là 0 đ.
+              </span>
+            </div>
+          )}
+
           {/* 3 Thẻ Chỉ Số Doanh Thu Chính (Hôm Nay, 7 Ngày, 30 Ngày) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* THẺ 1: HÔM NAY (HẰNG NGÀY) */}
@@ -1354,18 +1369,30 @@ export default function Wallet() {
                     </span>
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span className="flex items-center space-x-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                    <span>Nạp ví:</span>
-                  </span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-200">
-                    {formatVND(revenueStats?.today?.topup_revenue || 0)}{' '}
-                    <span className="font-normal text-[11px] text-slate-500">
-                      ({revenueStats?.today?.topup_count || 0} đơn)
+                {revenueStats?.scope === 'MANAGED' ? (
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center space-x-1">
+                      <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" />
+                      <span>Trạm quản lý:</span>
                     </span>
-                  </span>
-                </div>
+                    <span className="font-medium text-slate-700 dark:text-slate-300 text-[11px] truncate max-w-[150px]">
+                      {revenueStats?.managed_stations?.length > 0 ? revenueStats.managed_stations.join(', ') : 'Chưa có'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center space-x-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                      <span>Nạp ví:</span>
+                    </span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
+                      {formatVND(revenueStats?.today?.topup_revenue || 0)}{' '}
+                      <span className="font-normal text-[11px] text-slate-500">
+                        ({revenueStats?.today?.topup_count || 0} đơn)
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1408,18 +1435,30 @@ export default function Wallet() {
                     </span>
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span className="flex items-center space-x-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                    <span>Nạp ví:</span>
-                  </span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-200">
-                    {formatVND(revenueStats?.last_7_days?.topup_revenue || 0)}{' '}
-                    <span className="font-normal text-[11px] text-slate-500">
-                      ({revenueStats?.last_7_days?.topup_count || 0} đơn)
+                {revenueStats?.scope === 'MANAGED' ? (
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center space-x-1">
+                      <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" />
+                      <span>Trạm quản lý:</span>
                     </span>
-                  </span>
-                </div>
+                    <span className="font-medium text-slate-700 dark:text-slate-300 text-[11px] truncate max-w-[150px]">
+                      {revenueStats?.managed_stations?.length > 0 ? revenueStats.managed_stations.join(', ') : 'Chưa có'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center space-x-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                      <span>Nạp ví:</span>
+                    </span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
+                      {formatVND(revenueStats?.last_7_days?.topup_revenue || 0)}{' '}
+                      <span className="font-normal text-[11px] text-slate-500">
+                        ({revenueStats?.last_7_days?.topup_count || 0} đơn)
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1462,18 +1501,30 @@ export default function Wallet() {
                     </span>
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span className="flex items-center space-x-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                    <span>Nạp ví:</span>
-                  </span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-200">
-                    {formatVND(revenueStats?.last_30_days?.topup_revenue || 0)}{' '}
-                    <span className="font-normal text-[11px] text-slate-500">
-                      ({revenueStats?.last_30_days?.topup_count || 0} đơn)
+                {revenueStats?.scope === 'MANAGED' ? (
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center space-x-1">
+                      <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" />
+                      <span>Trạm quản lý:</span>
                     </span>
-                  </span>
-                </div>
+                    <span className="font-medium text-slate-700 dark:text-slate-300 text-[11px] truncate max-w-[150px]">
+                      {revenueStats?.managed_stations?.length > 0 ? revenueStats.managed_stations.join(', ') : 'Chưa có'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center space-x-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                      <span>Nạp ví:</span>
+                    </span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-200">
+                      {formatVND(revenueStats?.last_30_days?.topup_revenue || 0)}{' '}
+                      <span className="font-normal text-[11px] text-slate-500">
+                        ({revenueStats?.last_30_days?.topup_count || 0} đơn)
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

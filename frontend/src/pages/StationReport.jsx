@@ -109,10 +109,10 @@ export default function StationReport() {
       setError403(false);
       setErrorMessage('');
 
-      // Kiểm tra quyền hạn trạm (AC: Giả sử tôi là chủ trạm A, khi gọi báo cáo của trạm B thì trả 403)
-      if (role === 'OPERATOR') {
+      // Kiểm tra quyền hạn trạm (AC: Giả sử tôi là chủ trạm / kế toán trạm A, khi gọi báo cáo của trạm B thì trả 403)
+      if (role === 'OPERATOR' || role === 'ACCOUNTANT') {
         const found = stations.find((s) => String(s.id) === String(stationId));
-        // Nếu user role là OPERATOR mà trạm này không thuộc danh sách quản lý của họ
+        // Nếu user role là OPERATOR hoặc ACCOUNTANT mà trạm này không thuộc danh sách quản lý của họ
         if (stations.length > 0 && !found) {
           setError403(true);
           setLoading(false);

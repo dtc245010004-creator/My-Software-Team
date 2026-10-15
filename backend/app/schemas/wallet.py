@@ -190,4 +190,6 @@ class RevenueSummaryResponse(BaseModel):
     chart_7d: list[RevenueDayData] = Field(default_factory=list)
     chart_30d: list[RevenueDayData] = Field(default_factory=list)
     currency: str = "VND"
+    managed_stations: list[str] = Field(default_factory=list)
+    scope: str = "ALL"
 

@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.payment import TopupOrder
 from app.models.session import ChargingSession
-from app.models.station import ChargingPoint, Connector
+from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
 from app.schemas.wallet import (
@@ -585,9 +585,21 @@ def get_revenue_summary_for_admin(
     start_7d = now - timedelta(days=7)
     start_30d = now - timedelta(days=30)
 
-    # 1. Base query cho ChargingSession
-    if current_user.role in ["OPERATOR", "CPO"]:
+    managed_stations = []
+    scope = "ALL"
+
+    # 1. Base query cho ChargingSession & Topup
+    if current_user.role in ["OPERATOR", "CPO", "ACCOUNTANT"]:
+        scope = "MANAGED"
         accessible_ids = get_accessible_station_ids(current_user, db)
+        if accessible_ids:
+            st_records = (
+                db.query(Station.name)
+                .filter(Station.id.in_(accessible_ids))
+                .all()
+            )
+            managed_stations = [s[0] for s in st_records]
+
         if not accessible_ids:
             sessions_query = db.query(ChargingSession).filter(ChargingSession.id == -1)
         else:
@@ -597,9 +609,21 @@ def get_revenue_summary_for_admin(
                 .join(Connector.charging_point)
                 .filter(ChargingPoint.station_id.in_(accessible_ids))
             )
+
+        # Chủ trạm và Kế toán phụ trách trạm chỉ quản lý doanh thu trạm (sạc xe), không sở hữu nạp ví nền tảng của tài xế.
+        all_30d_topups = []
     else:
-        # ADMIN, ACCOUNTANT: toàn hệ thống
+        # ADMIN: toàn hệ thống
+        scope = "ALL"
         sessions_query = db.query(ChargingSession)
+        all_30d_topups = (
+            db.query(TopupOrder)
+            .filter(
+                TopupOrder.status == "SUCCESS",
+                TopupOrder.created_at >= start_30d,
+            )
+            .all()
+        )
 
     # Lấy toàn bộ sessions trong 30 ngày qua
     all_30d_sessions = (
@@ -610,16 +634,6 @@ def get_revenue_summary_for_admin(
         for s in all_30d_sessions
         if s.status in ("COMPLETED", "ACTIVE", "CHARGING")
     ]
-
-    # 2. Base query cho TopupOrder (Các đơn nạp tiền thành công)
-    all_30d_topups = (
-        db.query(TopupOrder)
-        .filter(
-            TopupOrder.status == "SUCCESS",
-            TopupOrder.created_at >= start_30d,
-        )
-        .all()
-    )
 
     def is_after(dt_val, threshold):
         if not dt_val:
@@ -722,4 +736,6 @@ def get_revenue_summary_for_admin(
         chart_7d=chart_7d,
         chart_30d=chart_30d,
         currency="VND",
+        managed_stations=managed_stations,
+        scope=scope,
     )
