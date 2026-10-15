@@ -1,18 +1,23 @@
+import base64
 import hashlib
 import hmac
 import logging
 import re
+import uuid
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user_or_driver_guest
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.payment import TopupOrder
+from app.models.user import User
 from app.services.payment_service import verify_webhook_signature
 from app.services.wallet_service import topup_wallet
 
@@ -457,4 +462,95 @@ async def sepay_webhook(
             "message": "Internal error, routed to Admin manual approval",
             "order_code": order.order_code,
         }
+
+
+class SepayCheckoutInitRequest(BaseModel):
+    amount: int = Field(..., gt=0, description="Số tiền nạp (VND)")
+    order_code: str | None = Field(default=None, description="Mã đơn nạp (nếu có)")
+    description: str | None = Field(default=None, description="Mô tả đơn hàng")
+
+
+class SepayCheckoutInitResponse(BaseModel):
+    action_url: str
+    fields: dict[str, str]
+    order_code: str
+
+
+@router.post(
+    "/sepay/checkout-init",
+    response_model=SepayCheckoutInitResponse,
+    summary="Khởi tạo dữ liệu chuyển hướng Cổng thanh toán SePay PG (Phương án 2)",
+)
+def init_sepay_checkout(
+    payload: SepayCheckoutInitRequest,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    """
+    Tạo chữ ký bảo mật HMAC-SHA256 chuẩn SePay PG và trả về form parameters
+    để frontend tự động submit chuyển hướng người dùng sang trang checkout của SePay:
+    https://pay.sepay.vn/v1/checkout/init (hoặc sandbox)
+    """
+    order_code = payload.order_code or f"ORDER_{uuid.uuid4().hex[:8].upper()}"
+    existing = db.query(TopupOrder).filter(TopupOrder.order_code == order_code).first()
+    if not existing:
+        existing = TopupOrder(
+            user_id=current_user.id,
+            order_code=order_code,
+            amount=Decimal(payload.amount),
+            status="PENDING",
+        )
+        db.add(existing)
+        db.commit()
+        db.refresh(existing)
+
+    merchant_id = getattr(settings, "SEPAY_MERCHANT_ID", "SP-TEST-XXXXXXXX")
+    secret_key = getattr(
+        settings, "SEPAY_MERCHANT_SECRET", "spsk_test_xxxxxxxxxxqE2z5EFvH8MBUj9ZMbHr3EN"
+    )
+    env = getattr(settings, "SEPAY_ENV", "sandbox").lower()
+
+    action_url = (
+        "https://pay-sandbox.sepay.vn/v1/checkout/init"
+        if env == "sandbox"
+        else "https://pay.sepay.vn/v1/checkout/init"
+    )
+
+    amount_str = str(int(payload.amount))
+    desc = payload.description or f"Nap tien vi {order_code}"
+    base_fe = "http://localhost:8080"
+    success_url = f"{base_fe}/wallet?status=SUCCESS&order_code={order_code}"
+    error_url = f"{base_fe}/wallet?status=FAILED&order_code={order_code}"
+    cancel_url = f"{base_fe}/wallet?status=CANCELLED&order_code={order_code}"
+
+    # Thứ tự các tham số ký theo chuẩn tài liệu SePay:
+    # order_amount, merchant, currency, operation, order_description, order_invoice_number, success_url, error_url, cancel_url
+    data_to_sign = {
+        "order_amount": amount_str,
+        "merchant": merchant_id,
+        "currency": "VND",
+        "operation": "PURCHASE",
+        "order_description": desc,
+        "order_invoice_number": order_code,
+        "success_url": success_url,
+        "error_url": error_url,
+        "cancel_url": cancel_url,
+    }
+
+    signed_string = ",".join(f"{k}={v}" for k, v in data_to_sign.items())
+    signature = base64.b64encode(
+        hmac.new(
+            secret_key.encode("utf-8"), signed_string.encode("utf-8"), hashlib.sha256
+        ).digest()
+    ).decode("utf-8")
+
+    fields = dict(data_to_sign)
+    fields["signature"] = signature
+
+    return SepayCheckoutInitResponse(
+        action_url=action_url,
+        fields=fields,
+        order_code=order_code,
+    )
+
 

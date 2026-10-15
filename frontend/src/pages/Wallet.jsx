@@ -714,6 +714,44 @@ export default function Wallet() {
   const handleSandboxPayFailed = () => setSandboxCheckout(null);
   const handleSandboxCancel = () => setSandboxCheckout(null);
 
+  // Mở Cổng thanh toán chính thức SePay (Phương án 2: Hosted Checkout)
+  const handleOpenSepayGateway = async () => {
+    try {
+      setProcessingGatewayAction(true);
+      const res = await api.post('/payments/sepay/checkout-init', {
+        amount: Number(sandboxCheckout?.amount || currentAmountNum),
+        order_code: sandboxCheckout?.orderCode,
+      });
+      const { action_url, fields } = res.data;
+
+      // Tạo và submit form chuyển hướng trực tiếp tới trang thanh toán của SePay
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = action_url;
+      form.target = '_blank';
+
+      Object.entries(fields).forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    } catch (err) {
+      console.error('Lỗi khởi tạo cổng SePay:', err);
+      setAmountError(
+        'Không thể kết nối Cổng thanh toán SePay: ' +
+          (err.response?.data?.detail || err.message)
+      );
+    } finally {
+      setProcessingGatewayAction(false);
+    }
+  };
+
   // ============================================================================
   // HÀNH ĐỘNG CỦA ADMIN & CHỦ TRẠM (CPO): PHÊ DUYỆT & TỪ CHỐI ĐƠN NẠP
   // ============================================================================
@@ -1874,6 +1912,16 @@ export default function Wallet() {
                               <span>TÔI ĐÃ CHUYỂN KHOẢN XONG</span>
                             </>
                           )}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={processingGatewayAction}
+                          onClick={handleOpenSepayGateway}
+                          className="w-full flex items-center justify-center space-x-2 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-sky-600 dark:text-sky-400 font-bold text-xs uppercase tracking-wider transition-all border border-slate-200 dark:border-slate-700"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          <span>MỞ TRANG THANH TOÁN SEPAY (PG)</span>
                         </button>
                       </div>
                     </div>
