@@ -415,7 +415,10 @@ export default function Wallet() {
   const [processingGatewayAction, setProcessingGatewayAction] = useState(false);
   const [delayedWebhookCountdown, setDelayedWebhookCountdown] = useState(0);
 
-  // Trạng thái đã gửi yêu cầu nạp tiền (Chờ Ban quản trị duyệt)
+  // Trạng thái bước nạp tiền: 'INPUT' | 'CHECKING' | 'SUCCESS' | 'TIMEOUT_OR_ERROR'
+  const [checkoutStep, setCheckoutStep] = useState('INPUT');
+  const [checkingSecondsLeft, setCheckingSecondsLeft] = useState(15);
+  const [successOrderInfo, setSuccessOrderInfo] = useState(null);
   const [submittedOrderInfo, setSubmittedOrderInfo] = useState(null);
 
   // Form Thẻ Quốc Tế
@@ -560,16 +563,21 @@ export default function Wallet() {
     onConfirmedSuccess: async (confirmedOrder) => {
       await fetchWalletData(true);
       if (canApprove) await fetchAdminOrders();
+      setCheckoutStep('SUCCESS');
+      setSuccessOrderInfo(confirmedOrder);
       setBannerAlert({
         type: 'SUCCESS',
         title: 'Nạp tiền thành công!',
         detail: `Đơn nạp #${confirmedOrder.order_code} (+${formatVND(
           confirmedOrder.amount
-        )}) đã được Ban quản lý phê duyệt và cộng vào ví của bạn.`,
+        )}) đã được tự động nạp vào ví của bạn.`,
       });
     },
     onConfirmedFailure: (failedOrder) => {
       const isCancelled = String(failedOrder.status).toUpperCase() === 'CANCELLED';
+      if (sandboxCheckout && sandboxCheckout.orderCode === failedOrder.order_code) {
+        setCheckoutStep('TIMEOUT_OR_ERROR');
+      }
       setBannerAlert({
         type: 'ERROR',
         title: isCancelled ? 'Giao dịch đã được hủy' : 'Yêu cầu nạp tiền bị từ chối',
@@ -577,7 +585,7 @@ export default function Wallet() {
           failedOrder.failure_reason ||
           (isCancelled
             ? 'Giao dịch nạp tiền đã hủy theo yêu cầu của bạn.'
-            : 'Ban quản trị từ chối yêu cầu do không nhận được sao kê hợp lệ.'),
+            : 'Giao dịch nạp tiền chưa thành công, vui lòng thử lại hoặc liên hệ hỗ trợ.'),
       });
     },
     pollIntervalMs: 2000,
@@ -681,6 +689,8 @@ export default function Wallet() {
 
       setActiveGatewayTab(selectedChannel);
       setSandboxCheckout(parsedGateway);
+      setCheckoutStep('INPUT');
+      setSuccessOrderInfo(null);
       setSubmittedOrderInfo(null);
       setCheckoutCountdown(900);
     } catch (err) {
@@ -691,22 +701,39 @@ export default function Wallet() {
     }
   };
 
-  // Tài xế xác nhận đã chuyển khoản / nạp tiền -> Chuyển sang trạng thái "Chờ duyệt"
+  // Tài xế xác nhận đã chuyển khoản / nạp tiền -> Tự động kiểm tra webhook từ SePay
   const handleDriverConfirmPayment = () => {
     if (!sandboxCheckout) return;
-    setProcessingGatewayAction(true);
-    setTimeout(() => {
-      setSubmittedOrderInfo({
-        orderCode: sandboxCheckout.orderCode,
-        amount: sandboxCheckout.amount,
-        channelName:
-          PAYMENT_CHANNELS.find((c) => c.id === activeGatewayTab)?.name || 'Chuyển khoản VietQR',
-      });
-      setProcessingGatewayAction(false);
-      fetchWalletData(true);
-      if (canApprove) fetchAdminOrders();
-    }, 600);
+    setCheckoutStep('CHECKING');
+    setCheckingSecondsLeft(15);
+    checkOrderStatusNow(sandboxCheckout.orderCode);
   };
+
+  // Timer kiểm tra biến động số dư SePay (Đếm ngược 15s nếu trễ mới chuyển Admin)
+  useEffect(() => {
+    if (checkoutStep !== 'CHECKING' || !sandboxCheckout) return undefined;
+
+    const timer = setInterval(() => {
+      setCheckingSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          // Hết 15 giây mà ngân hàng chưa xác nhận -> Chuyển sang hàng đợi Admin duyệt thủ công
+          setCheckoutStep('TIMEOUT_OR_ERROR');
+          setSubmittedOrderInfo({
+            orderCode: sandboxCheckout.orderCode,
+            amount: sandboxCheckout.amount,
+            channelName:
+              PAYMENT_CHANNELS.find((c) => c.id === activeGatewayTab)?.name || 'Chuyển khoản VietQR',
+          });
+          return 0;
+        }
+        checkOrderStatusNow(sandboxCheckout.orderCode);
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [checkoutStep, sandboxCheckout, activeGatewayTab, checkOrderStatusNow]);
 
   // Test runners handlers cho automated tests
   const handleSandboxPaySuccess = () => handleDriverConfirmPayment();
@@ -1747,36 +1774,143 @@ export default function Wallet() {
               </button>
             </div>
 
-            {/* Màn hình sau khi tài xế gửi yêu cầu thành công */}
-            {submittedOrderInfo ? (
-              <div className="p-8 text-center space-y-4">
-                <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                  <CheckCircle2 className="w-8 h-8" />
+            {/* 1. MÀN HÌNH NẠP TIỀN THÀNH CÔNG (TỰ ĐỘNG 100%, KHÔNG CẦN CHỜ DUYỆT) */}
+            {checkoutStep === 'SUCCESS' ? (
+              <div className="p-8 text-center space-y-5 animate-scaleUp">
+                <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+
+                <div>
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                    <span>TỰ ĐỘNG XÁC NHẬN QUA SEPAY</span>
+                  </span>
+                  <h4 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 mt-2">
+                    Nạp Tiền Thành Công!
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                    Hệ thống đã nhận được tiền từ ngân hàng và tự động cộng trực tiếp vào ví của bạn.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-2 max-w-sm mx-auto">
+                  <div className="flex justify-between items-center text-slate-500">
+                    <span>Mã giao dịch:</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                      #{successOrderInfo?.order_code || sandboxCheckout.orderCode}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-500">
+                    <span>Số tiền nạp:</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                      +{formatVND(successOrderInfo?.amount || sandboxCheckout.amount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-700/60 text-slate-500">
+                    <span>Số dư ví hiện tại:</span>
+                    <span className="font-extrabold text-sky-600 dark:text-sky-400">
+                      {formatVND(wallet?.balance || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSandboxCheckout(null);
+                    setCheckoutStep('INPUT');
+                  }}
+                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-600/20"
+                >
+                  HOÀN TẤT &amp; VỀ VÍ CỦA TÔI
+                </button>
+              </div>
+            ) : checkoutStep === 'CHECKING' ? (
+              /* 2. MÀN HÌNH ĐANG KIỂM TRA WEBHOOK SEPAY TỰ ĐỘNG */
+              <div className="p-8 text-center space-y-5 animate-scaleUp">
+                <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full bg-sky-500/20 animate-ping" />
+                  <div className="relative w-14 h-14 bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800 rounded-full flex items-center justify-center shadow-md">
+                    <RefreshCw className="w-7 h-7 animate-spin" />
+                  </div>
                 </div>
 
                 <div>
                   <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                    Đã Ghi Nhận Yêu Cầu Nạp Tiền!
+                    Đang Kiểm Tra Biến Động Số Dư SePay...
                   </h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-                    Mã giao dịch: <strong className="font-mono text-slate-900 dark:text-slate-100">#{submittedOrderInfo.orderCode}</strong> &bull; Số tiền:{' '}
-                    <strong className="text-sky-600 dark:text-sky-400">{formatVND(submittedOrderInfo.amount)}</strong>
+                    Hệ thống đang tự động đối soát giao dịch chuyển khoản. Tiền sẽ được cộng tức thì ngay khi ngân hàng xác nhận (còn <strong className="text-sky-600 dark:text-sky-400 font-mono">{checkingSecondsLeft}s</strong>)...
+                  </p>
+                </div>
+
+                <div className="p-3 bg-sky-50 dark:bg-sky-950/30 rounded-xl border border-sky-200 dark:border-sky-800/50 text-[11px] text-sky-700 dark:text-sky-300 max-w-sm mx-auto flex items-center justify-center space-x-2">
+                  <Radio className="w-4 h-4 text-sky-500 animate-pulse shrink-0" />
+                  <span>Đang mở cổng lắng nghe Webhook ngân hàng thời gian thực...</span>
+                </div>
+
+                <div className="flex items-center space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutStep('INPUT')}
+                    className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
+                  >
+                    Xem Lại Mã QR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCheckoutStep('TIMEOUT_OR_ERROR');
+                      setSubmittedOrderInfo({
+                        orderCode: sandboxCheckout.orderCode,
+                        amount: sandboxCheckout.amount,
+                        channelName: 'Chuyển khoản VietQR',
+                      });
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-colors shadow-sm"
+                  >
+                    Chuyển Admin Duyệt Ngay
+                  </button>
+                </div>
+              </div>
+            ) : checkoutStep === 'TIMEOUT_OR_ERROR' || submittedOrderInfo ? (
+              /* 3. MÀN HÌNH CHỜ ADMIN DUYỆT THỦ CÔNG (CHỈ KHI LỖI HỆ THỐNG HOẶC TREO CHỜ WEBHOOK) */
+              <div className="p-8 text-center space-y-4 animate-scaleUp">
+                <div className="w-14 h-14 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                  <Clock className="w-8 h-8" />
+                </div>
+
+                <div>
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                    <span>CHỜ ĐỐI SOÁT THỦ CÔNG</span>
+                  </span>
+                  <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-2">
+                    Giao Dịch Đang Chờ Quản Trị Viên Duyệt
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                    Mã đơn: <strong className="font-mono text-slate-900 dark:text-slate-100">#{sandboxCheckout?.orderCode || submittedOrderInfo?.orderCode}</strong> &bull; Số tiền:{' '}
+                    <strong className="text-sky-600 dark:text-sky-400">{formatVND(sandboxCheckout?.amount || submittedOrderInfo?.amount || 0)}</strong>
                   </p>
                 </div>
 
                 <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl text-left text-xs text-amber-800 dark:text-amber-300 space-y-1.5">
                   <div className="font-bold flex items-center space-x-1.5">
                     <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Đang chờ Admin &amp; Chủ trạm đối soát duyệt tiền</span>
+                    <span>Hệ thống ngân hàng đang bị trễ hoặc chưa nhận được Webhook</span>
                   </div>
                   <p className="text-[11px] leading-relaxed opacity-90">
-                    Hệ thống đã gửi thông tin chuyển khoản đến Quản trị viên và Chủ trạm. Sau khi đối soát sao kê tài khoản ngân hàng, số tiền sẽ được duyệt vào ví của bạn. Bạn không cần chuyển khoản lại.
+                    Hệ thống chưa nhận được tín hiệu xác nhận tự động từ ngân hàng (có thể do nghẽn mạng ngân hàng hoặc sai cú pháp). Đơn nạp đã được chuyển sang hàng đợi để Admin &amp; Chủ trạm đối soát thủ công. Bạn không cần chuyển khoản lại.
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setSandboxCheckout(null)}
+                  onClick={() => {
+                    setSandboxCheckout(null);
+                    setCheckoutStep('INPUT');
+                  }}
                   className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-sky-600/20"
                 >
                   ĐÃ HIỂU &amp; VỀ VÍ CỦA TÔI
