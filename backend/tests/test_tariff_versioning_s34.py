@@ -379,3 +379,168 @@ def test_update_tariff_endpoint_creates_new_version(client, tariff_env, db_sessi
     new_t = db_session.query(Tariff).filter(Tariff.id == new_version_id).first()
     assert new_t.price_normal == Decimal("3800.00")
     assert new_t.name == base_t.name
+
+
+def test_put_tariff_inherits_idle_fee_when_not_provided(client, tariff_env, db_session):
+    """BUG-S28-01: PUT không truyền idle fee phải kế thừa idle_fee_per_minute và idle_grace_minutes từ bản cũ."""
+    headers = tariff_env["admin_headers"]
+    base_t = tariff_env["base_tariff"]
+    # Thiết lập bản gốc có phí chờ và grace minutes
+    base_t.idle_fee_per_minute = Decimal("1500.00")
+    base_t.idle_grace_minutes = 15
+    db_session.commit()
+
+    now_vn = get_vn_now()
+    tomorrow_vn = (
+        datetime(now_vn.year, now_vn.month, now_vn.day, tzinfo=VIETNAM_TZ)
+        + timedelta(days=1)
+    )
+
+    # Chỉ đổi giá price_normal, không gửi idle_fee_per_minute hay idle_grace_minutes
+    res = client.put(
+        f"/api/v1/tariffs/{base_t.id}",
+        json={
+            "price_normal": 3500,
+            "effective_from": tomorrow_vn.isoformat(),
+        },
+        headers=headers,
+    )
+    assert res.status_code == 200
+    new_id = res.json()["id"]
+    new_t = db_session.query(Tariff).filter(Tariff.id == new_id).first()
+
+    # BUG-S28-01: Kiểm tra bản mới phải kế thừa idle fee từ bản cũ
+    assert new_t.idle_fee_per_minute == Decimal("1500.00")
+    assert new_t.idle_grace_minutes == 15
+
+
+def test_put_tariff_explicit_zero_idle_fee(client, tariff_env, db_session):
+    """BUG-S28-01: PUT gửi tường minh idle fee = 0 thì phải nhận 0, không bị ghi đè lại giá trị cũ."""
+    headers = tariff_env["admin_headers"]
+    base_t = tariff_env["base_tariff"]
+    base_t.idle_fee_per_minute = Decimal("2000.00")
+    base_t.idle_grace_minutes = 30
+    db_session.commit()
+
+    now_vn = get_vn_now()
+    tomorrow_vn = (
+        datetime(now_vn.year, now_vn.month, now_vn.day, tzinfo=VIETNAM_TZ)
+        + timedelta(days=1)
+    )
+
+    res = client.put(
+        f"/api/v1/tariffs/{base_t.id}",
+        json={
+            "price_normal": 3500,
+            "idle_fee_per_minute": 0,
+            "idle_grace_minutes": 0,
+            "effective_from": tomorrow_vn.isoformat(),
+        },
+        headers=headers,
+    )
+    assert res.status_code == 200
+    new_id = res.json()["id"]
+    new_t = db_session.query(Tariff).filter(Tariff.id == new_id).first()
+
+    assert new_t.idle_fee_per_minute == Decimal("0.00")
+    assert new_t.idle_grace_minutes == 0
+
+
+def test_put_tariff_duplicate_effective_from_same_station_rejected(client, tariff_env):
+    """BUG-S34-01: Hai PUT cùng ngày cùng trạm (cùng effective_from) phải bị từ chối bằng HTTP 409 Conflict."""
+    headers = tariff_env["admin_headers"]
+    base_t = tariff_env["base_tariff"]
+    now_vn = get_vn_now()
+    tomorrow_vn = (
+        datetime(now_vn.year, now_vn.month, now_vn.day, tzinfo=VIETNAM_TZ)
+        + timedelta(days=1)
+    )
+
+    # 1. Trường hợp biểu giá chung (station_id is None)
+    res1 = client.put(
+        f"/api/v1/tariffs/{base_t.id}",
+        json={
+            "price_normal": 3600,
+            "effective_from": tomorrow_vn.isoformat(),
+        },
+        headers=headers,
+    )
+    assert res1.status_code == 200
+
+    res2 = client.put(
+        f"/api/v1/tariffs/{base_t.id}",
+        json={
+            "price_normal": 3700,
+            "effective_from": tomorrow_vn.isoformat(),
+        },
+        headers=headers,
+    )
+    assert res2.status_code == 409
+
+    # 2. Trường hợp biểu giá riêng của trạm (station_id is NOT None)
+    st = tariff_env["station"]
+    res_st1 = client.post(
+        "/api/v1/tariffs",
+        json={
+            "name": "Biểu giá riêng Trạm",
+            "station_id": st.id,
+            "price_normal": 4000,
+            "price_peak": 5000,
+            "price_offpeak": 3000,
+            "effective_from": tomorrow_vn.isoformat(),
+        },
+        headers=headers,
+    )
+    assert res_st1.status_code == 201
+    st_tariff_id = res_st1.json()["id"]
+
+    # PUT lần 2 cùng ngày cho trạm đó
+    res_st2 = client.put(
+        f"/api/v1/tariffs/{st_tariff_id}",
+        json={
+            "price_normal": 4200,
+            "effective_from": tomorrow_vn.isoformat(),
+        },
+        headers=headers,
+    )
+    assert res_st2.status_code == 409
+
+
+def test_put_tariff_copies_all_model_columns(client, tariff_env, db_session):
+    """Kiểm tra tính toàn vẹn: bản ghi mới qua PUT phải giữ nguyên tất cả thuộc tính của model Tariff trừ id/created_at."""
+    headers = tariff_env["admin_headers"]
+    base_t = tariff_env["base_tariff"]
+    base_t.idle_fee_per_minute = Decimal("2500.00")
+    base_t.idle_grace_minutes = 20
+    base_t.peak_start = "10:00"
+    base_t.peak_end = "12:00"
+    base_t.peak_start_2 = "18:00"
+    base_t.peak_end_2 = "21:00"
+    base_t.offpeak_start = "23:00"
+    base_t.offpeak_end = "05:00"
+    db_session.commit()
+
+    now_vn = get_vn_now()
+    day_after_tomorrow = (
+        datetime(now_vn.year, now_vn.month, now_vn.day, tzinfo=VIETNAM_TZ)
+        + timedelta(days=2)
+    )
+
+    res = client.put(
+        f"/api/v1/tariffs/{base_t.id}",
+        json={
+            "effective_from": day_after_tomorrow.isoformat(),
+        },
+        headers=headers,
+    )
+    assert res.status_code == 200
+    new_t = db_session.query(Tariff).filter(Tariff.id == res.json()["id"]).first()
+
+    ignored_cols = {"id", "created_at", "effective_from"}
+    for col in Tariff.__table__.columns:
+        if col.name not in ignored_cols:
+            val_old = getattr(base_t, col.name)
+            val_new = getattr(new_t, col.name)
+            assert val_old == val_new, f"Cột {col.name} không khớp giữa bản cũ ({val_old}) và mới ({val_new})"
+
+

@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     ENABLE_DEMO_ACCOUNTS: bool = False
     TESTING: bool = False
     ENVIRONMENT: str = "development"
+    RECONCILE_TOLERANCE_VND: int = 1000  # Ngưỡng lệch tiền chấp nhận được do làm tròn (S-53)
+    DEFAULT_NO_SHOW_FEE: int = 20000  # Phí giữ chỗ không đến mặc định (VND) (S-50 / SCRUM-374)
+
+
 
     # Cổng thanh toán Sandbox & Webhook (S-35)
     TOPUP_MIN_AMOUNT: int = 10000
