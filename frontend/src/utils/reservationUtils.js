@@ -142,16 +142,21 @@ export function isPenaltyTransaction(tx) {
     type === 'RESERVATION_PENALTY' ||
     type === 'HOLD_FEE' ||
     type === 'PENALTY_FEE' ||
+    type === 'OVERSTAY_PENALTY' ||
     refType === 'RESERVATION' ||
     refType === 'NO_SHOW' ||
     refType === 'RESERVATION_PENALTY' ||
+    refType === 'OVERSTAY_PENALTY' ||
     refId.startsWith('res_') ||
     refId.startsWith('reservation_') ||
+    refId.startsWith('overstay_') ||
     note.includes('quá hạn') ||
     note.includes('không đến') ||
     note.includes('giữ chỗ') ||
     note.includes('no-show') ||
-    note.includes('penalty')
+    note.includes('penalty') ||
+    note.includes('phạt') ||
+    note.includes('rút sạc')
   );
 }
 

@@ -2158,7 +2158,7 @@ export default function Wallet() {
                       { key: 'CHARGE_FEE', label: 'Cước sạc', count: chargeTxsCount },
                       {
                         key: 'PENALTY',
-                        label: 'Phí giữ chỗ',
+                        label: 'Phí phạt',
                         count: penaltyTxs.length,
                         highlight: true,
                       },
@@ -2272,6 +2272,8 @@ export default function Wallet() {
                                   >
                                     {isCredit
                                       ? 'Nạp tiền vào ví'
+                                      : (tx.note?.includes('Phạt không rút sạc') || tx.reference_type === 'OVERSTAY_PENALTY' || tx.reference_id?.startsWith('overstay'))
+                                      ? 'Phạt không rút sạc'
                                       : isPenalty
                                       ? 'Phí giữ chỗ quá hạn'
                                       : 'Cước sạc xe điện'}

@@ -359,7 +359,7 @@
   background: #edf3f8;
   color: #172635;
   border-bottom: 1px solid #d5dfe8;
-  padding: 11px 10px;
+  padding: 11px 8px;
   text-align: left;
   white-space: nowrap;
   font-size: 11px;
@@ -367,29 +367,12 @@
 
 .admin-table th:last-child,
 .admin-table td:last-child {
-  position: sticky;
-  right: 0;
-  background: #edf3f8;
-  box-shadow: -3px 0 8px rgba(0, 0, 0, 0.08);
-  z-index: 2;
   text-align: center;
-}
-
-.admin-table td:last-child {
-  background: #ffffff;
-}
-
-.admin-table tbody tr:nth-child(even) td:last-child {
-  background: #fbfdff;
-}
-
-.admin-table tbody tr:hover td:last-child {
-  background: #eff7ff;
 }
 
 .admin-table td {
   border-bottom: 1px solid #e5ebf0;
-  padding: 9px 10px;
+  padding: 8px 8px;
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -428,7 +411,7 @@
 }
 
 .role-select {
-  min-width: 110px;
+  min-width: 125px;
   height: 30px;
   border: 1px solid #d4dee8;
   border-radius: 5px;
@@ -444,6 +427,7 @@
   gap: 6px;
   font-weight: 800;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .status small {
@@ -474,7 +458,7 @@
 
 .table-action {
   height: 29px;
-  padding: 0 8px;
+  padding: 0 6px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -686,4 +670,98 @@
 .role-select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+
+/* Password Reset Button & Form Styles */
+.admin-create.batch-reset {
+  background: #334155;
+  border-color: #334155;
+}
+
+.admin-create.batch-reset:hover {
+  background: #1e293b;
+}
+
+.admin-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-action.key {
+  color: #0b75d1;
+  border-color: #b9daf7;
+  background: #f0f7ff;
+}
+
+.table-action.key:hover {
+  background: #e0effe;
+  border-color: #92c5f5;
+}
+
+.input-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-password-wrap input {
+  padding-right: 40px !important;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.password-toggle-btn:hover {
+  color: #0f172a;
+}
+
+.btn-generate-password {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #0284c7;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  align-self: flex-start;
+}
+
+.btn-generate-password:hover {
+  background: #f0f9ff;
+  border-color: #7dd3fc;
+}
+
+.admin-modal-checkbox {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  margin-top: 14px !important;
+  cursor: pointer;
+  font-weight: 600 !important;
+  color: #334155 !important;
+}
+
+.admin-modal-checkbox input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  cursor: pointer;
+  margin: 0;
 }

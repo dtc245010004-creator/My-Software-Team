@@ -18,12 +18,12 @@ export const getRoleLabel = (role) => {
 };
 
 /**
- * Danh mục tài khoản Demo phục vụ kiểm thử phân quyền 1-Click
+ * Danh mục tài khoản phục vụ kiểm thử phân quyền
  */
 export const DEMO_USERS = {
   ADMIN: {
     username: 'admin',
-    password: '12345678a',
+    password: 'admin123@',
     role: 'ADMIN',
     label: 'Admin',
     fullName: 'Quản Trị Viên Hệ Thống',
@@ -54,4 +54,3 @@ export const DEMO_USERS = {
     description: 'Tìm trạm và cắm sạc xe điện',
   },
 };
-

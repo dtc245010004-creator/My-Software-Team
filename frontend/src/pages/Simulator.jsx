@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Zap,
   Play,
@@ -11,6 +12,11 @@ import {
   Sliders,
   CheckCircle2,
   Info,
+  Clock,
+  Plug,
+  Wallet as WalletIcon,
+  ArrowRight,
+  ShieldAlert,
 } from 'lucide-react';
 import api from '../services/api';
 import { telemetryWs } from '../services/websocket';
@@ -225,6 +231,75 @@ export default function Simulator() {
       });
     } catch (err) {
       alert('Lỗi kích hoạt sự cố: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+
+  // State Demo Phạt không rút sạc (Pin 100%)
+  const [demoMinutes, setDemoMinutes] = useState(3);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoSuccess, setDemoSuccess] = useState(null);
+  const [demoError, setDemoError] = useState('');
+  const [isOverstayActive, setIsOverstayActive] = useState(false);
+  const [overstayTimerMinutes, setOverstayTimerMinutes] = useState(1);
+
+  // Kích hoạt mô phỏng pin đạt 100% trên phiên sạc đang chạy
+  const handleFastForwardSoc100 = () => {
+    setIsOverstayActive(true);
+    setTelemetry((prev) => ({
+      ...(prev || {}),
+      soc: 100.0,
+      power_kw: 0.0,
+      temp_c: 32.0,
+      energy_kwh: prev?.energy_kwh || 18.5,
+      cost_estimate: prev?.cost_estimate || 72000,
+    }));
+    setStatusMessage('Xe đã sạc đầy 100%! Trạng thái không rút sạc đang kích hoạt tính phí phạt 3.000 đ/phút.');
+  };
+
+  // Áp dụng phạt không rút sạc vào ví
+  const handleApplyOverstayPenalty = async (customMinutes) => {
+    const mins = Number(customMinutes !== undefined ? customMinutes : demoMinutes);
+    if (!mins || mins <= 0) {
+      alert('Vui lòng chọn hoặc nhập số phút hợp lệ (> 0).');
+      return;
+    }
+
+    try {
+      setDemoLoading(true);
+      setDemoError('');
+      setDemoSuccess(null);
+
+      const res = await api.post('/simulator/overstay-penalty', {
+        minutes: mins,
+        session_id: activeSession ? activeSession.id : null,
+        rate_per_minute: 3000,
+        note_custom: `Phạt không rút sạc - ${mins} phút`,
+      });
+
+      setDemoSuccess({
+        amount: res.data.amount,
+        minutes: mins,
+        note: res.data.note,
+        new_balance: res.data.new_balance,
+      });
+
+      setStatusMessage(
+        `Đã trừ phạt ${Math.abs(res.data.amount).toLocaleString('vi-VN')} đ vào ví với nội dung: "${res.data.note}"`
+      );
+
+      // Nếu đang trong phiên sạc, rút sạc và hoàn tất
+      if (isOverstayActive) {
+        setIsOverstayActive(false);
+        if (activeSession) {
+          handleStopCharging();
+        }
+      }
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || 'Lỗi khi áp dụng phạt ví.';
+      setDemoError(msg);
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -742,6 +817,208 @@ export default function Simulator() {
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* BẢNG GIẢ LẬP PHẠT KHÔNG RÚT SẠC KHI PIN ĐẦY 100% (3.000 VNĐ / PHÚT)     */}
+      {/* ========================================================================= */}
+      <section className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
+          <div className="space-y-1">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60">
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
+              <span>CHÍNH SÁCH QUẢN LÝ TRỤ SẠC & CHỐNG CHIẾM CHỖ</span>
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              Demo Bảng Giả Lập: Phạt Không Rút Sạc Khi Pin Đầy 100%
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Khi pin xe điện sạc đầy 100% mà tài xế không rút sạc, hệ thống áp dụng mức phạt{' '}
+              <strong className="text-rose-600 dark:text-rose-400 font-semibold">3.000 VNĐ / phút</strong>.
+              Tiền phạt sẽ tự động trừ vào ví điện tử và hiển thị minh bạch trong sổ cái lịch sử giao dịch.
+            </p>
+          </div>
+
+          <Link
+            to="/wallet"
+            className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors self-start md:self-auto shrink-0"
+          >
+            <WalletIcon className="w-4 h-4 text-sky-500" />
+            <span>Xem Lịch Sử Giao Dịch Ví</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* Thông báo kết quả áp dụng phạt */}
+        {demoSuccess && (
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 p-4 rounded-xl space-y-2">
+            <div className="flex items-center space-x-2 text-emerald-800 dark:text-emerald-300 font-bold text-sm">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <span>ĐÃ ÁP DỤNG PHẠT VÀ TRỪ TIỀN VÍ THÀNH CÔNG!</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+              <div className="bg-white/80 dark:bg-slate-900/60 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900">
+                <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Số tiền bị trừ:</span>
+                <strong className="text-rose-600 text-sm font-extrabold">
+                  -{Math.abs(demoSuccess.amount).toLocaleString('vi-VN')} ₫
+                </strong>
+              </div>
+              <div className="bg-white/80 dark:bg-slate-900/60 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900">
+                <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Nội dung ghi nhận trong ví:</span>
+                <strong className="text-slate-900 dark:text-slate-100 font-semibold">
+                  "{demoSuccess.note}"
+                </strong>
+              </div>
+              <div className="bg-white/80 dark:bg-slate-900/60 p-2.5 rounded-lg border border-emerald-100 dark:border-emerald-900">
+                <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Số dư ví sau khi trừ:</span>
+                <strong className="text-sky-600 text-sm font-bold">
+                  {Math.round(demoSuccess.new_balance).toLocaleString('vi-VN')} ₫
+                </strong>
+              </div>
+            </div>
+            <div className="pt-2 flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">
+                Giao dịch đã được lưu vào CSDL và đồng bộ thời gian thực sang màn hình Ví.
+              </span>
+              <Link
+                to="/wallet"
+                className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center space-x-1"
+              >
+                <span>Kiểm tra trong Ví ngay</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {demoError && (
+          <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 p-3.5 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+            <span>{demoError}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Cột 1: Thông số giả lập hiện tại */}
+          <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
+            <div className="font-semibold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800">
+              1. Trạng thái giả lập sạc xe
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 dark:text-slate-400">Mức pin xe:</span>
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
+                <Battery className="w-3.5 h-3.5" />
+                <span>100% (Pin đầy)</span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 dark:text-slate-400">Tình trạng súng sạc:</span>
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-700">
+                <Plug className="w-3.5 h-3.5" />
+                <span>Chưa rút sạc</span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 dark:text-slate-400">Đơn giá phạt:</span>
+              <strong className="text-slate-900 dark:text-slate-100">3.000 VNĐ / 1 phút</strong>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 dark:text-slate-400">Chính sách ân hạn:</span>
+              <span className="text-slate-600 dark:text-slate-300">0 phút (Tính phạt tức thì)</span>
+            </div>
+          </div>
+
+          {/* Cột 2: Chọn thời gian không rút sạc */}
+          <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
+            <div className="font-semibold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800">
+              2. Chọn số thời gian tài xế không rút sạc
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Thời gian chưa rút sạc:</span>
+              <strong className="text-base text-rose-600 font-extrabold">{demoMinutes} phút</strong>
+            </div>
+
+            {/* Các mốc thời gian mẫu */}
+            <div className="grid grid-cols-5 gap-1.5 pt-1">
+              {[1, 2, 3, 5, 10].map((mins) => (
+                <button
+                  key={mins}
+                  type="button"
+                  onClick={() => setDemoMinutes(mins)}
+                  className={`py-1.5 px-1 rounded-xl text-xs font-semibold text-center border transition-all ${
+                    demoMinutes === mins
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  {mins} phút
+                </button>
+              ))}
+            </div>
+
+            {/* Slider tùy chỉnh */}
+            <div className="pt-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="range"
+                  min="1"
+                  max="60"
+                  step="1"
+                  value={demoMinutes}
+                  onChange={(e) => setDemoMinutes(Number(e.target.value))}
+                  className="w-full accent-rose-600 cursor-pointer"
+                />
+                <div className="w-16 shrink-0">
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={demoMinutes}
+                    onChange={(e) => setDemoMinutes(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1 px-1.5 text-center text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cột 3: Tính toán & Kích hoạt trừ phạt */}
+          <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="font-semibold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800">
+                3. Dự kiến tiền phạt & Nội dung ghi ví
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 dark:text-slate-400">Tiền phạt:</span>
+                <strong className="text-base text-rose-600 font-extrabold">
+                  {(demoMinutes * 3000).toLocaleString('vi-VN')} ₫
+                </strong>
+              </div>
+
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">
+                  Nội dung ghi nhận trong lịch sử ví:
+                </span>
+                <div className="text-xs font-bold text-sky-600 dark:text-sky-400">
+                  "Phạt không rút sạc - {demoMinutes} phút"
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleApplyOverstayPenalty()}
+              disabled={demoLoading}
+              className="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm transition-all shadow-sm shadow-rose-600/20 flex items-center justify-center space-x-2"
+            >
+              <Plug className="w-4 h-4" />
+              <span>{demoLoading ? 'Đang thực hiện trừ tiền...' : '⚡ Rút Sạc & Kích Hoạt Phạt Trừ Ví'}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 }
