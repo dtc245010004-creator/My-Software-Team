@@ -31,7 +31,7 @@ import AdminDataErasure from './pages/AdminDataErasure';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
-  const { user, role, loading } = useAuth();
+  const { user, rawUser, token, role, loading } = useAuth();
 
   if (loading) {
     return (
@@ -42,6 +42,11 @@ function AppLayout() {
         </div>
       </div>
     );
+  }
+
+  // Khi chưa đăng nhập, người dùng bắt buộc truy cập trực tiếp vào giao diện đăng nhập
+  if (!rawUser || !token) {
+    return <Navigate to="/login" replace />;
   }
 
   const homeRoute = getHomeRouteByRole(role);

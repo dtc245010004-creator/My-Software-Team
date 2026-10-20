@@ -1,12 +1,14 @@
+import re
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.rbac import roles
+from app.core.security import get_password_hash
 from app.models.user import User
 
 router = APIRouter(
@@ -17,6 +19,42 @@ router = APIRouter(
 
 class RoleUpdate(BaseModel):
     role: str
+
+
+class PasswordResetPayload(BaseModel):
+    new_password: str = Field(..., min_length=8, description="Mật khẩu mới")
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Mật khẩu phải có độ dài tối thiểu 8 ký tự.")
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Mật khẩu quá dài (tối đa 72 bytes).")
+        if not re.search(r"[A-Za-z]", v):
+            raise ValueError("Mật khẩu phải chứa ít nhất một chữ cái.")
+        if not re.search(r"\d", v):
+            raise ValueError("Mật khẩu phải chứa ít nhất một chữ số.")
+        return v
+
+
+class BatchPasswordResetPayload(BaseModel):
+    new_password: str = Field(..., min_length=8, description="Mật khẩu mới áp dụng chung")
+    role: str = Field(default="ALL", description="Vai trò áp dụng (ALL, CUSTOMER, OPERATOR, ...)")
+    exclude_self: bool = Field(default=True, description="Không đổi mật khẩu của chính tài khoản Admin đang thực hiện")
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_batch_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Mật khẩu phải có độ dài tối thiểu 8 ký tự.")
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Mật khẩu quá dài (tối đa 72 bytes).")
+        if not re.search(r"[A-Za-z]", v):
+            raise ValueError("Mật khẩu phải chứa ít nhất một chữ cái.")
+        if not re.search(r"\d", v):
+            raise ValueError("Mật khẩu phải chứa ít nhất một chữ số.")
+        return v
 
 
 # Các tài khoản mặc định được bảo vệ
@@ -254,4 +292,73 @@ def unlock_login(
     return {
         "message": "Đã mở khóa đăng nhập.",
         "user_id": user.id,
+    }
+
+
+@router.patch("/{user_id}/password")
+@roles("ADMIN")
+def update_user_password(
+    user_id: int,
+    payload: PasswordResetPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin đặt lại mật khẩu cho một tài khoản cụ thể."""
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy tài khoản.",
+        )
+
+    user.password_hash = get_password_hash(payload.new_password)
+    user.failed_login_attempts = 0
+    user.locked_until = None
+
+    db.commit()
+
+    return {
+        "message": f"Đã đổi mật khẩu thành công cho tài khoản {user.username}.",
+        "user_id": user.id,
+        "username": user.username,
+    }
+
+
+@router.post("/batch-reset-password")
+@roles("ADMIN")
+def batch_reset_passwords(
+    payload: BatchPasswordResetPayload,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin đổi mật khẩu hàng loạt / toàn bộ người dùng trong hệ thống."""
+    query = db.query(User)
+
+    target_role = (payload.role or "ALL").strip().upper()
+    if target_role != "ALL":
+        query = query.filter(User.role == target_role)
+
+    if payload.exclude_self:
+        query = query.filter(User.id != current_user.id)
+
+    target_users = query.all()
+
+    if not target_users:
+        return {
+            "message": "Không tìm thấy người dùng nào phù hợp với bộ lọc.",
+            "count": 0,
+        }
+
+    new_hash = get_password_hash(payload.new_password)
+    for u in target_users:
+        u.password_hash = new_hash
+        u.failed_login_attempts = 0
+        u.locked_until = None
+
+    db.commit()
+
+    return {
+        "message": f"Đã đổi mật khẩu thành công cho {len(target_users)} người dùng.",
+        "count": len(target_users),
     }

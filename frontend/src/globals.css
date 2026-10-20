@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   WCAG AA / AAA ACCESSIBLE DESIGN TOKENS (SHADCN UI + TAILWIND CSS)
+   - Contrast calculation: Light Mode >= 4.5:1 (Normal text) / >= 7:1 (AAA)
+   - Dark Mode: Subtle luminescent glow without harsh saturated neon borders
+   ============================================================================= */
+
+@layer base {
+  :root {
+    /* Base Surfaces & Typography (Light Mode) */
+    --background: 210 40% 98%;          /* #F8FAFC - Slate 50 */
+    --foreground: 222.2 84% 4.9%;       /* #020817 - Slate 950 */
+
+    --card: 0 0% 100%;                  /* #FFFFFF - Pure White */
+    --card-foreground: 222.2 84% 4.9%;  /* #020817 */
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 199 89% 48%;             /* #0284C7 - Sky 600 */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;         /* #F1F5F9 - Slate 100 */
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 40%; /* #556987 - Contrast > 4.8:1 */
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 350 89% 32%;         /* #9F1239 - Rose 800 */
+    --destructive-foreground: 210 40% 98%;
+
+    /* System Borders & Rings (Subtle slate-200) */
+    --border: 214.3 31.8% 91.4%;        /* #E2E8F0 - Slate 200 */
+    --input: 214.3 31.8% 91.4%;
+    --ring: 199 89% 48%;
+
+    --radius: 0.75rem;                  /* 12px default border radius */
+
+    /* -------------------------------------------------------------------------
+       STATUS DESIGN TOKENS (LIGHT MODE)
+       High-contrast semantic dark text on soft tinted background (WCAG AA/AAA)
+       ------------------------------------------------------------------------- */
+    /* Success: Text emerald-800 (#065F46), Bg emerald-50 (#ECFDF5), Border emerald-200 (#A7F3D0)
+       Contrast ratio: 7.54:1 (WCAG AAA compliant) */
+    --status-success-text: 160 84% 20%;
+    --status-success-bg: 152 76% 97%;
+    --status-success-border: 149 80% 90%;
+
+    /* Warning: Text amber-800 (#92400E), Bg amber-50 (#FFFBEB), Border amber-200 (#FDE68A)
+       Contrast ratio: 5.82:1 (WCAG AA compliant) */
+    --status-warning-text: 28 80% 27%;
+    --status-warning-bg: 48 100% 96%;
+    --status-warning-border: 48 96% 89%;
+
+    /* Danger: Text rose-800 (#9F1239), Bg rose-50 (#FFF1F2), Border rose-200 (#FECDD3)
+       Contrast ratio: 6.89:1 (WCAG AA compliant) */
+    --status-danger-text: 350 89% 32%;
+    --status-danger-bg: 355 100% 97%;
+    --status-danger-border: 353 96% 90%;
+
+    /* Info: Text sky-800 (#075985), Bg sky-50 (#F0F9FF), Border sky-200 (#BAE6FD)
+       Contrast ratio: 6.51:1 (WCAG AA compliant) */
+    --status-info-text: 200 98% 28%;
+    --status-info-bg: 204 100% 97%;
+    --status-info-border: 201 94% 86%;
+
+    /* Neutral: Text slate-800 (#1E293B), Bg slate-100 (#F1F5F9), Border slate-200 (#E2E8F0) */
+    --status-neutral-text: 222.2 47.4% 17%;
+    --status-neutral-bg: 210 40% 96.1%;
+    --status-neutral-border: 214.3 31.8% 91.4%;
+  }
+
+  .dark,
+  html.dark {
+    /* Base Surfaces & Typography (Dark Mode) */
+    --background: 222.2 47.4% 6.7%;     /* #0B0F17 - Deep Slate/Zinc */
+    --foreground: 210 40% 98%;          /* #F8FAFC - Crisp Slate 50 */
+
+    --card: 217.2 32.6% 12.4%;          /* #151D2A - Elevated Panel */
+    --card-foreground: 210 40% 98%;     /* #F8FAFC */
+
+    --popover: 217.2 32.6% 12.4%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 199 89% 48%;             /* #0284C7 */
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;     /* #1E293B */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%; /* #94A3B8 - Slate 400 */
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 351 95% 71%;         /* #FDA4AF - Rose 300 */
+    --destructive-foreground: 222.2 47.4% 11.2%;
+
+    /* System Borders (Subtle slate-800/60, no harsh neon or solid white) */
+    --border: 217.2 32.6% 17.5%;        /* #1E293B - Slate 800 */
+    --input: 217.2 32.6% 17.5%;
+    --ring: 199 89% 48%;
+
+    /* -------------------------------------------------------------------------
+       STATUS DESIGN TOKENS (DARK MODE)
+       Crisp light text with subtle luminescent background tint & 50% border
+       ------------------------------------------------------------------------- */
+    /* Success: Text emerald-300 (#6EE7B7), Bg emerald-950/50, Border emerald-800/50 */
+    --status-success-text: 156 72% 67%;
+    --status-success-bg: 164 86% 9%;
+    --status-success-border: 160 84% 20%;
+
+    /* Warning: Text amber-300 (#FCD34D), Bg amber-950/50, Border amber-800/50 */
+    --status-warning-text: 43 96% 64%;
+    --status-warning-bg: 26 83% 10%;
+    --status-warning-border: 28 80% 27%;
+
+    /* Danger: Text rose-300 (#FDA4AF), Bg rose-950/50, Border rose-800/50 */
+    --status-danger-text: 351 95% 71%;
+    --status-danger-bg: 356 72% 10%;
+    --status-danger-border: 350 89% 32%;
+
+    /* Info: Text sky-300 (#7DD3FC), Bg sky-950/50, Border sky-800/50 */
+    --status-info-text: 199 95% 74%;
+    --status-info-bg: 205 87% 10%;
+    --status-info-border: 200 98% 28%;
+
+    /* Neutral: Text slate-300 (#CBD5E1), Bg slate-900/60, Border slate-700/60 */
+    --status-neutral-text: 215 20.2% 80%;
+    --status-neutral-bg: 222.2 47.4% 11.2%;
+    --status-neutral-border: 217.2 32.6% 25%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* =============================================================================
+   SURFACE ELEVATION & ACCESSIBLE TABLE UTILITIES
+   ============================================================================= */
+
+@layer utilities {
+  /* Dynamic soft card elevation */
+  .surface-card {
+    @apply bg-card text-card-foreground border border-slate-200 dark:border-slate-800/60 rounded-2xl shadow-sm transition-all duration-200;
+  }
+
+  .surface-card-hover {
+    @apply hover:-translate-y-0.5 hover:shadow-md dark:hover:shadow-cyan-950/20 cursor-pointer;
+  }
+
+  /* Accessible Table Styles */
+  .table-row-accessible {
+    @apply border-b border-slate-200 dark:border-slate-800/60 transition-colors duration-150 hover:bg-slate-50/80 dark:hover:bg-slate-800/40;
+  }
+}
+

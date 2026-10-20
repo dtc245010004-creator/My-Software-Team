@@ -15,7 +15,7 @@ DEMO_ACCOUNTS = (
         "username": "admin",
         "email": "admin@evcsms.vn",
         "full_name": "Quản Trị Viên Hệ Thống",
-        "password": "12345678a",
+        "password": "admin123@",
         "role": "ADMIN",
         "balance": Decimal("5000000.00"),
     },

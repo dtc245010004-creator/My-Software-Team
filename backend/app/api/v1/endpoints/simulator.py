@@ -1,3 +1,5 @@
+import uuid
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,6 +13,7 @@ from app.api.deps import (
 from app.core.database import get_db
 from app.models.session import ChargingSession
 from app.models.user import User
+from app.services.wallet_service import get_or_create_wallet, post_ledger_entry
 from app.simulator.charging_simulator import simulator_manager
 
 router = APIRouter(prefix="/simulator", tags=["Charging Simulator"])
@@ -221,4 +224,60 @@ def set_simulator_power_limit(
         "message": f"Đã cập nhật công suất trần mới {payload.power_limit_kw} kW cho phiên sạc #{session_id}.",
         "session_id": session_id,
         "new_power_limit_kw": payload.power_limit_kw,
+    }
+
+
+class OverstayPenaltyRequest(BaseModel):
+    minutes: int = Field(..., ge=1, le=1440, description="Số phút không rút sạc sau khi pin đầy 100%")
+    session_id: int | None = Field(None, description="Mã phiên sạc (tùy chọn)")
+    rate_per_minute: int = Field(3000, description="Đơn giá phạt mỗi phút (3.000 VNĐ)")
+    note_custom: str | None = Field(None, description="Ghi chú tùy chỉnh")
+
+
+@router.post(
+    "/overstay-penalty",
+    summary="Phạt không rút sạc khi xe sạc đầy 100% (3.000 VNĐ/phút)",
+)
+def apply_overstay_penalty(
+    payload: OverstayPenaltyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_driver_guest),
+):
+    """
+    Giả lập phạt tài xế không rút sạc sau khi pin đầy 100%:
+    - Đơn giá: 3.000 VNĐ / phút.
+    - Tiền phạt = minutes * 3.000 VNĐ.
+    - Ghi nhận sổ cái ví với nội dung: 'Phạt không rút sạc - {minutes} phút'.
+    """
+    total_penalty = payload.minutes * payload.rate_per_minute
+    note_text = payload.note_custom or f"Phạt không rút sạc - {payload.minutes} phút"
+
+    wallet = get_or_create_wallet(db, current_user.id)
+    ref_id = f"overstay_{uuid.uuid4().hex[:10]}"
+    if payload.session_id:
+        ref_id = f"overstay_sess_{payload.session_id}_{uuid.uuid4().hex[:6]}"
+
+    wallet, tx, debt_locked = post_ledger_entry(
+        db=db,
+        wallet_id=wallet.id,
+        amount=-Decimal(str(total_penalty)),
+        transaction_type="CHARGE_FEE",
+        reference_id=ref_id,
+        note=note_text,
+        reference_type="OVERSTAY_PENALTY",
+    )
+    db.commit()
+    db.refresh(wallet)
+    db.refresh(tx)
+
+    return {
+        "success": True,
+        "transaction_id": tx.id,
+        "wallet_id": wallet.id,
+        "amount": -total_penalty,
+        "minutes": payload.minutes,
+        "rate_per_minute": payload.rate_per_minute,
+        "note": tx.note,
+        "new_balance": float(wallet.balance),
+        "created_at": tx.created_at.isoformat() if tx.created_at else None,
     }

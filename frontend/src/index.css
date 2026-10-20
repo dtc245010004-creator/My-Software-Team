@@ -12,9 +12,53 @@
     --text-secondary: #475569;
     --text-muted: #64748B;
     --accent-primary: #0284C7;
+
+    /* Shadcn UI Base Tokens (Light Mode) */
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 199 89% 48%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 40%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 350 89% 32%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 199 89% 48%;
+    --radius: 0.75rem;
+
+    /* WCAG AA / AAA Status Tokens (Light Mode) */
+    --status-success-text: 160 84% 20%;     /* emerald-800 */
+    --status-success-bg: 152 76% 97%;       /* emerald-50 */
+    --status-success-border: 149 80% 90%;   /* emerald-200 */
+
+    --status-warning-text: 28 80% 27%;      /* amber-800 */
+    --status-warning-bg: 48 100% 96%;       /* amber-50 */
+    --status-warning-border: 48 96% 89%;    /* amber-200 */
+
+    --status-danger-text: 350 89% 32%;      /* rose-800 */
+    --status-danger-bg: 355 100% 97%;       /* rose-50 */
+    --status-danger-border: 353 96% 90%;    /* rose-200 */
+
+    --status-info-text: 200 98% 28%;        /* sky-800 */
+    --status-info-bg: 204 100% 97%;         /* sky-50 */
+    --status-info-border: 201 94% 86%;      /* sky-200 */
+
+    --status-neutral-text: 222.2 47.4% 17%; /* slate-800 */
+    --status-neutral-bg: 210 40% 96.1%;     /* slate-100 */
+    --status-neutral-border: 214.3 31.8% 91.4%; /* slate-200 */
   }
 
-  html.dark {
+  html.dark,
+  .dark {
     --bg-app: #0B0F17;
     --bg-surface: #151D2A;
     --bg-subtle: #1E293B;
@@ -23,6 +67,48 @@
     --text-secondary: #94A3B8;
     --text-muted: #64748B;
     --accent-primary: #38BDF8;
+
+    /* Shadcn UI Base Tokens (Dark Mode) */
+    --background: 222.2 47.4% 6.7%;
+    --foreground: 210 40% 98%;
+    --card: 217.2 32.6% 12.4%;
+    --card-foreground: 210 40% 98%;
+    --popover: 217.2 32.6% 12.4%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 199 89% 48%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 351 95% 71%;
+    --destructive-foreground: 222.2 47.4% 11.2%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 199 89% 48%;
+
+    /* WCAG AA / AAA Status Tokens (Dark Mode) */
+    --status-success-text: 156 72% 67%;     /* emerald-300 */
+    --status-success-bg: 164 86% 9%;        /* emerald-950/50 */
+    --status-success-border: 160 84% 20%;   /* emerald-800/50 */
+
+    --status-warning-text: 43 96% 64%;      /* amber-300 */
+    --status-warning-bg: 26 83% 10%;        /* amber-950/50 */
+    --status-warning-border: 28 80% 27%;    /* amber-800/50 */
+
+    --status-danger-text: 351 95% 71%;      /* rose-300 */
+    --status-danger-bg: 356 72% 10%;        /* rose-950/50 */
+    --status-danger-border: 350 89% 32%;    /* rose-800/50 */
+
+    --status-info-text: 199 95% 74%;        /* sky-300 */
+    --status-info-bg: 205 87% 10%;          /* sky-950/50 */
+    --status-info-border: 200 98% 28%;      /* sky-800/50 */
+
+    --status-neutral-text: 215 20.2% 80%;   /* slate-300 */
+    --status-neutral-bg: 222.2 47.4% 11.2%; /* slate-900/60 */
+    --status-neutral-border: 217.2 32.6% 25%; /* slate-700/60 */
   }
 
   html {
@@ -161,17 +247,29 @@ html.dark .leaflet-popup-close-button:hover {
   filter: invert(100%) hue-rotate(180deg) brightness(0.9) contrast(0.9) !important;
 }
 
-/* Tự động chuyển đổi màu sắc cho các class kế thừa khi ở Light Mode */
+/* Tự động chuyển đổi màu sắc cho các class kế thừa khi ở Light Mode (WCAG AA/AAA) */
 @layer utilities {
-  html:not(.dark) .bg-obsidian {
+  html:not(.dark) .bg-obsidian,
+  html:not(.dark) [class*="bg-obsidian"] {
     background-color: #F8FAFC !important;
   }
-  html:not(.dark) .bg-panel {
+  html:not(.dark) .bg-panel,
+  html:not(.dark) [class*="bg-panel"] {
     background-color: #FFFFFF !important;
   }
-  html:not(.dark) .bg-panel\/70,
-  html:not(.dark) .bg-panel\/50 {
-    background-color: rgba(255, 255, 255, 0.85) !important;
+  html:not(.dark) .from-obsidian {
+    --tw-gradient-from: #F8FAFC var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgb(248 250 252 / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+  html:not(.dark) .to-panel,
+  html:not(.dark) [class*="to-panel"] {
+    --tw-gradient-to: #FFFFFF var(--tw-gradient-to-position) !important;
+  }
+  html:not(.dark) .via-panel,
+  html:not(.dark) [class*="via-panel"] {
+    --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), #FFFFFF var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
   }
   html:not(.dark) .hover\:bg-panel-hover:hover,
   html:not(.dark) .hover\:bg-panel:hover {
@@ -181,14 +279,39 @@ html.dark .leaflet-popup-close-button:hover {
     background-color: #E2E8F0 !important;
   }
   html:not(.dark) .border-hairline,
-  html:not(.dark) .border-hairline\/60 {
+  html:not(.dark) [class*="border-hairline"] {
     border-color: #E2E8F0 !important;
   }
-  html:not(.dark) .text-tech-white {
+  html:not(.dark) .text-tech-white,
+  html:not(.dark) [class*="text-tech-white"] {
     color: #0F172A !important;
   }
-  html:not(.dark) .text-steel-gray {
+  html:not(.dark) .text-steel-gray,
+  html:not(.dark) [class*="text-steel-gray"] {
     color: #475569 !important;
+  }
+
+  /* Tự động nâng độ tương phản cho các màu sáng rực khi ở Light Mode */
+  html:not(.dark) .text-amber-400 {
+    color: #92400E !important; /* amber-800: 5.82:1 contrast ratio */
+  }
+  html:not(.dark) .text-emerald-400 {
+    color: #065F46 !important; /* emerald-800: 7.54:1 contrast ratio */
+  }
+  html:not(.dark) .text-sky-400 {
+    color: #0369A1 !important; /* sky-700: 5.2:1 contrast ratio */
+  }
+  html:not(.dark) .text-grid-green {
+    color: #047857 !important; /* emerald-700 */
+  }
+  html:not(.dark) .text-caution-amber {
+    color: #B45309 !important; /* amber-700 */
+  }
+  html:not(.dark) .text-critical-red {
+    color: #BE123C !important; /* rose-700 */
+  }
+  html:not(.dark) .text-electric-cyan {
+    color: #0369A1 !important; /* sky-700 */
   }
   
   /* Thẻ card có bo góc lớn hơn và bóng đổ nhẹ ở mọi nơi */

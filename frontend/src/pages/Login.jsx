@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Shield, Key, User, ArrowRight, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -6,16 +6,23 @@ import ThemeToggle from '../components/ui/ThemeToggle';
 import Button from '../components/ui/Button';
 
 export default function Login() {
-  const { login, register, quickSwitch } = useAuth();
+  const { login, register, rawUser, token } = useAuth();
   const navigate = useNavigate();
 
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [username, setUsername] = useState('operator_a');
-  const [password, setPassword] = useState('OpPass123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Nếu người dùng đã đăng nhập hợp lệ thì tự động chuyển vào trang chính
+  useEffect(() => {
+    if (rawUser && token) {
+      navigate('/', { replace: true });
+    }
+  }, [rawUser, token, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,31 +50,14 @@ export default function Login() {
     }
   };
 
-  const handleQuickDemo = async (role) => {
-    try {
-      setLoading(true);
-      await quickSwitch(role);
-      navigate('/');
-    } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-          'Không thể đăng nhập tài khoản demo. Hãy kiểm tra thông tin đăng nhập và backend.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F17] flex flex-col justify-center items-center px-4 font-sans transition-colors duration-200 relative selection:bg-sky-500 selection:text-white py-12">
-      
       {/* Top Right Theme Toggle */}
       <div className="absolute top-5 right-5">
         <ThemeToggle />
       </div>
 
       <div className="max-w-md w-full bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-xl dark:shadow-soft-dark space-y-6">
-        
         {/* Brand */}
         <div className="text-center space-y-2">
           <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-600 to-cyan-400 p-0.5 shadow-lg shadow-sky-500/25 items-center justify-center transform transition-transform hover:scale-105">
@@ -81,55 +71,6 @@ export default function Login() {
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             Nền tảng Vận hành Trạm sạc Xe điện &amp; Phân phối Lưới điện
           </p>
-        </div>
-
-        {/* 1-Click Fast Login for Demo */}
-        <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3.5 rounded-2xl space-y-2.5 text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-semibold block text-[11px] uppercase tracking-wider">
-            Đăng nhập nhanh (Demo 1-Click):
-          </span>
-          <div className="grid grid-cols-5 gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('ADMIN')}
-              className="py-1.5 px-1 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 hover:bg-rose-100 rounded-xl font-bold text-center transition-all text-[11px]"
-              title="Quản trị viên toàn hệ thống"
-            >
-              Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('OPERATOR_A')}
-              className="py-1.5 px-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 rounded-xl font-bold text-center transition-all text-[11px]"
-              title="Chủ trạm A (VinFast - ST1, ST2)"
-            >
-              Chủ A
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('OPERATOR_B')}
-              className="py-1.5 px-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 rounded-xl font-bold text-center transition-all text-[11px]"
-              title="Chủ trạm B (Trung Tâm - ST3)"
-            >
-              Chủ B
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('CUSTOMER')}
-              className="py-1.5 px-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 rounded-xl font-bold text-center transition-all text-[11px]"
-              title="Tài xế sạc hợp lệ"
-            >
-              Tài xế
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('DEBT')}
-              className="py-1.5 px-1 bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700 hover:bg-rose-200 rounded-xl font-bold text-center transition-all text-[11px]"
-              title="Mô phỏng tài khoản nợ -330.000đ bị khóa"
-            >
-              Tài xế nợ
-            </button>
-          </div>
         </div>
 
         {error && (
@@ -150,7 +91,7 @@ export default function Login() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Nhập tên đăng nhập..."
+                placeholder="Nhập tên đăng nhập (VD: admin)..."
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition-all"
               />
             </div>
@@ -228,4 +169,3 @@ export default function Login() {
     </div>
   );
 }
-

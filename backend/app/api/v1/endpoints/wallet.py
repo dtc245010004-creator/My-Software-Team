@@ -1,5 +1,6 @@
 import math
 import uuid
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -13,14 +14,21 @@ from app.api.deps import (
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.payment import TopupOrder
+from app.models.session import ChargingSession
+from app.models.station import ChargingPoint, Connector, Station
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
 from app.schemas.wallet import (
     AdminManualTopupRequest,
     AdminManualTopupResponse,
     PaginatedWalletTransactionsResponse,
+    RevenueDayData,
+    RevenueSummaryResponse,
+    RevenueTimeframeStats,
     StandardizedWalletTransactionResponse,
+    TopupOrderRejectRequest,
     TopupOrderResponse,
+    TopupOrderReviewResponse,
     TopupOrderStatusResponse,
     TopupRequest,
     WalletReconciliationUnlockRequest,
@@ -28,6 +36,7 @@ from app.schemas.wallet import (
     WalletTransactionResponse,
 )
 from app.services.payment_service import build_payment_url
+from app.services.station_service import get_accessible_station_ids
 from app.services.wallet_service import (
     admin_manual_topup,
     topup_wallet,
@@ -344,6 +353,40 @@ def get_topup_request_status(
 
 
 @router.post(
+    "/topup-requests/{order_code}/cancel",
+    response_model=TopupOrderStatusResponse,
+    summary="Hủy yêu cầu nạp tiền đang chờ duyệt",
+)
+def cancel_my_topup_request(
+    order_code: str,
+    current_user: User = Depends(get_current_user_or_driver_guest),
+    db: Session = Depends(get_db),
+):
+    order = db.query(TopupOrder).filter(TopupOrder.order_code == order_code).first()
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Topup order not found"
+        )
+    if order.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this order",
+        )
+    if order.status != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel order with status {order.status}",
+        )
+    order.status = "CANCELLED"
+    order.failure_reason = "Người dùng tự hủy yêu cầu nạp tiền"
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+
+@router.post(
     "/admin/{wallet_id}/reconciliation/unlock",
     response_model=WalletResponse,
     summary="Admin mở khóa giao dịch ví sau khi xử lý lệch sổ cái",
@@ -372,3 +415,329 @@ async def wallet_webhook(
     db: Session = Depends(get_db),
 ):
     return await payment_webhook(request=request, payload=payload, db=db)
+
+
+@router.get(
+    "/admin/pending-topups",
+    response_model=list[TopupOrderReviewResponse],
+    summary="Danh sách yêu cầu nạp tiền cần phê duyệt (Dành cho Admin, Chủ trạm CPO, Kế toán)",
+)
+def get_pending_topups_for_admin(
+    status_filter: str | None = Query(
+        None, description="Lọc trạng thái: ALL, PENDING, SUCCESS, FAILED"
+    ),
+    current_admin: User = Depends(
+        require_roles(["ADMIN", "CPO", "ACCOUNTANT", "OPERATOR"])
+    ),
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(TopupOrder, User)
+        .join(User, TopupOrder.user_id == User.id)
+        .order_by(TopupOrder.created_at.desc(), TopupOrder.id.desc())
+    )
+    if status_filter and status_filter.upper() != "ALL":
+        query = query.filter(TopupOrder.status == status_filter.upper())
+
+    results = query.limit(100).all()
+
+    out = []
+    for order, user in results:
+        out.append(
+            TopupOrderReviewResponse(
+                id=order.id,
+                user_id=order.user_id,
+                username=user.username,
+                full_name=user.full_name or user.username,
+                email=user.email,
+                order_code=order.order_code,
+                amount=order.amount,
+                status=order.status,
+                failure_reason=order.failure_reason,
+                created_at=order.created_at,
+                updated_at=order.updated_at,
+            )
+        )
+    return out
+
+
+@router.post(
+    "/admin/topup/{order_code}/approve",
+    summary="Phê duyệt yêu cầu nạp tiền vào ví tài xế (Admin & Chủ trạm CPO)",
+)
+def approve_topup_order(
+    order_code: str,
+    current_admin: User = Depends(
+        require_roles(["ADMIN", "CPO", "ACCOUNTANT", "OPERATOR"])
+    ),
+    db: Session = Depends(get_db),
+):
+    order = (
+        db.query(TopupOrder)
+        .filter(TopupOrder.order_code == order_code)
+        .with_for_update()
+        .first()
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy đơn nạp tiền #{order_code}",
+        )
+
+    if order.status == "SUCCESS":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Đơn nạp #{order_code} đã được phê duyệt trước đó.",
+        )
+
+    if order.status in ["FAILED", "CANCELLED"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Đơn nạp #{order_code} đã ở trạng thái kết thúc ({order.status}).",
+        )
+
+    order.status = "SUCCESS"
+    order.failure_reason = None
+    db.add(order)
+
+    note = f"Phê duyệt nạp tiền #{order.order_code} bởi {current_admin.full_name or current_admin.username} ({current_admin.role})"
+    wallet = topup_wallet(
+        db=db,
+        user_id=order.user_id,
+        amount=order.amount,
+        note=note,
+        reference_id=order.order_code,
+        reference_type="TOPUP",
+        auto_commit=False,
+    )
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Đã phê duyệt thành công +{int(order.amount):,} VND cho tài xế.",
+        "order_code": order.order_code,
+        "new_balance": float(wallet.balance),
+    }
+
+
+@router.post(
+    "/admin/topup/{order_code}/reject",
+    summary="Từ chối yêu cầu nạp tiền (Admin & Chủ trạm CPO)",
+)
+def reject_topup_order(
+    order_code: str,
+    payload: TopupOrderRejectRequest,
+    current_admin: User = Depends(
+        require_roles(["ADMIN", "CPO", "ACCOUNTANT", "OPERATOR"])
+    ),
+    db: Session = Depends(get_db),
+):
+    order = (
+        db.query(TopupOrder)
+        .filter(TopupOrder.order_code == order_code)
+        .with_for_update()
+        .first()
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy đơn nạp tiền #{order_code}",
+        )
+
+    if order.status != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Chỉ có thể từ chối đơn hàng đang ở trạng thái chờ duyệt (PENDING). Đơn hiện tại là {order.status}.",
+        )
+
+    reason = (
+        payload.reason.strip()
+        or "Ban quản trị từ chối giao dịch do không nhận được sao kê hợp lệ."
+    )
+    order.status = "FAILED"
+    order.failure_reason = reason
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+
+    return {
+        "status": "FAILED",
+        "message": f"Đã từ chối đơn nạp tiền #{order.order_code}.",
+        "order_code": order.order_code,
+        "reason": reason,
+    }
+
+
+@router.get(
+    "/admin/revenue-summary",
+    response_model=RevenueSummaryResponse,
+    summary="Tổng hợp doanh thu hôm nay, 7 ngày và 30 ngày (Dành cho Admin, Chủ trạm CPO, Kế toán)",
+)
+def get_revenue_summary_for_admin(
+    current_user: User = Depends(
+        require_roles(["ADMIN", "CPO", "ACCOUNTANT", "OPERATOR"])
+    ),
+    db: Session = Depends(get_db),
+):
+    now = datetime.now(timezone.utc)
+    vn_now = now + timedelta(hours=7)
+    vn_today_start = vn_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = vn_today_start - timedelta(hours=7)
+    start_7d = now - timedelta(days=7)
+    start_30d = now - timedelta(days=30)
+
+    managed_stations = []
+    scope = "ALL"
+
+    # 1. Base query cho ChargingSession & Topup
+    if current_user.role in ["OPERATOR", "CPO", "ACCOUNTANT"]:
+        scope = "MANAGED"
+        accessible_ids = get_accessible_station_ids(current_user, db)
+        if accessible_ids:
+            st_records = (
+                db.query(Station.name)
+                .filter(Station.id.in_(accessible_ids))
+                .all()
+            )
+            managed_stations = [s[0] for s in st_records]
+
+        if not accessible_ids:
+            sessions_query = db.query(ChargingSession).filter(ChargingSession.id == -1)
+        else:
+            sessions_query = (
+                db.query(ChargingSession)
+                .join(ChargingSession.connector)
+                .join(Connector.charging_point)
+                .filter(ChargingPoint.station_id.in_(accessible_ids))
+            )
+
+        # Chủ trạm và Kế toán phụ trách trạm chỉ quản lý doanh thu trạm (sạc xe), không sở hữu nạp ví nền tảng của tài xế.
+        all_30d_topups = []
+    else:
+        # ADMIN: toàn hệ thống
+        scope = "ALL"
+        sessions_query = db.query(ChargingSession)
+        all_30d_topups = (
+            db.query(TopupOrder)
+            .filter(
+                TopupOrder.status == "SUCCESS",
+                TopupOrder.created_at >= start_30d,
+            )
+            .all()
+        )
+
+    # Lấy toàn bộ sessions trong 30 ngày qua
+    all_30d_sessions = (
+        sessions_query.filter(ChargingSession.start_time >= start_30d).all()
+    )
+    valid_sessions = [
+        s
+        for s in all_30d_sessions
+        if s.status in ("COMPLETED", "ACTIVE", "CHARGING")
+    ]
+
+    def is_after(dt_val, threshold):
+        if not dt_val:
+            return False
+        if dt_val.tzinfo is None:
+            dt_val = dt_val.replace(tzinfo=timezone.utc)
+        return dt_val >= threshold
+
+    def to_vn_date(dt_val):
+        if not dt_val:
+            return None
+        if dt_val.tzinfo is None:
+            return (dt_val + timedelta(hours=7)).date()
+        return (dt_val.astimezone(timezone(timedelta(hours=7)))).date()
+
+    # Hôm nay
+    sess_today = [s for s in valid_sessions if is_after(s.start_time, today_start)]
+    topups_today = [t for t in all_30d_topups if is_after(t.created_at, today_start)]
+
+    charging_today = sum(Decimal(str(s.total_amount or 0)) for s in sess_today)
+    topup_today = sum(Decimal(str(t.amount or 0)) for t in topups_today)
+
+    today_stats = RevenueTimeframeStats(
+        charging_revenue=charging_today,
+        topup_revenue=topup_today,
+        total_revenue=charging_today + topup_today,
+        session_count=len(sess_today),
+        topup_count=len(topups_today),
+    )
+
+    # 7 ngày
+    sess_7d = [s for s in valid_sessions if is_after(s.start_time, start_7d)]
+    topups_7d = [t for t in all_30d_topups if is_after(t.created_at, start_7d)]
+
+    charging_7d = sum(Decimal(str(s.total_amount or 0)) for s in sess_7d)
+    topup_7d = sum(Decimal(str(t.amount or 0)) for t in topups_7d)
+
+    stats_7d = RevenueTimeframeStats(
+        charging_revenue=charging_7d,
+        topup_revenue=topup_7d,
+        total_revenue=charging_7d + topup_7d,
+        session_count=len(sess_7d),
+        topup_count=len(topups_7d),
+    )
+
+    # 30 ngày
+    charging_30d = sum(Decimal(str(s.total_amount or 0)) for s in valid_sessions)
+    topup_30d = sum(Decimal(str(t.amount or 0)) for t in all_30d_topups)
+
+    stats_30d = RevenueTimeframeStats(
+        charging_revenue=charging_30d,
+        topup_revenue=topup_30d,
+        total_revenue=charging_30d + topup_30d,
+        session_count=len(valid_sessions),
+        topup_count=len(all_30d_topups),
+    )
+
+    # Dữ liệu biểu đồ 7 ngày
+    chart_7d = []
+    for i in range(6, -1, -1):
+        day_date = (vn_now - timedelta(days=i)).date()
+        day_label = day_date.strftime("%d/%m")
+        day_sess = [s for s in valid_sessions if to_vn_date(s.start_time) == day_date]
+        day_topups = [t for t in all_30d_topups if to_vn_date(t.created_at) == day_date]
+        c_rev = sum(Decimal(str(s.total_amount or 0)) for s in day_sess)
+        t_rev = sum(Decimal(str(t.amount or 0)) for t in day_topups)
+        chart_7d.append(
+            RevenueDayData(
+                date=day_date.isoformat(),
+                label=day_label,
+                charging_revenue=c_rev,
+                topup_revenue=t_rev,
+                total_revenue=c_rev + t_rev,
+            )
+        )
+
+    # Dữ liệu biểu đồ 30 ngày
+    chart_30d = []
+    for i in range(29, -1, -1):
+        day_date = (vn_now - timedelta(days=i)).date()
+        day_label = day_date.strftime("%d/%m")
+        day_sess = [s for s in valid_sessions if to_vn_date(s.start_time) == day_date]
+        day_topups = [t for t in all_30d_topups if to_vn_date(t.created_at) == day_date]
+        c_rev = sum(Decimal(str(s.total_amount or 0)) for s in day_sess)
+        t_rev = sum(Decimal(str(t.amount or 0)) for t in day_topups)
+        chart_30d.append(
+            RevenueDayData(
+                date=day_date.isoformat(),
+                label=day_label,
+                charging_revenue=c_rev,
+                topup_revenue=t_rev,
+                total_revenue=c_rev + t_rev,
+            )
+        )
+
+    return RevenueSummaryResponse(
+        today=today_stats,
+        last_7_days=stats_7d,
+        last_30_days=stats_30d,
+        chart_7d=chart_7d,
+        chart_30d=chart_30d,
+        currency="VND",
+        managed_stations=managed_stations,
+        scope=scope,
+    )

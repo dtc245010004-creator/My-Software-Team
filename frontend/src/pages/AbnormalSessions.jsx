@@ -231,29 +231,29 @@ export default function AbnormalSessions() {
   // KIỂM TRA PHÂN QUYỀN RBAC (NFR): Chỉ Vận hành viên và Kế toán vào được trang này
   if (!isAuthorized) {
     return (
-      <div className="py-16 text-center max-w-xl mx-auto space-y-4 font-mono">
+      <div className="py-16 text-center max-w-xl mx-auto space-y-4">
         <div className="p-4 rounded-full bg-critical-red/20 border border-critical-red/40 w-16 h-16 mx-auto flex items-center justify-center text-critical-red">
           <ShieldAlert className="w-8 h-8" />
         </div>
-        <h2 className="text-lg font-bold text-tech-white tracking-wide">
-          TRUY CẬP BỊ TỪ CHỐI (403 ACCESS DENIED)
+        <h2 className="text-lg font-bold text-tech-white">
+          Từ chối truy cập (403)
         </h2>
-        <div className="p-4 rounded bg-panel border border-hairline text-steel-gray text-xs leading-relaxed">
-          <p className="text-critical-red font-semibold mb-1">Ràng buộc kỹ thuật (NFR):</p>
+        <div className="p-4 rounded-xl bg-panel border border-hairline text-steel-gray text-xs leading-relaxed shadow-sm">
+          <p className="text-critical-red font-semibold mb-1">Ràng buộc kỹ thuật:</p>
           <p>
             Màn hình <strong>Danh sách phiên bất thường</strong> chỉ dành riêng cho vai trò{' '}
             <span className="text-tech-white font-bold">Vận hành viên (OPERATOR)</span> và{' '}
             <span className="text-tech-white font-bold">Kế toán (ACCOUNTANT)</span> để phục vụ công tác điều phối trạm và đối soát tài chính.
           </p>
-          <p className="mt-2 text-[11px] text-steel-gray">
-            Vai trò hiện tại của bạn: <span className="text-caution-amber font-bold uppercase">{role || 'GUEST'}</span>.
+          <p className="mt-2 text-xs text-steel-gray">
+            Vai trò hiện tại của bạn: <span className="text-caution-amber font-semibold">{role || 'Khách'}</span>.
           </p>
         </div>
         <a
           href="/"
-          className="inline-flex items-center space-x-2 px-4 py-2 rounded bg-panel hover:bg-panel-hover text-electric-cyan border border-electric-cyan/40 text-xs font-bold transition-all"
+          className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-all shadow-sm"
         >
-          <span>QUAY LẠI TRANG CHỦ</span>
+          <span>Quay lại trang chính</span>
           <ArrowRight className="w-4 h-4" />
         </a>
       </div>
@@ -276,9 +276,9 @@ export default function AbnormalSessions() {
           ) : (
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
           )}
-          <div className="flex-1 pr-2 font-mono">
-            <h4 className="font-bold text-xs uppercase tracking-wide">{toast.title}</h4>
-            <p className="text-xs text-tech-white/90 mt-0.5 font-sans leading-relaxed">{toast.message}</p>
+          <div className="flex-1 pr-2">
+            <h4 className="font-semibold text-xs">{toast.title}</h4>
+            <p className="text-xs text-tech-white/90 mt-0.5 leading-relaxed">{toast.message}</p>
           </div>
           <button
             onClick={() => setToast(null)}
@@ -290,23 +290,23 @@ export default function AbnormalSessions() {
       )}
 
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-hairline pb-4">
         <div>
           <div className="flex items-center space-x-2.5">
-            <div className="bg-critical-red/20 border border-critical-red/40 p-2 rounded">
+            <div className="bg-critical-red/20 border border-critical-red/40 p-2 rounded-xl">
               <AlertOctagon className="w-5 h-5 text-critical-red" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-base font-bold text-tech-white uppercase tracking-wider font-mono">
-                  DANH SÁCH PHIÊN BẤT THƯỜNG TRÊN MÀN HÌNH VẬN HÀNH
+                <h1 className="text-xl font-bold text-tech-white tracking-tight">
+                  Danh sách phiên bất thường trên màn hình vận hành
                 </h1>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-critical-red/20 text-critical-red border border-critical-red/40">
-                  {kpiStats.totalCount} PHIÊN CẦN XỬ LÝ
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-critical-red/20 text-critical-red border border-critical-red/40">
+                  {kpiStats.totalCount} phiên cần xử lý
                 </span>
               </div>
-              <p className="text-xs text-steel-gray font-mono mt-0.5">
-                GIÁM SÁT MẤT TÍN HIỆU, SỰ CỐ TRỤ SẠC & CAN THIỆP ĐÓNG TAY THỦ CÔNG (SCRUM-52 / SCRUM-148)
+              <p className="text-xs text-steel-gray mt-0.5">
+                Giám sát mất tín hiệu, sự cố trụ sạc &amp; can thiệp đóng tay thủ công
               </p>
             </div>
           </div>
@@ -315,58 +315,58 @@ export default function AbnormalSessions() {
         <button
           onClick={fetchAbnormalSessions}
           disabled={loading}
-          className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-panel hover:bg-panel-hover border border-hairline text-steel-gray hover:text-tech-white text-xs font-mono transition-colors self-start sm:self-auto"
+          className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-panel hover:bg-hairline border border-hairline text-steel-gray hover:text-tech-white text-xs font-medium transition-colors self-start sm:self-auto shadow-sm"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-electric-cyan' : ''}`} />
-          <span>LÀM MỚI DỮ LIỆU</span>
+          <span>Làm mới</span>
         </button>
       </div>
 
       {/* KPI Cards Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-panel border border-hairline p-3 rounded-lg flex items-center space-x-3">
-          <div className="p-2 rounded bg-critical-red/10 border border-critical-red/30 text-critical-red">
-            <AlertTriangle className="w-4 h-4" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-panel border border-hairline p-4 rounded-xl flex items-center space-x-3.5 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-critical-red/10 border border-critical-red/30 text-critical-red flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] text-steel-gray font-mono uppercase block">TỔNG PHIÊN BẤT THƯỜNG</span>
-            <span className="text-lg font-bold font-mono text-tech-white">{kpiStats.totalCount}</span>
+            <span className="text-xs text-steel-gray font-medium block">Tổng phiên bất thường</span>
+            <span className="text-2xl font-bold text-tech-white tabular-nums mt-0.5 block">{kpiStats.totalCount}</span>
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-3 rounded-lg flex items-center space-x-3">
-          <div className="p-2 rounded bg-caution-amber/10 border border-caution-amber/30 text-caution-amber">
-            <Radio className="w-4 h-4 animate-pulse" />
+        <div className="bg-panel border border-hairline p-4 rounded-xl flex items-center space-x-3.5 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-caution-amber/10 border border-caution-amber/30 text-caution-amber flex items-center justify-center shrink-0">
+            <Radio className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <span className="text-[10px] text-steel-gray font-mono uppercase block">MẤT TÍN HIỆU (INTERRUPTED)</span>
-            <span className="text-lg font-bold font-mono text-caution-amber">{kpiStats.totalInterrupted}</span>
+            <span className="text-xs text-steel-gray font-medium block">Mất tín hiệu (Interrupted)</span>
+            <span className="text-2xl font-bold text-caution-amber tabular-nums mt-0.5 block">{kpiStats.totalInterrupted}</span>
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-3 rounded-lg flex items-center space-x-3">
-          <div className="p-2 rounded bg-electric-cyan/10 border border-electric-cyan/30 text-electric-cyan">
-            <Zap className="w-4 h-4" />
+        <div className="bg-panel border border-hairline p-4 rounded-xl flex items-center space-x-3.5 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-electric-cyan/10 border border-electric-cyan/30 text-electric-cyan flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] text-steel-gray font-mono uppercase block">ĐIỆN NĂNG TREO (KWH)</span>
-            <span className="text-lg font-bold font-mono text-electric-cyan">{kpiStats.totalPendingKwh}</span>
+            <span className="text-xs text-steel-gray font-medium block">Điện năng treo (kWh)</span>
+            <span className="text-2xl font-bold text-electric-cyan tabular-nums mt-0.5 block">{kpiStats.totalPendingKwh}</span>
           </div>
         </div>
 
-        <div className="bg-panel border border-hairline p-3 rounded-lg flex items-center space-x-3">
-          <div className="p-2 rounded bg-panel-hover border border-hairline text-steel-gray">
-            <Building2 className="w-4 h-4" />
+        <div className="bg-panel border border-hairline p-4 rounded-xl flex items-center space-x-3.5 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-panel-hover border border-hairline text-steel-gray flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] text-steel-gray font-mono uppercase block">TRẠM BỊ ẢNH HƯỞNG</span>
-            <span className="text-lg font-bold font-mono text-tech-white">{kpiStats.affectedStations}</span>
+            <span className="text-xs text-steel-gray font-medium block">Trạm bị ảnh hưởng</span>
+            <span className="text-2xl font-bold text-tech-white tabular-nums mt-0.5 block">{kpiStats.affectedStations}</span>
           </div>
         </div>
       </div>
 
       {/* Filter & Search Strip */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-panel/60 p-3 rounded-lg border border-hairline">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-panel p-3 sm:p-4 rounded-xl border border-hairline shadow-sm">
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-steel-gray absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -374,7 +374,7 @@ export default function AbnormalSessions() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm theo mã phiên (#SES-..), trụ, trạm sạc..."
-            className="w-full bg-obsidian border border-hairline rounded-lg pl-9 pr-8 py-1.5 text-xs text-tech-white placeholder-steel-gray/60 focus:outline-none focus:border-electric-cyan font-mono"
+            className="w-full bg-obsidian border border-hairline rounded-lg pl-9 pr-8 py-2 text-xs font-medium text-tech-white placeholder:text-steel-gray focus:outline-none focus:border-sky-500"
           />
           {searchQuery && (
             <button
@@ -387,12 +387,12 @@ export default function AbnormalSessions() {
         </div>
 
         {uniqueStations.length > 0 && (
-          <div className="flex items-center space-x-2 text-xs font-mono">
-            <span className="text-steel-gray text-[11px] uppercase">Lọc theo trạm:</span>
+          <div className="flex items-center space-x-2 text-xs">
+            <span className="text-steel-gray font-semibold shrink-0">Lọc theo trạm:</span>
             <select
               value={selectedStation}
               onChange={(e) => setSelectedStation(e.target.value)}
-              className="bg-obsidian border border-hairline rounded px-2.5 py-1 text-xs text-tech-white focus:outline-none focus:border-electric-cyan"
+              className="bg-obsidian border border-hairline rounded-lg px-2.5 py-1.5 text-xs font-medium text-tech-white focus:outline-none focus:border-sky-500"
             >
               <option value="ALL">Tất cả các trạm ({uniqueStations.length})</option>
               {uniqueStations.map((st) => (
@@ -407,15 +407,15 @@ export default function AbnormalSessions() {
 
       {/* Abnormal Sessions List / Table */}
       {loading ? (
-        <div className="py-16 text-center text-steel-gray font-mono text-xs space-y-2">
-          <RefreshCw className="w-6 h-6 animate-spin mx-auto text-electric-cyan" />
+        <div className="py-16 text-center text-steel-gray text-xs space-y-2">
+          <RefreshCw className="w-6 h-6 animate-spin mx-auto text-sky-400" />
           <p>Đang tải danh sách các phiên sạc bất thường...</p>
         </div>
       ) : filteredSessions.length === 0 ? (
-        <div className="py-16 text-center bg-panel/30 border border-dashed border-hairline rounded-xl space-y-3 font-mono">
+        <div className="py-16 text-center bg-panel/30 border border-dashed border-hairline rounded-xl space-y-3">
           <CheckCircle2 className="w-10 h-10 text-grid-green mx-auto opacity-70" />
           <div>
-            <h3 className="text-sm font-bold text-tech-white">HỆ THỐNG HOẠT ĐỘNG BÌNH THƯỜNG</h3>
+            <h3 className="text-sm font-bold text-tech-white">Hệ thống hoạt động ổn định</h3>
             <p className="text-xs text-steel-gray mt-1">
               Không có phiên sạc nào bị gián đoạn kết nối hoặc gặp sự cố bất thường.
             </p>
@@ -426,7 +426,7 @@ export default function AbnormalSessions() {
                 setSearchQuery('');
                 setSelectedStation('ALL');
               }}
-              className="px-3 py-1.5 rounded text-xs bg-panel hover:bg-panel-hover text-electric-cyan border border-electric-cyan/30"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-panel hover:bg-hairline text-sky-400 border border-hairline transition-colors"
             >
               Xóa bộ lọc tìm kiếm
             </button>
@@ -441,16 +441,16 @@ export default function AbnormalSessions() {
             return (
               <div
                 key={session.id}
-                className="bg-panel border border-hairline hover:border-hairline-bright rounded-lg p-4 transition-all shadow-sm space-y-3"
+                className="bg-panel border border-hairline hover:border-hairline-bright rounded-xl p-4 transition-all shadow-sm space-y-3"
               >
                 {/* Header row: ID, Badge Status, and Force Close Button */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-hairline">
                   <div className="flex items-center space-x-3">
-                    <span className="px-2.5 py-1 rounded bg-critical-red/20 text-critical-red border border-critical-red/40 font-mono text-xs font-bold">
+                    <span className="px-2.5 py-1 rounded-md bg-critical-red/20 text-critical-red border border-critical-red/40 text-xs font-bold tabular-nums">
                       #SES-{session.id}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold flex items-center space-x-1 ${
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center space-x-1 ${
                         isInterrupted
                           ? 'bg-caution-amber/20 text-caution-amber border border-caution-amber/40'
                           : 'bg-critical-red/20 text-critical-red border border-critical-red/40'
@@ -459,7 +459,7 @@ export default function AbnormalSessions() {
                       <Radio className="w-3 h-3 animate-pulse" />
                       <span>{session.status}</span>
                     </span>
-                    <span className="text-xs font-bold text-tech-white font-mono">
+                    <span className="text-sm font-semibold text-tech-white">
                       {session.station_name || `Trạm sạc #${session.station_id || 'N/A'}`}
                     </span>
                   </div>
@@ -467,59 +467,59 @@ export default function AbnormalSessions() {
                   <button
                     type="button"
                     onClick={() => handleOpenCloseModal(session)}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-critical-red/20 hover:bg-critical-red/30 text-critical-red border border-critical-red/50 hover:border-critical-red text-xs font-mono font-bold transition-all shadow-sm self-start sm:self-auto"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-critical-red/20 hover:bg-critical-red/30 text-critical-red border border-critical-red/50 hover:border-critical-red text-xs font-semibold transition-all shadow-sm self-start sm:self-auto"
                     title="Can thiệp đóng tay phiên sạc và giải phóng trụ"
                   >
                     <PowerOff className="w-3.5 h-3.5" />
-                    <span>ĐÓNG TAY PHIÊN SẠC</span>
+                    <span>Đóng tay phiên sạc</span>
                   </button>
                 </div>
 
                 {/* Information Grid: AC Deliverables */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                   {/* 1. Trụ sạc & Cổng sạc */}
-                  <div className="bg-obsidian/70 p-2.5 rounded border border-hairline space-y-1">
-                    <span className="text-[10px] text-steel-gray block uppercase">TRỤ SẠC & CỔNG</span>
+                  <div className="bg-obsidian/70 p-3 rounded-lg border border-hairline space-y-1">
+                    <span className="text-xs text-steel-gray block font-medium">Trụ sạc &amp; Cổng</span>
                     <div className="text-tech-white font-bold flex items-center space-x-1.5">
                       <Zap className="w-3.5 h-3.5 text-electric-cyan" />
-                      <span>{session.charger_code || 'EVSE-Unknown'}</span>
+                      <span>{session.charger_code || 'EVSE-Chưa rõ'}</span>
                     </div>
-                    <span className="text-[11px] text-steel-gray block">
+                    <span className="text-xs text-steel-gray block">
                       Cổng sạc: ID #{session.connector_id}
                     </span>
                   </div>
 
                   {/* 2. Thời điểm mất liên lạc */}
-                  <div className="bg-obsidian/70 p-2.5 rounded border border-hairline space-y-1">
-                    <span className="text-[10px] text-steel-gray block uppercase">THỜI ĐIỂM MẤT LIÊN LẠC</span>
+                  <div className="bg-obsidian/70 p-3 rounded-lg border border-hairline space-y-1">
+                    <span className="text-xs text-steel-gray block font-medium">Thời điểm mất liên lạc</span>
                     <div className="text-caution-amber font-bold flex items-center space-x-1.5">
                       <Clock className="w-3.5 h-3.5 text-caution-amber" />
                       <span>{getTimeElapsed(lostTime)}</span>
                     </div>
-                    <span className="text-[11px] text-steel-gray block">
+                    <span className="text-xs text-steel-gray block tabular-nums">
                       {formatDateTime(lostTime)}
                     </span>
                   </div>
 
                   {/* 3. Số đo cuối & Pin */}
-                  <div className="bg-obsidian/70 p-2.5 rounded border border-hairline space-y-1">
-                    <span className="text-[10px] text-steel-gray block uppercase">SỐ ĐO CÔNG TƠ CUỐI</span>
-                    <div className="text-grid-green font-bold flex items-center space-x-1.5">
+                  <div className="bg-obsidian/70 p-3 rounded-lg border border-hairline space-y-1">
+                    <span className="text-xs text-steel-gray block font-medium">Số đo công tơ cuối</span>
+                    <div className="text-grid-green font-bold flex items-center space-x-1.5 tabular-nums">
                       <Gauge className="w-3.5 h-3.5 text-grid-green" />
                       <span>{Number(session.total_kwh || 0).toFixed(2)} kWh</span>
                     </div>
-                    <span className="text-[11px] text-steel-gray block">
+                    <span className="text-xs text-steel-gray block">
                       SoC Pin cuối: {session.current_soc != null ? `${session.current_soc}%` : 'N/A'}
                     </span>
                   </div>
 
                   {/* 4. Tài xế & Tiền điện */}
-                  <div className="bg-obsidian/70 p-2.5 rounded border border-hairline space-y-1">
-                    <span className="text-[10px] text-steel-gray block uppercase">TIỀN TẠM TÍNH</span>
-                    <div className="text-tech-white font-bold">
-                      {Number(session.total_amount || 0).toLocaleString('vi-VN')} VND
+                  <div className="bg-obsidian/70 p-3 rounded-lg border border-hairline space-y-1">
+                    <span className="text-xs text-steel-gray block font-medium">Tiền tạm tính</span>
+                    <div className="text-tech-white font-bold tabular-nums">
+                      {Number(session.total_amount || 0).toLocaleString('vi-VN')} đ
                     </div>
-                    <span className="text-[11px] text-steel-gray block">
+                    <span className="text-xs text-steel-gray block">
                       Tài xế ID #{session.user_id}
                     </span>
                   </div>
@@ -527,10 +527,10 @@ export default function AbnormalSessions() {
 
                 {/* Reason description bar */}
                 {session.stop_reason && (
-                  <div className="bg-obsidian/40 border border-hairline/60 px-3 py-1.5 rounded flex items-start space-x-2 text-[11px] font-mono text-steel-gray">
+                  <div className="bg-obsidian/40 border border-hairline/60 px-3 py-2 rounded-lg flex items-start space-x-2 text-xs text-steel-gray">
                     <AlertCircle className="w-3.5 h-3.5 text-caution-amber shrink-0 mt-0.5" />
                     <span>
-                      <strong className="text-tech-white">Chi tiết sự cố:</strong> {session.stop_reason}
+                      <strong className="text-tech-white font-semibold">Chi tiết sự cố:</strong> {session.stop_reason}
                     </span>
                   </div>
                 )}
@@ -543,52 +543,52 @@ export default function AbnormalSessions() {
       {/* Modal Can thiệp Đóng tay phiên sạc (Force Close Modal) */}
       {selectedSessionForClose && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-panel border border-hairline p-6 rounded-lg max-w-xl w-full shadow-2xl space-y-4 font-mono text-xs">
+          <div className="bg-panel border border-hairline p-6 rounded-2xl max-w-xl w-full shadow-2xl space-y-4 text-xs">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-hairline">
               <div className="flex items-center space-x-2 text-critical-red">
                 <PowerOff className="w-5 h-5" />
-                <h3 className="text-sm font-bold text-tech-white uppercase tracking-wider">
-                  CAN THIỆP ĐÓNG TAY PHIÊN SẠC BẤT THƯỜNG
+                <h3 className="text-base font-bold text-tech-white">
+                  Can thiệp đóng tay phiên sạc bất thường
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={handleDismissModal}
                 disabled={isSubmitting}
-                className="text-steel-gray hover:text-tech-white p-1 rounded hover:bg-obsidian transition-colors"
+                className="text-steel-gray hover:text-tech-white p-1 rounded-lg hover:bg-obsidian transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Session Summary Card */}
-            <div className="bg-obsidian p-3 rounded border border-hairline space-y-2">
+            <div className="bg-obsidian p-3.5 rounded-xl border border-hairline space-y-2">
               <div className="flex items-center justify-between text-steel-gray">
-                <span>MÃ PHIÊN:</span>
-                <span className="text-tech-white font-bold">#SES-{selectedSessionForClose.id}</span>
+                <span>Mã phiên:</span>
+                <span className="text-tech-white font-bold tabular-nums">#SES-{selectedSessionForClose.id}</span>
               </div>
               <div className="flex items-center justify-between text-steel-gray">
-                <span>TRỤ SẠC:</span>
-                <span className="text-tech-white font-bold">{selectedSessionForClose.charger_code} ({selectedSessionForClose.station_name})</span>
+                <span>Trụ sạc:</span>
+                <span className="text-tech-white font-semibold">{selectedSessionForClose.charger_code} ({selectedSessionForClose.station_name})</span>
               </div>
               <div className="flex items-center justify-between text-steel-gray">
-                <span>THỜI ĐIỂM MẤT LIÊN LẠC:</span>
-                <span className="text-caution-amber font-bold">
+                <span>Thời điểm mất liên lạc:</span>
+                <span className="text-caution-amber font-semibold tabular-nums">
                   {formatDateTime(selectedSessionForClose.last_checkpoint_at || selectedSessionForClose.end_time || selectedSessionForClose.start_time)}
                 </span>
               </div>
               <div className="flex items-center justify-between text-steel-gray">
-                <span>SỐ ĐO CÔNG TƠ CUỐI:</span>
-                <span className="text-grid-green font-bold">{Number(selectedSessionForClose.total_kwh || 0).toFixed(2)} kWh</span>
+                <span>Số đo công tơ cuối:</span>
+                <span className="text-grid-green font-bold tabular-nums">{Number(selectedSessionForClose.total_kwh || 0).toFixed(2)} kWh</span>
               </div>
             </div>
 
             {/* Form can thiệp */}
             <form onSubmit={handleForceCloseSubmit} className="space-y-4">
               <div>
-                <label className="text-steel-gray block mb-1 font-bold">
-                  LÝ DO CAN THIỆP ĐÓNG PHIÊN <span className="text-critical-red">* (BẮT BUỘC)</span>
+                <label className="text-steel-gray block mb-1 font-semibold">
+                  Lý do can thiệp đóng phiên <span className="text-critical-red">* (Bắt buộc)</span>
                 </label>
                 <textarea
                   id="force-close-reason-input"
@@ -599,22 +599,22 @@ export default function AbnormalSessions() {
                     if (reasonError) setReasonError(null);
                   }}
                   placeholder="Nhập lý do can thiệp (Ví dụ: Trụ sạc mất kết nối lưới điện, xe đã rút súng sạc an toàn...)"
-                  className={`w-full bg-obsidian border p-2.5 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono resize-none ${
+                  className={`w-full bg-obsidian border p-2.5 rounded-xl text-tech-white focus:outline-none focus:border-sky-500 resize-none text-xs ${
                     reasonError || (!closeReason.trim() && closeReason.length > 0)
                       ? 'border-critical-red bg-rose-950/20'
                       : 'border-hairline'
                   }`}
                 />
 
-                {/* Validation message: "đóng tay không có lý do thì bị chặn" */}
+                {/* Validation message */}
                 {reasonError && (
-                  <p className="text-critical-red text-[11px] mt-1 flex items-center space-x-1">
+                  <p className="text-critical-red text-xs mt-1 flex items-center space-x-1">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>{reasonError}</span>
                   </p>
                 )}
                 {!closeReason.trim() && !reasonError && (
-                  <p className="text-critical-red text-[10px] mt-1 flex items-center space-x-1 opacity-85">
+                  <p className="text-critical-red text-xs mt-1 flex items-center space-x-1 opacity-85">
                     <AlertCircle className="w-3 h-3 shrink-0" />
                     <span>Đóng tay không có lý do thì bị chặn theo quy định vận hành.</span>
                   </p>
@@ -623,8 +623,8 @@ export default function AbnormalSessions() {
 
               {/* Quick Reason Chips */}
               <div>
-                <span className="text-[10px] text-steel-gray uppercase block mb-1.5 font-bold">
-                  GỢI Ý LÝ DO NHANH:
+                <span className="text-xs text-steel-gray block mb-1.5 font-semibold">
+                  Gợi ý lý do nhanh:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {quickReasonPresets.map((preset) => (
@@ -635,7 +635,7 @@ export default function AbnormalSessions() {
                         setCloseReason(preset);
                         if (reasonError) setReasonError(null);
                       }}
-                      className="px-2 py-1 rounded bg-obsidian hover:bg-hairline text-steel-gray hover:text-tech-white border border-hairline text-[11px] transition-colors text-left"
+                      className="px-2.5 py-1 rounded-lg bg-obsidian hover:bg-hairline text-steel-gray hover:text-tech-white border border-hairline text-xs transition-colors text-left"
                     >
                       + {preset}
                     </button>
@@ -645,8 +645,8 @@ export default function AbnormalSessions() {
 
               {/* Số đo cuối điều chỉnh nếu cần */}
               <div>
-                <label className="text-steel-gray block mb-1">
-                  SỐ ĐO CÔNG TƠ CHỐT CUỐI CÙNG (KWH)
+                <label className="text-steel-gray block mb-1 font-semibold">
+                  Số đo công tơ chốt cuối cùng (kWh)
                 </label>
                 <input
                   type="number"
@@ -655,14 +655,14 @@ export default function AbnormalSessions() {
                   value={manualMeterKwh}
                   onChange={(e) => setManualMeterKwh(e.target.value)}
                   placeholder="Lấy theo số đo công tơ trước khi mất liên lạc"
-                  className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                  className="w-full bg-obsidian border border-hairline p-2.5 rounded-xl text-tech-white focus:outline-none focus:border-sky-500 text-xs tabular-nums"
                 />
               </div>
 
               {/* Warning note */}
-              <div className="p-2.5 rounded bg-caution-amber/10 border border-caution-amber/30 text-caution-amber text-[11px] flex items-start space-x-2">
+              <div className="p-3 rounded-xl bg-caution-amber/10 border border-caution-amber/30 text-caution-amber text-xs flex items-start space-x-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
+                <span className="leading-relaxed">
                   Hành động đóng tay sẽ chuyển trạng thái phiên sang <strong>COMPLETED</strong>, ghi nhận nguyên nhân can thiệp và mở khóa cổng sạc về trạng thái <strong>AVAILABLE</strong> cho các xe khác tiếp tục sạc.
                 </span>
               </div>
@@ -673,15 +673,15 @@ export default function AbnormalSessions() {
                   type="button"
                   disabled={isSubmitting}
                   onClick={handleDismissModal}
-                  className="px-3.5 py-1.5 rounded bg-hairline text-steel-gray hover:text-tech-white transition-colors"
+                  className="px-4 py-2 rounded-xl bg-hairline text-steel-gray hover:text-tech-white text-xs font-medium transition-colors"
                 >
-                  HỦY BỎ
+                  Hủy bỏ
                 </button>
                 <button
                   id="confirm-force-close-btn"
                   type="submit"
                   disabled={isSubmitting || !closeReason.trim() || closeReason.trim().length < 5}
-                  className={`flex items-center space-x-1.5 px-4 py-1.5 rounded font-bold transition-all shadow-md ${
+                  className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-md ${
                     isSubmitting || !closeReason.trim() || closeReason.trim().length < 5
                       ? 'bg-hairline text-steel-gray/60 cursor-not-allowed border border-hairline'
                       : 'bg-critical-red hover:bg-critical-red-hover text-white'
@@ -695,12 +695,12 @@ export default function AbnormalSessions() {
                   {isSubmitting ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>ĐANG XỬ LÝ...</span>
+                      <span>Đang xử lý...</span>
                     </>
                   ) : (
                     <>
                       <PowerOff className="w-3.5 h-3.5" />
-                      <span>XÁC NHẬN ĐÓNG PHIÊN</span>
+                      <span>Xác nhận đóng phiên</span>
                     </>
                   )}
                 </button>

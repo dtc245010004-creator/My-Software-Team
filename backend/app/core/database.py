@@ -28,6 +28,7 @@ def configure_sqlite_connection(dbapi_connection, connection_record):
         # Bật WAL để hỗ trợ đọc và ghi đồng thời không bị lỗi database locked
         cursor.execute("PRAGMA journal_mode = WAL;")
         cursor.execute("PRAGMA synchronous = NORMAL;")
+        cursor.execute("PRAGMA busy_timeout = 30000;")
         cursor.close()
 
 

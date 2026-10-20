@@ -19,7 +19,8 @@ import {
   Play,
   Clock,
   Trash2,
-  Save
+  Save,
+  Coins,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -27,6 +28,8 @@ import { useAuth } from '../context/AuthContext';
 import { useRestartChargePoint } from '../hooks/useRestartChargePoint';
 import StationLocationPicker from '../components/StationLocationPicker';
 import StationsMapView from '../components/StationsMapView';
+import TariffForm from '../components/TariffForm';
+import StatusBadge from '../components/ui/StatusBadge';
 import { validatePowerLimitSlots } from '../utils/tariffValidation';
 
 export default function Stations() {
@@ -65,6 +68,9 @@ export default function Stations() {
   const [powerLimitSaving, setPowerLimitSaving] = useState(false);
   const [powerLimitServerError, setPowerLimitServerError] = useState('');
   const [powerLimitSubmitted, setPowerLimitSubmitted] = useState(false);
+
+  // State cho màn hình Cấu hình biểu giá linh hoạt theo từng trạm (Tariff)
+  const [tariffStation, setTariffStation] = useState(null);
 
   // Form thêm đầu nối (connector) vào trụ sạc đã có
   const [showAddConnectorModal, setShowAddConnectorModal] = useState(false);
@@ -162,6 +168,7 @@ export default function Stations() {
   });
 
   const [owners, setOwners] = useState([]);
+  const [accountants, setAccountants] = useState([]);
 
   // Form tạo trạm mới (mặc định chưa có ghim, tọa độ null để nhìn toàn Việt Nam)
   const [formData, setFormData] = useState({
@@ -173,6 +180,7 @@ export default function Stations() {
     operating_hours: '24/7',
     status: 'ACTIVE',
     operator_id: null,
+    accountant_id: null,
   });
 
   // Form sửa trạm
@@ -185,6 +193,7 @@ export default function Stations() {
     operating_hours: '24/7',
     status: 'ACTIVE',
     operator_id: null,
+    accountant_id: null,
   });
 
   useEffect(() => {
@@ -193,6 +202,9 @@ export default function Stations() {
       api.get('/stations/owners')
         .then((res) => setOwners(res.data || []))
         .catch((err) => console.error('Lỗi tải danh sách chủ trạm:', err));
+      api.get('/stations/accountants')
+        .then((res) => setAccountants(res.data || []))
+        .catch((err) => console.error('Lỗi tải danh sách kế toán:', err));
     }
   }, [role]);
 
@@ -222,6 +234,7 @@ export default function Stations() {
       operating_hours: '24/7',
       status: 'ACTIVE',
       operator_id: null,
+      accountant_id: null,
     });
     setFormErrors({});
     setStationValidationError(null);
@@ -250,6 +263,7 @@ export default function Stations() {
         operating_hours: formData.operating_hours || '24/7',
         status: formData.status || 'ACTIVE',
         operator_id: formData.operator_id ? parseInt(formData.operator_id, 10) : null,
+        accountant_id: formData.accountant_id ? parseInt(formData.accountant_id, 10) : null,
       };
       const res = await api.post('/stations', payload);
       setShowAddModal(false);
@@ -262,6 +276,7 @@ export default function Stations() {
         operating_hours: '24/7',
         status: 'ACTIVE',
         operator_id: null,
+        accountant_id: null,
       });
       setFormErrors({});
       setStationValidationError(null);
@@ -292,6 +307,7 @@ export default function Stations() {
       operating_hours: st.operating_hours || '24/7',
       status: st.status || 'ACTIVE',
       operator_id: st.operator_id || null,
+      accountant_id: st.accountant_id || null,
     });
     setEditFormErrors({});
     setStationValidationError(null);
@@ -323,9 +339,11 @@ export default function Stations() {
       if (role === 'ADMIN') {
         payload.total_grid_capacity_kw = parseFloat(editFormData.total_grid_capacity_kw) || editingStation.total_grid_capacity_kw;
         payload.operator_id = editFormData.operator_id ? parseInt(editFormData.operator_id, 10) : null;
+        payload.accountant_id = editFormData.accountant_id ? parseInt(editFormData.accountant_id, 10) : null;
       } else {
         payload.total_grid_capacity_kw = editingStation.total_grid_capacity_kw;
         payload.operator_id = editingStation.operator_id;
+        payload.accountant_id = editingStation.accountant_id;
       }
       const res = await api.put(`/stations/${editingStation.id}`, payload);
       setShowEditModal(false);
@@ -730,47 +748,47 @@ export default function Stations() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-tech-white">Hạ Tầng Trạm Sạc & Điểm Cấp Nguồn</h1>
-          <p className="text-xs text-steel-gray mt-0.5 font-mono">
-            QUẢN LÝ MÁY BIẾN ÁP, CÔNG SUẤT ĐỊNH MỨC & CÁC CỔNG SẠC VẬT LÝ
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Hạ Tầng Trạm Sạc &amp; Điểm Cấp Nguồn</h1>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+            Quản lý máy biến áp, công suất định mức &amp; các cổng sạc vật lý
           </p>
         </div>
         <div className="flex items-center space-x-2">
           {/* Bộ chuyển đổi chế độ xem: DANH SÁCH | BẢN ĐỒ */}
-          <div className="flex items-center bg-obsidian border border-hairline rounded p-0.5 text-xs font-mono">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl p-1 text-xs font-medium">
             <button
               type="button"
               onClick={() => handleToggleViewMode('list')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-panel text-tech-white font-bold shadow-sm'
-                  : 'text-steel-gray hover:text-tech-white'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-semibold shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <ListIcon className="w-3.5 h-3.5" />
-              <span>DANH SÁCH</span>
+              <span>Danh sách</span>
             </button>
             <button
               type="button"
               onClick={() => handleToggleViewMode('map')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors ${
                 viewMode === 'map'
-                  ? 'bg-panel text-electric-cyan font-bold shadow-sm'
-                  : 'text-steel-gray hover:text-tech-white'
+                  ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 font-semibold shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
-              <span>BẢN ĐỒ</span>
+              <span>Bản đồ</span>
             </button>
           </div>
 
           {role === 'ADMIN' && (
             <button
               onClick={handleOpenAddStation}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-electric-cyan hover:bg-electric-cyan-hover text-white text-xs font-semibold transition-colors"
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>THÊM TRẠM SẠC</span>
+              <span>Thêm trạm sạc</span>
             </button>
           )}
         </div>
@@ -794,48 +812,48 @@ export default function Stations() {
       ) : (
         <div className="space-y-6">
           {/* KPI Summary Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="bg-panel border border-hairline p-3 rounded-lg">
-              <span className="text-[11px] font-mono text-steel-gray uppercase block">Tổng trạm sạc</span>
-              <span className="text-lg font-bold font-mono text-tech-white mt-1 block">
-                {stationStats.total} <span className="text-xs text-steel-gray font-normal">trạm</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Tổng trạm sạc</span>
+              <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1 block">
+                {stationStats.total} <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">trạm</span>
               </span>
             </div>
-            <div className="bg-panel border border-hairline p-3 rounded-lg">
-              <span className="text-[11px] font-mono text-emerald-400 uppercase block">Đang hoạt động</span>
-              <span className="text-lg font-bold font-mono text-emerald-400 mt-1 block">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 block">Đang hoạt động</span>
+              <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mt-1 block">
                 {stationStats.active}
               </span>
             </div>
-            <div className="bg-panel border border-hairline p-3 rounded-lg">
-              <span className="text-[11px] font-mono text-amber-400 uppercase block">Bảo trì</span>
-              <span className="text-lg font-bold font-mono text-amber-400 mt-1 block">
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-400 block">Bảo trì</span>
+              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 mt-1 block">
                 {stationStats.maintenance}
               </span>
             </div>
-            <div className="bg-panel border border-hairline p-3 rounded-lg">
-              <span className="text-[11px] font-mono text-electric-cyan uppercase block">Tổng công suất nguồn</span>
-              <span className="text-lg font-bold font-mono text-electric-cyan mt-1 block">
-                {stationStats.totalKw} <span className="text-xs text-steel-gray font-normal">kW</span>
+            <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
+              <span className="text-xs font-medium text-sky-700 dark:text-sky-400 block">Tổng công suất nguồn</span>
+              <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 mt-1 block">
+                {stationStats.totalKw} <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">kW</span>
               </span>
             </div>
           </div>
 
           {/* Search & Status Filter Bar */}
-          <div className="bg-panel/90 border border-hairline p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
             <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-steel-gray absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm theo tên trạm hoặc địa chỉ..."
-                className="w-full bg-obsidian border border-hairline rounded-lg pl-9 pr-8 py-1.5 text-xs text-tech-white placeholder-steel-gray/60 focus:outline-none focus:border-electric-cyan font-mono"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-steel-gray hover:text-tech-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -843,25 +861,25 @@ export default function Stations() {
             </div>
 
             <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-              <span className="text-[11px] font-mono text-steel-gray mr-1 hidden md:inline">Lọc trạng thái:</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 mr-1 hidden md:inline font-medium">Lọc trạng thái:</span>
               {[
-                { id: 'ALL', label: 'TẤT CẢ', count: stationStats.total },
-                { id: 'ACTIVE', label: 'HOẠT ĐỘNG', count: stationStats.active, color: 'text-emerald-400' },
-                { id: 'MAINTENANCE', label: 'BẢO TRÌ', count: stationStats.maintenance, color: 'text-amber-400' },
+                { id: 'ALL', label: 'Tất cả', count: stationStats.total },
+                { id: 'ACTIVE', label: 'Hoạt động', count: stationStats.active, color: 'text-emerald-700 dark:text-emerald-300' },
+                { id: 'MAINTENANCE', label: 'Bảo trì', count: stationStats.maintenance, color: 'text-amber-700 dark:text-amber-300' },
               ].map((item) => {
                 const active = statusFilter === item.id;
                 return (
                   <button
                     key={item.id}
                     onClick={() => setStatusFilter(item.id)}
-                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
                       active
-                        ? 'bg-electric-cyan text-tech-white font-bold shadow-sm'
-                        : 'bg-obsidian/70 text-steel-gray hover:text-tech-white hover:bg-obsidian border border-hairline'
+                        ? 'bg-sky-600 text-white font-semibold shadow-sm'
+                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700/60'
                     }`}
                   >
                     <span>{item.label}</span>
-                    <span className={`px-1 rounded text-[10px] ${active ? 'bg-black/30 text-white' : item.color || 'text-steel-gray'}`}>
+                    <span className={`px-1.5 py-0.2 rounded-full text-xs font-semibold ${active ? 'bg-black/25 text-white' : item.color || 'text-slate-500'}`}>
                       {item.count}
                     </span>
                   </button>
@@ -897,45 +915,71 @@ export default function Stations() {
             <div
               key={st.id}
               id={`station-card-${st.id}`}
-              className="bg-panel border border-hairline rounded-sm overflow-hidden scroll-mt-24"
+              className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 rounded-2xl overflow-hidden scroll-mt-24 shadow-sm hover:shadow-md transition-all duration-200"
             >
               {/* Station Header Bar */}
               <div
                 onClick={() => setExpandedStationId(isExpanded ? null : st.id)}
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-panel-hover transition-colors"
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="bg-obsidian border border-hairline p-2 rounded">
-                    <Zap className="w-5 h-5 text-electric-cyan" />
+                <div className="flex items-center space-x-3.5">
+                  <div className="bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 p-2.5 rounded-xl text-sky-600 dark:text-sky-400">
+                    <Zap className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="flex items-center space-x-2">
-                      <h2 className="text-sm font-bold text-tech-white">{st.name}</h2>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-obsidian text-steel-gray border border-hairline">
-                        MÃ: ST-{st.id}
+                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">{st.name}</h2>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60 font-medium">
+                        Mã: ST-{st.id}
                       </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-grid-green/20 text-grid-green font-semibold">
-                        {st.status}
-                      </span>
-                      {role === 'ADMIN' && (
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-semibold ${
-                          st.operator_id
-                            ? 'bg-caution-amber/15 text-caution-amber border-caution-amber/30'
-                            : 'bg-obsidian text-steel-gray border-hairline'
-                        }`}>
-                          {st.operator_id ? `Chủ trạm: ${st.operator_name || `ID #${st.operator_id}`}` : 'Chưa gán chủ'}
-                        </span>
+                      <StatusBadge
+                        variant={st.status === 'ACTIVE' ? 'success' : st.status === 'MAINTENANCE' ? 'warning' : 'neutral'}
+                        size="sm"
+                        dot
+                      >
+                        {st.status === 'ACTIVE' ? 'Hoạt động' : st.status}
+                      </StatusBadge>
+                      {role === 'ADMIN' ? (
+                        <>
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${
+                            st.operator_id
+                              ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50'
+                              : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60'
+                          }`}>
+                            {st.operator_id ? `Chủ trạm: ${st.operator_name || `ID #${st.operator_id}`}` : 'Chưa gán chủ'}
+                          </span>
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${
+                            st.accountant_id
+                              ? 'bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-800/50'
+                              : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60'
+                          }`}>
+                            {st.accountant_id ? `Kế toán: ${st.accountant_name || `ID #${st.accountant_id}`}` : 'Chưa gán kế toán'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {st.operator_name && (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full border font-medium bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50">
+                              Chủ trạm: {st.operator_name}
+                            </span>
+                          )}
+                          {st.accountant_name && (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full border font-medium bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-800/50">
+                              Kế toán: {st.accountant_name}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
-                    <div className="flex items-center space-x-3 text-xs text-steel-gray mt-1 font-mono">
+                    <div className="flex items-center space-x-3 text-xs text-slate-600 dark:text-slate-400 mt-1">
                       <span className="flex items-center">
-                        <MapPin className="w-3.5 h-3.5 mr-1" />
+                        <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400 dark:text-slate-500" />
                         {st.address}
                       </span>
                       {st.latitude != null && st.longitude != null && (
                         <>
                           <span>•</span>
-                          <span className="text-[11px] text-electric-cyan">
+                          <span className="text-xs text-sky-600 dark:text-sky-400 font-medium">
                             GPS: {st.latitude.toFixed(4)}, {st.longitude.toFixed(4)}
                           </span>
                         </>
@@ -947,9 +991,9 @@ export default function Stations() {
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  <div className="text-right font-mono">
-                    <div className="text-xs text-steel-gray">CÔNG SUẤT LƯỚI ĐỊNH MỨC</div>
-                    <div className="text-base font-bold text-electric-cyan tabular-nums">
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Công suất nguồn lưới</div>
+                    <div className="text-base font-bold text-sky-600 dark:text-sky-400 tabular-nums">
                       {st.total_grid_capacity_kw} kW
                     </div>
                   </div>
@@ -964,10 +1008,10 @@ export default function Stations() {
                         handleOpenEditStation(st);
                       }
                     }}
-                    className={`p-1.5 rounded border border-hairline transition-colors ${
+                    className={`p-1.5 rounded-xl border transition-colors ${
                       st.latitude != null && st.longitude != null
-                        ? 'hover:bg-obsidian text-steel-gray hover:text-electric-cyan'
-                        : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                        ? 'border-slate-200 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-sky-600'
+                        : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/50'
                     }`}
                   >
                     <MapIcon className="w-4 h-4" />
@@ -976,13 +1020,26 @@ export default function Stations() {
                     <>
                       <button
                         type="button"
+                        data-testid={`btn-tariff-station-${st.id}`}
+                        title="Cấu hình biểu giá điện linh hoạt (Tariff) cho trạm này"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTariffStation(st);
+                        }}
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800/50 text-xs font-medium transition-colors shadow-sm"
+                      >
+                        <Coins className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Biểu giá trạm</span>
+                      </button>
+                      <button
+                        type="button"
                         data-testid={`btn-power-limits-station-${st.id}`}
-                        title="Cấu hình hạn mức công suất theo khung giờ (SCRUM-294 / SCRUM-314)"
+                        title="Cấu hình hạn mức công suất theo khung giờ"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOpenPowerLimitModal(st);
                         }}
-                        className="flex items-center space-x-1 px-2.5 py-1.5 rounded bg-obsidian hover:bg-electric-cyan/15 text-electric-cyan border border-electric-cyan/40 text-[11px] font-mono font-bold transition-colors"
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 dark:bg-sky-950/50 dark:hover:bg-sky-900/50 dark:text-sky-300 dark:border-sky-800/50 text-xs font-medium transition-colors shadow-sm"
                       >
                         <Clock className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Hạn mức khung giờ</span>
@@ -994,22 +1051,22 @@ export default function Stations() {
                           e.stopPropagation();
                           handleOpenEditStation(st);
                         }}
-                        className="p-1.5 rounded hover:bg-obsidian text-steel-gray hover:text-electric-cyan border border-hairline transition-colors"
+                        className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 border border-slate-200 dark:border-slate-700/60 transition-colors"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                     </>
                   )}
-                  {isExpanded ? <ChevronDown className="w-5 h-5 text-steel-gray" /> : <ChevronRight className="w-5 h-5 text-steel-gray" />}
+                  {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
                 </div>
               </div>
 
               {/* Station Expanded Chargers View */}
               {isExpanded && (
-                <div className="border-t border-hairline bg-obsidian p-4 space-y-4">
+                <div className="border-t border-slate-200 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/40 p-4 sm:p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-steel-gray font-mono">
-                      DANH SÁCH TRỤ SẠC (EVSE BAYS) — {chargers.length} TRỤ VẬT LÝ
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Danh sách trụ sạc ({chargers.length} trụ)
                     </span>
                     {canManageChargers && (
                       <button
@@ -1017,16 +1074,16 @@ export default function Stations() {
                           e.stopPropagation();
                           handleOpenAddCharger(st);
                         }}
-                        className="flex items-center space-x-1 px-2.5 py-1 rounded bg-panel hover:bg-panel-hover border border-electric-cyan/40 hover:border-electric-cyan text-electric-cyan text-xs font-mono font-semibold transition-colors shadow-sm"
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-medium transition-all shadow-sm hover:shadow"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>GẮN TRỤ SẠC</span>
+                        <span>Thêm trụ sạc</span>
                       </button>
                     )}
                   </div>
 
                   {chargers.length === 0 ? (
-                    <div className="text-xs text-steel-gray text-center py-6 font-mono border border-dashed border-hairline rounded bg-panel/30">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 text-center py-8 font-mono border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl bg-white/50 dark:bg-slate-900/20">
                       <p>Chưa có trụ sạc nào được gắn vào trạm này.</p>
                       {canManageChargers && (
                         <button
@@ -1034,7 +1091,7 @@ export default function Stations() {
                             e.stopPropagation();
                             handleOpenAddCharger(st);
                           }}
-                          className="mt-2 inline-flex items-center space-x-1 text-electric-cyan hover:underline text-xs"
+                          className="mt-2.5 inline-flex items-center space-x-1 text-sky-600 dark:text-sky-400 hover:underline text-xs font-semibold"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Gắn trụ sạc đầu tiên cho trạm</span>
@@ -1042,23 +1099,31 @@ export default function Stations() {
                       )}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                       {chargers.map((ch) => (
-                        <div key={ch.id} className="bg-panel border border-hairline p-3 rounded-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-mono text-xs font-bold text-tech-white">{ch.code}</span>
-                            <div className="flex items-center space-x-1.5">
-                              <span
-                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                        <div
+                          key={ch.id}
+                          className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200"
+                        >
+                          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{ch.code}</span>
+                            <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                              <StatusBadge
+                                variant={
                                   ch.status === 'CHARGING'
-                                    ? 'bg-electric-cyan/20 text-electric-cyan'
+                                    ? 'info'
                                     : ch.status === 'AVAILABLE'
-                                    ? 'bg-grid-green/20 text-grid-green'
-                                    : 'bg-critical-red/20 text-critical-red'
-                                }`}
+                                    ? 'success'
+                                    : ch.status === 'FAULTED'
+                                    ? 'danger'
+                                    : 'warning'
+                                }
+                                size="sm"
+                                dot
+                                pulse={ch.status === 'CHARGING'}
                               >
-                                {ch.status === 'UNAVAILABLE' ? 'MAINTENANCE' : ch.status}
-                              </span>
+                                {ch.status === 'UNAVAILABLE' ? 'Bảo trì' : ch.status === 'CHARGING' ? 'Đang sạc' : ch.status === 'AVAILABLE' ? 'Sẵn sàng' : ch.status}
+                              </StatusBadge>
                               {(role === 'ADMIN' || role === 'OPERATOR') && (
                                 <button
                                   type="button"
@@ -1074,12 +1139,12 @@ export default function Stations() {
                                     e.stopPropagation();
                                     handleToggleChargerStatus(ch.id, ch.status);
                                   }}
-                                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+                                  className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${
                                     ch.status === 'CHARGING'
-                                      ? 'opacity-40 cursor-not-allowed border-hairline text-steel-gray'
+                                      ? 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
                                       : ch.status === 'AVAILABLE'
-                                      ? 'border-caution-amber/40 text-caution-amber hover:bg-caution-amber/20'
-                                      : 'border-grid-green/40 text-grid-green hover:bg-grid-green/20'
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60 hover:bg-amber-100'
+                                      : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60 hover:bg-emerald-100'
                                   }`}
                                 >
                                   {ch.status === 'AVAILABLE' ? 'Bảo trì' : 'Mở lại'}
@@ -1094,7 +1159,7 @@ export default function Stations() {
                                     setRestartingCharger({ id: ch.id, code: ch.code, status: ch.status });
                                     resetResult();
                                   }}
-                                  className="text-[10px] font-mono flex items-center space-x-1 px-1.5 py-0.5 rounded border border-blue-500/40 text-blue-500 hover:bg-blue-500/20 transition-colors"
+                                  className="text-xs flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800/60 text-sky-800 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 transition-colors font-medium"
                                 >
                                   <RefreshCw className="w-3 h-3" />
                                   <span>Khởi động lại</span>
@@ -1102,12 +1167,12 @@ export default function Stations() {
                               )}
                               <button
                                 type="button"
-                                title="Màn hình trụ & điều khiển bắt đầu sạc (S-24 / T-52)"
+                                title="Màn hình trụ & điều khiển bắt đầu sạc"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigate(`/chargers/${ch.id}`);
                                 }}
-                                className="text-[10px] font-mono flex items-center space-x-1 px-1.5 py-0.5 rounded border border-electric-cyan/40 text-electric-cyan hover:bg-electric-cyan/20 transition-colors"
+                                className="text-xs flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/70 hover:bg-slate-200 transition-colors font-medium"
                               >
                                 <Play className="w-3 h-3 fill-current" />
                                 <span>Màn hình trụ</span>
@@ -1118,7 +1183,7 @@ export default function Stations() {
                           {/* Khu vực thông báo trạng thái restart */}
                           {(restartLoading || restartResult?.chargerId === ch.id) && (
                             <div 
-                              className={`mb-3 text-xs p-2 rounded border font-mono ${
+                              className={`mb-3 text-xs p-2 rounded border ${
                                 restartLoading 
                                   ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
                                   : restartResult?.type === 'success'
@@ -1147,7 +1212,7 @@ export default function Stations() {
                                         e.stopPropagation();
                                         restart(ch.id, restartResult.type); // Giữ nguyên mock status nếu đang test, hoặc mặc định
                                       }}
-                                      className="mt-1 self-start text-[10px] underline hover:text-white"
+                                      className="mt-1 self-start text-xs underline hover:text-white"
                                     >
                                       Thử lại
                                     </button>
@@ -1157,41 +1222,53 @@ export default function Stations() {
                             </div>
                           )}
 
-                          <div className="text-xs text-steel-gray font-mono mb-2">
-                            Hãng: {ch.vendor} • Định mức: <span className="text-tech-white font-bold">{ch.max_power_kw} kW</span>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mb-2 font-normal">
+                            Thiết bị: {ch.vendor} • Định mức: <span className="text-slate-900 dark:text-slate-100 font-bold">{ch.max_power_kw} kW</span>
                           </div>
 
                           {/* Connectors list */}
-                          <div className="space-y-1.5 pt-2 border-t border-hairline">
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/60">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-steel-gray font-mono block">CỔNG SẠC (CONNECTORS):</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Cổng sạc:</span>
                               {canManageChargers && (
                                 <button
                                   type="button"
-                                  title={`Thêm đầu nối mới vào trụ ${ch.code}`}
+                                  title={`Thêm cổng sạc mới vào trụ ${ch.code}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleOpenAddConnector(ch);
                                   }}
-                                  className="flex items-center space-x-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded border border-electric-cyan/40 text-electric-cyan hover:bg-electric-cyan/10 transition-colors"
+                                  className="flex items-center space-x-0.5 text-xs px-2.5 py-0.5 rounded-lg border border-sky-300 dark:border-sky-800/60 text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 transition-colors font-medium"
                                 >
                                   <Plus className="w-3 h-3" />
-                                  <span>ĐẦU NỐI</span>
+                                  <span>Thêm cổng</span>
                                 </button>
                               )}
                             </div>
                             {(ch.connectors || []).length === 0 && (
-                              <div className="text-[11px] text-steel-gray font-mono italic">Trụ chưa có đầu nối nào.</div>
+                              <div className="text-xs text-slate-500 italic">Trụ chưa có cổng sạc nào.</div>
                             )}
                             {(ch.connectors || []).map((conn) => (
                               <div
                                 key={conn.id}
-                                className="bg-obsidian border border-hairline px-2 py-1 rounded flex items-center justify-between text-xs font-mono"
+                                className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/60 px-3 py-2 rounded-xl flex items-center justify-between text-xs text-slate-800 dark:text-slate-200"
                               >
-                                <span>Súng #{conn.connector_number} ({conn.connector_type}) • {conn.max_power_kw} kW</span>
-                                <span className={conn.status === 'CHARGING' ? 'text-electric-cyan font-bold' : 'text-grid-green'}>
-                                  {conn.status}
-                                </span>
+                                <span>Cổng #{conn.connector_number} ({conn.connector_type}) • {conn.max_power_kw} kW</span>
+                                <StatusBadge
+                                  variant={
+                                    conn.status === 'CHARGING'
+                                      ? 'info'
+                                      : conn.status === 'AVAILABLE'
+                                      ? 'success'
+                                      : conn.status === 'FAULTED'
+                                      ? 'danger'
+                                      : 'neutral'
+                                  }
+                                  size="sm"
+                                  dot
+                                >
+                                  {conn.status === 'AVAILABLE' ? 'Sẵn sàng' : conn.status === 'CHARGING' ? 'Đang sạc' : conn.status === 'FAULTED' ? 'Lỗi' : conn.status}
+                                </StatusBadge>
                               </div>
                             ))}
                           </div>
@@ -1208,15 +1285,15 @@ export default function Stations() {
           )}
 
           {/* Bản đồ tổng quát mạng lưới trạm sạc */}
-          <div id="stations-overview-map" className="pt-6 border-t border-hairline space-y-3">
+          <div id="stations-overview-map" className="pt-6 border-t border-slate-200 dark:border-slate-800/60 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-sm font-bold text-tech-white uppercase font-mono flex items-center space-x-2">
-                  <MapIcon className="w-4 h-4 text-electric-cyan" />
-                  <span>BẢN ĐỒ TỔNG QUÁT MẠNG LƯỚI TRẠM SẠC</span>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
+                  <MapIcon className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                  <span>Bản đồ tổng quát mạng lưới trạm sạc</span>
                 </h2>
-                <p className="text-xs text-steel-gray font-mono mt-0.5">
-                  VỊ TRÍ GPS VÀ TRẠNG THÁI HOẠT ĐỘNG THỜI GIAN THỰC CỦA TOÀN BỘ {stations.length} TRẠM SẠC
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  Vị trí GPS và trạng thái hoạt động thời gian thực của toàn bộ {stations.length} trạm sạc
                 </p>
               </div>
             </div>
@@ -1377,20 +1454,37 @@ export default function Stations() {
               </div>
 
               {role === 'ADMIN' && (
-                <div>
-                  <label className="text-steel-gray block mb-1 font-bold">GÁN CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
-                  <select
-                    value={formData.operator_id || ''}
-                    onChange={(e) => setFormData({ ...formData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
-                  >
-                    <option value="">Chưa gán chủ (Trạm tự do / Admin quản lý)</option>
-                    {owners.map((ow) => (
-                      <option key={ow.id} value={ow.id}>
-                        [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-steel-gray block mb-1 font-bold">GÁN CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
+                    <select
+                      value={formData.operator_id || ''}
+                      onChange={(e) => setFormData({ ...formData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                    >
+                      <option value="">Chưa gán chủ (Admin quản lý)</option>
+                      {owners.map((ow) => (
+                        <option key={ow.id} value={ow.id}>
+                          [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-steel-gray block mb-1 font-bold">GÁN KẾ TOÁN PHỤ TRÁCH (CHỈ DÀNH CHO ADMIN)</label>
+                    <select
+                      value={formData.accountant_id || ''}
+                      onChange={(e) => setFormData({ ...formData, accountant_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                    >
+                      <option value="">Chưa gán kế toán (Không có phụ trách riêng)</option>
+                      {accountants.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          [ID #{acc.id}] {acc.full_name || acc.username} ({acc.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -1570,20 +1664,37 @@ export default function Stations() {
               </div>
 
               {role === 'ADMIN' && (
-                <div>
-                  <label className="text-steel-gray block mb-1 font-bold">GÁN / ĐỔI CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
-                  <select
-                    value={editFormData.operator_id || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
-                    className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
-                  >
-                    <option value="">Chưa gán chủ (Trạm tự do / Admin quản lý)</option>
-                    {owners.map((ow) => (
-                      <option key={ow.id} value={ow.id}>
-                        [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-steel-gray block mb-1 font-bold">GÁN / ĐỔI CHỦ TRẠM SẠC (CHỈ DÀNH CHO ADMIN)</label>
+                    <select
+                      value={editFormData.operator_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, operator_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                    >
+                      <option value="">Chưa gán chủ (Admin quản lý)</option>
+                      {owners.map((ow) => (
+                        <option key={ow.id} value={ow.id}>
+                          [ID #{ow.id}] {ow.full_name || ow.username} ({ow.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-steel-gray block mb-1 font-bold">GÁN / ĐỔI KẾ TOÁN PHỤ TRÁCH (CHỈ DÀNH CHO ADMIN)</label>
+                    <select
+                      value={editFormData.accountant_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, accountant_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      className="w-full bg-obsidian border border-hairline p-2 rounded text-tech-white focus:outline-none focus:border-electric-cyan font-mono"
+                    >
+                      <option value="">Chưa gán kế toán (Không có phụ trách riêng)</option>
+                      {accountants.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          [ID #{acc.id}] {acc.full_name || acc.username} ({acc.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -2267,6 +2378,29 @@ export default function Stations() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================
+          MODAL CẤU HÌNH BIỂU GIÁ LINH HOẠT CHO TỪNG TRẠM (TARIFF)
+         ============================================================================ */}
+      {tariffStation && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl my-8">
+            <TariffForm
+              stationId={tariffStation.id}
+              stationName={tariffStation.name}
+              isModal={true}
+              onClose={() => setTariffStation(null)}
+              onSaved={() => {
+                showToast(
+                  'success',
+                  'ĐÃ LƯU BIỂU GIÁ TRẠM',
+                  `Cập nhật biểu giá điện thành công cho trạm "${tariffStation.name}".`
+                );
+              }}
+            />
           </div>
         </div>
       )}
