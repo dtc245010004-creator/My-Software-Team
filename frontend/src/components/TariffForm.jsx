@@ -53,6 +53,8 @@ export default function TariffForm({
   const [stationsLoading, setStationsLoading] = useState(true);
 
   const [periods, setPeriods] = useState([]);
+  const [idleFeePerMinute, setIdleFeePerMinute] = useState(3000);
+  const [idleGraceMinutes, setIdleGraceMinutes] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // 'success' | 'error' | null
@@ -117,6 +119,16 @@ export default function TariffForm({
         } else {
           setPeriods([]);
         }
+        if (data && data.idle_fee_per_minute !== undefined) {
+          setIdleFeePerMinute(Number(data.idle_fee_per_minute));
+        } else {
+          setIdleFeePerMinute(3000);
+        }
+        if (data && data.idle_grace_minutes !== undefined) {
+          setIdleGraceMinutes(Number(data.idle_grace_minutes));
+        } else {
+          setIdleGraceMinutes(0);
+        }
       })
       .catch((err) => {
         if (!isMounted) return;
@@ -174,10 +186,19 @@ export default function TariffForm({
     setServerError('');
 
     try {
-      await saveTariff(selectedStationId, { periods });
+      await saveTariff(selectedStationId, {
+        periods,
+        idle_fee_per_minute: Number(idleFeePerMinute) || 3000,
+        idle_grace_minutes: Number(idleGraceMinutes) || 0,
+      });
       setSaveStatus('success');
       if (typeof onSaved === 'function') {
-        onSaved({ stationId: selectedStationId, periods });
+        onSaved({
+          stationId: selectedStationId,
+          periods,
+          idle_fee_per_minute: Number(idleFeePerMinute) || 3000,
+          idle_grace_minutes: Number(idleGraceMinutes) || 0,
+        });
       }
       setTimeout(() => setSaveStatus(null), 3500);
     } catch (error) {
@@ -530,6 +551,75 @@ export default function TariffForm({
             </span>
           </div>
         )}
+      </div>
+
+      {/* CẤU HÌNH PHÍ ĐỖ XE / PHẠT KHÔNG RÚT SẠC SAU KHI ĐẦY 100% */}
+      <div className="p-4 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl space-y-3">
+        <div className="flex items-center space-x-2">
+          <div className="p-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg">
+            <Clock className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+              Biểu Phí Đỗ Xe / Phạt Chiếm Trụ (Khi Xe Sạc Đầy 100% Không Rút Sạc)
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Áp dụng tự động trừ vào ví tài xế khi pin xe đã đạt 100% nhưng tài xế chưa rút súng sạc để nhường trụ cho xe khác.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          <div>
+            <label htmlFor="idle-fee-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Đơn giá phạt quá giờ (VNĐ / phút)
+            </label>
+            <div className="relative">
+              <input
+                id="idle-fee-input"
+                data-testid="idle-fee-input"
+                type="number"
+                min="0"
+                step="500"
+                value={idleFeePerMinute}
+                onChange={(e) => setIdleFeePerMinute(Number(e.target.value))}
+                className="w-full p-2.5 text-sm font-mono font-bold text-amber-700 dark:text-amber-400 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="3000"
+              />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400 font-sans">
+                VNĐ / phút
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Mặc định: 3.000 VNĐ / phút (Tương đương 180.000 VNĐ / giờ).
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="idle-grace-input" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Thời gian ân hạn miễn phí (Phút)
+            </label>
+            <div className="relative">
+              <input
+                id="idle-grace-input"
+                data-testid="idle-grace-input"
+                type="number"
+                min="0"
+                max="60"
+                value={idleGraceMinutes}
+                onChange={(e) => setIdleGraceMinutes(Number(e.target.value))}
+                className="w-full p-2.5 text-sm font-mono font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="0"
+              />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400 font-sans">
+                Phút
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Thời gian chờ tài xế rút sạc trước khi bắt đầu tính phí phạt (0 = tính ngay lập tức).
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* VÙNG THAO TÁC / LƯU BIỂU GIÁ */}

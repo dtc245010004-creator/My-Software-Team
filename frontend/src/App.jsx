@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Header from './components/Header';
-import Navigation from './components/Navigation';
+import Sidebar from './components/Sidebar';
+import MobileHeader from './components/MobileHeader';
+import BottomNavBar from './components/BottomNavBar';
 
 import Dashboard from './pages/Dashboard';
 import Stations from './pages/Stations';
@@ -51,12 +53,45 @@ function AppLayout() {
 
   const homeRoute = getHomeRouteByRole(role);
 
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar_collapsed', String(collapsed));
+    } catch {
+      // ignore
+    }
+  }, [collapsed]);
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F17] text-slate-900 dark:text-[#F1F5F9] flex flex-col font-sans transition-colors duration-200">
-      <Header />
-      <Navigation />
-      <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">
-        <Routes>
+    <div className="h-screen w-screen overflow-hidden flex bg-slate-50 dark:bg-[#0B0F17] text-slate-900 dark:text-[#F1F5F9] font-sans transition-colors duration-200">
+      {/* Thanh điều hướng dọc có thể thu gọn (Collapsible Left Sidebar) */}
+      <Sidebar
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
+
+      {/* Vùng nội dung bên phải (Right Wrapper: Desktop Header + Mobile Header + Main Content + Bottom Nav) */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        {/* Desktop Header (>= 768px) */}
+        <Header />
+
+        {/* Mobile Header (< 768px) */}
+        <MobileHeader />
+
+        {/* Main Content với khoảng trống phía dưới pb-24 (96px) tránh bị Bottom Nav che khuất */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 sm:p-4 md:p-6 pb-24 md:pb-6 scroll-smooth">
+          <div className="max-w-7xl mx-auto w-full">
+            <Routes>
           <Route
             path="/"
             element={
@@ -110,7 +145,7 @@ function AppLayout() {
           <Route
             path="/simulator"
             element={
-              role === 'CUSTOMER' ? <Simulator /> : <Navigate to={homeRoute} replace />
+              ['CUSTOMER', 'ADMIN', 'OPERATOR'].includes(role) ? <Simulator /> : <Navigate to={homeRoute} replace />
             }
           />
           <Route path="/wallet" element={<Wallet />} />
@@ -177,8 +212,13 @@ function AppLayout() {
             }
           />
           <Route path="*" element={<Navigate to={homeRoute} replace />} />
-        </Routes>
-      </main>
+            </Routes>
+          </div>
+        </main>
+
+        {/* Mobile Bottom Navigation Bar (< 768px) */}
+        <BottomNavBar />
+      </div>
     </div>
   );
 }

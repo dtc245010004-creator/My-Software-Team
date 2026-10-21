@@ -12,6 +12,7 @@ from app.api.deps import (
 )
 from app.core.database import get_db
 from app.models.session import ChargingSession
+from app.models.tariff import Tariff
 from app.models.user import User
 from app.services.wallet_service import get_or_create_wallet, post_ledger_entry
 from app.simulator.charging_simulator import simulator_manager
@@ -230,13 +231,14 @@ def set_simulator_power_limit(
 class OverstayPenaltyRequest(BaseModel):
     minutes: int = Field(..., ge=1, le=1440, description="Số phút không rút sạc sau khi pin đầy 100%")
     session_id: int | None = Field(None, description="Mã phiên sạc (tùy chọn)")
-    rate_per_minute: int = Field(3000, description="Đơn giá phạt mỗi phút (3.000 VNĐ)")
+    station_id: int | None = Field(None, description="Mã trạm sạc để tra cứu biểu giá (tùy chọn)")
+    rate_per_minute: int | None = Field(None, description="Đơn giá phạt mỗi phút (mặc định lấy từ biểu giá trạm hoặc 3.000 VNĐ)")
     note_custom: str | None = Field(None, description="Ghi chú tùy chỉnh")
 
 
 @router.post(
     "/overstay-penalty",
-    summary="Phạt không rút sạc khi xe sạc đầy 100% (3.000 VNĐ/phút)",
+    summary="Phạt không rút sạc khi xe sạc đầy 100% (Theo biểu giá hoặc mặc định 3.000 VNĐ/phút)",
 )
 def apply_overstay_penalty(
     payload: OverstayPenaltyRequest,
@@ -245,12 +247,39 @@ def apply_overstay_penalty(
 ):
     """
     Giả lập phạt tài xế không rút sạc sau khi pin đầy 100%:
-    - Đơn giá: 3.000 VNĐ / phút.
-    - Tiền phạt = minutes * 3.000 VNĐ.
+    - Đơn giá: Lấy theo cấu hình biểu giá của trạm (idle_fee_per_minute) hoặc mặc định 3.000 VNĐ / phút.
+    - Tiền phạt = minutes * đơn giá.
     - Ghi nhận sổ cái ví với nội dung: 'Phạt không rút sạc - {minutes} phút'.
     """
-    total_penalty = payload.minutes * payload.rate_per_minute
+    sess = None
+    if payload.session_id:
+        sess = db.query(ChargingSession).filter(ChargingSession.id == payload.session_id).first()
+
+    rate = payload.rate_per_minute
+    if rate is None or rate <= 0:
+        station_id = payload.station_id
+        if not station_id and sess:
+            if sess.connector and sess.connector.charging_point:
+                station_id = sess.connector.charging_point.station_id
+
+        tariff = None
+        if station_id:
+            tariff = db.query(Tariff).filter(Tariff.station_id == station_id, Tariff.is_active == True).first()
+        if not tariff:
+            tariff = db.query(Tariff).filter(Tariff.station_id.is_(None), Tariff.is_active == True).first()
+
+        if tariff and tariff.idle_fee_per_minute is not None and float(tariff.idle_fee_per_minute) > 0:
+            rate = int(float(tariff.idle_fee_per_minute))
+        else:
+            rate = 3000
+
+    total_penalty = payload.minutes * rate
     note_text = payload.note_custom or f"Phạt không rút sạc - {payload.minutes} phút"
+
+    if sess:
+        sess.idle_amount = (sess.idle_amount or Decimal("0")) + Decimal(str(total_penalty))
+        sess.idle_chargeable_minutes = (sess.idle_chargeable_minutes or 0) + payload.minutes
+        sess.idle_fee_per_minute_applied = Decimal(str(rate))
 
     wallet = get_or_create_wallet(db, current_user.id)
     ref_id = f"overstay_{uuid.uuid4().hex[:10]}"
@@ -276,7 +305,7 @@ def apply_overstay_penalty(
         "wallet_id": wallet.id,
         "amount": -total_penalty,
         "minutes": payload.minutes,
-        "rate_per_minute": payload.rate_per_minute,
+        "rate_per_minute": rate,
         "note": tx.note,
         "new_balance": float(wallet.balance),
         "created_at": tx.created_at.isoformat() if tx.created_at else None,

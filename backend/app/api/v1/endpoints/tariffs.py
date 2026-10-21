@@ -61,6 +61,8 @@ class LiveTariffPeriodItem(BaseModel):
 class LiveTariffConfigPayload(BaseModel):
     station_id: int | None = None
     periods: list[LiveTariffPeriodItem]
+    idle_fee_per_minute: float | None = None
+    idle_grace_minutes: int | None = None
 
 
 @router.get(
@@ -93,10 +95,16 @@ def get_live_tariff_config(
     db: Session = Depends(get_db),
 ):
     tariff = get_or_create_default_tariff(db, station_id=station_id)
+    raw_idle_fee = float(tariff.idle_fee_per_minute) if (tariff and tariff.idle_fee_per_minute is not None) else 3000.0
+    idle_fee = raw_idle_fee if raw_idle_fee > 0 else 3000.0
+    idle_grace = int(tariff.idle_grace_minutes) if (tariff and tariff.idle_grace_minutes is not None) else 0
+
     if tariff and tariff.periods:
         ordered = sorted(tariff.periods, key=lambda p: (p.sort_order, p.id or 0))
         return {
             "station_id": tariff.station_id or station_id or 1,
+            "idle_fee_per_minute": idle_fee,
+            "idle_grace_minutes": idle_grace,
             "periods": [
                 {
                     "start": p.start_time,
@@ -112,6 +120,8 @@ def get_live_tariff_config(
     base_offpeak = float(tariff.price_offpeak) if tariff else 2500.0
     return {
         "station_id": station_id or 1,
+        "idle_fee_per_minute": idle_fee,
+        "idle_grace_minutes": idle_grace,
         "periods": [
             {"start": "00:00", "end": "06:00", "price": base_offpeak},
             {"start": "06:00", "end": "18:00", "price": base_normal},
@@ -168,6 +178,12 @@ def update_live_tariff_config(
         t.periods = new_periods
         db.flush()
 
+        # Cập nhật phí đỗ xe / chiếm trụ nếu được truyền vào
+        if payload.idle_fee_per_minute is not None:
+            t.idle_fee_per_minute = Decimal(str(payload.idle_fee_per_minute))
+        if payload.idle_grace_minutes is not None:
+            t.idle_grace_minutes = int(payload.idle_grace_minutes)
+
         # Tính đơn giá tại đúng thời điểm hiện tại theo khung giờ vừa lưu
         active_rate = determine_tou_rate(t, vn_now_time)
         t.price_normal = active_rate
@@ -186,6 +202,8 @@ def update_live_tariff_config(
     return {
         "station_id": payload.station_id or 1,
         "applied_price_now": float(current_rate),
+        "idle_fee_per_minute": float(primary_tariff.idle_fee_per_minute or 3000.0),
+        "idle_grace_minutes": int(primary_tariff.idle_grace_minutes or 0),
         "periods": [
             {"start": item.start, "end": item.end, "price": item.price}
             for item in payload.periods

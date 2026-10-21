@@ -19,6 +19,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import api from '../services/api';
+import { getTariff } from '../services/tariffApi';
 import { telemetryWs } from '../services/websocket';
 import { useAuth } from '../context/AuthContext';
 import { formatVNTime } from '../utils/formatTime';
@@ -100,10 +101,14 @@ export default function Simulator() {
       setStations(stData);
       const searchParams = new URLSearchParams(window.location.search);
       const queryStationId = searchParams.get('station_id');
+      const queryConnectorId = searchParams.get('connector_id');
       if (queryStationId && stData.some((st) => String(st.id) === String(queryStationId))) {
         setSelectedStationId(String(queryStationId));
       } else if (stData.length > 0) {
         setSelectedStationId(String(stData[0].id));
+      }
+      if (queryConnectorId) {
+        setSelectedConnectorId(String(queryConnectorId));
       }
     } catch (err) {
       console.error('Lỗi tải danh sách trạm:', err);
@@ -153,7 +158,7 @@ export default function Simulator() {
         alert(`Trụ sạc [${targetConn.chargerCode}] hiện đang trong trạng thái bảo trì hoặc sự cố. Vui lòng chọn trụ sạc khác.`);
         return;
       }
-      if (targetConn.status !== 'AVAILABLE') {
+      if (targetConn.status !== 'AVAILABLE' && targetConn.status !== 'RESERVED') {
         alert(`Cổng sạc hiện không khả dụng (Trạng thái: ${targetConn.status}). Vui lòng chọn cổng sạc khác.`);
         return;
       }
@@ -235,71 +240,149 @@ export default function Simulator() {
   };
 
 
-  // State Demo Phạt không rút sạc (Pin 100%)
-  const [demoMinutes, setDemoMinutes] = useState(3);
+  // Biểu phí đỗ xe / phạt không rút sạc (lấy động từ Biểu giá trạm của Admin)
+  const [idleFeeRate, setIdleFeeRate] = useState(3000);
+  const [idleGraceMinutes, setIdleGraceMinutes] = useState(0);
+
+  // State Demo Phạt không rút sạc đồng bộ với phiên sạc
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoSuccess, setDemoSuccess] = useState(null);
   const [demoError, setDemoError] = useState('');
   const [isOverstayActive, setIsOverstayActive] = useState(false);
-  const [overstayTimerMinutes, setOverstayTimerMinutes] = useState(1);
+  const [overstaySeconds, setOverstaySeconds] = useState(0);
 
-  // Kích hoạt mô phỏng pin đạt 100% trên phiên sạc đang chạy
-  const handleFastForwardSoc100 = () => {
+  // Nạp cấu hình biểu phí phạt đỗ xe từ trạm đang chọn
+  useEffect(() => {
+    if (selectedStationId) {
+      getTariff(selectedStationId)
+        .then((data) => {
+          if (data && data.idle_fee_per_minute !== undefined && Number(data.idle_fee_per_minute) > 0) {
+            setIdleFeeRate(Number(data.idle_fee_per_minute));
+          } else {
+            setIdleFeeRate(3000);
+          }
+          if (data && data.idle_grace_minutes !== undefined) {
+            setIdleGraceMinutes(Number(data.idle_grace_minutes));
+          } else {
+            setIdleGraceMinutes(0);
+          }
+        })
+        .catch(() => {
+          setIdleFeeRate(3000);
+          setIdleGraceMinutes(0);
+        });
+    }
+  }, [selectedStationId]);
+
+  // Bộ đếm thời gian tự động chạy khi pin xe đạt 100% mà chưa rút sạc
+  useEffect(() => {
+    let interval = null;
+    if (isOverstayActive) {
+      interval = setInterval(() => {
+        setOverstaySeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setOverstaySeconds(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isOverstayActive]);
+
+  // Tự động phát hiện khi mức pin đạt 100% trong phiên sạc trực tiếp
+  useEffect(() => {
+    if (telemetry && telemetry.soc >= 100 && !isOverstayActive && activeSession) {
+      setIsOverstayActive(true);
+      setStatusMessage('Xe đã sạc đầy 100%! Bắt đầu đếm thời gian chiếm chỗ và tự động tính phí đỗ xe.');
+    }
+  }, [telemetry, isOverstayActive, activeSession]);
+
+  // Kích hoạt mô phỏng pin đạt 100% ngay lập tức (Chỉ cần 1 nút bấm)
+  const handleFastForwardSoc100 = async () => {
+    if (!activeSession) {
+      const connId = selectedConnectorId || (availableConnectors[0]?.id);
+      if (connId) {
+        try {
+          setLoading(true);
+          const res = await api.post('/sessions/start', {
+            connector_id: Number(connId),
+            battery_capacity_kwh: 60,
+            initial_soc: 99,
+          });
+          setActiveSession(res.data);
+        } catch (e) {
+          console.warn('Không thể tự tạo phiên sạc:', e);
+        } finally {
+          setLoading(false);
+        }
+      }
+    }
     setIsOverstayActive(true);
+    setOverstaySeconds(1);
     setTelemetry((prev) => ({
       ...(prev || {}),
       soc: 100.0,
       power_kw: 0.0,
       temp_c: 32.0,
-      energy_kwh: prev?.energy_kwh || 18.5,
-      cost_estimate: prev?.cost_estimate || 72000,
+      energy_kwh: prev?.energy_kwh || 24.5,
+      cost_estimate: prev?.cost_estimate || 85000,
     }));
-    setStatusMessage('Xe đã sạc đầy 100%! Trạng thái không rút sạc đang kích hoạt tính phí phạt 3.000 đ/phút.');
+    setStatusMessage('Xe đã sạc đầy 100%! Bắt đầu tự động đếm thời gian và tính phí đỗ xe phạt không rút sạc.');
   };
 
-  // Áp dụng phạt không rút sạc vào ví
-  const handleApplyOverstayPenalty = async (customMinutes) => {
-    const mins = Number(customMinutes !== undefined ? customMinutes : demoMinutes);
-    if (!mins || mins <= 0) {
-      alert('Vui lòng chọn hoặc nhập số phút hợp lệ (> 0).');
-      return;
-    }
+  // Tính số phút và tiền phạt tạm tính theo thời gian thực
+  const billableMinutes = Math.max(1, Math.ceil(overstaySeconds / 60));
+  const livePenaltyAmount = isOverstayActive ? billableMinutes * idleFeeRate : 0;
 
-    try {
-      setDemoLoading(true);
-      setDemoError('');
-      setDemoSuccess(null);
+  const formatTimer = (totalSec) => {
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
-      const res = await api.post('/simulator/overstay-penalty', {
-        minutes: mins,
-        session_id: activeSession ? activeSession.id : null,
-        rate_per_minute: 3000,
-        note_custom: `Phạt không rút sạc - ${mins} phút`,
-      });
+  // Nút [Rút sạc xe]: Tính phí phạt đỗ xe nếu quá giờ, trừ ví và kết thúc phiên sạc
+  const handleUnplugAndFinalize = async () => {
+    if (isOverstayActive) {
+      const mins = billableMinutes;
+      try {
+        setDemoLoading(true);
+        setDemoError('');
+        setDemoSuccess(null);
 
-      setDemoSuccess({
-        amount: res.data.amount,
-        minutes: mins,
-        note: res.data.note,
-        new_balance: res.data.new_balance,
-      });
+        const res = await api.post('/simulator/overstay-penalty', {
+          minutes: mins,
+          session_id: activeSession ? activeSession.id : null,
+          station_id: selectedStationId ? Number(selectedStationId) : null,
+          rate_per_minute: idleFeeRate,
+          note_custom: `Phạt không rút sạc - ${mins} phút`,
+        });
 
-      setStatusMessage(
-        `Đã trừ phạt ${Math.abs(res.data.amount).toLocaleString('vi-VN')} đ vào ví với nội dung: "${res.data.note}"`
-      );
+        setDemoSuccess({
+          amount: res.data.amount,
+          minutes: mins,
+          note: res.data.note,
+          new_balance: res.data.new_balance,
+        });
 
-      // Nếu đang trong phiên sạc, rút sạc và hoàn tất
-      if (isOverstayActive) {
+        setStatusMessage(
+          `Đã rút sạc xe! Trừ phí phạt đỗ xe ${Math.abs(res.data.amount).toLocaleString('vi-VN')} đ vào ví với nội dung: "${res.data.note}"`
+        );
+      } catch (err) {
+        const msg = err.response?.data?.detail || err.message || 'Lỗi khi áp dụng phạt ví.';
+        setDemoError(msg);
+      } finally {
         setIsOverstayActive(false);
+        setOverstaySeconds(0);
+        setDemoLoading(false);
         if (activeSession) {
           handleStopCharging();
         }
       }
-    } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Lỗi khi áp dụng phạt ví.';
-      setDemoError(msg);
-    } finally {
-      setDemoLoading(false);
+    } else {
+      if (activeSession) {
+        setStatusMessage('Đã rút sạc xe an toàn.');
+        handleStopCharging();
+      }
     }
   };
 
@@ -403,6 +486,8 @@ export default function Simulator() {
                       statusTag = '[Đang có xe sạc]';
                     } else if (isConnUnavailable) {
                       statusTag = '[Không khả dụng]';
+                    } else if (c.status === 'RESERVED') {
+                      statusTag = '[Đang giữ chỗ - Có thể sạc]';
                     } else if (c.status === 'AVAILABLE') {
                       statusTag = '[Sẵn sàng]';
                     }
@@ -549,27 +634,68 @@ export default function Simulator() {
                 </div>
               </div>
 
-              {/* Nút dừng sạc */}
-              <button
-                onClick={handleStopCharging}
-                disabled={loading}
-                className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all shadow-sm"
-              >
-                <Square className="w-4 h-4 fill-current" />
-                <span>Dừng phiên sạc</span>
-              </button>
+              {/* Cảnh báo pin 100% hoặc nút thao tác sạc */}
+              {isOverstayActive ? (
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-rose-500 animate-bounce" />
+                      PIN ĐẦY 100% - CHƯA RÚT SẠC
+                    </span>
+                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200">
+                      ⏱️ {formatTimer(overstaySeconds)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-300">
+                    <span>Phí đỗ quá giờ:</span>
+                    <strong className="text-rose-600 dark:text-rose-400 font-bold">
+                      {livePenaltyAmount.toLocaleString('vi-VN')} ₫ ({billableMinutes} phút)
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleUnplugAndFinalize}
+                    disabled={demoLoading}
+                    className="w-full py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-sm transition-all"
+                  >
+                    <Plug className="w-4 h-4" />
+                    <span>🔌 Rút sạc xe (Chốt phạt đỗ & Trừ ví)</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Nút Demo Pin Đầy 100% */}
+                  <button
+                    type="button"
+                    onClick={handleFastForwardSoc100}
+                    className="w-full flex items-center justify-center space-x-2 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs transition-all shadow-sm shadow-amber-500/20"
+                  >
+                    <Zap className="w-4 h-4 fill-current" />
+                    <span>⚡ Mô phỏng Pin đầy 100%</span>
+                  </button>
 
-              {/* Mô phỏng nhiệt độ cao */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
-                  Thử nghiệm an toàn hệ thống:
-                </span>
+                  {/* Nút Rút sạc xe */}
+                  <button
+                    type="button"
+                    onClick={handleUnplugAndFinalize}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition-all shadow-sm"
+                  >
+                    <Plug className="w-4 h-4" />
+                    <span>🔌 Rút sạc xe</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Thử nghiệm sự cố quá nhiệt */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
+                  type="button"
                   onClick={handleTriggerOverheat}
-                  className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-400 font-medium text-xs transition-all"
+                  className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium text-[11px] transition-all"
                 >
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Mô phỏng nhiệt độ cao (&gt; 75°C)</span>
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Mô phỏng quá nhiệt (&gt; 75°C)</span>
                 </button>
               </div>
 
@@ -832,9 +958,9 @@ export default function Simulator() {
               Demo Bảng Giả Lập: Phạt Không Rút Sạc Khi Pin Đầy 100%
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Khi pin xe điện sạc đầy 100% mà tài xế không rút sạc, hệ thống áp dụng mức phạt{' '}
-              <strong className="text-rose-600 dark:text-rose-400 font-semibold">3.000 VNĐ / phút</strong>.
-              Tiền phạt sẽ tự động trừ vào ví điện tử và hiển thị minh bạch trong sổ cái lịch sử giao dịch.
+              Khi pin xe điện sạc đầy 100% mà tài xế không rút sạc, hệ thống áp dụng mức phạt đỗ xe{' '}
+              <strong className="text-rose-600 dark:text-rose-400 font-semibold font-mono">{idleFeeRate.toLocaleString('vi-VN')} VNĐ / phút</strong>{' '}
+              (cấu hình linh hoạt theo từng trạm tại mục Biểu giá). Đồng hồ đếm giờ tự động chạy và tiền phạt sẽ tự động trừ vào ví điện tử khi tài xế nhấn "Rút sạc xe".
             </p>
           </div>
 
@@ -898,101 +1024,132 @@ export default function Simulator() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Cột 1: Thông số giả lập hiện tại */}
+          {/* Cột 1: Thông số trạm & Biểu phí cấu hình */}
           <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
-            <div className="font-semibold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800">
-              1. Trạng thái giả lập sạc xe
+            <div className="font-semibold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <span>1. Trạng thái phiên sạc & Trụ</span>
+              {activeSession ? (
+                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-full">
+                  Phiên #{activeSession.id}
+                </span>
+              ) : (
+                <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full">
+                  Chưa sạc
+                </span>
+              )}
             </div>
+
             <div className="flex justify-between items-center">
               <span className="text-slate-500 dark:text-slate-400">Mức pin xe:</span>
-              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
+              <span className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                isOverstayActive || (telemetry && telemetry.soc >= 100)
+                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}>
                 <Battery className="w-3.5 h-3.5" />
-                <span>100% (Pin đầy)</span>
+                <span>
+                  {isOverstayActive
+                    ? '100% (Pin đầy)'
+                    : telemetry
+                    ? `${telemetry.soc.toFixed(1)}%`
+                    : activeSession
+                    ? `${activeSession.current_soc}%`
+                    : 'Chờ sạc'}
+                </span>
               </span>
             </div>
+
             <div className="flex justify-between items-center">
               <span className="text-slate-500 dark:text-slate-400">Tình trạng súng sạc:</span>
-              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-700">
-                <Plug className="w-3.5 h-3.5" />
-                <span>Chưa rút sạc</span>
-              </span>
+              {isOverstayActive ? (
+                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-700 animate-pulse">
+                  <Plug className="w-3.5 h-3.5" />
+                  <span>Chưa rút sạc (Quá giờ)</span>
+                </span>
+              ) : activeSession ? (
+                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-400">
+                  <Plug className="w-3.5 h-3.5" />
+                  <span>Đang cắm sạc</span>
+                </span>
+              ) : (
+                <span className="text-slate-500">Đã ngắt kết nối</span>
+              )}
             </div>
+
             <div className="flex justify-between items-center">
-              <span className="text-slate-500 dark:text-slate-400">Đơn giá phạt:</span>
-              <strong className="text-slate-900 dark:text-slate-100">3.000 VNĐ / 1 phút</strong>
+              <span className="text-slate-500 dark:text-slate-400">Biểu phí đỗ xe:</span>
+              <strong className="text-amber-600 dark:text-amber-400 font-bold font-mono">
+                {idleFeeRate.toLocaleString('vi-VN')} VNĐ / phút
+              </strong>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-500 dark:text-slate-400">Chính sách ân hạn:</span>
-              <span className="text-slate-600 dark:text-slate-300">0 phút (Tính phạt tức thì)</span>
+
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Link
+                to={`/tariffs?stationId=${selectedStationId || 1}`}
+                className="text-[11px] text-sky-600 dark:text-sky-400 hover:underline flex items-center space-x-1 font-medium"
+              >
+                <span>⚙️ Thay đổi biểu phí đỗ xe tại mục Biểu giá</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
           </div>
 
-          {/* Cột 2: Chọn thời gian không rút sạc */}
-          <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
-            <div className="font-semibold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800">
-              2. Chọn số thời gian tài xế không rút sạc
-            </div>
+          {/* Cột 2: Thời gian tự động chạy khi pin đầy 100% */}
+          <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="font-semibold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <span>2. Thời gian không rút sạc (Tự động đếm)</span>
+                {isOverstayActive && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                )}
+              </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400">Thời gian chưa rút sạc:</span>
-              <strong className="text-base text-rose-600 font-extrabold">{demoMinutes} phút</strong>
-            </div>
-
-            {/* Các mốc thời gian mẫu */}
-            <div className="grid grid-cols-5 gap-1.5 pt-1">
-              {[1, 2, 3, 5, 10].map((mins) => (
-                <button
-                  key={mins}
-                  type="button"
-                  onClick={() => setDemoMinutes(mins)}
-                  className={`py-1.5 px-1 rounded-xl text-xs font-semibold text-center border transition-all ${
-                    demoMinutes === mins
-                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  {mins} phút
-                </button>
-              ))}
-            </div>
-
-            {/* Slider tùy chỉnh */}
-            <div className="pt-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="range"
-                  min="1"
-                  max="60"
-                  step="1"
-                  value={demoMinutes}
-                  onChange={(e) => setDemoMinutes(Number(e.target.value))}
-                  className="w-full accent-rose-600 cursor-pointer"
-                />
-                <div className="w-16 shrink-0">
-                  <input
-                    type="number"
-                    min="1"
-                    max="120"
-                    value={demoMinutes}
-                    onChange={(e) => setDemoMinutes(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1 px-1.5 text-center text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                  />
+              {/* Đồng hồ đếm thời gian thực */}
+              <div className="text-center py-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold mb-0.5">
+                  Đồng hồ đếm thời gian thực
+                </span>
+                <div className={`text-3xl font-extrabold font-mono tracking-wider tabular-nums ${
+                  isOverstayActive ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-slate-400 dark:text-slate-600'
+                }`}>
+                  {formatTimer(overstaySeconds)}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1">
+                  {isOverstayActive
+                    ? `Đang tự động chạy: Quy đổi ${billableMinutes} phút tính phí`
+                    : 'Chờ pin đạt 100% để kích hoạt đồng hồ'}
                 </div>
               </div>
             </div>
+
+            {/* Nút Demo Pin Đầy 100% */}
+            {!isOverstayActive ? (
+              <button
+                type="button"
+                onClick={handleFastForwardSoc100}
+                className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                <span>⚡ Demo Pin Đầy 100% (Bật tự đếm giờ)</span>
+              </button>
+            ) : (
+              <div className="text-center text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/40 p-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                ✓ Bộ đếm thời gian đang tự động ghi nhận
+              </div>
+            )}
           </div>
 
-          {/* Cột 3: Tính toán & Kích hoạt trừ phạt */}
+          {/* Cột 3: Tính toán tiền phạt & Nút Rút Sạc Xe */}
           <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs flex flex-col justify-between">
             <div className="space-y-2">
               <div className="font-semibold text-slate-700 dark:text-slate-300 pb-2 border-b border-slate-200 dark:border-slate-800">
-                3. Dự kiến tiền phạt & Nội dung ghi ví
+                3. Tiền phạt đỗ xe & Nội dung ghi ví
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-slate-500 dark:text-slate-400">Tiền phạt:</span>
-                <strong className="text-base text-rose-600 font-extrabold">
-                  {(demoMinutes * 3000).toLocaleString('vi-VN')} ₫
+                <span className="text-slate-500 dark:text-slate-400">Tiền phạt đỗ xe:</span>
+                <strong className="text-lg text-rose-600 dark:text-rose-400 font-extrabold font-mono tabular-nums">
+                  {livePenaltyAmount.toLocaleString('vi-VN')} ₫
                 </strong>
               </div>
 
@@ -1000,20 +1157,27 @@ export default function Simulator() {
                 <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block">
                   Nội dung ghi nhận trong lịch sử ví:
                 </span>
-                <div className="text-xs font-bold text-sky-600 dark:text-sky-400">
-                  "Phạt không rút sạc - {demoMinutes} phút"
+                <div className="text-xs font-bold text-sky-600 dark:text-sky-400 font-mono">
+                  "Phạt không rút sạc - {isOverstayActive ? billableMinutes : 1} phút"
                 </div>
               </div>
             </div>
 
+            {/* Nút Rút sạc xe chính */}
             <button
               type="button"
-              onClick={() => handleApplyOverstayPenalty()}
-              disabled={demoLoading}
-              className="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm transition-all shadow-sm shadow-rose-600/20 flex items-center justify-center space-x-2"
+              onClick={handleUnplugAndFinalize}
+              disabled={demoLoading || (!isOverstayActive && !activeSession)}
+              className="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm transition-all shadow-sm shadow-rose-600/20 flex items-center justify-center space-x-2 cursor-pointer"
             >
               <Plug className="w-4 h-4" />
-              <span>{demoLoading ? 'Đang thực hiện trừ tiền...' : '⚡ Rút Sạc & Kích Hoạt Phạt Trừ Ví'}</span>
+              <span>
+                {demoLoading
+                  ? 'Đang quyết toán...'
+                  : isOverstayActive
+                  ? '🔌 Rút Sạc Xe (Chốt Phạt Đỗ & Trừ Ví)'
+                  : '🔌 Rút Sạc Xe'}
+              </span>
             </button>
           </div>
         </div>

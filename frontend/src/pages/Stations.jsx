@@ -812,7 +812,7 @@ export default function Stations() {
       ) : (
         <div className="space-y-6">
           {/* KPI Summary Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Tổng trạm sạc</span>
               <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1 block">

@@ -249,6 +249,19 @@ def handle_start_transaction(
     db.commit()
     db.refresh(new_session)
 
+    # Tự động xác nhận đặt chỗ chuyển sang COMPLETED khi tài xế cắm sạc
+    if id_tag and id_tag.user_id:
+        try:
+            from app.services.reservation_service import confirm_reservation_usage
+            confirm_reservation_usage(
+                db,
+                user_id=id_tag.user_id,
+                connector_id=connector.id,
+                session_id=new_session.id,
+            )
+        except Exception as exc:
+            logger.warning("Lỗi tự động xác nhận đặt chỗ trong handle_start_transaction: %s", exc)
+
     id_tag_info = {"status": "Accepted"}
     if expiry_date:
         id_tag_info["expiryDate"] = expiry_date.isoformat()

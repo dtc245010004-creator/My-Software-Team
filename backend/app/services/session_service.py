@@ -305,8 +305,25 @@ def start_charging_session(
             detail=f"Trạm sạc '{station.name}' hiện đang tạm ngừng hoạt động hoặc bảo trì, không thể bắt đầu phiên sạc.",
         )
 
-    # Chặn nếu cổng sạc không ở trạng thái AVAILABLE
-    if connector.status != "AVAILABLE":
+    # Chặn nếu cổng sạc không ở trạng thái AVAILABLE hoặc RESERVED bởi chính user
+    if connector.status == "RESERVED":
+        now_utc = datetime.now(timezone.utc)
+        from app.models.reservation import Reservation, ReservationStatus
+        active_res = (
+            db.query(Reservation)
+            .filter(
+                Reservation.connector_id == connector.id,
+                Reservation.status == ReservationStatus.ACTIVE.value,
+                Reservation.expiry_date > now_utc,
+            )
+            .first()
+        )
+        if active_res and active_res.user_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cổng sạc này đang được giữ chỗ bởi tài xế khác.",
+            )
+    elif connector.status != "AVAILABLE":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cổng sạc hiện không khả dụng, đang được sử dụng hoặc đang bảo trì (Trạng thái: {connector.status}).",
@@ -314,8 +331,8 @@ def start_charging_session(
 
     # 3. Khóa cổng sạc độc quyền bằng Atomic Conditional Update
     stmt = text(
-        "UPDATE connectors SET status = 'CHARGING' "
-        "WHERE id = :cid AND status = 'AVAILABLE' AND is_active = 1;"
+        "UPDATE connectors SET status = 'CHARGING', ocpp_status = 'Charging' "
+        "WHERE id = :cid AND status IN ('AVAILABLE', 'RESERVED') AND is_active = 1;"
     )
     result = db.execute(stmt, {"cid": connector_id})
     if result.rowcount == 0:
@@ -357,6 +374,13 @@ def start_charging_session(
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
+
+    # Tự động xác nhận đặt chỗ chuyển sang COMPLETED khi tài xế cắm sạc
+    try:
+        from app.services.reservation_service import confirm_reservation_usage
+        confirm_reservation_usage(db, user_id=user.id, connector_id=connector_id, session_id=new_session.id)
+    except Exception as exc:
+        logger.warning("Không thể tự động cập nhật trạng thái đặt chỗ khi bắt đầu phiên: %s", exc)
 
     # 7. Khởi động bộ giả lập phần cứng (Charging Simulator) trong RAM
     try:
@@ -500,6 +524,18 @@ def stop_charging_session(
                     ),
                     {"cpid": charger.id},
                 )
+
+        # Tự động đảm bảo lượt đặt chỗ chuyển sang COMPLETED
+        try:
+            from app.services.reservation_service import confirm_reservation_usage
+            confirm_reservation_usage(
+                db,
+                user_id=session.user_id or user.id,
+                connector_id=session.connector_id,
+                session_id=session.id,
+            )
+        except Exception as exc:
+            logger.warning("Lỗi tự động xác nhận đặt chỗ khi stop_session: %s", exc)
 
         # S-27/T-57: audit nằm cùng transaction với việc đóng phiên.
         ghi_nhat_ky(
@@ -961,7 +997,24 @@ async def remote_start_charging_session(
         raise HTTPException(status_code=409, detail="Trạm sạc hiện không hoạt động.")
 
     # Ca 3 của S-24: Đầu nối bận
-    if condition == "BUSY" or connector.status != "AVAILABLE":
+    if condition == "BUSY":
+        raise HTTPException(status_code=409, detail="Đầu nối đang bận hoặc không khả dụng.")
+
+    if connector.status == "RESERVED":
+        now_utc = datetime.now(timezone.utc)
+        from app.models.reservation import Reservation, ReservationStatus
+        active_res = (
+            db.query(Reservation)
+            .filter(
+                Reservation.connector_id == connector.id,
+                Reservation.status == ReservationStatus.ACTIVE.value,
+                Reservation.expiry_date > now_utc,
+            )
+            .first()
+        )
+        if active_res and active_res.user_id != user.id:
+            raise HTTPException(status_code=409, detail="Cổng sạc này đang được giữ chỗ bởi tài xế khác.")
+    elif connector.status != "AVAILABLE":
         raise HTTPException(status_code=409, detail="Đầu nối đang bận hoặc không khả dụng.")
 
     # S-38 / SCRUM-265: Thẩm định số dư ví theo quy tắc dùng chung

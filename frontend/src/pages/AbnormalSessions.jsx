@@ -323,7 +323,7 @@ export default function AbnormalSessions() {
       </div>
 
       {/* KPI Cards Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-panel border border-hairline p-4 rounded-xl flex items-center space-x-3.5 shadow-sm">
           <div className="w-10 h-10 rounded-xl bg-critical-red/10 border border-critical-red/30 text-critical-red flex items-center justify-center shrink-0">
             <AlertTriangle className="w-5 h-5" />

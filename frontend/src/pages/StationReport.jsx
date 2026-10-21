@@ -464,7 +464,7 @@ export default function StationReport() {
           </div>
 
           {/* 3. Thẻ thống kê 5 chỉ số KPI tổng quan của toàn trạm */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {/* Tổng số phiên */}
             <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-4 rounded-2xl shadow-sm flex items-center justify-between">
               <div>
