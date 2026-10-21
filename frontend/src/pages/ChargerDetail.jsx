@@ -566,12 +566,14 @@ export default function ChargerDetail() {
                     className={`inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
                       conn.status === 'AVAILABLE'
                         ? 'bg-grid-green/20 text-grid-green border border-grid-green/40'
+                        : conn.status === 'RESERVED'
+                        ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40'
                         : conn.status === 'CHARGING'
                         ? 'bg-electric-cyan/20 text-electric-cyan border border-electric-cyan/40'
                         : 'bg-critical-red/20 text-critical-red border border-critical-red/40'
                     }`}
                   >
-                    {conn.status}
+                    {conn.status === 'RESERVED' ? 'GIỮ CHỖ (RESERVED)' : conn.status}
                   </span>
                   {isSelected && (
                     <div className="text-[10px] text-electric-cyan font-mono mt-1 font-bold">
@@ -651,7 +653,7 @@ export default function ChargerDetail() {
           className={`w-full py-4 rounded font-mono font-bold text-sm uppercase tracking-wider flex items-center justify-center space-x-2 shadow-lg transition-all ${
             isStarting
               ? 'bg-hairline text-steel-gray cursor-not-allowed opacity-60'
-              : selectedConnector?.status === 'AVAILABLE' || simulateCondition !== 'AUTO'
+              : selectedConnector?.status === 'AVAILABLE' || selectedConnector?.status === 'RESERVED' || simulateCondition !== 'AUTO'
               ? 'bg-gradient-to-r from-electric-cyan to-blue-600 hover:from-electric-cyan-hover hover:to-blue-700 text-tech-white active:scale-[0.99] shadow-electric-cyan/20'
               : 'bg-obsidian border border-hairline text-steel-gray hover:text-tech-white'
           }`}

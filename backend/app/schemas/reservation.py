@@ -64,14 +64,19 @@ class ReservationResponse(BaseModel):
     station_id: Optional[int] = None
     station_name: Optional[str] = None
     station_address: Optional[str] = None
+    station_latitude: Optional[float] = None
+    station_longitude: Optional[float] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     charger_id: Optional[int] = None
     charger_code: Optional[str] = None
     connector_type: Optional[str] = None
     max_power_kw: Optional[float] = None
     valid_until: Optional[datetime] = None
-    no_show_fee: Optional[float] = 20000.0
+    no_show_fee: Optional[float] = 0.0
     wallet_transaction_id: Optional[str] = None
     reason: Optional[str] = None
+    session_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -81,4 +86,3 @@ class ReservationConflictResponse(BaseModel):
 
     detail: str
     suggested_connectors: list[SuggestedConnectorResponse] = []
-

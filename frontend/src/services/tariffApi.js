@@ -6,6 +6,8 @@ import api from './api';
  * GET /api/v1/tariffs/live-config?station_id={stationId}
  * Response 200 OK: {
  *   station_id: 1,
+ *   idle_fee_per_minute: 3000,
+ *   idle_grace_minutes: 0,
  *   periods: [
  *     { start: "00:00", end: "06:00", price: 2000 },
  *     ...
@@ -13,7 +15,7 @@ import api from './api';
  * }
  * 
  * PUT /api/v1/tariffs/live-config
- * Body: { station_id: 1, periods: [...] }
+ * Body: { station_id: 1, idle_fee_per_minute: 3000, idle_grace_minutes: 0, periods: [...] }
  * Response 200 OK
  */
 
@@ -63,6 +65,8 @@ function loadStoredTariffs() {
     return {
         '1': {
             station_id: 1,
+            idle_fee_per_minute: 3000,
+            idle_grace_minutes: 0,
             periods: [
                 { start: '00:00', end: '06:00', price: 2000 },
                 { start: '06:00', end: '18:00', price: 3000 },
@@ -71,6 +75,8 @@ function loadStoredTariffs() {
         },
         '2': {
             station_id: 2,
+            idle_fee_per_minute: 3000,
+            idle_grace_minutes: 0,
             periods: [
                 { start: '00:00', end: '06:00', price: 2500 },
                 { start: '06:00', end: '17:00', price: 3500 },
@@ -79,6 +85,8 @@ function loadStoredTariffs() {
         },
         '3': {
             station_id: 3,
+            idle_fee_per_minute: 3000,
+            idle_grace_minutes: 0,
             periods: [
                 { start: '00:00', end: '07:00', price: 2200 },
                 { start: '07:00', end: '18:00', price: 3200 },
@@ -113,6 +121,8 @@ export const getTariff = async (stationId) => {
         }
         return mockTariffs[sId] || {
             station_id: Number(stationId) || 1,
+            idle_fee_per_minute: 3000,
+            idle_grace_minutes: 0,
             periods: [
                 { start: '00:00', end: '06:00', price: 2200 },
                 { start: '06:00', end: '18:00', price: 3300 },
@@ -122,6 +132,8 @@ export const getTariff = async (stationId) => {
     } catch {
         return mockTariffs[sId] || {
             station_id: Number(stationId) || 1,
+            idle_fee_per_minute: 3000,
+            idle_grace_minutes: 0,
             periods: [
                 { start: '00:00', end: '06:00', price: 2200 },
                 { start: '06:00', end: '18:00', price: 3300 },
@@ -139,7 +151,9 @@ export const saveTariff = async (stationId, payload) => {
     try {
         const response = await api.put('/tariffs/live-config', {
             station_id: Number(stationId) || 1,
-            periods: payload.periods
+            periods: payload.periods,
+            idle_fee_per_minute: payload.idle_fee_per_minute !== undefined ? Number(payload.idle_fee_per_minute) : undefined,
+            idle_grace_minutes: payload.idle_grace_minutes !== undefined ? Number(payload.idle_grace_minutes) : undefined,
         });
         mockTariffs[sId] = response.data;
         saveStoredTariffs(mockTariffs);
@@ -148,7 +162,9 @@ export const saveTariff = async (stationId, payload) => {
         // Fallback offline / demo
         const fallbackData = {
             station_id: Number(stationId) || 1,
-            periods: payload.periods
+            periods: payload.periods,
+            idle_fee_per_minute: payload.idle_fee_per_minute !== undefined ? Number(payload.idle_fee_per_minute) : 3000,
+            idle_grace_minutes: payload.idle_grace_minutes !== undefined ? Number(payload.idle_grace_minutes) : 0,
         };
         mockTariffs[sId] = fallbackData;
         saveStoredTariffs(mockTariffs);

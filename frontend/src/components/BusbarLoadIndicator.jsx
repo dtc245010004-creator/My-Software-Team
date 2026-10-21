@@ -42,11 +42,11 @@ export default function BusbarLoadIndicator({
     <Card padding="p-5" className="shadow-sm hover:shadow-md transition-shadow duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
         <div>
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold tracking-wider text-slate-700 dark:text-slate-300 uppercase">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold tracking-wider text-slate-700 dark:text-slate-300 uppercase break-words">
               {label}
             </span>
-            <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badgeColor}`}>
+            <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border shrink-0 ${badgeColor}`}>
               <StatusIcon className="w-3 h-3" />
               <span>{percentage >= 95 ? 'Nguy cơ quá tải' : percentage >= 80 ? 'Tải cao' : 'An toàn'}</span>
             </span>

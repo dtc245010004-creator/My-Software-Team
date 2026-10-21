@@ -258,11 +258,11 @@ export default function Dashboard() {
          ========================================================================= */}
       <div className="sticky top-0 z-20 backdrop-blur-md bg-slate-50/85 dark:bg-[#0B0F17]/85 py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 border-b border-slate-200/80 dark:border-slate-800/80 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2.5">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-base sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white break-words">
               Tổng Quan Vận Hành Mạng Lưới Trạm Sạc
             </h1>
-            <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60">
+            <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shrink-0">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -277,9 +277,9 @@ export default function Dashboard() {
         </div>
 
         {/* Scope Selector & Quick Actions */}
-        <div className="flex items-center flex-wrap gap-2.5">
+        <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
           {/* Station Scope Selector */}
-          <div className="flex items-center space-x-2 bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 shadow-sm text-xs">
+          <div className="flex-1 sm:flex-initial flex items-center space-x-2 bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 shadow-sm text-xs min-w-0">
             <Filter className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
             <span className="text-slate-600 dark:text-slate-400 font-medium">Phạm vi:</span>
             <select
@@ -443,7 +443,7 @@ export default function Dashboard() {
       {/* =========================================================================
           4 KEY METRIC CARDS (SUBTLE 3D ELEVATION & WCAG AAA CONTRAST)
          ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         <MetricBox
           label="Tổng Hạ Tầng Trạm Sạc"
           value={totalStations}
@@ -479,9 +479,10 @@ export default function Dashboard() {
           value={faultedCount}
           unit="Cảnh báo"
           icon={AlertTriangle}
-          color={faultedCount > 0 ? 'critical-red' : 'grid-green'}
-          subtext={faultedCount > 0 ? 'Cần kỹ thuật viên kiểm tra' : 'Hệ thống vận hành an toàn'}
+          color="critical-red"
+          subtext={faultedCount > 0 ? '⚠️ Cần kỹ thuật viên kiểm tra ngay' : 'Hệ thống vận hành an toàn'}
           trend={faultedCount > 0 ? 'Cảnh báo' : 'Ổn định'}
+          onClick={() => navigate('/abnormal-sessions')}
         />
       </div>
 

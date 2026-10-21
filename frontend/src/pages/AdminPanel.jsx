@@ -678,38 +678,6 @@ export default function AdminPanel() {
                                     Khóa
                                   </button>
                                 )}
-
-                                {user.is_active ? (
-                                  <button
-                                    className="table-action disable"
-                                    disabled={busy || user.username === rawUser?.username || user.username === 'admin'}
-                                    title="Vô hiệu hóa tài khoản"
-                                    onClick={() =>
-                                      doUserAction(
-                                        user.id,
-                                        'disable',
-                                        `Đã vô hiệu hóa tài khoản ${user.username}.`
-                                      )
-                                    }
-                                  >
-                                    Tắt
-                                  </button>
-                                ) : (
-                                  <button
-                                    className="table-action enable"
-                                    disabled={busy}
-                                    title="Kích hoạt lại tài khoản"
-                                    onClick={() =>
-                                      doUserAction(
-                                        user.id,
-                                        'enable',
-                                        `Đã kích hoạt tài khoản ${user.username}.`
-                                      )
-                                    }
-                                  >
-                                    Bật
-                                  </button>
-                                )}
                               </div>
                             </td>
                           </tr>

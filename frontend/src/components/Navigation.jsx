@@ -36,7 +36,7 @@ export default function Navigation() {
     { to: '/settlement', label: 'Kỳ Đối Soát', icon: CalendarCheck, roles: ['ADMIN', 'ACCOUNTANT'] },
     { to: '/tariffs', label: 'Biểu Giá', icon: Clock, roles: ['ADMIN', 'OPERATOR', 'CPO'] },
     { to: '/abnormal-sessions', label: 'Phiên Bất Thường', icon: AlertOctagon, roles: ['ADMIN', 'OPERATOR', 'ACCOUNTANT'] },
-    { to: '/simulator', label: 'Bảng Giả Lập Sạc', icon: Gauge, roles: ['CUSTOMER'] },
+    { to: '/simulator', label: 'Bảng Giả Lập Sạc', icon: Gauge, roles: ['CUSTOMER', 'ADMIN', 'OPERATOR'] },
     { to: '/reservations', label: 'Đặt Chỗ', icon: Clock, roles: ['CUSTOMER', 'ADMIN', 'OPERATOR'] },
     { to: '/wallet', label: 'Ví & Nạp Tiền', icon: Wallet, roles: ['CUSTOMER', 'ADMIN', 'OPERATOR', 'ACCOUNTANT', 'CPO'] },
     { to: '/data-erasure', label: 'Xóa Dữ Liệu', icon: UserX, roles: ['CUSTOMER'] },

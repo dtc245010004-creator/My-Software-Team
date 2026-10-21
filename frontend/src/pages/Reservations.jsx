@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  Navigation as NavigationIcon,
   Clock,
   AlertTriangle,
   CheckCircle2,
@@ -25,6 +26,7 @@ import {
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatVNDateTime } from '../utils/formatTime';
+import ReservationRouteMap from '../components/reservation/ReservationRouteMap';
 import {
   RESERVATION_STATUS,
   DEFAULT_NO_SHOW_FEE,
@@ -144,6 +146,23 @@ export default function Reservations() {
   const [bookingSuccess, setBookingSuccess] = useState(null);
   const [suggestedConnectors, setSuggestedConnectors] = useState([]);
   const [cancellingId, setCancellingId] = useState(null);
+  const [selectedMapReservationId, setSelectedMapReservationId] = useState(null);
+
+  const activeReservation = useMemo(() => {
+    return reservations.find((r) => r.status === 'ACTIVE') || null;
+  }, [reservations]);
+
+  const mapReservation = useMemo(() => {
+    if (selectedMapReservationId) {
+      return (
+        reservations.find((r) => r.id === selectedMapReservationId) ||
+        activeReservation ||
+        reservations[0] ||
+        null
+      );
+    }
+    return activeReservation || reservations[0] || null;
+  }, [reservations, selectedMapReservationId, activeReservation]);
 
   // Cập nhật đồng hồ mỗi giây để hiển thị đếm ngược chính xác
   useEffect(() => {
@@ -516,6 +535,14 @@ export default function Reservations() {
         </div>
       </div>
 
+      {/* Bản đồ dẫn đường trực tiếp từ vị trí tài xế tới trạm sạc đang đặt chỗ */}
+      {mapReservation && (
+        <ReservationRouteMap
+          reservation={mapReservation}
+          now={now}
+        />
+      )}
+
       {/* Thanh công cụ tìm kiếm và lọc theo Tab trạng thái */}
       <div className="bg-white dark:bg-[#151D2A] border border-slate-200 dark:border-slate-800/60 p-3.5 rounded-2xl shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -732,26 +759,55 @@ export default function Reservations() {
                             <span>{cancellingId === res.id ? 'Đang hủy...' : 'Hủy giữ chỗ'}</span>
                           </button>
 
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedMapReservationId(res.id);
+                              const mapEl = document.getElementById('reservation-route-map-panel');
+                              if (mapEl) {
+                                mapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:hover:bg-sky-900/50 dark:text-sky-300 border border-sky-300 dark:border-sky-800/60 text-xs font-semibold transition-all shadow-sm inline-flex items-center space-x-1"
+                            title="Xem vị trí và đường đi trực tiếp trên bản đồ"
+                          >
+                            <NavigationIcon className="w-3 h-3 text-sky-600 dark:text-sky-400" />
+                            <span>Chỉ đường</span>
+                          </button>
+
                           <Link
-                            to={`/chargers/${res.charge_point_id || res.charger_id}`}
+                            to={`/chargers/${res.charge_point_id || res.charger_id}?connector_id=${res.connector_id || ''}`}
                             className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-all shadow-sm inline-flex items-center space-x-1"
+                            title="Đến màn hình sạc của trụ này"
                           >
                             <Zap className="w-3 h-3" />
                             <span>Đến trụ sạc</span>
                             <ChevronRight className="w-3 h-3" />
                           </Link>
+
+                          <Link
+                            to={`/simulator?station_id=${res.station_id || ''}&connector_id=${res.connector_id || ''}`}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-all shadow-sm inline-flex items-center space-x-1"
+                            title="Mô phỏng sạc trực tiếp trên cổng đã đặt"
+                          >
+                            <span>Bảng giả lập</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </Link>
                         </div>
                       )}
 
-                      {meta.key === 'COMPLETED' && res.session_id && (
+                      {meta.key === 'COMPLETED' && (
                         <Link
-                          to={`/session/${res.session_id}`}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700/60 text-xs font-medium transition-all shadow-sm inline-flex items-center space-x-1"
+                          to={res.session_id ? `/session/${res.session_id}` : '/sessions'}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60 text-xs font-semibold transition-all shadow-sm inline-flex items-center space-x-1"
+                          title="Xem chi tiết phiên sạc tương ứng với lượt đặt chỗ"
                         >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                           <span>Xem phiên sạc</span>
-                          <ChevronRight className="w-3 h-3" />
+                          <ChevronRight className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                         </Link>
                       )}
+
                     </div>
                   </div>
                 </div>

@@ -93,7 +93,7 @@ def get_suggested_connectors(
     return suggested
 
 
-def _enrich_reservation(res: Reservation) -> Reservation:
+def _enrich_reservation(res: Reservation, db: Session | None = None) -> Reservation:
     """Bổ sung các trường thông tin trạm, trụ, đầu sạc phục vụ hiển thị toàn diện hệ thống (S-50)."""
     cp = res.charging_point
     conn = res.connector
@@ -105,6 +105,10 @@ def _enrich_reservation(res: Reservation) -> Reservation:
             res.station_id = cp.station.id
             res.station_name = cp.station.name
             res.station_address = cp.station.address
+            res.station_latitude = float(cp.station.latitude) if cp.station.latitude is not None else None
+            res.station_longitude = float(cp.station.longitude) if cp.station.longitude is not None else None
+            res.latitude = res.station_latitude
+            res.longitude = res.station_longitude
     if conn:
         res.connector_number = conn.connector_number or conn.connector_id
         res.connector_type = conn.connector_type or conn.type or "Type 2"
@@ -114,18 +118,48 @@ def _enrich_reservation(res: Reservation) -> Reservation:
         f"RES-{res.created_at.strftime('%Y%m%d') if res.created_at else '2026'}-{res.id:04d}"
     )
     res.valid_until = res.expiry_date
-    res.no_show_fee = 20000.0
 
     st_upper = (res.status or "").upper()
     if st_upper == "ACTIVE":
         res.reason = "Đang trong thời gian giữ chỗ an toàn. Vui lòng đến cắm súng trước hạn."
+        res.no_show_fee = 0.0
     elif st_upper == "EXPIRED":
         res.reason = "Quá giờ giữ chỗ không tới nhận trụ. Đã tự động mở lại trụ và trừ phí không đến."
         res.wallet_transaction_id = f"TX-LEDGER-{res.id + 800}"
+        res.no_show_fee = 20000.0
     elif st_upper == "CANCELLED":
         res.reason = "Tài xế đã chủ động hủy giữ chỗ trước hạn. Không tính phí."
+        res.no_show_fee = 0.0
     elif st_upper == "COMPLETED":
-        res.reason = "Tài xế đã đến cắm súng đúng giờ và bắt đầu phiên sạc."
+        res.reason = "Tài xế đã đến cắm súng đúng giờ và bắt đầu phiên sạc. Miễn phí giữ chỗ."
+        res.no_show_fee = 0.0
+    else:
+        res.no_show_fee = 0.0
+
+    if not hasattr(res, "session_id"):
+        res.session_id = None
+
+    if st_upper == "COMPLETED" and db is not None and res.session_id is None:
+        try:
+            from app.models.session import ChargingSession
+            sess = (
+                db.query(ChargingSession)
+                .filter(
+                    (ChargingSession.user_id == res.user_id) | (ChargingSession.driver_id == res.user_id),
+                )
+            )
+            if res.connector_id and res.charge_point_id:
+                sess = sess.filter(
+                    (ChargingSession.connector_id == res.connector_id)
+                    | (ChargingSession.connector.has(charge_point_id=res.charge_point_id))
+                )
+            elif res.connector_id:
+                sess = sess.filter(ChargingSession.connector_id == res.connector_id)
+            matching = sess.order_by(ChargingSession.id.desc()).first()
+            if matching:
+                res.session_id = matching.id
+        except Exception:
+            pass
 
     return res
 
@@ -486,24 +520,188 @@ async def cancel_reservation(
     return reservation
 
 
-def get_my_reservations(
+
+
+def confirm_reservation_usage(
     db: Session,
-    user: User,
-) -> list[Reservation]:
-    """Lấy danh sách các lượt đặt chỗ của tài xế hiện tại, tự động cập nhật trạng thái hết hạn."""
+    user_id: int,
+    connector_id: int,
+    session_id: int | None = None,
+) -> Reservation | None:
+    """Tự động xác nhận lượt đặt chỗ thành COMPLETED khi tài xế tới cắm súng / bắt đầu sạc (S-50 / SCRUM-378).
+
+    1. Tìm đặt chỗ ACTIVE hoặc PENDING của user:
+       - Ưu tiên 1: Đặt chỗ chính xác trên connector_id này.
+       - Ưu tiên 2: Đặt chỗ trên cùng trụ sạc (charge_point_id).
+       - Ưu tiên 3: Đặt chỗ trên cùng trạm sạc (station_id).
+    2. Nếu không tìm thấy ACTIVE/PENDING, kiểm tra đặt chỗ gần nhất (trong vòng 24 giờ) tại trụ/trạm đó.
+    3. Cập nhật reservation.status = 'COMPLETED', cập nhật updated_at.
+    4. Nếu user sạc trên cổng khác cổng đã giữ chỗ ban đầu, giải phóng cổng cũ về AVAILABLE.
+    """
     now = datetime.now(timezone.utc)
-    reservations = (
+
+    conn = db.query(Connector).filter(Connector.id == connector_id).first()
+    cp_id = conn.charge_point_id if conn else None
+    station_id = conn.charging_point.station_id if (conn and conn.charging_point) else None
+
+    # Ưu tiên 1: Cùng connector_id và status ACTIVE/PENDING
+    res = (
         db.query(Reservation)
-        .filter(Reservation.user_id == user.id)
+        .filter(
+            Reservation.user_id == user_id,
+            Reservation.connector_id == connector_id,
+            Reservation.status.in_([ReservationStatus.ACTIVE.value, "PENDING"]),
+        )
         .order_by(Reservation.created_at.desc())
-        .all()
+        .first()
     )
 
+    # Ưu tiên 2: Cùng charge_point_id
+    if not res and cp_id:
+        res = (
+            db.query(Reservation)
+            .filter(
+                Reservation.user_id == user_id,
+                Reservation.charge_point_id == cp_id,
+                Reservation.status.in_([ReservationStatus.ACTIVE.value, "PENDING"]),
+            )
+            .order_by(Reservation.created_at.desc())
+            .first()
+        )
+
+    # Ưu tiên 3: Cùng station_id
+    if not res and station_id:
+        res = (
+            db.query(Reservation)
+            .join(ChargingPoint, Reservation.charge_point_id == ChargingPoint.id)
+            .filter(
+                Reservation.user_id == user_id,
+                ChargingPoint.station_id == station_id,
+                Reservation.status.in_([ReservationStatus.ACTIVE.value, "PENDING"]),
+            )
+            .order_by(Reservation.created_at.desc())
+            .first()
+        )
+
+    # Fallback: Đặt chỗ gần đây nhất (trong vòng 24 giờ) tại trụ/trạm này
+    if not res:
+        window_start = now - timedelta(hours=24)
+        query = (
+            db.query(Reservation)
+            .filter(
+                Reservation.user_id == user_id,
+                Reservation.created_at >= window_start,
+                Reservation.status.in_([
+                    ReservationStatus.ACTIVE.value,
+                    ReservationStatus.EXPIRED.value,
+                    ReservationStatus.CANCELLED.value,
+                ]),
+            )
+        )
+        if cp_id:
+            query = query.filter(
+                (Reservation.connector_id == connector_id) | (Reservation.charge_point_id == cp_id)
+            )
+        else:
+            query = query.filter(Reservation.connector_id == connector_id)
+
+        candidate = query.order_by(Reservation.created_at.desc()).first()
+        if candidate:
+            exp = candidate.expiry_date
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            start_t = candidate.start_time or candidate.created_at
+            if start_t.tzinfo is None:
+                start_t = start_t.replace(tzinfo=timezone.utc)
+            if (start_t - timedelta(seconds=15)) <= now <= (exp + timedelta(hours=2)):
+                res = candidate
+
+    if not res:
+        return None
+
+    res.status = ReservationStatus.COMPLETED.value
+    res.updated_at = now
+    if session_id:
+        res.session_id = session_id
+
+    # Nếu reservation được tạo cho connector khác cổng đang cắm, giải phóng cổng cũ
+    if res.connector_id != connector_id and res.connector:
+        if res.connector.status == "RESERVED":
+            res.connector.status = "AVAILABLE"
+            res.connector.ocpp_status = "Available"
+
+    db.commit()
+    logger.info(
+        "Tự động xác nhận đặt chỗ #%s thành COMPLETED cho user #%s khi bắt đầu sạc tại connector #%s (session=%s)",
+        res.id,
+        user_id,
+        connector_id,
+        session_id,
+    )
+    return res
+
+
+def auto_heal_reservations(db: Session, reservations: list[Reservation]) -> bool:
+    """Tự động đối soát và khôi phục (Self-healing) các lượt đặt chỗ:
+
+    1. Nếu có ChargingSession khớp thời gian & vị trí đặt chỗ: Tự động chuyển thành COMPLETED.
+    2. Nếu không có phiên sạc và quá hạn: Chuyển thành EXPIRED và mở lại cổng sạc.
+    """
+    from app.models.session import ChargingSession
+    now = datetime.now(timezone.utc)
     needs_commit = False
+
     for res in reservations:
         exp = res.expiry_date
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
+        start_t = res.start_time or res.created_at
+        if start_t.tzinfo is None:
+            start_t = start_t.replace(tzinfo=timezone.utc)
+
+        # 1. Kiểm tra xem tài xế đã sạc xe thực tế chưa
+        if res.status != ReservationStatus.COMPLETED.value:
+            # Chỉ khớp với phiên sạc bắt đầu SAU KHI tạo lượt đặt chỗ (dung sai tối đa 15 giây)
+            # Tuyệt đối không lấy phiên sạc cũ trong quá khứ để tránh tự động hoàn thành khi chưa đến trụ!
+            window_min = start_t - timedelta(seconds=5)
+            window_max = exp + timedelta(minutes=15)
+
+            s_query = (
+                db.query(ChargingSession)
+                .filter(
+                    (ChargingSession.user_id == res.user_id) | (ChargingSession.driver_id == res.user_id),
+                    ChargingSession.start_time.isnot(None),
+                    ChargingSession.start_time >= window_min,
+                    ChargingSession.start_time <= window_max,
+                )
+                .filter(
+                    (ChargingSession.end_time.is_(None)) | (ChargingSession.end_time > start_t)
+                )
+            )
+            if res.connector_id and res.charge_point_id:
+                s_query = s_query.filter(
+                    (ChargingSession.connector_id == res.connector_id)
+                    | (ChargingSession.connector.has(charge_point_id=res.charge_point_id))
+                )
+            elif res.connector_id:
+                s_query = s_query.filter(ChargingSession.connector_id == res.connector_id)
+
+            matching_session = (
+                s_query.order_by(ChargingSession.id.desc())
+                .first()
+            )
+
+            if matching_session:
+                res.status = ReservationStatus.COMPLETED.value
+                res.updated_at = matching_session.start_time or now
+                res.session_id = matching_session.id
+                needs_commit = True
+                if res.connector and res.connector.status.upper() == "RESERVED":
+                    res.connector.status = "AVAILABLE"
+                    res.connector.ocpp_status = "Available"
+                continue
+
+        # 2. Nếu không có phiên sạc và đã quá hạn
         if res.status == ReservationStatus.ACTIVE.value and exp < now:
             res.status = ReservationStatus.EXPIRED.value
             res.updated_at = now
@@ -515,8 +713,25 @@ def get_my_reservations(
     if needs_commit:
         db.commit()
 
+    return needs_commit
+
+
+def get_my_reservations(
+    db: Session,
+    user: User,
+) -> list[Reservation]:
+    """Lấy danh sách các lượt đặt chỗ của tài xế hiện tại, tự động đối soát và cập nhật trạng thái."""
+    reservations = (
+        db.query(Reservation)
+        .filter(Reservation.user_id == user.id)
+        .order_by(Reservation.created_at.desc())
+        .all()
+    )
+
+    auto_heal_reservations(db, reservations)
+
     for res in reservations:
-        _enrich_reservation(res)
+        _enrich_reservation(res, db)
 
     return reservations
 
@@ -526,7 +741,6 @@ def get_all_reservations(
     user: User,
 ) -> list[Reservation]:
     """Lấy danh sách tất cả các lượt đặt chỗ theo phân quyền người dùng."""
-    now = datetime.now(timezone.utc)
     query = db.query(Reservation).order_by(Reservation.created_at.desc())
 
     if user.role == "ADMIN":
@@ -544,24 +758,10 @@ def get_all_reservations(
 
     reservations = query.all()
 
-    needs_commit = False
-    for res in reservations:
-        exp = res.expiry_date
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        if res.status == ReservationStatus.ACTIVE.value and exp < now:
-            res.status = ReservationStatus.EXPIRED.value
-            res.updated_at = now
-            needs_commit = True
-            if res.connector and res.connector.status.upper() == "RESERVED":
-                res.connector.status = "AVAILABLE"
-                res.connector.ocpp_status = "Available"
-
-    if needs_commit:
-        db.commit()
+    auto_heal_reservations(db, reservations)
 
     for res in reservations:
-        _enrich_reservation(res)
+        _enrich_reservation(res, db)
 
     return reservations
 
@@ -595,18 +795,6 @@ def get_reservation_by_id(
             detail="Bạn không có quyền xem thông tin đặt chỗ này.",
         )
 
-    now = datetime.now(timezone.utc)
-    exp = reservation.expiry_date
-    if exp.tzinfo is None:
-        exp = exp.replace(tzinfo=timezone.utc)
-    if reservation.status == ReservationStatus.ACTIVE.value and exp < now:
-        reservation.status = ReservationStatus.EXPIRED.value
-        reservation.updated_at = now
-        if reservation.connector and reservation.connector.status.upper() == "RESERVED":
-            reservation.connector.status = "AVAILABLE"
-            reservation.connector.ocpp_status = "Available"
-        db.commit()
-        db.refresh(reservation)
-
-    _enrich_reservation(reservation)
+    auto_heal_reservations(db, [reservation])
+    _enrich_reservation(reservation, db)
     return reservation
