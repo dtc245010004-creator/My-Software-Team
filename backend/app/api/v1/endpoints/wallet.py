@@ -178,7 +178,9 @@ def get_driver_wallet_history(
             created_at=tx.created_at,
             note=tx.note,
             reference_type=tx.reference_type,
-            reference_id=tx.receipt_code if tx.reference_type == "MANUAL_TOPUP" else tx.reference_id,
+            reference_id=tx.receipt_code
+            if tx.reference_type == "MANUAL_TOPUP"
+            else tx.reference_id,
         )
         for tx in records
     ]
@@ -242,6 +244,7 @@ def get_my_wallet_transactions(
 )
 def topup_my_wallet(
     topup_in: TopupRequest,
+    request: Request,
     current_user: User = Depends(get_current_user_or_driver_guest),
     db: Session = Depends(get_db),
 ):
@@ -263,11 +266,17 @@ def topup_my_wallet(
         or f"Nạp tiền ví chuyển khoản QR ({current_user.full_name or 'Tài xế'})"
     )
 
+    client_ip = request.client.host if request.client else None
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
     wallet = topup_wallet(
         db=db,
         user_id=current_user.id,
         amount=topup_in.amount,
         note=note_text,
+        client_ip=client_ip,
     )
     return wallet
 
@@ -385,7 +394,6 @@ def cancel_my_topup_request(
     return order
 
 
-
 @router.post(
     "/admin/{wallet_id}/reconciliation/unlock",
     response_model=WalletResponse,
@@ -393,15 +401,22 @@ def cancel_my_topup_request(
 )
 def unlock_wallet_reconciliation_lock(
     wallet_id: int,
-    request: WalletReconciliationUnlockRequest,
+    payload: WalletReconciliationUnlockRequest,
+    http_request: Request,
     current_user: User = Depends(require_roles(["ADMIN"])),
     db: Session = Depends(get_db),
 ):
+    client_ip = http_request.client.host if http_request.client else None
+    forwarded = http_request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
     return unlock_wallet_reconciliation(
         db,
         wallet_id,
         admin_user_id=current_user.id,
-        reason=request.reason,
+        reason=payload.reason,
+        client_ip=client_ip,
     )
 
 
@@ -596,9 +611,7 @@ def get_revenue_summary_for_admin(
         accessible_ids = get_accessible_station_ids(current_user, db)
         if accessible_ids:
             st_records = (
-                db.query(Station.name)
-                .filter(Station.id.in_(accessible_ids))
-                .all()
+                db.query(Station.name).filter(Station.id.in_(accessible_ids)).all()
             )
             managed_stations = [s[0] for s in st_records]
 
@@ -628,13 +641,11 @@ def get_revenue_summary_for_admin(
         )
 
     # Lấy toàn bộ sessions trong 30 ngày qua
-    all_30d_sessions = (
-        sessions_query.filter(ChargingSession.start_time >= start_30d).all()
-    )
+    all_30d_sessions = sessions_query.filter(
+        ChargingSession.start_time >= start_30d
+    ).all()
     valid_sessions = [
-        s
-        for s in all_30d_sessions
-        if s.status in ("COMPLETED", "ACTIVE", "CHARGING")
+        s for s in all_30d_sessions if s.status in ("COMPLETED", "ACTIVE", "CHARGING")
     ]
 
     def is_after(dt_val, threshold):
@@ -740,4 +751,4 @@ def get_revenue_summary_for_admin(
         currency="VND",
         managed_stations=managed_stations,
         scope=scope,
-    )
+    )

@@ -13,7 +13,7 @@ from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user_or_driver_guest
+from app.api.deps import get_current_user, get_current_user_or_driver_guest
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.payment import TopupOrder
@@ -40,6 +40,12 @@ PaymentWebhookRequest = WebhookPayload
 class SandboxSignRequest(BaseModel):
     order_code: str
     status: str = "SUCCESS"
+
+
+class SandboxSimulateRequest(BaseModel):
+    order_code: str
+    status: str = "SUCCESS"
+    message: str | None = None
 
 
 class SandboxSignResponse(BaseModel):
@@ -94,7 +100,6 @@ def verify_signature(payload: WebhookPayload) -> bool:
     secret_key = settings.PAYMENT_WEBHOOK_SECRET
     data = f"{payload.order_code}|{payload.status}"
     return verify_webhook_signature(data, payload.signature, secret_key)
-
 
 
 @router.post("/webhook", summary="Xử lý Webhook từ cổng thanh toán")
@@ -237,6 +242,54 @@ async def payment_webhook(
     return {"status": "IGNORED", "message": "Ignored"}
 
 
+@router.post(
+    "/sandbox/simulate",
+    summary="Mô phỏng thanh toán Sandbox (Ký phía máy chủ và kiểm tra quyền sở hữu đơn hàng)",
+)
+async def simulate_sandbox_payment(
+    payload: SandboxSimulateRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mô phỏng thanh toán Sandbox (SCRUM-269).
+
+    Ký phía máy chủ bằng PAYMENT_WEBHOOK_SECRET và chỉ cho phép chủ đơn hàng
+    ở trạng thái PENDING thực hiện mô phỏng.
+    """
+    if not getattr(settings, "ALLOW_PAYMENT_SANDBOX_SIMULATION", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sandbox simulation is disabled",
+        )
+
+    order = (
+        db.query(TopupOrder)
+        .filter(
+            TopupOrder.order_code == payload.order_code,
+            TopupOrder.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not order or order.status != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found, not owned by user, or not in PENDING status",
+        )
+
+    secret_key = settings.PAYMENT_WEBHOOK_SECRET
+    sig = None
+    if secret_key:
+        raw_data = f"{payload.order_code}|{payload.status}".encode("utf-8")
+        sig = hmac.new(secret_key.encode("utf-8"), raw_data, hashlib.sha256).hexdigest()
+
+    webhook_payload = WebhookPayload(
+        order_code=payload.order_code,
+        status=payload.status,
+        message=payload.message or "Sandbox simulation",
+        signature=sig,
+    )
+    return await payment_webhook(request=request, payload=webhook_payload, db=db)
 
 
 @router.get("/return", summary="Return URL từ cổng thanh toán")
@@ -244,13 +297,15 @@ def payment_return(order_code: str, db: Session = Depends(get_db)):
     # Tuyệt đối không thay đổi trạng thái giao dịch hay số dư ở đây
     # Chỉ đọc DB để lấy trạng thái thực tế
     order = db.query(TopupOrder).filter(TopupOrder.order_code == order_code).first()
-    
+
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-        
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+        )
+
     frontend_url = "http://localhost:5173/wallet/topup/result"
     redirect_url = f"{frontend_url}?order_code={order.order_code}&status={order.status}"
-    
+
     return RedirectResponse(url=redirect_url)
 
 
@@ -269,7 +324,9 @@ class SepayWebhookPayload(BaseModel):
     description: str | None = None
 
 
-@router.post("/sepay-webhook", summary="Webhook nạp tiền tự động từ SePay (API Banking)")
+@router.post(
+    "/sepay-webhook", summary="Webhook nạp tiền tự động từ SePay (API Banking)"
+)
 async def sepay_webhook(
     request: Request,
     payload: SepayWebhookPayload,
@@ -321,7 +378,9 @@ async def sepay_webhook(
             )
 
     # Nếu chỉ là ping kiểm tra webhook hoặc không có nội dung
-    if not payload.content and (not payload.transferAmount or payload.transferAmount <= 0):
+    if not payload.content and (
+        not payload.transferAmount or payload.transferAmount <= 0
+    ):
         return {
             "success": True,
             "message": "SePay webhook ping received successfully",
@@ -398,7 +457,9 @@ async def sepay_webhook(
             order.amount,
             transfer_amount,
         )
-        order.status = "PENDING"  # Giữ ở PENDING để Admin/Chủ trạm đối soát duyệt thủ công
+        order.status = (
+            "PENDING"  # Giữ ở PENDING để Admin/Chủ trạm đối soát duyệt thủ công
+        )
         order.failure_reason = f"Số tiền thực nhận ({transfer_amount:,.0f}đ) ít hơn số tiền đơn ({order.amount:,.0f}đ)"
         db.add(order)
         db.commit()
@@ -546,5 +607,3 @@ def init_sepay_checkout(
         fields=fields,
         order_code=order_code,
     )
-
-
