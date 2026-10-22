@@ -26,6 +26,8 @@ import Reservations from './pages/Reservations';
 import StationReport from './pages/StationReport';
 import ReconciliationReport from './pages/ReconciliationReport';
 import Settlement from './pages/Settlement';
+import DataErasure from './pages/DataErasure';
+import AdminDataErasure from './pages/AdminDataErasure';
 import { getHomeRouteByRole } from './utils/routeUtils';
 
 function AppLayout() {
@@ -154,6 +156,19 @@ function AppLayout() {
             path="/admin"
             element={
               role === 'ADMIN' ? <AdminPanel /> : <Navigate to={homeRoute} replace />
+            }
+          />
+          {/* Quản lý yêu cầu xóa dữ liệu cá nhân theo Nghị định 13/2023/NĐ-CP (SCRUM-418 / SCRUM-389) */}
+          <Route
+            path="/data-erasure"
+            element={
+              role === 'CUSTOMER' ? <DataErasure /> : <Navigate to={homeRoute} replace />
+            }
+          />
+          <Route
+            path="/admin/data-erasure"
+            element={
+              role === 'ADMIN' ? <AdminDataErasure /> : <Navigate to={homeRoute} replace />
             }
           />
           <Route path="*" element={<Navigate to={homeRoute} replace />} />

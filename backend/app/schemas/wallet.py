@@ -131,3 +131,65 @@ class WalletReconciliationUnlockRequest(BaseModel):
         if not cleaned:
             raise ValueError("Lý do mở khóa không được để trống.")
         return cleaned
+
+
+class TopupOrderReviewResponse(BaseModel):
+    """Chi tiết yêu cầu nạp tiền phục vụ Admin và Chủ trạm CPO đối soát duyệt tiền."""
+
+    id: int
+    user_id: int
+    username: str
+    full_name: str | None = None
+    email: str | None = None
+    order_code: str
+    amount: Decimal
+    status: str
+    failure_reason: str | None = None
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TopupOrderRejectRequest(BaseModel):
+    """Lý do từ chối đơn nạp tiền."""
+
+    reason: str = Field(
+        default="Chưa nhận được tiền vào tài khoản hoặc thông tin sai lệch",
+        max_length=255,
+        description="Lý do từ chối yêu cầu nạp tiền",
+    )
+
+
+class RevenueTimeframeStats(BaseModel):
+    """Thống kê doanh thu theo mốc thời gian (Hôm nay, 7 ngày, 30 ngày)."""
+
+    charging_revenue: Decimal
+    topup_revenue: Decimal
+    total_revenue: Decimal
+    session_count: int
+    topup_count: int
+
+
+class RevenueDayData(BaseModel):
+    """Dữ liệu doanh thu từng ngày phục vụ biểu đồ."""
+
+    date: str
+    label: str
+    charging_revenue: Decimal
+    topup_revenue: Decimal
+    total_revenue: Decimal
+
+
+class RevenueSummaryResponse(BaseModel):
+    """Tổng quan doanh thu hằng ngày, 7 ngày và 30 ngày cho Admin, Chủ trạm và Kế toán."""
+
+    today: RevenueTimeframeStats
+    last_7_days: RevenueTimeframeStats
+    last_30_days: RevenueTimeframeStats
+    chart_7d: list[RevenueDayData] = Field(default_factory=list)
+    chart_30d: list[RevenueDayData] = Field(default_factory=list)
+    currency: str = "VND"
+    managed_stations: list[str] = Field(default_factory=list)
+    scope: str = "ALL"
+

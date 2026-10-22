@@ -34,6 +34,7 @@ class Station(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     operator_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    accountant_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     name = Column(String(255), nullable=False, index=True)
     address = Column(String(500), nullable=False)
     latitude = Column(Float, nullable=True)
@@ -62,6 +63,7 @@ class Station(Base):
 
     # Relationships
     operator = relationship("User", foreign_keys=[operator_id], lazy="joined")
+    accountant = relationship("User", foreign_keys=[accountant_id], lazy="joined")
     # charging_points được khai báo tự động bằng backref ở ChargingPoint.station
     # (để tránh SQLAlchemy 2.x không resolve được khi có 2 class cùng map
     # bảng "charging_points": ChargingPoint + ChargePoint trong charge_point.py)

@@ -497,7 +497,7 @@ export default function DriverStationsList() {
                 </div>
 
                 {/* Các nút hành động (Responsive 360px) */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
                   {/* Nút chỉ đường Google Maps */}
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${st.latitude},${st.longitude}`}
@@ -520,13 +520,25 @@ export default function DriverStationsList() {
                     Xem bản đồ
                   </Button>
 
+                  {/* Nút đặt chỗ trước đầu sạc */}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Clock}
+                    onClick={() => navigate(`/reservations?book=true&station_id=${st.id}`)}
+                    disabled={!hasAvailable}
+                    className="py-2 text-xs font-bold"
+                  >
+                    Đặt chỗ
+                  </Button>
+
                   {/* Nút sạc tại trạm này */}
                   <Button
                     variant="primary"
                     size="sm"
                     icon={BatteryCharging}
                     onClick={() => handleChargeAtStation(st)}
-                    className="col-span-2 sm:col-span-1 py-2 text-xs font-bold"
+                    className="py-2 text-xs font-bold"
                   >
                     Sạc tại trạm
                   </Button>
