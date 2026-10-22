@@ -414,9 +414,15 @@ describe('Heartbeat', () => {
     const ws1 = getLastWs();
     ws1.simulateOpen();
     vi.advanceTimersByTime(25000);
-    vi.advanceTimersByTime(11000);
+    vi.advanceTimersByTime(10000);
+    expect(ws1.readyState).toBe(globalThis.WebSocket.CLOSED);
     expect(telemetryWs._ws).toBeNull();
     expect(telemetryWs.status).not.toBe(WS_STATUS.CONNECTED);
+
+    // Tu dong reconnect sau timeout
+    vi.advanceTimersByTime(2000);
+    expect(telemetryWs._ws).not.toBeNull();
+    expect(getLastWs()).not.toBe(ws1);
   });
 
   it('WS khong OPEN khong gui ping', () => {

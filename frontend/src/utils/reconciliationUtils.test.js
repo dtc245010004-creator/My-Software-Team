@@ -20,7 +20,7 @@ describe('SCRUM-385 / SCRUM-397: reconciliationUtils unit tests', () => {
       const result = detectSessionAnomaly(session);
       expect(result.isAnomaly).toBe(true);
       expect(result.type).toBe(RECONCILIATION_ANOMALY_TYPES.MISSING_INVOICE);
-      expect(result.typeLabel).toContain('(1) CÓ kWh CHƯA LẬP HÓA ĐƠN');
+      expect(result.typeLabel).toContain('(1) Có kWh chưa lập hóa đơn');
       expect(result.expectedAmount).toBe(154000); // 40 * 3850
       expect(result.varianceAmount).toBe(-154000);
     });
@@ -37,7 +37,7 @@ describe('SCRUM-385 / SCRUM-397: reconciliationUtils unit tests', () => {
       const result = detectSessionAnomaly(session);
       expect(result.isAnomaly).toBe(true);
       expect(result.type).toBe(RECONCILIATION_ANOMALY_TYPES.MISSING_LEDGER);
-      expect(result.typeLabel).toContain('(2) CÓ HÓA ĐƠN THIẾU SỔ CÁI VÍ');
+      expect(result.typeLabel).toContain('(2) Có hóa đơn thiếu sổ cái ví');
       expect(result.varianceAmount).toBe(-115500);
     });
 
@@ -54,7 +54,7 @@ describe('SCRUM-385 / SCRUM-397: reconciliationUtils unit tests', () => {
       const result = detectSessionAnomaly(session);
       expect(result.isAnomaly).toBe(true);
       expect(result.type).toBe(RECONCILIATION_ANOMALY_TYPES.PRICE_MISMATCH);
-      expect(result.typeLabel).toContain('(3) LỆCH TIỀN SO VỚI BIỂU GIÁ');
+      expect(result.typeLabel).toContain('(3) Lệch tiền so với biểu giá');
       expect(result.varianceAmount).toBe(23000);
     });
 
