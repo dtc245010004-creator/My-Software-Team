@@ -33,6 +33,7 @@ export function getReservationStatusMeta(status) {
     case 'ACTIVE':
     case 'HOLDING':
     case 'PENDING':
+    case 'CONFIRMED':
       return {
         key: 'ACTIVE',
         label: 'Đang giữ chỗ',
@@ -52,6 +53,7 @@ export function getReservationStatusMeta(status) {
         description: 'Tài xế đã đến cắm súng đúng giờ và bắt đầu phiên sạc. Miễn phí giữ chỗ.',
       };
     case 'CANCELLED':
+    case 'CANCELED':
       return {
         key: 'CANCELLED',
         label: 'Đã hủy',

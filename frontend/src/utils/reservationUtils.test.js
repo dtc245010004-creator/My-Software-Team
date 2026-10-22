@@ -14,7 +14,7 @@ describe('SCRUM-378: reservationUtils unit tests', () => {
     it('nhận diện đúng trạng thái EXPIRED với badge và mô tả cảnh báo quá hạn', () => {
       const meta = getReservationStatusMeta('EXPIRED');
       expect(meta.key).toBe('EXPIRED');
-      expect(meta.label).toBe('QUÁ HẠN');
+      expect(meta.label).toBe('Quá hạn');
       expect(meta.isOverdue).toBe(true);
       expect(meta.badgeClass).toContain('text-critical-red');
       expect(meta.description).toContain('Quá giờ giữ chỗ không tới');
@@ -33,18 +33,31 @@ describe('SCRUM-378: reservationUtils unit tests', () => {
     it('nhận diện đúng trạng thái ACTIVE đang giữ chỗ', () => {
       const meta = getReservationStatusMeta('ACTIVE');
       expect(meta.key).toBe('ACTIVE');
-      expect(meta.label).toBe('ĐANG GIỮ CHỖ');
+      expect(meta.label).toBe('Đang giữ chỗ');
       expect(meta.isOverdue).toBe(false);
+    });
+
+    it('tương thích với các biến thể ACTIVE như HOLDING, PENDING, CONFIRMED', () => {
+      ['HOLDING', 'PENDING', 'CONFIRMED'].forEach((st) => {
+        const meta = getReservationStatusMeta(st);
+        expect(meta.key).toBe('ACTIVE');
+        expect(meta.label).toBe('Đang giữ chỗ');
+        expect(meta.isOverdue).toBe(false);
+      });
     });
 
     it('nhận diện đúng trạng thái COMPLETED và CANCELLED', () => {
       const metaComp = getReservationStatusMeta('COMPLETED');
       expect(metaComp.key).toBe('COMPLETED');
-      expect(metaComp.label).toBe('HOÀN THÀNH');
+      expect(metaComp.label).toBe('Hoàn thành');
 
       const metaCanc = getReservationStatusMeta('CANCELLED');
       expect(metaCanc.key).toBe('CANCELLED');
-      expect(metaCanc.label).toBe('ĐÃ HỦY');
+      expect(metaCanc.label).toBe('Đã hủy');
+
+      const metaCanc2 = getReservationStatusMeta('CANCELED');
+      expect(metaCanc2.key).toBe('CANCELLED');
+      expect(metaCanc2.label).toBe('Đã hủy');
     });
   });
 
